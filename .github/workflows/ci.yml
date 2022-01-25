@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.7", "3.8", "3.9"]
+        conda-solver-logic: ["libmamba", "libmamba2"]
+        include:
+          - test-type: "integration"
+            test-splits: "3"
+            test-group: "1"
+          - test-type: "integration"
+            test-splits: "3"
+            test-group: "2"
+          - test-type: "integration"
+            test-splits: "3"
+            test-group: "3"
+          - test-type: "experimental-resolver"
+
+    env:
+      OS: "linux"
+      PYTHON: ${{ matrix.python-version }}
+      TEST_SPLITS: ${{ matrix.test-splits }}
+      TEST_GROUP: ${{ matrix.test-group }}
+      CONDA_SOLVER_LOGIC: ${{ matrix.conda-solver-logic }}
+    steps:
+      - name: Checkout our source
+        uses: actions/checkout@v2
+        with:
+          path: conda-libmamba-solver
+          fetch-depth: 0
+
+      - name: Checkout conda-forge feedstock
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          repository: conda/conda
+          ref: poc-libsolv
+          path: conda
+
+      - name: Merge repositories
+        run: mv conda-libmamba-solver conda/
+
+      - name: Python ${{ matrix.python-version }} ${{ matrix.test_type }} tests, group ${{ matrix.test-group }}
+        working-directory: conda
+        run: >
+          docker run
+          --rm -v ${PWD}:/opt/conda-src
+          -e TEST_SPLITS
+          -e TEST_GROUP
+          -e CONDA_SOLVER_LOGIC
+          ghcr.io/conda/conda-ci:poc-libsolv-linux-python${{ matrix.python-version }}-mamba
+          bash -c "/opt/conda/bin/python -m pip install /opt/conda-src/conda-libmamba-solver --no-deps -vvv &&
+                   source /opt/conda-src/dev/linux/${{ matrix.test-type }}.sh"
