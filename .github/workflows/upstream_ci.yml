@@ -55,7 +55,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-migration
           path: conda
 
       - name: Merge repositories
