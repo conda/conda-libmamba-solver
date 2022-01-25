@@ -1,4 +1,4 @@
-name: CI
+name: Upstream
 
 on:
   push:
@@ -12,16 +12,36 @@ on:
 
 jobs:
   linux:
-    name: Python ${{ matrix.python-version }}
+    name: Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test_type }}, group ${{ matrix.test-group }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
+        conda-solver-logic: ["libmamba2"]
+        test-group: ["1", "2", "3"]
+        test-splits: ["3"]
+        test-type: ["integration"]
+        include:
+          - python-version: "3.7"
+            test-type: "experimental-resolver"
+            test-group: "1"
+            conda-solver-logic: "libmamba2"
+          - python-version: "3.8"
+            test-type: "experimental-resolver"
+            test-group: "1"
+            conda-solver-logic: "libmamba2"
+          - python-version: "3.9"
+            test-type: "experimental-resolver"
+            test-group: "1"
+            conda-solver-logic: "libmamba2"
 
     env:
       OS: "linux"
       PYTHON: ${{ matrix.python-version }}
+      TEST_SPLITS: ${{ matrix.test-splits }}
+      TEST_GROUP: ${{ matrix.test-group }}
+      CONDA_SOLVER_LOGIC: ${{ matrix.conda-solver-logic }}
 
     steps:
       - name: Checkout our source
@@ -41,7 +61,7 @@ jobs:
       - name: Merge repositories
         run: mv conda-libmamba-solver conda/
 
-      - name: Python ${{ matrix.python-version }}
+      - name: Python ${{ matrix.python-version }} ${{ matrix.test_type }} tests, group ${{ matrix.test-group }}
         working-directory: conda
         run: >
           docker run
@@ -51,5 +71,4 @@ jobs:
           -e CONDA_SOLVER_LOGIC
           ghcr.io/conda/conda-ci:poc-libsolv-linux-python${{ matrix.python-version }}-mamba
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-src/conda-libmamba-solver --no-deps -vvv &&
-                   source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-src/conda-libmamba-solver/ -v"
+                   source /opt/conda-src/dev/linux/${{ matrix.test-type }}.sh"
