@@ -18,19 +18,16 @@ jobs:
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
         conda-solver-logic: ["libmamba", "libmamba2"]
-        test-group: ["1"]
-        test-splits: ["1"]
+        test-group: ["1", "2", "3"]
+        test-splits: ["3"]
+        test-type: ["integration"]
         include:
-          - test-type: "experimental-resolver"
-          - test-type: "integration"
-            test-splits: "3"
-            test-group: "1"
-          - test-type: "integration"
-            test-splits: "3"
-            test-group: "2"
-          - test-type: "integration"
-            test-splits: "3"
-            test-group: "3"
+          - python-version: "3.7"
+            test-type: "experimental-resolver"
+          - python-version: "3.8"
+            test-type: "experimental-resolver"
+          - python-version: "3.9"
+            test-type: "experimental-resolver"
 
     env:
       OS: "linux"
