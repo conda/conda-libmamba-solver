@@ -13,11 +13,12 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from conda.base.context import context, fresh_context
-from conda.core.solve.classic import Solver
-from conda.core.solve.libmamba2 import LibMambaIndexHelper
-from conda.core.solve.state import SolverInputState, SolverOutputState
+from conda.core.solve import Solver
 from conda.models.match_spec import MatchSpec
 from conda.testing.solver_helpers import SimpleEnvironment, index_packages
+
+from conda_libmamba_solver.libmamba2 import LibMambaIndexHelper
+from conda_libmamba_solver.state import SolverInputState, SolverOutputState
 
 
 def empty_prefix():
