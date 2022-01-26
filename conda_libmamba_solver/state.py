@@ -68,7 +68,7 @@ from os import PathLike
 import logging
 import sys
 
-from conda. import CondaError
+from conda import CondaError
 from conda._vendor.boltons.setutils import IndexedSet
 from conda.auxlib import NULL
 from conda.auxlib.ish import dals
