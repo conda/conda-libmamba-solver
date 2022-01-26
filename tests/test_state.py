@@ -17,9 +17,7 @@ from conda.core.solve.classic import Solver
 from conda.core.solve.libmamba2 import LibMambaIndexHelper
 from conda.core.solve.state import SolverInputState, SolverOutputState
 from conda.models.match_spec import MatchSpec
-
-# TODO: Fix how we deal with testing dependencies across projects!
-from ..test_solvers import SimpleEnvironment, index_packages
+from conda.testing.solver_helpers import SimpleEnvironment, index_packages
 
 
 def empty_prefix():
