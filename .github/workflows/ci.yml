@@ -147,9 +147,9 @@ jobs:
         shell: cmd
         working-directory: conda
         run: |
-          .\dev\windows\setup.bat
+          call .\dev\windows\setup.bat
           if errorlevel 1 exit 1
-          .\dev-init.bat
+          call .\dev-init.bat
           if errorlevel 1 exit 1
           python -m pip install --no-deps -vv ..\conda-libmamba-solver
           if errorlevel 1 exit 1
@@ -158,7 +158,7 @@ jobs:
         shell: cmd
         working-directory: conda
         run: |
-          .\dev-init.bat
+          call .\dev-init.bat
           if errorlevel 1 exit 1
           conda info
           if errorlevel 1 exit 1
