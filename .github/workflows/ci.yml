@@ -159,10 +159,10 @@ jobs:
         working-directory: conda
         run: |
           call .\dev-init.bat
-          if errorlevel 1 exit 1
-          conda info
-          if errorlevel 1 exit 1
+          :: if errorlevel 1 exit 1
+          conda info -a
+          :: if errorlevel 1 exit 1
           mamba --version
-          if errorlevel 1 exit 1
-          python -m pytest ..\conda-libmamba-solver -vv
-          if errorlevel 1 exit 1
+          :: if errorlevel 1 exit 1
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv
+          :: if errorlevel 1 exit 1
