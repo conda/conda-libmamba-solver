@@ -148,11 +148,11 @@ jobs:
         working-directory: conda
         run: |
           CALL .\dev\windows\setup.bat
-          if errorlevel 1 exit 1
-          CALL dev-init.bat
-          if errorlevel 1 exit 1
-          python -m pip install --no-deps -vv ..\conda-libmamba-solver
-          if errorlevel 1 exit 1
+          REM if errorlevel 1 exit 1
+          REM CALL dev-init.bat
+          REM if errorlevel 1 exit 1
+          REM python -m pip install --no-deps -vv ..\conda-libmamba-solver
+          REM if errorlevel 1 exit 1
 
       - name: Python ${{ matrix.python-version }}
         shell: cmd
