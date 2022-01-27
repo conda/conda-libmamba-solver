@@ -56,7 +56,7 @@ jobs:
 
   macos:
     name: MacOS, Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
@@ -111,7 +111,7 @@ jobs:
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
