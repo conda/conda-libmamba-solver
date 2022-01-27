@@ -1,8 +1,8 @@
 # conda-libmamba-solver
 
-<!-- TODO: Needs to be updated for the new namespaces -->
+The fast mamba solver, now in conda!
 
-## Trying solvers
+## Trying it out
 
 The new libmamba integrations are experimental, but you can get a taste of how they are working
 so far by following these instructions.
@@ -32,7 +32,13 @@ which means that:
 docker compose run interactive
 ```
 
-4. Now you can experiment different things. `--dry-run` is specially useful to check how different
+4. Pip install this repository, with no deps:
+
+```
+python -m pip install --no-deps https://github.com/conda-incubator/conda-libmamba-solver/archive/main.tar.gz
+```
+
+5. Now you can experiment different things. `--dry-run` is specially useful to check how different
 solvers interact. The main switch you need to take care of is the _solver logic_ option:
 
 ```bash
@@ -42,14 +48,14 @@ $ conda create -n demo scipy --dry-run
 $ CONDA_SOLVER_LOGIC=classic conda create -n demo scipy --dry-run
 # Using original libmamba integrations
 $ CONDA_SOLVER_LOGIC=libmamba conda create -n demo scipy --dry-run
-# Using refactored libmamba
+# Using refactored libmamba integrations
 $ CONDA_SOLVER_LOGIC=libmamba2 conda create -n demo scipy --dry-run
 ```
 
 > `mamba` is also available in case you want to compare our integrations with the original Mamba
 > project: `mamba create -n demo scipy --dry-run`
 
-5. Use `time` to measure how different solvers perform. Take into account that repodata
+6. Use `time` to measure how different solvers perform. Take into account that repodata
    retrieval is cached across attempts, so only consider timings after warming that up:
 
 ```bash
@@ -65,7 +71,7 @@ $ time env CONDA_SOLVER_LOGIC=libmamba2 conda create -n demo scipy --dry-run
 > things change once you factor in existing environments. Simple commands like `conda install scipy`
 > show ~2x speedups already.
 
-6. If you need extra details on _why_ solvers are working in that way, increase verbosity. Output
+7. If you need extra details on _why_ solvers are working in that way, increase verbosity. Output
 might get too long for your terminal buffer, so consider using a pager like `less`:
 
 ```bash
