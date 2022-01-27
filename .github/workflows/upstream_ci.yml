@@ -12,7 +12,7 @@ on:
 
 jobs:
   linux:
-    name: Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -148,7 +148,7 @@ jobs:
 
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: bash -l {0}
-        working-directory: conda-libmamba-solver
+        working-directory: conda
         run: |
           ./dev/macos/${{ matrix.test-type }}.sh
 
