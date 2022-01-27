@@ -107,7 +107,7 @@ jobs:
           eval "$(sudo $CONDA/envs/conda-test-env/bin/python -m conda init bash --dev)"
           conda info
           mamba --version
-          python -m pytest ..\conda-libmamba-solver -vv
+          python -m pytest ../conda-libmamba-solver -vv
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}
