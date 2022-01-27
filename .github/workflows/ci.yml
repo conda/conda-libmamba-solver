@@ -12,7 +12,7 @@ on:
 
 jobs:
   linux:
-    name: Python ${{ matrix.python-version }}
+    name: Linux, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -55,7 +55,7 @@ jobs:
                    /opt/conda/bin/python -m pytest /opt/conda-src/conda-libmamba-solver/ -vv"
 
   macos:
-    name: Python ${{ matrix.python-version }}
+    name: MacOS, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -97,7 +97,7 @@ jobs:
           # make sure the caching works correctly
           conda config --set use_only_tar_bz2 true
           # install all test requirements
-          conda install --name conda-test-env --yes --file tests/requirements.txt
+          conda install --yes --file tests/requirements.txt
           conda update openssl ca-certificates certifi
 
       - name: Python ${{ matrix.python-version }}
@@ -105,13 +105,13 @@ jobs:
         working-directory: conda
         run: |
           set -euxo pipefail
-          eval "$(sudo python -m conda init bash --dev)"
+          eval "$(sudo $CONDA/bin/python -m conda init bash --dev)"
           conda info
           mamba --version
           python -m pytest ..\conda-libmamba-solver -vv
 
   windows:
-    name: Python ${{ matrix.python-version }}
+    name: Windows, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
