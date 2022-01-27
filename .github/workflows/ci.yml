@@ -147,9 +147,6 @@ jobs:
         shell: cmd
         working-directory: conda
         run: |
-          :: A juntion will be created fot GITHUB_WORKSPACE, but we have cloned to a
-          :: subdirectory there, so we temporarily redefine it here to make the junction work
-          set "GITHUB_WORKSPACE=%cd%"
           call .\dev\windows\setup.bat
           if errorlevel 1 exit 1
           call .\dev-init.bat
