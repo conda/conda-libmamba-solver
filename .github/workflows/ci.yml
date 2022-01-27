@@ -83,8 +83,8 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         with:
+          activate-environment: conda-test-env
           miniconda-version: "latest"
-          python-version: ${{ matrix.python-version }}
           use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
 
       - name: Setup environment
@@ -96,7 +96,7 @@ jobs:
           # make sure the caching works correctly
           conda config --set use_only_tar_bz2 true
           # install all test requirements
-          conda install --yes --file tests/requirements.txt
+          conda install --yes --file tests/requirements.txt python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
 
       - name: Python ${{ matrix.python-version }}
@@ -104,7 +104,7 @@ jobs:
         working-directory: conda
         run: |
           set -euxo pipefail
-          eval "$(sudo $CONDA/bin/python -m conda init bash --dev)"
+          eval "$(sudo $CONDA/envs/conda-test-env/bin/python -m conda init bash --dev)"
           conda info
           mamba --version
           python -m pytest ..\conda-libmamba-solver -vv
