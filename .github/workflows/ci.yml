@@ -109,10 +109,10 @@ jobs:
 
       - name: Python ${{ matrix.python-version }}
         shell: bash -l {0}
-        working-directory: conda-libmamba-solver
+        working-directory: conda
         run: |
           eval "$(sudo $CONDA/envs/conda-test-env/bin/python -m conda init bash --dev)"
-          python -m pytest -vv
+          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}
