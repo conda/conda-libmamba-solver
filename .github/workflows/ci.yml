@@ -159,6 +159,7 @@ jobs:
 
       - name: Python ${{ matrix.python-version }}
         shell: cmd
+        working-directory: conda
         run: |
           CALL dev-init.bat
           if errorlevel 1 exit 1
