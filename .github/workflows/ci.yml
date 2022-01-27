@@ -153,16 +153,18 @@ jobs:
           if errorlevel 1 exit 1
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
-          conda info -a
-          if errorlevel 1 exit 1
           mamba --version
+          conda info -a
           if errorlevel 1 exit 1
 
       - name: Python ${{ matrix.python-version }}
         shell: cmd
-        working-directory: conda
         run: |
-          call .\dev-init.bat
+          pushd %TEMP%
+          if errorlevel 1 exit 1
+          cd \conda_src
+          if errorlevel 1 exit 1
+          CALL dev-init.bat
           if errorlevel 1 exit 1
           python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv
           if errorlevel 1 exit 1
