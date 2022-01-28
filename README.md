@@ -2,7 +2,7 @@
 
 The fast mamba solver, now in conda!
 
-## Trying it out
+## Trying it out (Docker image)
 
 The new libmamba integrations are experimental, but you can get a taste of how they are working
 so far by following these instructions.
@@ -38,8 +38,9 @@ docker compose run interactive
 python -m pip install --no-deps https://github.com/conda-incubator/conda-libmamba-solver/archive/main.tar.gz
 ```
 
-5. Now you can experiment different things. `--dry-run` is specially useful to check how different
-solvers interact. The main switch you need to take care of is the _solver logic_ option:
+5. Now you can experiment with different things. `--dry-run` is specially useful to check how
+different solvers interact. The main switch you need to take care of is the _solver logic_
+option:
 
 ```bash
 # Using default (classic) solver
