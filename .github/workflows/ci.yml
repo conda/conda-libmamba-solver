@@ -38,21 +38,19 @@ jobs:
           ref: libmamba-integration-helpers
           path: conda
 
-      - name: Merge repositories
-        run: mv conda-libmamba-solver conda/
-
       - name: Python ${{ matrix.python-version }}
-        working-directory: conda
         run: >
           docker run
-          --rm -v ${PWD}:/opt/conda-src
+          --rm
+          -v ${GITHUB_WORKSPACE}/conda:/opt/conda-src
+          -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_SOLVER_LOGIC
           ghcr.io/conda/conda-ci:poc-libsolv-linux-python${{ matrix.python-version }}-mamba
-          bash -c "/opt/conda/bin/python -m pip install /opt/conda-src/conda-libmamba-solver --no-deps -vvv &&
+          bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-src/conda-libmamba-solver/ -vv"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv"
 
   macos:
     name: MacOS, Python ${{ matrix.python-version }}
