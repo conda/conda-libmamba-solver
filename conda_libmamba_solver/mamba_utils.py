@@ -9,6 +9,10 @@ import os
 import tempfile
 import urllib.parse
 from collections import OrderedDict
+try:
+    from importlib.metadata import version
+except ImportError:
+    from importlib_metadata import version
 
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
@@ -21,6 +25,10 @@ from conda.models.channel import Channel as CondaChannel
 from conda.models.records import PackageRecord
 
 import libmambapy as api
+
+
+def mamba_version():
+    return version("libmambapy")
 
 
 def get_index(

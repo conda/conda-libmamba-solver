@@ -1,3 +1,11 @@
+"""
+This was the first implementation that integrated mamba into conda
+
+It should be considered frozen and we won't modify it at all. It only
+serves the purpose of providing a checkpoint in terms of test compliance.
+
+It will be eventually removed!
+"""
 from itertools import chain
 from collections import defaultdict, OrderedDict
 from logging import getLogger
@@ -32,7 +40,7 @@ from conda.core.solve import Solver, get_pinned_specs
 log = getLogger(__name__)
 
 
-class LibMambaSolver(Solver):
+class LibMambaSolverDraft(Solver):
     """
     This alternative Solver logic wraps ``libmamba`` through their Python bindings.
 
@@ -233,7 +241,7 @@ class LibMambaSolver(Solver):
 
     def _setup_state(self):
         import libmambapy as api
-        from .libmamba_utils import load_channels, get_installed_jsonfile, init_api_context
+        from .mamba_utils import load_channels, get_installed_jsonfile, init_api_context
 
         init_api_context()
 
@@ -882,7 +890,7 @@ class LibMambaSolver(Solver):
 
     def _export_final_state(self, state):
         import libmambapy as api
-        from .libmamba_utils import to_package_record_from_subjson
+        from .mamba_utils import to_package_record_from_subjson
 
         solver = state["solver"]
         index = state["index"]

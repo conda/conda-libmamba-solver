@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from conda.testing.solver_helpers import SolverTests
 
-from conda_libmamba_solver import LibMambaSolver, LibMambaSolver2
+from conda_libmamba_solver import LibMambaSolver, LibMambaSolverDraft
 
 
 
@@ -37,7 +37,7 @@ class TestLibMambaSolver(SolverTests):
         }
 
 
-class TestLibMambaSolver2(TestLibMambaSolver):
+class TestLibMambaSolverDraft(TestLibMambaSolver):
     @property
     def solver_class(self):
-        return LibMambaSolver2
+        return LibMambaSolverDraft

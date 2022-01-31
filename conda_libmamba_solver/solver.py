@@ -1,3 +1,8 @@
+"""
+This module defines the conda.core.solve.Solver interface and its immediate helpers
+
+We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
+"""
 import os
 from itertools import chain
 from collections import defaultdict, OrderedDict
@@ -28,8 +33,10 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 from conda.core.solve import Solver
+import libmambapy as api
 
 from .state import SolverInputState, SolverOutputState, IndexHelper
+from .mamba_utils import load_channels, to_package_record_from_subjson, init_api_context, mamba_version
 
 log = logging.getLogger(__name__)
 
@@ -41,8 +48,6 @@ class LibMambaIndexHelper(IndexHelper):
         channels: Iterable[Union[Channel, str]] = None,
         subdirs: Iterable[str] = None,
     ):
-        import libmambapy as api
-        from .libmamba_utils import load_channels
 
         self._pool = api.Pool()
 
@@ -124,7 +129,7 @@ class LibMambaIndexHelper(IndexHelper):
         return tuple(explicit_pool)
 
 
-class LibMambaSolver2(Solver):
+class LibMambaSolver(Solver):
     """
     Cleaner implementation using the ``state`` module helpers.
     """
@@ -197,8 +202,6 @@ class LibMambaSolver2(Solver):
             return none_or_final_state
 
         # From now on we _do_ require a solver and the index
-        from .libmamba_utils import init_api_context
-
         with CapturedDescriptor(stream=sys.stderr, threaded=True) as captured:
             api_ctx = init_api_context(verbosity=3)
             index = LibMambaIndexHelper(
@@ -297,19 +300,15 @@ class LibMambaSolver2(Solver):
                 )
             )
 
-        import mamba
-
         log.info("Using experimental libmamba2 integrations")
         log.info("Conda version: %s", _conda_version)
-        log.info("Mamba version: %s", mamba.__version__)
+        log.info("Mamba version: %s", mamba_version())
         log.info("Target prefix: %s", self.prefix)
         log.info("Command: %s", sys.argv)
         log.info("Specs to add: %s", self.specs_to_add)
         log.info("Specs to remove: %s", self.specs_to_remove)
 
     def _setup_solver(self, index: LibMambaIndexHelper):
-        import libmambapy as api
-
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
             (api.SOLVER_FLAG_ALLOW_UNINSTALL, 1),
@@ -393,8 +392,6 @@ class LibMambaSolver2(Solver):
         return self._specs_to_tasks_add(in_state, out_state)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
-        import libmambapy as api
-
         # These packages receive special protection, since they will be
         # exempt from conflict treatment (ALLOWUNINSTALL) and if installed
         # their updates will be considered ESSENTIAL and USERINSTALLED
@@ -459,7 +456,7 @@ class LibMambaSolver2(Solver):
                 if all(conditions):
                     if self._command == "last_solve_attempt":
                         key = (
-                            "UPDATE | ESSENTIAL | FORCEBEST",
+                            "UPDATE | ESSENTIAL | FORCEBEST",
                             api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL | api.SOLVER_FORCEBEST,
                         )
                     else:
@@ -472,7 +469,6 @@ class LibMambaSolver2(Solver):
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
-        import libmambapy as api
 
         tasks = defaultdict(list)
 
@@ -568,9 +564,6 @@ class LibMambaSolver2(Solver):
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
-
-        import libmambapy as api
-        from .libmamba_utils import to_package_record_from_subjson
 
         with CapturedDescriptor(stream=sys.stderr, threaded=True) as captured:
             transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))

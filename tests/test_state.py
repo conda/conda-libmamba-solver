@@ -17,7 +17,7 @@ from conda.core.solve import Solver
 from conda.models.match_spec import MatchSpec
 from conda.testing.solver_helpers import SimpleEnvironment, index_packages
 
-from conda_libmamba_solver.libmamba2 import LibMambaIndexHelper
+from conda_libmamba_solver.solver import LibMambaIndexHelper
 from conda_libmamba_solver.state import SolverInputState, SolverOutputState
 
 
