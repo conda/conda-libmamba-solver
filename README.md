@@ -47,10 +47,10 @@ option:
 $ conda create -n demo scipy --dry-run
 # This is equivalent
 $ CONDA_SOLVER_LOGIC=classic conda create -n demo scipy --dry-run
-# Using original libmamba integrations
+# Using libmamba integrations
 $ CONDA_SOLVER_LOGIC=libmamba conda create -n demo scipy --dry-run
-# Using refactored libmamba integrations
-$ CONDA_SOLVER_LOGIC=libmamba2 conda create -n demo scipy --dry-run
+# Using old proof-of-concept, debugging-only libmamba integrations
+$ CONDA_SOLVER_LOGIC=libmamba-draft conda create -n demo scipy --dry-run
 ```
 
 > `mamba` is also available in case you want to compare our integrations with the original Mamba
@@ -65,7 +65,7 @@ $ conda create -n demo scipy --dry-run
 # Timings for original solver
 $ time env CONDA_SOLVER_LOGIC=classic conda create -n demo scipy --dry-run
 # Timings for libmamba integration
-$ time env CONDA_SOLVER_LOGIC=libmamba2 conda create -n demo scipy --dry-run
+$ time env CONDA_SOLVER_LOGIC=libmamba conda create -n demo scipy --dry-run
 ```
 
 > `conda create` commands will have similar performance because it's a very simple action! However,
