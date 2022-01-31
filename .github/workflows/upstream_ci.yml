@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
-        conda-solver-logic: ["libmamba2"]
+        conda-solver-logic: ["libmamba"]
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
@@ -26,15 +26,15 @@ jobs:
           - python-version: "3.7"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
           - python-version: "3.8"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
           - python-version: "3.9"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
 
     env:
       OS: "linux"
@@ -80,7 +80,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
-        conda-solver-logic: ["libmamba2"]
+        conda-solver-logic: ["libmamba"]
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
@@ -88,15 +88,15 @@ jobs:
           - python-version: "3.7"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
           - python-version: "3.8"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
           - python-version: "3.9"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
 
     env:
       OS: "macos"
@@ -159,7 +159,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
-        conda-solver-logic: ["libmamba2"]
+        conda-solver-logic: ["libmamba"]
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
@@ -167,15 +167,15 @@ jobs:
           - python-version: "3.7"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
           - python-version: "3.8"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
           - python-version: "3.9"
             test-type: "experimental-resolver"
             test-group: "1"
-            conda-solver-logic: "libmamba2"
+            conda-solver-logic: "libmamba"
 
     env:
       OS: "windows"
