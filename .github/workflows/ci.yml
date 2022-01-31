@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-integration-helpers
           path: conda
 
       - name: Merge repositories
@@ -49,7 +49,7 @@ jobs:
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_SOLVER_LOGIC
-          ghcr.io/conda/conda-ci:poc-libsolv-linux-python${{ matrix.python-version }}-mamba
+          ghcr.io/conda/conda-ci:libmamba-integration-helpers-linux-python${{ matrix.python-version }}-mamba
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-src/conda-libmamba-solver --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-src/conda-libmamba-solver/ -vv"
@@ -78,7 +78,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-integration-helpers
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -138,7 +138,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-integration-helpers
           path: conda
 
       - name: Set temp dirs correctly

@@ -7,12 +7,10 @@ from conda.testing.solver_helpers import SolverTests
 from conda_libmamba_solver import LibMambaSolver, LibMambaSolverDraft
 
 
-
 class TestLibMambaSolver(SolverTests):
     @property
     def solver_class(self):
         return LibMambaSolver
-
 
     @property
     def tests_to_skip(self):

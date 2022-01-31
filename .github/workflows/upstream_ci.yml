@@ -55,7 +55,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-integration-helpers
           path: conda
 
       - name: Merge repositories
@@ -117,7 +117,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-integration-helpers
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -196,7 +196,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba-integration-helpers
           path: conda
 
       - name: Set temp dirs correctly
