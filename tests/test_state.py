@@ -13,10 +13,17 @@ import pytest
 
 from conda.base.context import context, fresh_context
 from conda.models.match_spec import MatchSpec
-from conda.testing.solver_helpers import SimpleEnvironment, index_packages, empty_prefix
+from conda.testing.solver_helpers import (
+    SimpleEnvironment,
+    index_packages,
+    empty_prefix,
+    temp_simple_env,
+)
 
 from conda_libmamba_solver.solver import LibMambaIndexHelper
 from conda_libmamba_solver.state import SolverInputState, SolverOutputState
+
+env = temp_simple_env
 
 
 @pytest.mark.parametrize(
