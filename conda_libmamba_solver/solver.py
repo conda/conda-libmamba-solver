@@ -18,6 +18,7 @@ from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import CapturedDescriptor
 from conda.common.serialize import json_dump, json_load
+from conda.common.path import paths_equal
 from conda.common.url import (
     escape_channel_url,
     split_anaconda_token,
@@ -28,6 +29,7 @@ from conda.exceptions import (
     RawStrUnsatisfiableError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
+    CondaEnvironmentError,
 )
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
@@ -36,7 +38,12 @@ from conda.core.solve import Solver
 import libmambapy as api
 
 from .state import SolverInputState, SolverOutputState, IndexHelper
-from .mamba_utils import load_channels, to_package_record_from_subjson, init_api_context, mamba_version
+from .mamba_utils import (
+    load_channels,
+    to_package_record_from_subjson,
+    init_api_context,
+    mamba_version,
+)
 
 log = logging.getLogger(__name__)
 
@@ -181,6 +188,7 @@ class LibMambaSolver(Solver):
     ):
         # Temporary, only during experimental phase to ease debugging
         self._print_info()
+        self._check_env_is_base()
 
         in_state = SolverInputState(
             prefix=self.prefix,
@@ -287,7 +295,7 @@ class LibMambaSolver(Solver):
             print(
                 dedent(
                     f"""
-                    ----       USING EXPERIMENTAL LIBMAMBA2 INTEGRATIONS       ----
+                    ----       USING EXPERIMENTAL LIBMAMBA INTEGRATIONS       ----
                         This is a highly experimental product. If something is
                         not working as expected, please submit an issue at
                         https://github.com/conda/conda and attach the log file
@@ -300,13 +308,23 @@ class LibMambaSolver(Solver):
                 )
             )
 
-        log.info("Using experimental libmamba2 integrations")
+        log.info("Using experimental libmamba integrations")
         log.info("Conda version: %s", _conda_version)
         log.info("Mamba version: %s", mamba_version())
         log.info("Target prefix: %s", self.prefix)
         log.info("Command: %s", sys.argv)
         log.info("Specs to add: %s", self.specs_to_add)
         log.info("Specs to remove: %s", self.specs_to_remove)
+
+    def _check_env_is_base(self):
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            return
+
+        if paths_equal(self.prefix, context.root_prefix):
+            raise CondaEnvironmentError(
+                f"{self.__class__.__name__} is not allowed on the base environment during "
+                "the experimental release phase. Try using it on a non-base environment!"
+            )
 
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [

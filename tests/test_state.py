@@ -8,27 +8,22 @@ We'll try our best to encode the intricate legacy logic as a testable
 behavioral units that, eventually, will allow us to further split the
 logic into discrete, composable parts.
 """
-from tempfile import TemporaryDirectory
 
 import pytest
 
 from conda.base.context import context, fresh_context
-from conda.core.solve import Solver
 from conda.models.match_spec import MatchSpec
-from conda.testing.solver_helpers import SimpleEnvironment, index_packages
+from conda.testing.solver_helpers import (
+    SimpleEnvironment,
+    index_packages,
+    empty_prefix,
+    temp_simple_env,
+)
 
 from conda_libmamba_solver.solver import LibMambaIndexHelper
 from conda_libmamba_solver.state import SolverInputState, SolverOutputState
 
-
-def empty_prefix():
-    return TemporaryDirectory(prefix="conda-test-repo-")
-
-
-@pytest.fixture()
-def env(solver_class=Solver) -> SimpleEnvironment:
-    with empty_prefix() as prefix:
-        yield SimpleEnvironment(prefix, solver_class)
+env = temp_simple_env
 
 
 @pytest.mark.parametrize(

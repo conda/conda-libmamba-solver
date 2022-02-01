@@ -9,6 +9,7 @@ It will be eventually removed!
 from itertools import chain
 from collections import defaultdict, OrderedDict
 from logging import getLogger
+import os
 
 from conda.core.index import _supplement_index_with_system
 from conda.core.prefix_data import PrefixData
@@ -28,6 +29,7 @@ from conda.exceptions import (
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     RawStrUnsatisfiableError,
+    CondaEnvironmentError,
 )
 from conda.history import History
 from conda.models.channel import Channel
@@ -72,6 +74,12 @@ class LibMambaSolverDraft(Solver):
 
         if not context.json and not context.quiet:
             print("------ USING EXPERIMENTAL LIBMAMBA INTEGRATIONS ------")
+
+        if "PYTEST_CURRENT_TEST" not in os.environ and paths_equal(self.prefix, context.root_prefix):
+            raise CondaEnvironmentError(
+                f"{self.__class__.__name__} is not allowed on the base environment during "
+                "the experimental release phase. Try using it on a non-base environment!"
+            )
 
         # 0. Identify strategies
         kwargs = self._merge_signature_flags_with_context(
