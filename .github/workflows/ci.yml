@@ -35,7 +35,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba-integration-helpers
+          ref: poc-libsolv
           path: conda
 
       - name: Python ${{ matrix.python-version }}
@@ -76,7 +76,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba-integration-helpers
+          ref: poc-libsolv
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -136,7 +136,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba-integration-helpers
+          ref: poc-libsolv
           path: conda
 
       - name: Set temp dirs correctly
