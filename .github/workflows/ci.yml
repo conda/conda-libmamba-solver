@@ -47,7 +47,7 @@ jobs:
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_SOLVER_LOGIC
-          ghcr.io/conda/conda-ci:poc-libsolv-linux-python${{ matrix.python-version }}-mamba
+          ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv"
