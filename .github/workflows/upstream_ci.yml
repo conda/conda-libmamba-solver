@@ -12,36 +12,32 @@ on:
 
 jobs:
   linux:
-    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
-        conda-solver-logic: ["libmamba"]
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
         include:
           - python-version: "3.7"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
           - python-version: "3.8"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
           - python-version: "3.9"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
 
     env:
       OS: "linux"
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER_LOGIC: ${{ matrix.conda-solver-logic }}
+      CONDA_SOLVER_LOGIC: "libmamba"
 
     steps:
       - name: Checkout our source
@@ -58,6 +54,15 @@ jobs:
           ref: libmamba
           path: conda
 
+      - name: Define test type
+        run: |
+          if [[ ${{ matrix.test-type }} == "integration" ]]; then
+            run_test_cmd="source /opt/conda-src/dev/linux/integration.sh"
+          else
+            run_test_cmd="source /opt/conda-libmamba-solver-src/dev/upstream_unit_tests_linux.sh"
+          fi
+          echo "run_test_cmd=${run_test_cmd}" >> $GITHUB_ENV
+
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         working-directory: conda
         run: >
@@ -70,7 +75,7 @@ jobs:
           -e CONDA_SOLVER_LOGIC
           ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
-                   source /opt/conda-src/dev/linux/${{ matrix.test-type }}.sh"
+                   $run_test_cmd"
 
   macos:
     name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
@@ -79,30 +84,26 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
-        conda-solver-logic: ["libmamba"]
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
         include:
           - python-version: "3.7"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
           - python-version: "3.8"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
           - python-version: "3.9"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
 
     env:
       OS: "macos"
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER_LOGIC: ${{ matrix.conda-solver-logic }}
+      CONDA_SOLVER_LOGIC: libmamba
 
     steps:
       - name: Checkout our source
@@ -148,8 +149,14 @@ jobs:
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: bash -l {0}
         working-directory: conda
-        run: |
-          ./dev/macos/${{ matrix.test-type }}.sh
+        if: matrix.test-type = 'integration'
+        run: ./dev/macos/integration.sh
+
+      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests
+        shell: bash -l {0}
+        working-directory: conda
+        if: matrix.test-type = 'unit'
+        run: ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
@@ -158,30 +165,26 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.7", "3.8", "3.9"]
-        conda-solver-logic: ["libmamba"]
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
         include:
           - python-version: "3.7"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
           - python-version: "3.8"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
           - python-version: "3.9"
-            test-type: "experimental-resolver"
+            test-type: "unit"
             test-group: "1"
-            conda-solver-logic: "libmamba"
 
     env:
       OS: "windows"
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER_LOGIC: ${{ matrix.conda-solver-logic }}
+      CONDA_SOLVER_LOGIC: libmamba
 
     steps:
       - name: Checkout our source
@@ -229,5 +232,11 @@ jobs:
       - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: cmd
         working-directory: conda
-        run: |
-          call .\dev\windows\${{ matrix.test-type }}.bat
+        if: matrix.test-type == 'integration'
+        run: call .\dev\windows\${{ matrix.test-type }}.bat
+
+      - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests
+        shell: cmd
+        working-directory: conda
+        if: matrix.test-type == 'unit'
+        run: call ..\conda-libmamba-solver\dev\upstream_unit_tests_win.bat

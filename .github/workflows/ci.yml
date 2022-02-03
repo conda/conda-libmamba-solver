@@ -109,7 +109,7 @@ jobs:
         shell: bash -l {0}
         working-directory: conda
         run: |
-          eval "$(sudo $CONDA/envs/conda-test-env/bin/python -m conda init bash --dev)"
+          eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
           python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv
 
   windows:
