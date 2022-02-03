@@ -149,13 +149,13 @@ jobs:
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: bash -l {0}
         working-directory: conda
-        if: matrix.test-type = 'integration'
+        if: matrix.test-type == 'integration'
         run: ./dev/macos/integration.sh
 
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests
         shell: bash -l {0}
         working-directory: conda
-        if: matrix.test-type = 'unit'
+        if: matrix.test-type == 'unit'
         run: ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
 
   windows:
