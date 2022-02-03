@@ -301,7 +301,7 @@ class LibMambaSolver(Solver):
                         https://github.com/conda/conda and attach the log file
                         found in the following path. Thank you!
 
-                        {context.logfile_path}
+                        {context._logfile_path}
 
                     ---------------------------------------------------------------
                     """
