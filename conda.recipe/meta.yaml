@@ -1,0 +1,42 @@
+package:
+  name: "conda-libmamba-solver"
+  version: {{ GIT_DESCRIBE_TAG }}.{{ GIT_BUILD_STR }}
+
+source:
+  # git_url is nice in that it won't capture devenv stuff.  However, it only
+  # captures committed code, so pay attention.
+  git_url: ../
+
+build:
+  noarch: python
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
+
+requirements:
+  host:
+    - python >=3.6
+    - pip
+    - flit-core >=3.2,<4
+  run:
+    - python >=3.6
+    - libmambapy
+    - conda >=4.11
+
+test:
+  imports:
+    - conda_libmamba_solver
+  commands:
+    - CONDA_SOLVER_LOGIC=libmamba conda create -n test --dry-run scipy
+
+about:
+  home: https://github.com/conda-incubator/conda-libmamba-solver
+  license: BSD-3-Clause
+  license_family: BSD
+  license_file: LICENSE
+  summary: 'The fast mamba solver, now in conda!'
+
+extra:
+  recipe-maintainers:
+    - jaimergp
+    - jezdez
+    - wolfv
