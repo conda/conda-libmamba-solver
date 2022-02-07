@@ -37,3 +37,35 @@ build-backend = "flit_core.buildapi"
 
 [tool.flit.module]
 name = "conda_libmamba_solver"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = [
+  ### Original settings from conda/conda
+  "--ignore=setup.py",
+  "--ignore=conda/__main__.py",
+  "--ignore=conda/_vendor",
+  "--ignore=tests/conda_env/specs/test_binstar.py",
+  "--ignore=tests/conda_env/support",
+  "--ignore=tests/conda_env/utils/test_uploader.py",
+  "--ignore=test_data",
+  "--tb=native",
+  "--strict-markers",
+  "--xdoctest-modules",
+  "--xdoctest-style=google",
+  ### Deselect tests from conda/conda we cannot pass due to different reasons
+  ### These used to be skipped or xfail'd upstream, but we are trying to
+  ### keep it clean from this project's specifics
+  # Conflict report / analysis is done differently with libmamba.
+  "--deselect=tests/cli/test_cli_install.py::TestCliInstall::test_find_conflicts_called_once",
+  # SolverStateContainer needed
+  "--deselect=tests/core/test_solve.py::test_solve_2",
+  "--deselect=tests/core/test_solve.py::test_virtual_package_solver",
+  "--deselect=tests/core/test_solve.py::test_broken_install",
+  # Features / nomkl involved
+  "--deselect=tests/core/test_solve.py::test_features_solve_1",
+  "--deselect=tests/core/test_solve.py::test_prune_1",
+  "--deselect=tests/test_create.py::IntegrationTests::test_remove_features",
+  # Inconsistency analysis not implemented yet
+  "--deselect=tests/test_create.py::IntegrationTests::test_conda_recovery_of_pip_inconsistent_env",
+]

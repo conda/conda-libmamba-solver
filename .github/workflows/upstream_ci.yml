@@ -54,7 +54,7 @@ jobs:
           ref: libmamba
           path: conda
 
-      - name: Define test type
+      - name: Define test type and override pytest settings
         run: |
           if [[ ${{ matrix.test-type }} == "integration" ]]; then
             run_test_cmd="source /opt/conda-src/dev/linux/integration.sh"
@@ -62,6 +62,10 @@ jobs:
             run_test_cmd="source /opt/conda-libmamba-solver-src/dev/upstream_unit_tests_linux.sh"
           fi
           echo "run_test_cmd=${run_test_cmd}" >> $GITHUB_ENV
+
+          # override pytest settings
+          cp conda-libmamba-solver/pyproject.toml conda/pyproject.toml
+          rm conda/setup.cfg
 
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         working-directory: conda
@@ -150,13 +154,23 @@ jobs:
         shell: bash -l {0}
         working-directory: conda
         if: matrix.test-type == 'integration'
-        run: ./dev/macos/integration.sh
+        run: |
+          # override pytest settings
+          cp ../conda-libmamba-solver/pyproject.toml ./pyproject.toml
+          rm ./setup.cfg
+          # run test
+          ./dev/macos/integration.sh
 
       - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests
         shell: bash -l {0}
         working-directory: conda
         if: matrix.test-type == 'unit'
-        run: ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
+        run: |
+          # override pytest settings
+          cp ../conda-libmamba-solver/pyproject.toml ./pyproject.toml
+          rm ./setup.cfg
+          # run test
+          ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
@@ -233,10 +247,20 @@ jobs:
         shell: cmd
         working-directory: conda
         if: matrix.test-type == 'integration'
-        run: call .\dev\windows\${{ matrix.test-type }}.bat
+        run: |
+          :: override pytest settings
+          copy ..\conda-libmamba-solver\pyproject.toml .\pyproject.toml
+          del .\setup.cfg
+          :: run test
+          call .\dev\windows\${{ matrix.test-type }}.bat
 
       - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests
         shell: cmd
         working-directory: conda
         if: matrix.test-type == 'unit'
-        run: call ..\conda-libmamba-solver\dev\upstream_unit_tests_win.bat
+        run: |
+          :: override pytest settings
+          copy ..\conda-libmamba-solver\pyproject.toml .\pyproject.toml
+          del .\setup.cfg
+          :: run test
+          call ..\conda-libmamba-solver\dev\upstream_unit_tests_win.bat
