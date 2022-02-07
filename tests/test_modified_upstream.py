@@ -247,7 +247,7 @@ def test_pinned_1(tmpdir):
 
 
 @pytest.mark.integration
-def test_freeze_deps_1(self, tmpdir):
+def test_freeze_deps_1(tmpdir):
     specs = MatchSpec("six=1.7"),
     with get_solver_2(tmpdir, specs) as solver:
         final_state_1 = solver.solve_final_state()
