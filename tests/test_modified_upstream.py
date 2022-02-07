@@ -25,6 +25,7 @@ from conda.common.io import env_var
 from conda.base.constants import UpdateModifier
 from conda.base.context import context ,conda_tests_ctxt_mgmt_def_pol
 from conda.core.package_cache_data import PackageCacheData
+from conda.core.prefix_data import PrefixData
 from conda.exceptions import UnsatisfiableError, SpecsConfigurationConflictError
 from conda.models.match_spec import MatchSpec
 from conda.testing.cases import BaseTestCase
@@ -62,15 +63,35 @@ class PatchedCondaTestCreate(BaseTestCase):
             stdout, stderr, _ = run_command(Commands.INSTALL, prefix, "python=3.6")
             with open(os.path.join(prefix, 'conda-meta', 'history')) as f:
                 d = f.read()
-            assert re.search(r"neutered specs:.*'psutil==5.6.3'\]", d)
+
+            ### MODIFIED
+            ## libmamba relaxes more aggressively sometimes
+            ## instead of relaxing from pkgname=version=build to pkgname=version, it
+            ## goes to just pkgname; this is because libmamba does not take into account
+            ## matchspec target and optionality (iow, MatchSpec.conda_build_form() does not)
+            ## Original check was stricter:
+            # assert re.search(r"neutered specs:.*'psutil==5.6.3'\]", d)
+            assert re.search(r"neutered specs:.*'psutil'\]", d)
+            ### /MODIFIED
+
             # this would be unsatisfiable if the neutered specs were not being factored in correctly.
             #    If this command runs successfully (does not raise), then all is well.
             stdout, stderr, _ = run_command(Commands.INSTALL, prefix, "imagesize")
 
     def test_pinned_override_with_explicit_spec(self):
         with make_temp_env("python=3.6") as prefix:
+
+            ### MODIFIED
+            ## Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
+            ## Instead we only pin whatever the solver decided to install
+            ## Original lines were:
+            # run_command(Commands.CONFIG, prefix,
+            #             "--add", "pinned_packages", "python=3.6.5")
+            python = next(PrefixData(prefix).query("python"))
             run_command(Commands.CONFIG, prefix,
-                        "--add", "pinned_packages", "python=3.6.5")
+                        "--add", "pinned_packages", f"python={python.version}")
+            ### /MODIFIED
+
             run_command(Commands.INSTALL, prefix, "python=3.7", no_capture=True)
             assert package_is_installed(prefix, "python=3.7")
 
