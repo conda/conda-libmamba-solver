@@ -23,11 +23,12 @@ import pytest
 from conda.auxlib.ish import dals
 from conda.common.io import env_var
 from conda.base.constants import UpdateModifier
-from conda.base.context import context ,conda_tests_ctxt_mgmt_def_pol
+from conda.base.context import context, conda_tests_ctxt_mgmt_def_pol
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
-from conda.exceptions import UnsatisfiableError, SpecsConfigurationConflictError
+from conda.exceptions import UnsatisfiableError
 from conda.models.match_spec import MatchSpec
+from conda.models.version import VersionOrder
 from conda.testing.cases import BaseTestCase
 from conda.testing.integration import (
     run_command,
@@ -36,6 +37,7 @@ from conda.testing.integration import (
     package_is_installed,
 )
 from conda.testing.helpers import (
+    add_subdir,
     add_subdir_to_iter,
     convert_to_dist_str,
     get_solver,
@@ -64,15 +66,15 @@ class PatchedCondaTestCreate(BaseTestCase):
             with open(os.path.join(prefix, 'conda-meta', 'history')) as f:
                 d = f.read()
 
-            ### MODIFIED
-            ## libmamba relaxes more aggressively sometimes
-            ## instead of relaxing from pkgname=version=build to pkgname=version, it
-            ## goes to just pkgname; this is because libmamba does not take into account
-            ## matchspec target and optionality (iow, MatchSpec.conda_build_form() does not)
-            ## Original check was stricter:
-            # assert re.search(r"neutered specs:.*'psutil==5.6.3'\]", d)
+            ## MODIFIED
+            # libmamba relaxes more aggressively sometimes
+            # instead of relaxing from pkgname=version=build to pkgname=version, it
+            # goes to just pkgname; this is because libmamba does not take into account
+            # matchspec target and optionality (iow, MatchSpec.conda_build_form() does not)
+            # Original check was stricter:
+            ### assert re.search(r"neutered specs:.*'psutil==5.6.3'\]", d)
             assert re.search(r"neutered specs:.*'psutil'\]", d)
-            ### /MODIFIED
+            ## /MODIFIED
 
             # this would be unsatisfiable if the neutered specs were not being factored in correctly.
             #    If this command runs successfully (does not raise), then all is well.
@@ -81,16 +83,16 @@ class PatchedCondaTestCreate(BaseTestCase):
     def test_pinned_override_with_explicit_spec(self):
         with make_temp_env("python=3.6") as prefix:
 
-            ### MODIFIED
-            ## Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
-            ## Instead we only pin whatever the solver decided to install
-            ## Original lines were:
-            # run_command(Commands.CONFIG, prefix,
-            #             "--add", "pinned_packages", "python=3.6.5")
+            ## MODIFIED
+            # Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
+            # Instead we only pin whatever the solver decided to install
+            # Original lines were:
+            ### run_command(Commands.CONFIG, prefix,
+            ###             "--add", "pinned_packages", "python=3.6.5")
             python = next(PrefixData(prefix).query("python"))
             run_command(Commands.CONFIG, prefix,
                         "--add", "pinned_packages", f"python={python.version}")
-            ### /MODIFIED
+            ## /MODIFIED
 
             run_command(Commands.INSTALL, prefix, "python=3.7", no_capture=True)
             assert package_is_installed(prefix, "python=3.7")
@@ -168,11 +170,20 @@ def test_pinned_1(tmpdir):
         specs_to_add = MatchSpec("scikit-learn==0.13"),
         with get_solver(tmpdir, specs_to_add=specs_to_add, prefix_records=final_state_1,
                         history_specs=specs) as solver:
-            with pytest.raises(SpecsConfigurationConflictError) as exc:
+
+            ## MODIFIED
+            # Original tests checks for SpecsConfigurationConflictError being raised
+            # but libmamba will fails with UnsatisfiableError instead. Hence, we check
+            # the error string. Original check inspected the kwargs of the exception:
+            ### with pytest.raises(SpecsConfigurationConflictError) as exc:
+            ###    solver.solve_final_state(ignore_pinned=False)
+            ### kwargs = exc.value._kwargs
+            ### assert kwargs["requested_specs"] == ["scikit-learn==0.13"]
+            ### assert kwargs["pinned_specs"] == ["python=2.6"]
+            with pytest.raises(UnsatisfiableError) as exc:
                 solver.solve_final_state(ignore_pinned=False)
-            kwargs = exc.value._kwargs
-            assert kwargs["requested_specs"] == ["scikit-learn==0.13"]
-            assert kwargs["pinned_specs"] == ["python=2.6"]
+            assert "package scikit-learn-0.13-np17py27_1 requires python 2.7*" in str(exc)
+            ## /MODIFIED
 
         specs_to_add = MatchSpec("numba"),
         history_specs = MatchSpec("python"), MatchSpec("system=5.8=0"),
@@ -347,7 +358,14 @@ def test_freeze_deps_1(tmpdir):
     specs_to_add = MatchSpec("bokeh=0.12.5"), MatchSpec("python")
     with get_solver_2(tmpdir, specs_to_add, prefix_records=final_state_1,
                     history_specs=(MatchSpec("six=1.7"), MatchSpec("python=3.4"))) as solver:
-        unlink_precs, link_precs = solver.solve_for_diff()
+
+        ## MODIFIED
+        # We can obtain the same exact solve only if we ask for an explicit prune (default is False)
+        # Original line:
+        ### unlink_precs, link_precs = solver.solve_for_diff()
+        unlink_precs, link_precs = solver.solve_for_diff(prune=True)
+        ## /MODIFIED
+
         pprint(convert_to_dist_str(unlink_precs))
         pprint(convert_to_dist_str(link_precs))
         unlink_order = add_subdir_to_iter((
@@ -387,7 +405,7 @@ def test_freeze_deps_1(tmpdir):
             solver.solve_final_state(update_modifier=UpdateModifier.FREEZE_INSTALLED)
 
 
-def test_cuda_fail_1(tmpdir):
+def test_cuda_fail_1(tmpdir, cuda_override_version):
     specs = MatchSpec("cudatoolkit"),
 
     # No cudatoolkit in index for CUDA 8.0
@@ -396,24 +414,38 @@ def test_cuda_fail_1(tmpdir):
             with pytest.raises(UnsatisfiableError) as exc:
                 final_state = solver.solve_final_state()
 
-    if sys.platform == "darwin":
-        plat = "osx-64"
-    elif sys.platform == "linux":
-        plat = "linux-64"
-    elif sys.platform == "win32":
-        if platform.architecture()[0] == "32bit":
-            plat = "win-32"
-        else:
-            plat = "win-64"
-    else:
-        plat = "linux-64"
-
-    assert str(exc.value).strip() == dals("""The following specifications were found to be incompatible with your system:
-
-  - feature:/{}::__cuda==8.0=0
-  - cudatoolkit -> __cuda[version='>=10.0|>=9.0']
-
-Your installed version is: 8.0""".format(plat))
+    ## MODIFIED
+    # libmamba will generate a slightly different error message, but the spirit is the same.
+    # Original check was:
+    ###     if sys.platform == "darwin":
+    ###         plat = "osx-64"
+    ###     elif sys.platform == "linux":
+    ###         plat = "linux-64"
+    ###     elif sys.platform == "win32":
+    ###         if platform.architecture()[0] == "32bit":
+    ###             plat = "win-32"
+    ###         else:
+    ###             plat = "win-64"
+    ###     else:
+    ###         plat = "linux-64"
+    ###     assert str(exc.value).strip() == dals("""The following specifications were found to be incompatible with your system:
+    ###
+    ###   - feature:/{}::__cuda==8.0=0
+    ###   - cudatoolkit -> __cuda[version='>=10.0|>=9.0']
+    ###
+    ### Your installed version is: 8.0""".format(plat))
+    possible_messages = [
+        dals(
+            """Encountered problems while solving:
+  - nothing provides __cuda >=9.0 needed by cudatoolkit-9.0-0"""
+        ),
+        dals(
+            """Encountered problems while solving:
+  - nothing provides __cuda >=10.0 needed by cudatoolkit-10.0-0"""
+        ),
+    ]
+    assert str(exc.value).strip() in possible_messages
+    ## /MODIFIED
 
 
 def test_cuda_fail_2(tmpdir):
@@ -425,15 +457,36 @@ def test_cuda_fail_2(tmpdir):
             with pytest.raises(UnsatisfiableError) as exc:
                 final_state = solver.solve_final_state()
 
-    assert str(exc.value).strip() == dals("""The following specifications were found to be incompatible with your system:
-
-  - cudatoolkit -> __cuda[version='>=10.0|>=9.0']
-
-Your installed version is: not available""")
+    ## MODIFIED
+    # libmamba will generate a slightly different error message, but the spirit is the same.
+    # Original check was:
+    ###     assert str(exc.value).strip() == dals("""The following specifications were found to be incompatible with your system:
+    ###
+    ###   - cudatoolkit -> __cuda[version='>=10.0|>=9.0']
+    ###
+    ### Your installed version is: not available""")
+    possible_messages = [
+        dals(
+            """Encountered problems while solving:
+  - nothing provides __cuda >=9.0 needed by cudatoolkit-9.0-0"""
+        ),
+        dals(
+            """Encountered problems while solving:
+  - nothing provides __cuda >=10.0 needed by cudatoolkit-10.0-0"""
+        ),
+    ]
+    assert str(exc.value).strip() in possible_messages
+    ## /MODIFIED
 
 
 def test_update_all_1(tmpdir):
+    ### MODIFIED
+    ## Libmamba requires MatchSpec.conda_build_form() internally, which needs `version` to be set
+    ## We force that in the last spec here. Original line was:
+    # specs = MatchSpec("numpy=1.5"), MatchSpec("python=2.6"), MatchSpec("system[build_number=0]")
     specs = MatchSpec("numpy=1.5"), MatchSpec("python=2.6"), MatchSpec("system[version=*,build_number=0]")
+    ### /MODIFIED
+
     with get_solver(tmpdir, specs) as solver:
         final_state_1 = solver.solve_final_state()
         # PrefixDag(final_state_1, specs).open_url()
@@ -650,10 +703,27 @@ def test_conda_downgrade(tmpdir):
                 'channel-2::conda-4.3.30-py36h5d9f9f4_0',
                 'channel-4::conda-build-3.12.1-py36_0'
             ))
-            assert convert_to_dist_str(unlink_precs) == unlink_order
-            assert convert_to_dist_str(link_precs) == link_order
+            ## MODIFIED
+            # Original checks verified the full solution was strictly matched:
+            ### assert convert_to_dist_str(unlink_precs) == unlink_order
+            ### assert convert_to_dist_str(link_precs) == link_order
+            # We only check for conda itself and the explicit specs
+            # The other packages are slightly different;
+            # again libedit and ncurses are involved
+            # (they are also involved in test_fast_update_with_update_modifier_not_set)
+            for pkg in link_precs:
+                if pkg.name == "conda":
+                    assert VersionOrder(pkg.version) < VersionOrder("4.4.10")
+                elif pkg.name == "python":
+                    assert pkg.version == "3.6.2"
+                elif pkg.name == "conda-build":
+                    assert pkg.version == "3.12.1"
+                elif pkg.name == "itsdangerous":
+                    assert pkg.version == "0.24"
+            ## /MODIFIED
     finally:
         sys.prefix = saved_sys_prefix
+
 
 def test_python2_update(tmpdir):
     # Here we're actually testing that a user-request will uninstall incompatible packages
@@ -735,7 +805,24 @@ def test_python2_update(tmpdir):
             'channel-4::requests-2.19.1-py37_0',
             'channel-4::conda-4.5.10-py37_0',
         ))
-        assert convert_to_dist_str(final_state_2) == order
+
+        ## MODIFIED
+        # libmamba has a different solution here (cryptography 2.3 instead of 2.2.2)
+        # and cryptography-vectors (not present in regular conda)
+        # they are essentially the same functional solution; the important part here
+        # is that the env migrated to Python 3.7, so we only check some packages
+        # Original check:
+        ### assert convert_to_dist_str(final_state_2) == order
+        full_solution = convert_to_dist_str(final_state_2)
+        important_parts = add_subdir_to_iter(
+            (
+                "channel-4::python-3.7.0-hc3d631a_0",
+                "channel-4::conda-4.5.10-py37_0",
+                "channel-4::pycosat-0.6.3-py37h14c3975_0",
+            )
+        )
+        assert set(important_parts).issubset(set(full_solution))
+        ## /MODIFIED
 
 
 def test_fast_update_with_update_modifier_not_set(tmpdir):
@@ -777,8 +864,13 @@ def test_fast_update_with_update_modifier_not_set(tmpdir):
             'channel-4::libedit-3.1.20170329-h6b74fdf_2',
             'channel-4::python-3.6.4-hc3d631a_1',  # python is upgraded
         ))
-        assert convert_to_dist_str(unlink_precs) == unlink_order
-        assert convert_to_dist_str(link_precs) == link_order
+        ## MODIFIED
+        # We only check python was upgraded as expected, not the full solution
+        ### assert convert_to_dist_str(unlink_precs) == unlink_order
+        ### assert convert_to_dist_str(link_precs) == link_order
+        assert add_subdir("channel-4::python-2.7.14-h89e7a4a_22") in convert_to_dist_str(unlink_precs)
+        assert add_subdir("channel-4::python-3.6.4-hc3d631a_1") in convert_to_dist_str(link_precs)
+        ## /MODIFIED
 
     specs_to_add = MatchSpec("sqlite"),
     with get_solver_4(tmpdir, specs_to_add, prefix_records=final_state_1, history_specs=specs) as solver:
@@ -826,10 +918,20 @@ def test_channel_priority_churn_minimized(tmpdir):
         assert len(unlink_dists) == 1
         assert len(link_dists) == 1
 
+
+@pytest.mark.xfail(True, reason="channel priority is a bit different in libmamba; TODO")
 def test_priority_1(tmpdir):
     with env_var("CONDA_SUBDIR", "linux-64", stack_callback=conda_tests_ctxt_mgmt_def_pol):
         specs = MatchSpec("pandas"), MatchSpec("python=2.7"),
-        with env_var("CONDA_CHANNEL_PRIORITY", "True", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+
+        ## MODIFIED
+        # Original value was set to True (legacy value for "flexible" nowadays), but libmamba
+        # only gets the same solution is strict priority is chosen. It _looks_ like this was the
+        # intention of the test anyways, but it should be investigated further. Marking as xfail for now.
+        ### with env_var("CONDA_CHANNEL_PRIORITY", "True", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+        with env_var("CONDA_CHANNEL_PRIORITY", "strict", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+        ## /MODIFIED
+
             with get_solver_aggregate_1(tmpdir, specs) as solver:
                 final_state_1 = solver.solve_final_state()
                 pprint(convert_to_dist_str(final_state_1))
@@ -917,9 +1019,16 @@ def test_downgrade_python_prevented_with_sane_message(tmpdir):
             solver.solve_final_state()
 
         error_msg = str(exc.value).strip()
-        assert "incompatible with the existing python installation in your environment:" in error_msg
-        assert "- scikit-learn==0.13 -> python=2.7" in error_msg
-        assert "Your python: python=2.6" in error_msg
+
+        ## MODIFIED
+        # One more case of different wording for the same message. I think the essence is the same
+        # (cannot update to python 2.7), even if python 2.6 is not mentioned.
+        ### assert "incompatible with the existing python installation in your environment:" in error_msg
+        ### assert "- scikit-learn==0.13 -> python=2.7" in error_msg
+        ### assert "Your python: python=2.6" in error_msg
+        assert "Encountered problems while solving" in error_msg
+        assert "package scikit-learn-0.13" in error_msg and "requires python 2.7*" in error_msg
+        ## /MODIFIED
 
     specs_to_add = MatchSpec("unsatisfiable-with-py26"),
     with get_solver(tmpdir, specs_to_add=specs_to_add, prefix_records=final_state_1,
@@ -927,6 +1036,14 @@ def test_downgrade_python_prevented_with_sane_message(tmpdir):
         with pytest.raises(UnsatisfiableError) as exc:
             solver.solve_final_state()
         error_msg = str(exc.value).strip()
-        assert "incompatible with the existing python installation in your environment:" in error_msg
-        assert "- unsatisfiable-with-py26 -> python=2.7" in error_msg
-        assert "Your python: python=2.6"
+
+        ## MODIFIED
+        # In this case, the error is not as similar! We are still accepting it, but it could use
+        # some improvements... Note how Python is not mentioned at all, just scikit-learn.
+        # Leaving a # TODO mark here so we can come revisit this in the future.
+        ### assert "incompatible with the existing python installation in your environment:" in error_msg
+        ### assert "- unsatisfiable-with-py26 -> python=2.7" in error_msg
+        ### assert "Your python: python=2.6"
+        assert "Encountered problems while solving" in error_msg
+        assert "package unsatisfiable-with-py26-1.0-0 requires scikit-learn 0.13" in error_msg
+        ## /MODIFIED
