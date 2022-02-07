@@ -3,9 +3,9 @@ name: Canary builds
 on:
   workflow_run:
     workflows:
-      - CI tests
+      - CI
     branches:
-      - master
+      - main
     types:
       - completed
 
@@ -32,10 +32,10 @@ jobs:
           fetch-depth: 0
 
       - name: Create and upload canary build
-        uses: conda/actions/canary-release@v22.1.3
+        uses: conda/actions/canary-release@v22.1.4
         with:
           package-name: conda-libmamba-solver
           subdir: ${{ matrix.subdir }}
-          anaconda-org-channel: jaimergp
+          anaconda-org-channel: conda-canary
           anaconda-org-label: ${{ github.event.repository.name }}-dev
-          anaconda-org-token: ${{ secrets.JAIMERGP_ANACONDA_ORG_TOKEN }}
+          anaconda-org-token: ${{ secrets.CONDA_CANARY_ANACONDA_ORG_TOKEN }}
