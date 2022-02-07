@@ -68,6 +68,8 @@ addopts = [
   "--deselect=tests/test_create.py::IntegrationTests::test_remove_features",
   # Inconsistency analysis not implemented yet
   "--deselect=tests/test_create.py::IntegrationTests::test_conda_recovery_of_pip_inconsistent_env",
+  # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
+  "--deselect=tests/test_create.py::IntegrationTests::test_offline_with_empty_index_cache",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
