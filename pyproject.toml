@@ -70,6 +70,21 @@ addopts = [
   "--deselect=tests/test_create.py::IntegrationTests::test_conda_recovery_of_pip_inconsistent_env",
   # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
   "--deselect=tests/test_create.py::IntegrationTests::test_offline_with_empty_index_cache",
+  # The following are known to fail upstream due to too strict expectations
+  # We provide the same tests with adjusted checks in tests/test_modified_upstream.py
+  "--deselect=tests/test_create.py::IntegrationTests::test_neutering_of_historic_specs",
+  "--deselect=tests/test_create.py::IntegrationTests::test_pinned_override_with_explicit_spec",
+  "--deselect=tests/test_solve.py::test_pinned_1",
+  "--deselect=tests/test_solve.py::test_freeze_deps_1",
+  "--deselect=tests/test_solve.py::test_cuda_fail_1",
+  "--deselect=tests/test_solve.py::test_cuda_fail_2",
+  "--deselect=tests/test_solve.py::test_update_all_1",
+  "--deselect=tests/test_solve.py::test_conda_downgrade",
+  "--deselect=tests/test_solve.py::test_python2_update",
+  "--deselect=tests/test_solve.py::test_fast_update_with_update_modifier_not_set",
+  "--deselect=tests/test_solve.py::test_channel_priority_churn_minimized",
+  "--deselect=tests/test_solve.py::test_priority_1",
+  "--deselect=tests/test_solve.py::test_downgrade_python_prevented_with_sane_message",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
