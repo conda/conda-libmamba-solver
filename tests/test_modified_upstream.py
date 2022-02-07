@@ -405,7 +405,7 @@ def test_freeze_deps_1(tmpdir):
             solver.solve_final_state(update_modifier=UpdateModifier.FREEZE_INSTALLED)
 
 
-def test_cuda_fail_1(tmpdir, cuda_override_version):
+def test_cuda_fail_1(tmpdir):
     specs = MatchSpec("cudatoolkit"),
 
     # No cudatoolkit in index for CUDA 8.0
@@ -480,12 +480,13 @@ def test_cuda_fail_2(tmpdir):
 
 
 def test_update_all_1(tmpdir):
-    ### MODIFIED
-    ## Libmamba requires MatchSpec.conda_build_form() internally, which needs `version` to be set
-    ## We force that in the last spec here. Original line was:
-    # specs = MatchSpec("numpy=1.5"), MatchSpec("python=2.6"), MatchSpec("system[build_number=0]")
-    specs = MatchSpec("numpy=1.5"), MatchSpec("python=2.6"), MatchSpec("system[version=*,build_number=0]")
-    ### /MODIFIED
+    ## MODIFIED
+    # Libmamba requires MatchSpec.conda_build_form() internally, which depends on `version` and
+    # `build` fields. `system` below is using only `build_number`, so we have to adapt the syntax
+    # accordingly. It should be the same result, but in a conda_build_form-friendly way:
+    ### specs = MatchSpec("numpy=1.5"), MatchSpec("python=2.6"), MatchSpec("system[build_number=0]")
+    specs = MatchSpec("numpy=1.5"), MatchSpec("python=2.6"), MatchSpec("system[version=*,build=*0]")
+    ## /MODIFIED
 
     with get_solver(tmpdir, specs) as solver:
         final_state_1 = solver.solve_final_state()
