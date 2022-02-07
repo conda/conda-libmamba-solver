@@ -182,7 +182,9 @@ def test_pinned_1(tmpdir):
             ### assert kwargs["pinned_specs"] == ["python=2.6"]
             with pytest.raises(UnsatisfiableError) as exc:
                 solver.solve_final_state(ignore_pinned=False)
-            assert "package scikit-learn-0.13-np17py27_1 requires python 2.7*" in str(exc)
+            error = str(exc)
+            assert "package scikit-learn-0.13" in error
+            assert "requires python 2.7*" in error
             ## /MODIFIED
 
         specs_to_add = MatchSpec("numba"),
