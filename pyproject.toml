@@ -69,3 +69,7 @@ addopts = [
   # Inconsistency analysis not implemented yet
   "--deselect=tests/test_create.py::IntegrationTests::test_conda_recovery_of_pip_inconsistent_env",
 ]
+markers = [
+  "integration: integration tests that usually require an internet connect",
+  "slow: slow running tests",
+]
