@@ -1117,7 +1117,7 @@ class LibMambaSolverDraft(Solver):
             # Add in the original specs_to_add on top.
             specs_map.update({spec.name: spec for spec in self.specs_to_add})
 
-            with context.override("quiet", True):
+            with context._override("quiet", True):
                 # Create a new solver instance to perform a 2nd solve with deps added
                 # We do it like this to avoid overwriting state accidentally. Instead,
                 # we will import the needed state bits manually.

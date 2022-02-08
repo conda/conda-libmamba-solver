@@ -1082,7 +1082,7 @@ class SolverOutputState:
                 specs_to_add = list(new_specs.values())
                 specs_to_remove = ()
 
-            with context.override("quiet", False):
+            with context._override("quiet", False):
                 # Create a new solver instance to perform a 2nd solve with deps added We do it
                 # like this to avoid overwriting state accidentally. Instead, we will import
                 # the needed state bits manually.
