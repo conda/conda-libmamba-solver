@@ -16,7 +16,6 @@ from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
 from conda.base.context import context
 from conda.common.constants import NULL
-from conda.common.io import CapturedDescriptor
 from conda.common.serialize import json_dump, json_load
 from conda.common.path import paths_equal
 from conda.common.url import (
@@ -26,7 +25,6 @@ from conda.common.url import (
 )
 from conda.exceptions import (
     PackagesNotFoundError,
-    RawStrUnsatisfiableError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
     CondaEnvironmentError,
@@ -37,13 +35,15 @@ from conda.models.records import PackageRecord
 from conda.core.solve import Solver
 import libmambapy as api
 
-from .state import SolverInputState, SolverOutputState, IndexHelper
+from .exceptions import LibMambaUnsatisfiableError
 from .mamba_utils import (
     load_channels,
     to_package_record_from_subjson,
     init_api_context,
     mamba_version,
 )
+from .state import SolverInputState, SolverOutputState, IndexHelper
+from .utils import CapturedDescriptor
 
 log = logging.getLogger(__name__)
 
@@ -572,7 +572,7 @@ class LibMambaSolver(Solver):
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
                 raise PackagesNotFoundError([" ".join(packages)])
-        raise RawStrUnsatisfiableError(problems)
+        raise LibMambaUnsatisfiableError(problems)
 
     def _export_solved_records(
         self,

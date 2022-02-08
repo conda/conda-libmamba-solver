@@ -28,7 +28,6 @@ from conda.common.url import (
 from conda.exceptions import (
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
-    RawStrUnsatisfiableError,
     CondaEnvironmentError,
 )
 from conda.history import History
@@ -38,7 +37,7 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.version import VersionOrder
 from conda.core.solve import Solver, get_pinned_specs
 
-
+from .exceptions import LibMambaUnsatisfiableError
 log = getLogger(__name__)
 
 
@@ -1162,7 +1161,7 @@ class LibMambaSolverDraft(Solver):
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
                 raise PackagesNotFoundError([" ".join(packages)])
-        raise RawStrUnsatisfiableError(problems)
+        raise LibMambaUnsatisfiableError(problems)
 
 
 class TrackedDict(dict):

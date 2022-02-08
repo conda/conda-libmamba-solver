@@ -799,7 +799,7 @@ class SolverOutputState:
                 #         sis.find_conflicts(specs)  # this might call the solver -- remove?
                 #     else:
                 #         # oops, no message?
-                #         raise RawStrUnsatisfiableError(
+                #         raise LibMambaUnsatisfiableError(
                 #             "Couldn't find a Python version that does not conflict..."
                 #         )
 
