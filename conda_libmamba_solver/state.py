@@ -672,7 +672,7 @@ class SolverOutputState:
                     reason="Pin matches one of the potential dependencies of user requests",
                 )
             else:
-                logger.warn(
+                log.warn(
                     "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
                 )
 
