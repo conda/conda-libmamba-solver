@@ -41,7 +41,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER_LOGIC: "libmamba"
+      CONDA_EXPERIMENTAL_SOLVER: "libmamba"
 
     steps:
       - name: Checkout our source
@@ -80,7 +80,7 @@ jobs:
           -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
           -e TEST_GROUP
-          -e CONDA_SOLVER_LOGIC
+          -e CONDA_EXPERIMENTAL_SOLVER
           ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    $run_test_cmd"
@@ -111,7 +111,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER_LOGIC: libmamba
+      CONDA_EXPERIMENTAL_SOLVER: libmamba
 
     steps:
       - name: Checkout our source
@@ -202,7 +202,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER_LOGIC: libmamba
+      CONDA_EXPERIMENTAL_SOLVER: libmamba
 
     steps:
       - name: Checkout our source

@@ -13,7 +13,7 @@ from ._libmamba import LibMambaSolverDraft
 from .solver import LibMambaSolver
 
 
-def get_solver_logic(key=None):
+def get_solver_class(key=None):
     return {
         "libmamba-draft": LibMambaSolverDraft,
         "libmamba": LibMambaSolver,
