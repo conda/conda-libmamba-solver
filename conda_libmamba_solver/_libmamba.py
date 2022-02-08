@@ -38,7 +38,7 @@ from conda.models.version import VersionOrder
 from conda.core.solve import Solver, get_pinned_specs
 
 from .exceptions import LibMambaUnsatisfiableError
-log = getLogger(__name__)
+log = getLogger(f"conda.{__name__}")
 
 
 class LibMambaSolverDraft(Solver):

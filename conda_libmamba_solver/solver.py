@@ -45,7 +45,7 @@ from .mamba_utils import (
 from .state import SolverInputState, SolverOutputState, IndexHelper
 from .utils import CapturedDescriptor
 
-log = logging.getLogger(__name__)
+log = logging.getLogger(f"conda.{__name__}")
 
 
 class LibMambaIndexHelper(IndexHelper):
@@ -309,6 +309,7 @@ class LibMambaSolver(Solver):
             )
 
         log.info("Using experimental libmamba integrations")
+        log.info("Logfile path: %s", context._logfile_path)
         log.info("Conda version: %s", _conda_version)
         log.info("Mamba version: %s", mamba_version())
         log.info("Target prefix: %s", self.prefix)

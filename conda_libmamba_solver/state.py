@@ -84,7 +84,7 @@ from conda.core.solve import get_pinned_specs
 
 from .models import EnumAsBools, TrackedMap
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(f"conda.{__name__}")
 
 
 class IndexHelper:
