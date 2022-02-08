@@ -16,11 +16,7 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-latest
-            subdir: linux-64
-          - runner: macos-latest
-            subdir: osx-64
-          - runner: windows-latest
-            subdir: win-64
+            subdir: noarch
     runs-on: ${{ matrix.runner }}
     steps:
       # Clean checkout of specific git ref needed for package metadata version
