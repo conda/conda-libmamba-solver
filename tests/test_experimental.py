@@ -74,7 +74,7 @@ def test_cli_flag_in_help():
         assert "--experimental-solver" not in stdout
 
 
-def test_cli_flag_and_env_var_settings():
+def cli_flag_and_env_var_settings():
     env_no_var = os.environ.copy()
     env_libmamba = os.environ.copy()
     env_classic = os.environ.copy()
@@ -84,19 +84,22 @@ def test_cli_flag_and_env_var_settings():
     cli_libmamba = ["--experimental-solver=libmamba"]
     cli_classic = ["--experimental-solver=classic"]
     tests = [
-        {"cmd": command, "env": env_no_var, "solver": "classic"},
-        {"cmd": command, "env": env_classic, "solver": "classic"},
-        {"cmd": command, "env": env_libmamba, "solver": "libmamba"},
-        {"cmd": command + cli_libmamba, "env": env_no_var, "solver": "libmamba"},
-        {"cmd": command + cli_libmamba, "env": env_libmamba, "solver": "libmamba"},
-        {"cmd": command + cli_libmamba, "env": env_classic, "solver": "libmamba"},
-        {"cmd": command + cli_classic, "env": env_no_var, "solver": "classic"},
-        {"cmd": command + cli_classic, "env": env_libmamba, "solver": "classic"},
-        {"cmd": command + cli_classic, "env": env_classic, "solver": "classic"},
+        ["no flag, no env", command, env_no_var, "classic"],
+        ["no flag, env classic", command, env_classic, "classic"],
+        ["no flag, env libmamba", command, env_libmamba, "libmamba"],
+        ["flag libmamba, no env", command + cli_libmamba, env_no_var, "libmamba"],
+        ["flag libmamba, env libmamba", command + cli_libmamba, env_libmamba, "libmamba"],
+        ["flag libmamba, env classic", command + cli_libmamba, env_classic, "libmamba"],
+        ["flag classic, no env", command + cli_classic, env_no_var, "classic"],
+        ["flag classic, env libmamba", command + cli_classic, env_libmamba, "classic"],
+        ["flag classic, env classic", command + cli_classic, env_classic, "classic"],
     ]
-    for test in tests:
-        stdout = check_output(test["cmd"], env=test["env"], stderr=STDOUT, universal_newlines=True)
-        if test["solver"] == "libmamba":
+    return tests
+
+@pytest.mark.parametrize("name, command, env, solver", cli_flag_and_env_var_settings())
+def test_cli_flag_and_env_var(name, command, env, solver):
+        stdout = check_output(command, env=env, stderr=STDOUT, universal_newlines=True)
+        if solver == "libmamba":
             assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in stdout
         else:
             assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in stdout
