@@ -35,12 +35,15 @@ option:
 # Using default (classic) solver
 $ conda create -n demo scipy --dry-run
 # This is equivalent
-$ CONDA_EXPERIMENTAL_SOLVER=classic conda create -n demo scipy --dry-run
+$ conda create -n demo scipy --dry-run --experimental-solver=classic
 # Using libmamba integrations
-$ CONDA_EXPERIMENTAL_SOLVER=libmamba conda create -n demo scipy --dry-run
+$ conda create -n demo scipy --dry-run --experimental-solver=libmamba
 # Using old proof-of-concept, debugging-only libmamba integrations
-$ CONDA_EXPERIMENTAL_SOLVER=libmamba-draft conda create -n demo scipy --dry-run
+$ conda create -n demo scipy --dry-run --experimental-solver=libmamba-draft
 ```
+
+> Hint: You can also enable the experimental solver with the `CONDA_EXPERIMENTAL_SOLVER`
+> environment variable: `CONDA_EXPERIMENTAL_SOLVER=libmamba conda install ...`
 
 3. Use `time` to measure how different solvers perform. Take into account that repodata
 retrieval is cached across attempts, so only consider timings after warming that up:
@@ -49,9 +52,9 @@ retrieval is cached across attempts, so only consider timings after warming that
 # Warm up the repodata cache
 $ conda create -n demo scipy --dry-run
 # Timings for original solver
-$ time env CONDA_EXPERIMENTAL_SOLVER=classic conda create -n demo scipy --dry-run
-# Timings for libmamba integration
-$ time env CONDA_EXPERIMENTAL_SOLVER=libmamba conda create -n demo scipy --dry-run
+$ time conda create -n demo scipy --dry-run --experimental-solver=classic
+# Timings for libmamba integrations
+$ time conda create -n demo scipy --dry-run --experimental-solver=libmamba
 ```
 
 > `conda create` commands will have similar performance because it's a very simple action! However,
@@ -62,8 +65,8 @@ $ time env CONDA_EXPERIMENTAL_SOLVER=libmamba conda create -n demo scipy --dry-r
 might get too long for your terminal buffer, so consider using a pager like `less`:
 
 ```bash
-# Verbosity can be 0, 1, 2 or 3
-$ CONDA_VERBOSITY=1 CONDA_EXPERIMENTAL_SOLVER=libmamba conda create -n demo scipy --dry-run  2>&1 | less
+# Verbosity can be expressed with 1, 2 or 3 `v`
+$ conda create -n demo scipy --dry-run -vvv --experimental-solver=libmamba  2>&1 | less
 ```
 
 ## FAQ
@@ -99,5 +102,5 @@ $ conda config --set experimental_solver libmamba --env
 Note that we are using the `--env` flag so the setting is only applied to the active
 environment. Otherwise it will have a global effect on all your environments, including `base`,
 which is now protected. As such, we strongly recommend to enable this setting in a case by case
-basis or, even better, on a command by command basis by setting the `CONDA_EXPERIMENTAL_SOLVER`
-environment variable when needed.
+basis or, even better, on a command by command basis by setting the corresponding command line flags
+or environment variables when needed.
