@@ -56,6 +56,7 @@ class LibMambaIndexHelper(IndexHelper):
         subdirs: Iterable[str] = None,
     ):
 
+        self._repos = []
         self._pool = api.Pool()
 
         # export installed records to a temporary json file
@@ -71,6 +72,7 @@ class LibMambaIndexHelper(IndexHelper):
             f.write(json_dump(exported_installed))
         installed = api.Repo(self._pool, "installed", f.name, "")
         installed.set_installed()
+        self._repos.append(installed)
         os.unlink(f.name)
 
         if channels is None:
@@ -81,7 +83,7 @@ class LibMambaIndexHelper(IndexHelper):
         self._index = load_channels(
             pool=self._pool,
             channels=self._channel_urls(channels),
-            repos=[installed],
+            repos=self._repos,
             prepend=False,
             use_local=context.use_local,
             platform=subdirs,
@@ -585,7 +587,11 @@ class LibMambaSolver(Solver):
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         with CapturedDescriptor(stream=sys.stderr, threaded=True) as captured:
-            transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
+            transaction = api.Transaction(
+                self.solver,
+                api.MultiPackageCache(context.pkgs_dirs),
+                index._repos
+            )
             (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
         if captured.text:
             log.debug("Solver.solve:\n%s", captured.text)

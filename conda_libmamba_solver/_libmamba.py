@@ -906,6 +906,7 @@ class LibMambaSolverDraft(Solver):
         transaction = api.Transaction(
             solver,
             api.MultiPackageCache(context.pkgs_dirs),
+            state["repos"],
         )
         (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
