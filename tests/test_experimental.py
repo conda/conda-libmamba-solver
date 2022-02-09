@@ -43,3 +43,29 @@ def test_logging():
         assert "conda.conda_libmamba_solver" in log_contents
         assert "solver started" in log_contents
         assert "choice rule creation took" in log_contents
+
+
+def test_cli_flag():
+    commands_with_flag = (
+       ["install"],
+       ["update"],
+       ["remove"],
+       ["create"],
+       ["env", "create"],
+       ["env", "update"],
+       ["env", "remove"],
+    )
+    for command in commands_with_flag:
+        stdout = check_output([sys.executable, "-m", "conda"] + command + ["--help"], stderr=STDOUT, universal_newlines=True)
+        assert "--experimental-solver" in stdout
+
+    commands_without_flag = (
+       ["config"],
+       ["list"],
+       ["info"],
+       ["run"],
+       ["env", "list"],
+    )
+    for command in commands_without_flag:
+        stdout = check_output([sys.executable, "-m", "conda"] + command + ["--help"], stderr=STDOUT, universal_newlines=True)
+        assert "--experimental-solver" not in stdout
