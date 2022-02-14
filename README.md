@@ -34,7 +34,6 @@ $ conda install \
 $ conda install --override-channels -c conda-canary/label/conda-conda-pr-11193 -c conda-canary/label/conda-libmamba-solver-dev -c conda-forge -c defaults conda conda-libmamba-solver
 ```
 
-For Windows
 2. Now you can experiment with different things. `--dry-run` is specially useful to check how
 different solvers interact. The main switch you need to take care of is the _experimental solver_
 option:
