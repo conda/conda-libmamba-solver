@@ -6,7 +6,7 @@ import shutil
 
 import pytest
 
-from conda.testing.integration import make_temp_env, run_command, Commands
+from conda.testing.integration import make_temp_env, run_command, Commands, _get_temp_prefix
 from conda.common.io import env_var
 from conda.base.context import context
 from conda.base.constants import ExperimentalSolverChoice
@@ -23,7 +23,9 @@ def prefix(request):
     if lock_platform != platform:
         pytest.skip(f"Running platform {platform} does not match file platform {lock_platform}")
     with env_var("CONDA_TEST_SAVE_TEMPS", "1"):
-        with make_temp_env("--file", os.path.join(TEST_DATA_DIR, request.param)) as prefix:
+        prefix = _get_temp_prefix(use_restricted_unicode=True).replace(" ", "")
+        args = ("--file", os.path.join(TEST_DATA_DIR, request.param))
+        with make_temp_env(*args, prefix=prefix) as prefix:
             yield prefix
     shutil.rmtree(prefix)
 
@@ -44,3 +46,14 @@ def test_update_python(prefix, solver_args):
     with pytest.raises(DryRunExit):
         run_command(Commands.UPDATE, prefix, *solver_args, "python")
 
+
+@pytest.mark.slow
+def test_update_python_update_deps(prefix, solver_args):
+    with pytest.raises(DryRunExit):
+        run_command(Commands.INSTALL, prefix, *solver_args, "python", "--update-deps")
+
+
+@pytest.mark.slow
+def test_update_all(prefix, solver_args):
+    with pytest.raises(DryRunExit):
+        run_command(Commands.UPDATE, prefix, *solver_args, "--all")
