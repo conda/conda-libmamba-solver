@@ -84,7 +84,7 @@ from conda.core.solve import get_pinned_specs
 
 from .models import EnumAsBools, TrackedMap
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(f"conda.{__name__}")
 
 
 class IndexHelper:
@@ -672,7 +672,7 @@ class SolverOutputState:
                     reason="Pin matches one of the potential dependencies of user requests",
                 )
             else:
-                logger.warn(
+                log.warn(
                     "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
                 )
 
@@ -799,7 +799,7 @@ class SolverOutputState:
                 #         sis.find_conflicts(specs)  # this might call the solver -- remove?
                 #     else:
                 #         # oops, no message?
-                #         raise RawStrUnsatisfiableError(
+                #         raise LibMambaUnsatisfiableError(
                 #             "Couldn't find a Python version that does not conflict..."
                 #         )
 
@@ -1082,7 +1082,7 @@ class SolverOutputState:
                 specs_to_add = list(new_specs.values())
                 specs_to_remove = ()
 
-            with context.override("quiet", False):
+            with context._override("quiet", False):
                 # Create a new solver instance to perform a 2nd solve with deps added We do it
                 # like this to avoid overwriting state accidentally. Instead, we will import
                 # the needed state bits manually.

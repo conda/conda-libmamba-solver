@@ -28,7 +28,6 @@ from conda.common.url import (
 from conda.exceptions import (
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
-    RawStrUnsatisfiableError,
     CondaEnvironmentError,
 )
 from conda.history import History
@@ -38,8 +37,8 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.version import VersionOrder
 from conda.core.solve import Solver, get_pinned_specs
 
-
-log = getLogger(__name__)
+from .exceptions import LibMambaUnsatisfiableError
+log = getLogger(f"conda.{__name__}")
 
 
 class LibMambaSolverDraft(Solver):
@@ -907,6 +906,7 @@ class LibMambaSolverDraft(Solver):
         transaction = api.Transaction(
             solver,
             api.MultiPackageCache(context.pkgs_dirs),
+            state["repos"],
         )
         (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
@@ -1118,7 +1118,7 @@ class LibMambaSolverDraft(Solver):
             # Add in the original specs_to_add on top.
             specs_map.update({spec.name: spec for spec in self.specs_to_add})
 
-            with context.override("quiet", True):
+            with context._override("quiet", True):
                 # Create a new solver instance to perform a 2nd solve with deps added
                 # We do it like this to avoid overwriting state accidentally. Instead,
                 # we will import the needed state bits manually.
@@ -1162,7 +1162,7 @@ class LibMambaSolverDraft(Solver):
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
                 raise PackagesNotFoundError([" ".join(packages)])
-        raise RawStrUnsatisfiableError(problems)
+        raise LibMambaUnsatisfiableError(problems)
 
 
 class TrackedDict(dict):

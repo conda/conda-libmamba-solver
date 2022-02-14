@@ -4,7 +4,7 @@ from typing import Any, Hashable, Iterable, Union, Optional, Tuple
 import sys
 import logging
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(f"conda.{__name__}")
 
 
 class TrackedMap(MutableMapping):
@@ -235,7 +235,7 @@ class TrackedMap(MutableMapping):
         # stacklevel was only added to logging in py38
         if sys.version_info < (3, 8):
             kwargs.pop("stacklevel", None)
-        logger.debug(*args, **kwargs)
+        log.debug(*args, **kwargs)
 
 
 class EnumAsBools:

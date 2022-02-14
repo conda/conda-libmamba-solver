@@ -7,13 +7,13 @@ We offer two implementations:
   This is the one we will eventually ship as final.
 """
 
-__version__ = "0.1.0"
+__version__ = "22.2.0"
 
 from ._libmamba import LibMambaSolverDraft
 from .solver import LibMambaSolver
 
 
-def get_solver_logic(key=None):
+def get_solver_class(key=None):
     return {
         "libmamba-draft": LibMambaSolverDraft,
         "libmamba": LibMambaSolver,

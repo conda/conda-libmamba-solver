@@ -10,6 +10,10 @@ on:
     paths-ignore:
       - "docs/**"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux:
     name: Linux, Python ${{ matrix.python-version }}
@@ -35,7 +39,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba
           path: conda
 
       - name: Python ${{ matrix.python-version }}
@@ -46,8 +50,8 @@ jobs:
           -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
           -e TEST_GROUP
-          -e CONDA_SOLVER_LOGIC
-          ghcr.io/conda/conda-ci:poc-libsolv-linux-python${{ matrix.python-version }}-mamba
+          -e CONDA_EXPERIMENTAL_SOLVER
+          ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv"
@@ -76,7 +80,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -109,7 +113,7 @@ jobs:
         shell: bash -l {0}
         working-directory: conda
         run: |
-          eval "$(sudo $CONDA/envs/conda-test-env/bin/python -m conda init bash --dev)"
+          eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
           python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv
 
   windows:
@@ -136,7 +140,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: poc-libsolv
+          ref: libmamba
           path: conda
 
       - name: Set temp dirs correctly
