@@ -1,14 +1,9 @@
 name: CI
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "docs/**"
   pull_request:
-    paths-ignore:
-      - "docs/**"
+    types:
+      - labeled
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,6 +11,9 @@ concurrency:
 
 jobs:
   linux:
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run'
     name: Linux, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
@@ -54,9 +52,12 @@ jobs:
           ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv --durations=0 -m 'slow'"
 
   macos:
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run'
     name: MacOS, Python ${{ matrix.python-version }}
     runs-on: macos-latest
     strategy:
@@ -114,9 +115,12 @@ jobs:
         working-directory: conda
         run: |
           eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
-          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
+          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv --durations=0 -m "slow"
 
   windows:
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run'
     name: Windows, Python ${{ matrix.python-version }}
     runs-on: windows-latest
     strategy:
@@ -177,5 +181,5 @@ jobs:
         run: |
           CALL dev-init.bat
           if errorlevel 1 exit 1
-          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow"
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv --durations=0 -m "slow"
           if errorlevel 1 exit 1
