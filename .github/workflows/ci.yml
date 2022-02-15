@@ -177,5 +177,5 @@ jobs:
         run: |
           CALL dev-init.bat
           if errorlevel 1 exit 1
-          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow"
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow" --timeout=600
           if errorlevel 1 exit 1
