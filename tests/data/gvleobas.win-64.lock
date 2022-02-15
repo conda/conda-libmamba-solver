@@ -2,6 +2,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: win-64
+# channels: conda-forge,defaults
 @EXPLICIT
 https://conda.anaconda.org/conda-forge/win-64/_go_select-2.3.0-cgo.tar.bz2
 https://conda.anaconda.org/conda-forge/win-64/ca-certificates-2021.10.8-h5b45459_0.tar.bz2

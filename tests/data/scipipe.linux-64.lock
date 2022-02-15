@@ -2,6 +2,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: linux-64
+# channels: conda-forge, defaults
 @EXPLICIT
 https://conda.anaconda.org/conda-forge/linux-64/git-lfs-2.11.0-0.tar.bz2
 https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2

@@ -2,6 +2,7 @@
 # This file may be used to create an environment using:
 # $ conda create --name <env> --file <this file>
 # platform: linux-64
+# channels: pyviz,ml4t,conda-forge,defaults
 @EXPLICIT
 https://conda.anaconda.org/conda-forge/linux-64/_libgcc_mutex-0.1-conda_forge.tar.bz2
 https://repo.anaconda.com/pkgs/main/linux-64/blas-1.0-openblas.conda
