@@ -12,6 +12,10 @@ from conda.exceptions import CondaEnvironmentError
 from conda.testing.integration import run_command, Commands, _get_temp_prefix
 
 
+def _get_temp_prefix_safe():
+    return _get_temp_prefix(use_restricted_unicode=True).replace(" ", "")
+
+
 def print_and_check_output(*args, **kwargs):
     kwargs.setdefault("capture_output", True)
     kwargs.setdefault("universal_newlines", True)
@@ -33,7 +37,7 @@ def test_logging():
     env = os.environ.copy()
     env["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
     process = print_and_check_output(
-        [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix(), "--dry-run", "xz"],
+        [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix_safe(), "--dry-run", "xz"],
         env=env
     )
     in_header = False
@@ -88,7 +92,7 @@ def cli_flag_and_env_var_settings():
     env_classic = os.environ.copy()
     env_libmamba["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
     env_classic["CONDA_EXPERIMENTAL_SOLVER"] = "classic"
-    command = [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix(), "--dry-run", "xz"]
+    command = [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix_safe(), "--dry-run", "xz"]
     cli_libmamba = ["--experimental-solver=libmamba"]
     cli_classic = ["--experimental-solver=classic"]
     tests = [
