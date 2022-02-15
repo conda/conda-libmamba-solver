@@ -52,7 +52,7 @@ jobs:
           ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv --durations=0 -m 'slow'"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv --durations=0 --timeout=1800 -m 'slow'"
 
   macos:
     if: |
@@ -115,7 +115,7 @@ jobs:
         working-directory: conda
         run: |
           eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
-          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv --durations=0 -m "slow"
+          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv --durations=0 --timeout=1800 -m "slow"
 
   windows:
     if: |
@@ -181,5 +181,5 @@ jobs:
         run: |
           CALL dev-init.bat
           if errorlevel 1 exit 1
-          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv --durations=0 -m "slow"
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv --durations=0 --timeout=1800 -m "slow"
           if errorlevel 1 exit 1
