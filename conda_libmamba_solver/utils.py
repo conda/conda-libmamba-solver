@@ -15,18 +15,24 @@ class CapturedDescriptor:
         self._threaded = threaded
         self._sentinel = sentinel
         self.text = ""
-        try:
-            # Keep a reference to the descriptor we are capturing
-            self._captured_stream_fd = self._captured_stream.fileno()
-        except UnsupportedOperation:
-            # This happens in our tests because we are already
-            # capturing sys.stdout and stderr; if that's the case
-            # make this a noop
+        if sys.platform.startswith("win"):
+            # This method of capturing stderr messes up downloads on libmamba 0.21
+            # Disable until we find a solution
             self.start = self._noop
             self.stop = self._noop
         else:
-            # Create a pipe so the stream can be captured:
-            self._pipe_out, self._pipe_in = os.pipe()
+            try:
+                # Keep a reference to the descriptor we are capturing
+                self._captured_stream_fd = self._captured_stream.fileno()
+            except UnsupportedOperation:
+                # This happens in our tests because we are already
+                # capturing sys.stdout and stderr; if that's the case
+                # make this a noop
+                self.start = self._noop
+                self.stop = self._noop
+            else:
+                # Create a pipe so the stream can be captured:
+                self._pipe_out, self._pipe_in = os.pipe()
 
     def __enter__(self):
         self.start()

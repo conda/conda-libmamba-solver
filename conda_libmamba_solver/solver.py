@@ -13,7 +13,7 @@ from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
 
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
+from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.serialize import json_dump, json_load
@@ -213,7 +213,9 @@ class LibMambaSolver(Solver):
 
         # From now on we _do_ require a solver and the index
         with CapturedDescriptor(stream=sys.stderr, threaded=True) as captured:
-            api_ctx = init_api_context(verbosity=3)
+            # FIXME: we can't enable debug on Windows because
+            #        stderr capturing blocks index downloads!
+            api_ctx = init_api_context(verbosity=context.verbosity if on_win else 3)
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=self._channels,
