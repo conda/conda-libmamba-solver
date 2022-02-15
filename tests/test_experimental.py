@@ -7,6 +7,7 @@ from subprocess import run
 
 import pytest
 
+from conda.base.constants import on_win
 from conda.base.context import fresh_context, context
 from conda.exceptions import CondaEnvironmentError
 from conda.testing.integration import run_command, Commands, _get_temp_prefix
@@ -53,11 +54,12 @@ def test_logging():
     else:
         pytest.fail("Could not find logfile path in outout")
 
-    with open(logfile_path) as f:
-        log_contents = f.read()
-        assert "conda.conda_libmamba_solver" in log_contents
-        assert "solver started" in log_contents
-        assert "choice rule creation took" in log_contents
+    if not on_win:  # file logging on windows is temporarily disabled :(
+        with open(logfile_path) as f:
+            log_contents = f.read()
+            assert "conda.conda_libmamba_solver" in log_contents
+            assert "solver started" in log_contents
+            assert "choice rule creation took" in log_contents
 
 
 def test_cli_flag_in_help():
