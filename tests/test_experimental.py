@@ -96,9 +96,11 @@ def cli_flag_and_env_var_settings():
     ]
     return tests
 
+
 @pytest.mark.parametrize("name, command, env, solver", cli_flag_and_env_var_settings())
 def test_cli_flag_and_env_var(name, command, env, solver):
         stdout = check_output(command, env=env, stderr=STDOUT, universal_newlines=True)
+        print(stdout)
         if solver == "libmamba":
             assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in stdout
         else:
