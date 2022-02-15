@@ -3,6 +3,7 @@
 
 # TODO: Temporarily vendored from mamba.utils v0.19 on 2021.12.02
 # Decide what to do with it when we split into a plugin
+# 2022.02.15: updated vendored parts to v0.21.2
 
 import json
 import os
@@ -94,7 +95,7 @@ def get_index(
             index.append((sd, {"platform": channel_platform, "url": url, "channel": channel}))
             dlist.add(sd)
 
-    is_downloaded = dlist.download(True)
+    is_downloaded = dlist.download(api.MAMBA_DOWNLOAD_FAILFAST)
 
     if not is_downloaded:
         raise RuntimeError("Error downloading repodata.")
@@ -232,7 +233,9 @@ def init_api_context(verbosity: int = context.verbosity, use_mamba_experimental:
                 )
     api_ctx.custom_multichannels = additional_custom_multichannels
 
-    api_ctx.default_channels = [x.base_url for x in context.default_channels]
+    api_ctx.default_channels = [
+        get_base_url(x.url(with_credentials=True)) for x in context.default_channels
+    ]
 
     if context.ssl_verify is False:
         api_ctx.ssl_verify = "<false>"
