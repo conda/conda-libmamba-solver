@@ -54,12 +54,11 @@ def test_logging():
     else:
         pytest.fail("Could not find logfile path in outout")
 
-    if not on_win:  # file logging on windows is temporarily disabled :(
-        with open(logfile_path) as f:
-            log_contents = f.read()
-            assert "conda.conda_libmamba_solver" in log_contents
-            assert "solver started" in log_contents
-            assert "choice rule creation took" in log_contents
+    with open(logfile_path) as f:
+        log_contents = f.read()
+        assert "conda.conda_libmamba_solver" in log_contents
+        assert "solver started" in log_contents
+        assert "choice rule creation took" in log_contents
 
 
 def test_cli_flag_in_help():
@@ -113,8 +112,8 @@ def cli_flag_and_env_var_settings():
 
 @pytest.mark.parametrize("name, command, env, solver", cli_flag_and_env_var_settings())
 def test_cli_flag_and_env_var(name, command, env, solver):
-        process = print_and_check_output(command, env=env)
-        if solver == "libmamba":
-            assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in process.stdout
-        else:
-            assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in process.stdout
+    process = print_and_check_output(command, env=env)
+    if solver == "libmamba":
+        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in process.stdout
+    else:
+        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in process.stdout
