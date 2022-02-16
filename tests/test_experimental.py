@@ -3,13 +3,27 @@ Ensure experimental features work accordingly.
 """
 import os
 import sys
-from subprocess import check_output, STDOUT
+from subprocess import run
 
 import pytest
 
+from conda.base.constants import on_win
 from conda.base.context import fresh_context, context
 from conda.exceptions import CondaEnvironmentError
 from conda.testing.integration import run_command, Commands, _get_temp_prefix
+
+
+def _get_temp_prefix_safe():
+    return _get_temp_prefix(use_restricted_unicode=True).replace(" ", "")
+
+
+def print_and_check_output(*args, **kwargs):
+    kwargs.setdefault("capture_output", True)
+    kwargs.setdefault("universal_newlines", True)
+    process = run(*args, **kwargs)
+    print("stdout", process.stdout, "---", "stderr", process.stderr, sep="\n")
+    process.check_returncode()
+    return process
 
 
 @pytest.mark.parametrize("solver", ("libmamba", "libmamba-draft"))
@@ -23,13 +37,12 @@ def test_logging():
     "Check we are indeed writing full logs to disk"
     env = os.environ.copy()
     env["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
-    stdout = check_output(
-        [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix(), "--dry-run", "xz"],
-        env=env, stderr=STDOUT, universal_newlines=True,
+    process = print_and_check_output(
+        [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix_safe(), "--dry-run", "xz"],
+        env=env
     )
-
     in_header = False
-    for line in stdout.splitlines():
+    for line in process.stdout.splitlines():
         line = line.strip()
         if "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in line:
             in_header = True
@@ -59,8 +72,8 @@ def test_cli_flag_in_help():
        ["env", "remove"],
     )
     for command in commands_with_flag:
-        stdout = check_output([sys.executable, "-m", "conda"] + command + ["--help"], stderr=STDOUT, universal_newlines=True)
-        assert "--experimental-solver" in stdout
+        process = print_and_check_output([sys.executable, "-m", "conda"] + command + ["--help"])
+        assert "--experimental-solver" in process.stdout
 
     commands_without_flag = (
        ["config"],
@@ -70,8 +83,8 @@ def test_cli_flag_in_help():
        ["env", "list"],
     )
     for command in commands_without_flag:
-        stdout = check_output([sys.executable, "-m", "conda"] + command + ["--help"], stderr=STDOUT, universal_newlines=True)
-        assert "--experimental-solver" not in stdout
+        process = print_and_check_output([sys.executable, "-m", "conda"] + command + ["--help"])
+        assert "--experimental-solver" not in process.stdout
 
 
 def cli_flag_and_env_var_settings():
@@ -80,7 +93,7 @@ def cli_flag_and_env_var_settings():
     env_classic = os.environ.copy()
     env_libmamba["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
     env_classic["CONDA_EXPERIMENTAL_SOLVER"] = "classic"
-    command = [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix(), "--dry-run", "xz"]
+    command = [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix_safe(), "--dry-run", "xz"]
     cli_libmamba = ["--experimental-solver=libmamba"]
     cli_classic = ["--experimental-solver=classic"]
     tests = [
@@ -96,10 +109,11 @@ def cli_flag_and_env_var_settings():
     ]
     return tests
 
+
 @pytest.mark.parametrize("name, command, env, solver", cli_flag_and_env_var_settings())
 def test_cli_flag_and_env_var(name, command, env, solver):
-        stdout = check_output(command, env=env, stderr=STDOUT, universal_newlines=True)
-        if solver == "libmamba":
-            assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in stdout
-        else:
-            assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in stdout
+    process = print_and_check_output(command, env=env)
+    if solver == "libmamba":
+        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in process.stdout
+    else:
+        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in process.stdout

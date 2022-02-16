@@ -3,6 +3,8 @@ import sys
 from io import UnsupportedOperation
 from time import sleep
 from threading import Thread
+import traceback
+import tempfile
 
 
 class CapturedDescriptor:
@@ -10,7 +12,7 @@ class CapturedDescriptor:
     Class used to grab standard output or another stream.
     """
 
-    def __init__(self, stream=sys.stdout, threaded=False, sentinel="\b"):
+    def __init__(self, stream=sys.stdout, threaded=False, sentinel="\0"):
         self._captured_stream = stream
         self._threaded = threaded
         self._sentinel = sentinel
@@ -60,17 +62,32 @@ class CapturedDescriptor:
         """
         Stop capturing the stream data and save the text in `text`.
         """
-        # Print the escape character to make the _read method stop:
-        self._captured_stream.write(self._sentinel)
-        # Flush the stream to make sure all our data goes in before
-        # the escape character:
-        self._captured_stream.flush()
-        if self._threaded:
-            # wait until the thread finishes so we are sure that
-            # we have the last character:
-            self._thread.join()
+        try:
+            if sys.platform.startswith("win"):
+                os.write(self._pipe_in, self._sentinel.encode())
+                os.fsync(self._pipe_in)
+            else:
+                # Print the escape character to make the _read method stop:
+                self._captured_stream.write(self._sentinel)
+                # Flush the stream to make sure all our data goes in before
+                # the escape character:
+                self._captured_stream.flush()
+            if self._threaded:
+                # wait until the thread finishes so we are sure that
+                # we have the last character:
+                self._thread.join()
+            else:
+                self._read()
+        except Exception as e:
+            traceback.print_exc(file=sys.stdout)
+            self._close()
+            raise
         else:
-            self._read()
+            self._close()
+
+    stop = _stop
+
+    def _close(self):
         # Close the pipe:
         os.close(self._pipe_in)
         os.close(self._pipe_out)
@@ -78,8 +95,6 @@ class CapturedDescriptor:
         os.dup2(self._original_stream_fd, self._captured_stream_fd)
         # Close the duplicate stream:
         os.close(self._original_stream_fd)
-
-    stop = _stop
 
     def _read(self, length=1):
         """
@@ -91,3 +106,45 @@ class CapturedDescriptor:
             if not char or self._sentinel in char:
                 break
             self.text += char
+
+
+class CaptureStreamToFile:
+    def __init__(self, stream=sys.stderr, path=None, callback=None):
+        self._original_stream = stream
+        if path is None:
+            self._file = tempfile.TemporaryFile(mode='w+t')
+        else:
+            self._file = open(path, mode="a+t")
+        self.text = None
+        self._callback = callback
+
+    def start(self):
+        self._original_fileno = self._original_stream.fileno()
+        self._saved_original_fileno = os.dup(self._original_fileno)
+        os.dup2(self._file.fileno(), self._original_fileno)
+
+    def stop(self):
+        os.dup2(self._saved_original_fileno, self._original_fileno)
+        os.close(self._saved_original_fileno)
+        self._file.flush()
+        self._file.seek(0)
+        self.text = self._file.read()
+        self._file.close()
+        if self._callback:
+            self._callback(self.text)
+
+    def __enter__(self):
+        try:
+            self.start()
+            return self
+        except Exception:
+            traceback.print_exception(file=sys.stdout)
+            raise
+
+    def __exit__(self, exc_type, exc_value, tb):
+        try:
+            self.stop()
+        finally:
+            if exc_type is not None:
+                traceback.print_exception(exc_type, exc_value, tb, file=sys.stdout)
+                raise exc_type(exc_value)
