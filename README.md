@@ -1,5 +1,8 @@
 # conda-libmamba-solver
 
+[![Anaconda-Server Badge](https://anaconda.org/conda-canary/conda-libmamba-solver/badges/version.svg)](https://anaconda.org/conda-canary/conda-libmamba-solver)
+[![Anaconda-Server Badge](https://anaconda.org/conda-canary/conda-libmamba-solver/badges/latest_release_date.svg)](https://anaconda.org/conda-canary/conda-libmamba-solver)
+
 The fast mamba solver, now in conda!
 
 ## Trying it out
@@ -20,11 +23,15 @@ $ conda activate base
 $ conda install \
     --override-channels \
     -c conda-canary/label/conda-conda-pr-11193 \
-    -c conda-canary/label/conda-libmamba-solver-pr-3 \
+    -c conda-canary/label/conda-libmamba-solver-dev \
     -c conda-forge \
     -c defaults \
     conda \
     conda-libmamba-solver
+```
+```bash
+# one-liner version (same as above)
+$ conda install --override-channels -c conda-canary/label/conda-conda-pr-11193 -c conda-canary/label/conda-libmamba-solver-dev -c conda-forge -c defaults conda conda-libmamba-solver
 ```
 
 2. Now you can experiment with different things. `--dry-run` is specially useful to check how
