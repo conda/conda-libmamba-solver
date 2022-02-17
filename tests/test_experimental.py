@@ -57,8 +57,8 @@ def test_logging():
     with open(logfile_path) as f:
         log_contents = f.read()
         assert "conda.conda_libmamba_solver" in log_contents
-        assert "solver started" in log_contents
-        assert "choice rule creation took" in log_contents
+        assert "info     Parsing MatchSpec" in log_contents
+        assert "info     Adding job" in log_contents
 
 
 def test_cli_flag_in_help():
