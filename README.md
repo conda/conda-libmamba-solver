@@ -8,6 +8,14 @@
 
 The fast mamba solver, now in conda!
 
+## What is this exactly?
+
+conda-libmamba-solver is a new (experimental) solver for the
+[conda package manager](https://docs.conda.io/) which uses the solver from the
+[mamba project](https://mamba.readthedocs.io/) behind the scenes, while
+carefully implementing conda's functionality and expected behaviors on top.
+The library used by mamba to do the heavy-lifting is called [libsolv](https://github.com/openSUSE/libsolv).
+
 ## Trying it out
 
 The new libmamba integrations are experimental, but you can get a taste of how they are working
