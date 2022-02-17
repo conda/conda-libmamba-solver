@@ -43,7 +43,7 @@ from .mamba_utils import (
     mamba_version,
 )
 from .state import SolverInputState, SolverOutputState, IndexHelper
-from .utils import CapturedDescriptor, CaptureStreamToFile
+from .utils import CaptureStreamToFile
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -213,7 +213,7 @@ class LibMambaSolver(Solver):
 
         # From now on we _do_ require a solver and the index
         with CaptureStreamToFile(callback=log.debug):
-            api_ctx = init_api_context(verbosity=3)
+            api_ctx = init_api_context(verbosity=max(2, context.verbosity))
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=self._channels,
