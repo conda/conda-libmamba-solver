@@ -19,8 +19,9 @@ concurrency:
 jobs:
   linux:
     if: |
-      github.event_name == 'pull_request' &&
-      github.event.label.name == 'performance::run'
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run') ||
+      (github.event.workflow_run.conclusion == 'success')
     name: Linux, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
@@ -63,8 +64,9 @@ jobs:
 
   macos:
     if: |
-      github.event_name == 'pull_request' &&
-      github.event.label.name == 'performance::run'
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run') ||
+      (github.event.workflow_run.conclusion == 'success')
     name: MacOS, Python ${{ matrix.python-version }}
     runs-on: macos-latest
     strategy:
@@ -126,8 +128,9 @@ jobs:
 
   windows:
     if: |
-      github.event_name == 'pull_request' &&
-      github.event.label.name == 'performance::run'
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run') ||
+      (github.event.workflow_run.conclusion == 'success')
     name: Windows, Python ${{ matrix.python-version }}
     runs-on: windows-latest
     strategy:
