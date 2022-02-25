@@ -39,7 +39,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba # change to `master` once upstream is merged
+          ref: master
           path: conda
 
       - name: Python ${{ matrix.python-version }}
@@ -81,7 +81,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba
+          ref: master
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -144,7 +144,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba
+          ref: master
           path: conda
 
       - name: Set temp dirs correctly
