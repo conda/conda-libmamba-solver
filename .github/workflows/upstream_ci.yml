@@ -82,7 +82,7 @@ jobs:
           -e TEST_GROUP
           -e CONDA_EXPERIMENTAL_SOLVER
           ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
-          bash -c "/opt/conda/condabin/conda install -p /opt/conda 'conda-forge::mamba>=0.19.0' conda-forge::libcurl &&
+          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda 'conda-forge::mamba>=0.19.0' conda-forge::libcurl &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    $run_test_cmd"
 
