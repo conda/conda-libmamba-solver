@@ -1,14 +1,16 @@
-name: CI
+name: Performance
 
 on:
-  push:
+  pull_request:
+    types:
+      - labeled
+  workflow_run:
+    workflows:
+      - CI
     branches:
       - main
-    paths-ignore:
-      - "docs/**"
-  pull_request:
-    paths-ignore:
-      - "docs/**"
+    types:
+      - completed
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -16,12 +18,16 @@ concurrency:
 
 jobs:
   linux:
+    if: |
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run') ||
+      (github.event.workflow_run.conclusion == 'success')
     name: Linux, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9"]
+        python-version: ["3.9"]
 
     env:
       OS: "linux"
@@ -42,7 +48,7 @@ jobs:
           ref: libmamba
           path: conda
 
-      - name: Python ${{ matrix.python-version }}
+      - name: Run performance tests
         run: >
           docker run
           --rm
@@ -54,15 +60,19 @@ jobs:
           ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
           bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv --durations=0 --timeout=1800 -m 'slow'"
 
   macos:
+    if: |
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run') ||
+      (github.event.workflow_run.conclusion == 'success')
     name: MacOS, Python ${{ matrix.python-version }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9"]
+        python-version: ["3.9"]
 
     env:
       OS: "macos"
@@ -109,20 +119,24 @@ jobs:
         run: |
           python -m pip install . -vv --no-deps
 
-      - name: Python ${{ matrix.python-version }}
+      - name: Run performance tests
         shell: bash -l {0}
         working-directory: conda
         run: |
           eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
-          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
+          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv --durations=0 --timeout=1800 -m "slow"
 
   windows:
+    if: |
+      (github.event_name == 'pull_request' &&
+      github.event.label.name == 'performance::run') ||
+      (github.event.workflow_run.conclusion == 'success')
     name: Windows, Python ${{ matrix.python-version }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9"]
+        python-version: ["3.9"]
 
     env:
       OS: "windows"
@@ -171,11 +185,11 @@ jobs:
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
 
-      - name: Python ${{ matrix.python-version }}
+      - name: Run performance tests
         shell: cmd
         working-directory: conda
         run: |
           CALL dev-init.bat
           if errorlevel 1 exit 1
-          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow" --timeout=600
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv --durations=0 --timeout=1800 -m "slow"
           if errorlevel 1 exit 1
