@@ -87,7 +87,7 @@ jobs:
                    $run_test_cmd"
 
   macos:
-    name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
@@ -181,7 +181,7 @@ jobs:
           ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
 
   windows:
-    name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.conda-solver-logic }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
