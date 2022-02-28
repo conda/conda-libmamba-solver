@@ -55,7 +55,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba
+          ref: master
           path: conda
 
       - name: Define test type and override pytest settings
@@ -126,7 +126,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba
+          ref: master
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -220,7 +220,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba
+          ref: master
           path: conda
 
       - name: Set temp dirs correctly
