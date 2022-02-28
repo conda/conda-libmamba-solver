@@ -1,4 +1,5 @@
-from collections import defaultdict, MutableMapping
+from collections import defaultdict
+from collections.abc import MutableMapping
 from enum import Enum
 from typing import Any, Hashable, Iterable, Union, Optional, Tuple
 import sys
