@@ -35,11 +35,19 @@ def test_protection_for_base_env(solver):
 
 def test_logging():
     "Check we are indeed writing full logs to disk"
-    env = os.environ.copy()
-    env["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
     process = print_and_check_output(
-        [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix_safe(), "--dry-run", "xz"],
-        env=env
+        [
+            sys.executable,
+            "-m",
+            "conda",
+            "create",
+            "-y",
+            "-p",
+            _get_temp_prefix_safe(),
+            "--dry-run",
+            "--experimental-solver=libmamba",
+            "xz",
+        ],
     )
     in_header = False
     for line in process.stdout.splitlines():
@@ -56,31 +64,32 @@ def test_logging():
 
     with open(logfile_path) as f:
         log_contents = f.read()
-        assert "conda.conda_libmamba_solver" in log_contents
-        assert "info     Parsing MatchSpec" in log_contents
-        assert "info     Adding job" in log_contents
+
+    assert "conda.conda_libmamba_solver" in log_contents
+    assert "info     Parsing MatchSpec" in log_contents
+    assert "info     Adding job" in log_contents
 
 
 def test_cli_flag_in_help():
     commands_with_flag = (
-       ["install"],
-       ["update"],
-       ["remove"],
-       ["create"],
-       ["env", "create"],
-       ["env", "update"],
-       ["env", "remove"],
+        ["install"],
+        ["update"],
+        ["remove"],
+        ["create"],
+        ["env", "create"],
+        ["env", "update"],
+        ["env", "remove"],
     )
     for command in commands_with_flag:
         process = print_and_check_output([sys.executable, "-m", "conda"] + command + ["--help"])
         assert "--experimental-solver" in process.stdout
 
     commands_without_flag = (
-       ["config"],
-       ["list"],
-       ["info"],
-       ["run"],
-       ["env", "list"],
+        ["config"],
+        ["list"],
+        ["info"],
+        ["run"],
+        ["env", "list"],
     )
     for command in commands_without_flag:
         process = print_and_check_output([sys.executable, "-m", "conda"] + command + ["--help"])
@@ -93,7 +102,17 @@ def cli_flag_and_env_var_settings():
     env_classic = os.environ.copy()
     env_libmamba["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
     env_classic["CONDA_EXPERIMENTAL_SOLVER"] = "classic"
-    command = [sys.executable, "-m", "conda", "create", "-y", "-p", _get_temp_prefix_safe(), "--dry-run", "xz"]
+    command = [
+        sys.executable,
+        "-m",
+        "conda",
+        "create",
+        "-y",
+        "-p",
+        _get_temp_prefix_safe(),
+        "--dry-run",
+        "xz",
+    ]
     cli_libmamba = ["--experimental-solver=libmamba"]
     cli_classic = ["--experimental-solver=classic"]
     tests = [
