@@ -22,11 +22,12 @@ import pytest
 
 from conda.auxlib.ish import dals
 from conda.common.io import env_var
-from conda.base.constants import UpdateModifier
+from conda.base.constants import UpdateModifier, on_win
 from conda.base.context import context, conda_tests_ctxt_mgmt_def_pol
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import UnsatisfiableError
+from conda.gateways.subprocess import subprocess_call_with_clean_env
 from conda.models.match_spec import MatchSpec
 from conda.models.version import VersionOrder
 from conda.testing.cases import BaseTestCase
@@ -35,6 +36,7 @@ from conda.testing.integration import (
     Commands,
     make_temp_env,
     package_is_installed,
+    PYTHON_BINARY,
 )
 from conda.testing.helpers import (
     add_subdir,
@@ -97,6 +99,18 @@ class PatchedCondaTestCreate(BaseTestCase):
             run_command(Commands.INSTALL, prefix, "python=3.7", no_capture=True)
             assert package_is_installed(prefix, "python=3.7")
 
+    @pytest.mark.xfail(on_win, reason="TODO: Investigate why this fails on Windows only")
+    def test_install_update_deps_only_deps_flags(self):
+        with make_temp_env("flask=2.0.1", "jinja2=3.0.1") as prefix:
+            python = os.path.join(prefix, PYTHON_BINARY)
+            result_before = subprocess_call_with_clean_env([python, "--version"])
+            assert package_is_installed(prefix, "flask=2.0.1")
+            assert package_is_installed(prefix, "jinja2=3.0.1")
+            run_command(Commands.INSTALL, prefix, "flask", "python", "--update-deps", "--only-deps")
+            result_after = subprocess_call_with_clean_env([python, "--version"])
+            assert result_before == result_after
+            assert package_is_installed(prefix, "flask=2.0.1")
+            assert package_is_installed(prefix, "jinja2>3.0.1")
 
 # The following tests come from `conda/conda::tests/core/test_solve.py`
 
@@ -1064,3 +1078,4 @@ def test_downgrade_python_prevented_with_sane_message(tmpdir):
         assert "Encountered problems while solving" in error_msg
         assert "package unsatisfiable-with-py26-1.0-0 requires scikit-learn 0.13" in error_msg
         ## /MODIFIED
+
