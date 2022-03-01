@@ -69,8 +69,8 @@ def test_logging():
     print(log_contents)
 
     assert "conda.conda_libmamba_solver" in log_contents
-    assert "info     Parsing MatchSpec" in log_contents
-    assert "info     Adding job" in log_contents
+    assert "info     libmamba Parsing MatchSpec" in log_contents
+    assert "info     libmamba Adding job" in log_contents
 
 
 def test_cli_flag_in_help():
