@@ -233,8 +233,9 @@ class LibMambaSolver(Solver):
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            # This modifies out_state in place
-            self._solving_loop(in_state, out_state, index)
+            # This function will copy and mutate `out_state`
+            # Make sure we get the latest copy to return the correct solution below
+            out_state = self._solving_loop(in_state, out_state, index)
 
         # Restore intended verbosity to avoid unwanted
         # "freeing xxxx..." messages when the libmambpy objects are deleted
@@ -309,7 +310,7 @@ class LibMambaSolver(Solver):
                     file=sys.stderr,
                 )
 
-        return out_state.current_solution
+        return out_state
 
     def _print_info(self):
         if not context.json and not context.quiet:
