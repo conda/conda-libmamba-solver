@@ -1,0 +1,2 @@
+conda-forge::mamba>=0.21
+conda-forge::libcurl

@@ -52,7 +52,7 @@ jobs:
           -e TEST_GROUP
           -e CONDA_EXPERIMENTAL_SOLVER
           ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
-          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda 'conda-forge::mamba>=0.19.0' conda-forge::libcurl &&
+          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv"
@@ -98,11 +98,11 @@ jobs:
           conda config --set changeps1 true
           # make sure the caching works correctly
           conda config --set use_only_tar_bz2 true
-          # add mamba to requirements
-          echo "conda-forge::mamba >=0.19.0" >> tests/requirements.txt
-          echo "conda-forge::libcurl" >> tests/requirements.txt
           # install all test requirements
-          conda install --yes --file tests/requirements.txt python=${{ matrix.python-version }}
+          conda install --yes \
+            --file tests/requirements.txt \
+            --file ../conda-libmamba-solver/dev/requirements.txt \
+            python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
           conda info
           mamba --version
@@ -159,9 +159,7 @@ jobs:
         working-directory: conda
         run: |
           :: add mamba to requirements
-          set "GT=^>="
-          echo conda-forge::mamba %GT%0.19.0 >> .\tests\requirements.txt
-          echo conda-forge::libcurl >> .\tests\requirements.txt
+          type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
           :: initialize conda dev
           call .\dev\windows\setup.bat
           if errorlevel 1 exit 1
