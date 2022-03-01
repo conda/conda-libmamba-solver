@@ -57,8 +57,9 @@ jobs:
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_EXPERIMENTAL_SOLVER
-          ghcr.io/conda/conda-ci:libmamba-linux-python${{ matrix.python-version }}
-          bash -c "/opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
+          ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
+          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
+                   /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv --durations=0 --timeout=1800 -m 'slow'"
 
@@ -108,7 +109,10 @@ jobs:
           # make sure the caching works correctly
           conda config --set use_only_tar_bz2 true
           # install all test requirements
-          conda install --yes --file tests/requirements.txt python=${{ matrix.python-version }}
+          conda install --yes \
+            --file tests/requirements.txt \
+            --file ../conda-libmamba-solver/dev/requirements.txt \
+            python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
           conda info
           mamba --version
@@ -168,6 +172,10 @@ jobs:
         shell: cmd
         working-directory: conda
         run: |
+          :: add mamba to requirements
+          type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
+          if errorlevel 1 exit 1
+          :: initialize conda dev
           call .\dev\windows\setup.bat
           if errorlevel 1 exit 1
           call .\dev-init.bat
