@@ -181,6 +181,7 @@ jobs:
           call .\dev-init.bat
           if errorlevel 1 exit 1
           mamba --version
+          if errorlevel 1 exit 1
           conda info -a
           if errorlevel 1 exit 1
 
