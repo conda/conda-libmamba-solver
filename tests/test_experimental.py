@@ -65,6 +65,9 @@ def test_logging():
     with open(logfile_path) as f:
         log_contents = f.read()
 
+    print("contents of", logfile_path)
+    print(log_contents)
+
     assert "conda.conda_libmamba_solver" in log_contents
     assert "info     Parsing MatchSpec" in log_contents
     assert "info     Adding job" in log_contents
