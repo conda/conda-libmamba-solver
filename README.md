@@ -39,7 +39,7 @@ Then install the canary versions of conda and conda-libmamba-solver:
 conda install \
     --override-channels \
     --yes \
-    -c conda-canary/label/conda-conda-pr-11193 \
+    -c conda-canary/label/dev \
     -c conda-canary/label/conda-libmamba-solver-dev \
     -c conda-forge \
     -c defaults \
@@ -49,7 +49,7 @@ conda install \
 
 (Optional) One-liner version (same as above):
 ```bash
-conda install --override-channels --yes -c conda-canary/label/conda-conda-pr-11193 -c conda-canary/label/conda-libmamba-solver-dev -c conda-forge -c defaults conda conda-libmamba-solver
+conda install --override-channels --yes -c conda-canary/label/dev -c conda-canary/label/conda-libmamba-solver-dev -c conda-forge -c defaults conda conda-libmamba-solver
 ```
 
 2. Now you can experiment with different things. `--dry-run` is specially useful to check how
