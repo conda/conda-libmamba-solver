@@ -16,6 +16,7 @@ from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
 from conda.base.context import context
 from conda.common.constants import NULL
+from conda.common.io import Spinner
 from conda.common.serialize import json_dump, json_load
 from conda.common.path import paths_equal
 from conda.common.url import (
@@ -219,8 +220,35 @@ class LibMambaSolver(Solver):
                 channels=self._channels,
                 subdirs=self.subdirs,
             )
-        self._setup_solver(index)
 
+        with Spinner(
+            "Collect all metadata",
+            enabled=not context.verbosity and not context.quiet,
+            json=context.json,
+        ):
+            self._setup_solver(index)
+
+        with Spinner(
+            "Solving environment",
+            enabled=not context.verbosity and not context.quiet,
+            json=context.json,
+        ):
+            # This function will copy and mutate `out_state`
+            # Make sure we get the latest copy to return the correct solution below
+            out_state = self._solving_loop(in_state, out_state, index)
+
+        # Restore intended verbosity to avoid unwanted
+        # "freeing xxxx..." messages when the libmambpy objects are deleted
+        api_ctx.verbosity = context.verbosity
+        api_ctx.set_verbosity(context.verbosity)
+
+        self.neutered_specs = tuple(out_state.neutered.values())
+
+        return out_state.current_solution
+
+    def _solving_loop(
+        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
+    ):
         for attempt in range(1, max(1, len(in_state.installed)) + 1):
             log.debug("Starting solver attempt %s", attempt)
             if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
@@ -270,6 +298,7 @@ class LibMambaSolver(Solver):
 
         # Run post-solve tasks
         out_state.post_solve(solver=self)
+
         if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
             print("SOLUTION for command", self._command, ":", file=sys.stderr)
             for name, record in out_state.records.items():
@@ -281,14 +310,7 @@ class LibMambaSolver(Solver):
                     file=sys.stderr,
                 )
 
-        self.neutered_specs = tuple(out_state.neutered.values())
-
-        # Restore intended verbosity to avoid unwanted
-        # "freeing xxxx..." messages when the libmambpy objects are deleted
-        api_ctx.verbosity = context.verbosity
-        api_ctx.set_verbosity(context.verbosity)
-
-        return out_state.current_solution
+        return out_state
 
     def _print_info(self):
         if not context.json and not context.quiet:
@@ -342,10 +364,7 @@ class LibMambaSolver(Solver):
             self.solver = api.Solver(index._pool, self._solver_options)
 
     def _solve_attempt(
-        self,
-        in_state: SolverInputState,
-        out_state: SolverOutputState,
-        index: LibMambaIndexHelper,
+        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         self._setup_solver(index)
 
@@ -570,19 +589,14 @@ class LibMambaSolver(Solver):
         raise LibMambaUnsatisfiableError(problems)
 
     def _export_solved_records(
-        self,
-        in_state: SolverInputState,
-        out_state: SolverOutputState,
-        index: LibMambaIndexHelper,
+        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         with CaptureStreamToFile(callback=log.debug):
             transaction = api.Transaction(
-                self.solver,
-                api.MultiPackageCache(context.pkgs_dirs),
-                index._repos
+                self.solver, api.MultiPackageCache(context.pkgs_dirs), index._repos,
             )
             (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
