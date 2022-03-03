@@ -332,7 +332,7 @@ class LibMambaSolver(Solver):
                 ---------------------------------------------------------------
                 """
             ).rstrip()
-            if context.experimental_solver_confirmation:
+            if context.experimental_solver_confirmation and not context.dry_run:
                 risk = dedent(
                     """
                     There are risks using this experimental solver since it
@@ -344,7 +344,7 @@ class LibMambaSolver(Solver):
                     Do you wish to proceed
                     """
                 ).rstrip()
-                confirm_yn(f"{msg}\n{risk}", dry_run=False)
+                confirm_yn(f"{msg}\n{risk}")
 
                 # update ~/.condarc to no longer prompt
                 try:
