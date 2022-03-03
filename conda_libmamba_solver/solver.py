@@ -48,6 +48,7 @@ from .state import SolverInputState, SolverOutputState, IndexHelper
 from .utils import CaptureStreamToFile
 
 log = logging.getLogger(f"conda.{__name__}")
+BLURB_COUNT = 0
 
 
 class LibMambaIndexHelper(IndexHelper):
@@ -181,6 +182,13 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+        # Temporary, only during experimental phase to ease debugging
+        global BLURB_COUNT
+        if not BLURB_COUNT:
+            self._print_info()
+            self._check_env_is_base()
+        BLURB_COUNT += 1
+
     def solve_final_state(
         self,
         update_modifier=NULL,
@@ -190,10 +198,6 @@ class LibMambaSolver(Solver):
         force_remove=NULL,
         should_retry_solve=False,
     ):
-        # Temporary, only during experimental phase to ease debugging
-        self._print_info()
-        self._check_env_is_base()
-
         in_state = SolverInputState(
             prefix=self.prefix,
             requested=self.specs_to_add or self.specs_to_remove,
