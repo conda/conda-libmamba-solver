@@ -333,8 +333,8 @@ class LibMambaSolver(Solver):
                     """
                     There are risks using this experimental solver since it
                     does not always produce identical results as that of the
-                    classical solver. As with any experimental/beta product it
-                    is not recommended to use this in production/critical
+                    classical solver. As with any experimental product it
+                    is *not* recommended to use it in production or critical
                     environments.
 
                     Do you wish to proceed
