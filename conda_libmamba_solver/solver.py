@@ -343,12 +343,20 @@ class LibMambaSolver(Solver):
                 confirm_yn(f"{msg}\n{risk}", dry_run=False)
 
                 # update ~/.condarc to no longer prompt
-                with open(user_rc_path, "r+") as fh:
-                    condarc = yaml_round_trip_load(fh.read())
-                    condarc["experimental_solver_confirmation"] = False
-                    fh.seek(0)
-                    fh.write(yaml_round_trip_dump(condarc))
-                reset_context()
+                try:
+                    with open(user_rc_path, "r+") as fh:
+                        condarc = yaml_round_trip_load(fh.read())
+                        condarc["experimental_solver_confirmation"] = False
+                        fh.seek(0)
+                        fh.write(yaml_round_trip_dump(condarc))
+                except OSError as e:
+                    log.warning(
+                        "Failed to set `experimental_solver_confirmation: false` in "
+                        "~/.condarc, is the home directory read-only?"
+                    )
+                    log.debug(e)
+                else:
+                    reset_context()
             else:
                 print(msg)
 
