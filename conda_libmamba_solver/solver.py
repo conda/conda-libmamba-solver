@@ -14,10 +14,11 @@ from textwrap import dedent
 
 from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
-from conda.base.context import context
+from conda.base.context import context, user_rc_path, reset_context
+from conda.cli.common import confirm_yn
 from conda.common.constants import NULL
 from conda.common.io import Spinner
-from conda.common.serialize import json_dump, json_load
+from conda.common.serialize import json_dump, json_load, yaml_round_trip_load, yaml_round_trip_dump
 from conda.common.path import paths_equal
 from conda.common.url import (
     escape_channel_url,
@@ -47,6 +48,7 @@ from .state import SolverInputState, SolverOutputState, IndexHelper
 from .utils import CaptureStreamToFile
 
 log = logging.getLogger(f"conda.{__name__}")
+BLURB_COUNT = 0
 
 
 class LibMambaIndexHelper(IndexHelper):
@@ -180,6 +182,13 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+        # Temporary, only during experimental phase to ease debugging
+        global BLURB_COUNT
+        if not BLURB_COUNT:
+            self._print_info()
+            self._check_env_is_base()
+        BLURB_COUNT += 1
+
     def solve_final_state(
         self,
         update_modifier=NULL,
@@ -189,10 +198,6 @@ class LibMambaSolver(Solver):
         force_remove=NULL,
         should_retry_solve=False,
     ):
-        # Temporary, only during experimental phase to ease debugging
-        self._print_info()
-        self._check_env_is_base()
-
         in_state = SolverInputState(
             prefix=self.prefix,
             requested=self.specs_to_add or self.specs_to_remove,
@@ -314,21 +319,50 @@ class LibMambaSolver(Solver):
 
     def _print_info(self):
         if not context.json and not context.quiet:
-            print(
-                dedent(
-                    f"""
-                    ----       USING EXPERIMENTAL LIBMAMBA INTEGRATIONS       ----
-                        This is a highly experimental product. If something is
-                        not working as expected, please submit an issue at
-                        https://github.com/conda/conda and attach the log file
-                        found in the following path. Thank you!
+            msg = dedent(
+                f"""
+                ----       USING EXPERIMENTAL LIBMAMBA INTEGRATIONS       ----
+                    This is a highly experimental product. If something is
+                    not working as expected, please submit an issue at
+                    https://github.com/conda/conda and attach the log file
+                    found in the following path. Thank you!
 
-                        {context._logfile_path}
+                    {context._logfile_path}
 
-                    ---------------------------------------------------------------
+                ---------------------------------------------------------------
+                """
+            ).rstrip()
+            if context.experimental_solver_confirmation and not context.dry_run:
+                risk = dedent(
                     """
-                )
-            )
+                    There are risks using this experimental solver since it
+                    does not always produce identical results as that of the
+                    classical solver. As with any experimental product it
+                    is *not* recommended to use it in production or critical
+                    environments.
+
+                    Do you wish to proceed
+                    """
+                ).rstrip()
+                confirm_yn(f"{msg}\n{risk}")
+
+                # update ~/.condarc to no longer prompt
+                try:
+                    with open(user_rc_path, "r+") as fh:
+                        condarc = yaml_round_trip_load(fh.read())
+                        condarc["experimental_solver_confirmation"] = False
+                        fh.seek(0)
+                        fh.write(yaml_round_trip_dump(condarc))
+                except OSError as e:
+                    log.warning(
+                        "Failed to set `experimental_solver_confirmation: false` in "
+                        "~/.condarc, is the home directory read-only?"
+                    )
+                    log.debug(e)
+                else:
+                    reset_context()
+            else:
+                print(msg)
 
         log.info("Using experimental libmamba integrations")
         log.info("Logfile path: %s", context._logfile_path)
