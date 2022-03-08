@@ -47,6 +47,7 @@ from .state import SolverInputState, SolverOutputState, IndexHelper
 from .utils import CaptureStreamToFile
 
 log = logging.getLogger(f"conda.{__name__}")
+BLURB_COUNT = 0
 
 
 class LibMambaIndexHelper(IndexHelper):
@@ -190,8 +191,11 @@ class LibMambaSolver(Solver):
         should_retry_solve=False,
     ):
         # Temporary, only during experimental phase to ease debugging
-        self._print_info()
-        self._check_env_is_base()
+        global BLURB_COUNT
+        if not BLURB_COUNT:
+            self._print_info()
+            self._check_env_is_base()
+        BLURB_COUNT += 1
 
         in_state = SolverInputState(
             prefix=self.prefix,
@@ -317,15 +321,21 @@ class LibMambaSolver(Solver):
             print(
                 dedent(
                     f"""
-                    ----       USING EXPERIMENTAL LIBMAMBA INTEGRATIONS       ----
-                        This is a highly experimental product. If something is
-                        not working as expected, please submit an issue at
-                        https://github.com/conda/conda and attach the log file
-                        found in the following path. Thank you!
+                    ***
 
-                        {context._logfile_path}
+                    NOTE: You are using the EXPERIMENTAL libmamba solver integration.
 
-                    ---------------------------------------------------------------
+                    If something is not working as expected, please:
+
+                    1. Go to https://github.com/conda/conda/issues/new/choose
+                    2. Choose the "Libmamba Solver Feedback (Experimental Feature)" option
+                    3. Attach the log file found in the following path:
+
+                    {context._logfile_path}
+
+                    Thank you for your help!
+
+                    ***
                     """
                 )
             )

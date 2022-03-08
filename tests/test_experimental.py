@@ -136,6 +136,6 @@ def cli_flag_and_env_var_settings():
 def test_cli_flag_and_env_var(name, command, env, solver):
     process = print_and_check_output(command, env=env)
     if solver == "libmamba":
-        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in process.stdout
+        assert "You are using the EXPERIMENTAL libmamba solver integration" in process.stdout
     else:
-        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in process.stdout
+        assert "You are using the EXPERIMENTAL libmamba solver integration" not in process.stdout
