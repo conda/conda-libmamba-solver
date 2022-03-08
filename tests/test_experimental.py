@@ -52,9 +52,9 @@ def test_logging():
     in_header = False
     for line in process.stdout.splitlines():
         line = line.strip()
-        if "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in line:
+        if "You are using the EXPERIMENTAL libmamba solver integration" in line:
             in_header = True
-        elif line.startswith("----------"):
+        elif line.startswith("***"):
             in_header = False
         elif in_header and line.endswith(".log"):
             logfile_path = line
@@ -136,6 +136,6 @@ def cli_flag_and_env_var_settings():
 def test_cli_flag_and_env_var(name, command, env, solver):
     process = print_and_check_output(command, env=env)
     if solver == "libmamba":
-        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in process.stdout
+        assert "You are using the EXPERIMENTAL libmamba solver integration" in process.stdout
     else:
-        assert "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" not in process.stdout
+        assert "You are using the EXPERIMENTAL libmamba solver integration" not in process.stdout

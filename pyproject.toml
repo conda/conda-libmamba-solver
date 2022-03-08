@@ -57,7 +57,7 @@ addopts = [
   ### These used to be skipped or xfail'd upstream, but we are trying to
   ### keep it clean from this project's specifics
   # Conflict report / analysis is done differently with libmamba.
-  "--deselect=tests/cli/test_cli_install.py::TestCliInstall::test_find_conflicts_called_once",
+  "--deselect=tests/cli/test_cli_install.py::test_find_conflicts_called_once",
   # SolverStateContainer needed
   "--deselect=tests/core/test_solve.py::test_solve_2",
   "--deselect=tests/core/test_solve.py::test_virtual_package_solver",
