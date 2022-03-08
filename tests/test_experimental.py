@@ -52,9 +52,9 @@ def test_logging():
     in_header = False
     for line in process.stdout.splitlines():
         line = line.strip()
-        if "USING EXPERIMENTAL LIBMAMBA INTEGRATIONS" in line:
+        if "You are using the EXPERIMENTAL libmamba solver integration" in line:
             in_header = True
-        elif line.startswith("----------"):
+        elif line.startswith("***"):
             in_header = False
         elif in_header and line.endswith(".log"):
             logfile_path = line
