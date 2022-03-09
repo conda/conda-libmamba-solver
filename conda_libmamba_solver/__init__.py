@@ -7,7 +7,7 @@ We offer two implementations:
   This is the one we will eventually ship as final.
 """
 
-__version__ = "22.2.0"
+__version__ = "22.3.0"
 
 from ._libmamba import LibMambaSolverDraft
 from .solver import LibMambaSolver
