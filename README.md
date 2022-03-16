@@ -15,7 +15,7 @@ conda-libmamba-solver is a new (experimental) solver for the
 carefully implementing conda's functionality and expected behaviors on top.
 The library used by mamba to do the heavy-lifting is called [libsolv](https://github.com/openSUSE/libsolv).
 
-## Trying it out
+## Getting started
 
 The new libmamba integrations are experimental, but you can get a taste of how they are working
 so far by following these instructions.
