@@ -22,9 +22,7 @@ The new libmamba integrations are experimental, but you can get a taste of how t
 so far by following these instructions.
 
 Before we start: to use the libmamba integrations you need to update the `conda` installation
-in your `base` environment to a canary release. This is potentially a destructive action, so
-make sure you are not testing this in a production environment. We recommend using a VM, a Docker
-image or something similar.
+in your `base` environment to at least 4.12.0 or higher.
 
 1. `conda-libmamba-solver` needs to be present in your `base` environment.
 
@@ -88,12 +86,6 @@ If you don't want to use the experimental solver anymore, you can uninstall it w
 
 ```
 $ conda remove conda-libmamba-solver
-```
-
-To revert `conda` to the stable version:
-
-```
-$ conda install -c defaults conda
 ```
 
 ### Why can't I use the experimental solver on the `base` environment?
