@@ -79,6 +79,17 @@ $ conda create -n demo scipy --dry-run -vvv --experimental-solver=libmamba  2>&1
 
 ## FAQ
 
+### Where can I provide feedback (e.g. bug reports)?
+
+If something is not working as expected please:
+
+1. Go to https://github.com/conda/conda/issues/new/choose
+2. Choose the "Libmamba Solver Feedback (Experimental Feature)" option
+3. Fill out the issue form as complete as possible
+4. Attach the log file as printed in your terminal output (if applicable)
+
+The conda team will regularly triage the feedback and respond to your issue.
+
 ### How do I uninstall it?
 
 If you don't want to use the experimental solver anymore, you can uninstall it with:
