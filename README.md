@@ -27,7 +27,6 @@ make sure you are not testing this in a production environment. We recommend usi
 image or something similar.
 
 1. `conda-libmamba-solver` needs to be present in your `base` environment.
-The following channels are required for now:
 
 First make sure you are running conda 4.12.0 or higher:
 ```bash
