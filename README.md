@@ -26,7 +26,7 @@ in your `base` environment to a canary release. This is potentially a destructiv
 make sure you are not testing this in a production environment. We recommend using a VM, a Docker
 image or something similar.
 
-1. Install the canary builds of both `conda` and `conda-libmamba-solver` in your `base` environment.
+1. `conda-libmamba-solver` needs to be present in your `base` environment.
 The following channels are required for now:
 
 First make sure you are running conda 4.12.0 or higher:
