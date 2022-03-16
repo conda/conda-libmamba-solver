@@ -1,10 +1,9 @@
 # conda-libmamba-solver
 
-[![Anaconda-Server Badge](https://anaconda.org/conda-canary/conda-libmamba-solver/badges/version.svg)](https://anaconda.org/conda-canary/conda-libmamba-solver)
-[![Anaconda-Server Badge](https://anaconda.org/conda-canary/conda-libmamba-solver/badges/latest_release_date.svg)](https://anaconda.org/conda-canary/conda-libmamba-solver)
-[![CalVer version used YY.MM.MICRO](https://img.shields.io/badge/calver-YY.MM.MICRO-22bfda.svg?style=flat-square)](https://calver.org)
+[![Anaconda-Server Badge](https://anaconda.org/main/conda-libmamba-solver/badges/version.svg)](https://anaconda.org/main/conda-libmamba-solver)
+[![Anaconda-Server Badge](https://anaconda.org/main/conda-libmamba-solver/badges/latest_release_date.svg)](https://anaconda.org/main/conda-libmamba-solver)
 [![GitHub Workflow Status](https://img.shields.io/github/workflow/status/conda-incubator/conda-libmamba-solver/CI?label=CI&logo=github&style=flat-square)](https://github.com/conda-incubator/conda-libmamba-solver/actions/workflows/ci.yml)
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/conda-incubator/conda-libmamba-solver/Canary%20builds?label=Canary%20builds&logo=github&style=flat-square)](https://github.com/conda-incubator/conda-libmamba-solver/actions/workflows/builds-canary.yaml)
+[![CalVer version used YY.MM.MICRO](https://img.shields.io/badge/calver-YY.MM.MICRO-22bfda.svg?style=flat-square)](https://calver.org)
 
 The fast mamba solver, now in conda!
 
@@ -22,34 +21,18 @@ The new libmamba integrations are experimental, but you can get a taste of how t
 so far by following these instructions.
 
 Before we start: to use the libmamba integrations you need to update the `conda` installation
-in your `base` environment to a canary release. This is potentially a destructive action, so
-make sure you are not testing this in a production environment. We recommend using a VM, a Docker
-image or something similar.
+in your `base` environment to at least 4.12.0 or higher.
 
-1. Install the canary builds of both `conda` and `conda-libmamba-solver` in your `base` environment.
-The following channels are required for now:
+1. `conda-libmamba-solver` needs to be present in your `base` environment.
 
-First activate the base environment:
+First make sure you are running conda 4.12.0 or higher:
 ```bash
-conda activate base
+conda update -n base conda
 ```
 
-Then install the canary versions of conda and conda-libmamba-solver:
+Then install conda-libmamba-solver:
 ```bash
-conda install \
-    --override-channels \
-    --yes \
-    -c conda-canary/label/dev \
-    -c conda-canary/label/conda-libmamba-solver-dev \
-    -c conda-forge \
-    -c defaults \
-    conda \
-    conda-libmamba-solver
-```
-
-(Optional) One-liner version (same as above):
-```bash
-conda install --override-channels --yes -c conda-canary/label/dev -c conda-canary/label/conda-libmamba-solver-dev -c conda-forge -c defaults conda conda-libmamba-solver
+conda install -n base conda-libmamba-solver
 ```
 
 2. Now you can experiment with different things. `--dry-run` is specially useful to check how
@@ -102,12 +85,6 @@ If you don't want to use the experimental solver anymore, you can uninstall it w
 
 ```
 $ conda remove conda-libmamba-solver
-```
-
-To revert `conda` to the stable version:
-
-```
-$ conda install -c defaults conda
 ```
 
 ### Why can't I use the experimental solver on the `base` environment?
