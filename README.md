@@ -36,7 +36,7 @@ conda update -n base conda
 
 Then install conda-libmamba-solver:
 ```bash
-conda install --name=base conda-libmamba-solver
+conda install -n base conda-libmamba-solver
 ```
 
 2. Now you can experiment with different things. `--dry-run` is specially useful to check how
