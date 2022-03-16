@@ -29,27 +29,14 @@ image or something similar.
 1. Install the canary builds of both `conda` and `conda-libmamba-solver` in your `base` environment.
 The following channels are required for now:
 
-First activate the base environment:
+First make sure you are running conda 4.12.0 or higher:
 ```bash
-conda activate base
+conda update -n base conda
 ```
 
-Then install the canary versions of conda and conda-libmamba-solver:
+Then install conda-libmamba-solver:
 ```bash
-conda install \
-    --override-channels \
-    --yes \
-    -c conda-canary/label/dev \
-    -c conda-canary/label/conda-libmamba-solver-dev \
-    -c conda-forge \
-    -c defaults \
-    conda \
-    conda-libmamba-solver
-```
-
-(Optional) One-liner version (same as above):
-```bash
-conda install --override-channels --yes -c conda-canary/label/dev -c conda-canary/label/conda-libmamba-solver-dev -c conda-forge -c defaults conda conda-libmamba-solver
+conda install --name=base conda-libmamba-solver
 ```
 
 2. Now you can experiment with different things. `--dry-run` is specially useful to check how
