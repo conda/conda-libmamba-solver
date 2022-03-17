@@ -54,10 +54,10 @@ jobs:
           ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
           bash -c "sudo /opt/conda/condabin/conda install -y -p /opt/conda \
                       --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
-                      --file /opt/conda-libmamba-solver-src/tests/requirements.txt
-                   && /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv
-                   && source /opt/conda-src/dev/linux/bashrc.sh
-                   && /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'
+                      --file /opt/conda-libmamba-solver-src/tests/requirements.txt \
+                   && /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv \
+                   && source /opt/conda-src/dev/linux/bashrc.sh \
+                   && /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow' \
                    && cd /opt/conda-libmamba-solver-src/tests && bash testserver.sh"
 
   macos:
