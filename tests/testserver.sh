@@ -2,9 +2,7 @@
 # File adapted from mamba-org/mamba, commit bff16c2bdc4103ba74c23ab4fdbf58849a55981c, on Mar 17 2022
 # See data/mamba_repo/LICENSE for full details
 
-set -euo pipefail
-
-export CONDA_VERBOSITY=3
+set -xuo pipefail
 
 rm -rf $CONDA_PREFIX/pkgs/test-package*
 ENV_NAME=testauth
@@ -15,7 +13,7 @@ conda create --experimental-solver=libmamba \
     --download-only \
     -c http://localhost:8000/ test-package --json
 exit_code=$?
-kill -9 $PID
+kill -TERM $PID
 [[ $exit_code != "0" ]] && exit $exit_code
 
 
@@ -26,7 +24,7 @@ conda create --experimental-solver=libmamba \
     --download-only \
     -c http://user:test@localhost:8000/ test-package --json
 exit_code=$?
-kill -9 $PID
+kill -TERM $PID
 [[ $exit_code != "0" ]] && exit $exit_code
 
 export TESTPWD="user@email.com:test"
@@ -36,7 +34,7 @@ conda create --experimental-solver=libmamba \
     --download-only \
     -c http://user@email.com:test@localhost:8000/ test-package --json
 exit_code=$?
-kill -9 $PID
+kill -TERM $PID
 [[ $exit_code != "0" ]] && exit $exit_code
 
 python _reposerver.py -d data/mamba_repo/ --auth token & PID=$!
@@ -45,7 +43,7 @@ conda create --experimental-solver=libmamba \
     --download-only \
     -c http://localhost:8000/t/xy-12345678-1234-1234-1234-123456789012 test-package --json
 exit_code=$?
-kill -9 $PID
+kill -TERM $PID
 [[ $exit_code != "0" ]] && exit $exit_code
 
 # if [[ "$(uname -s)" == "Linux" ]]; then
@@ -54,5 +52,7 @@ kill -9 $PID
 #     set -x
 # 	python _reposerver.py -d data/repo/ --auth none --sign & PID=$!
 # 	sleep 5s
-#     kill -9 $PID
+#     kill -TERM $PID
 # fi
+
+exit 0
