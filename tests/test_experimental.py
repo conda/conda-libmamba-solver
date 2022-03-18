@@ -28,9 +28,21 @@ def print_and_check_output(*args, **kwargs):
 
 @pytest.mark.parametrize("solver", ("libmamba", "libmamba-draft"))
 def test_protection_for_base_env(solver):
-    with pytest.raises(CondaEnvironmentError), fresh_context(CONDA_EXPERIMENTAL_SOLVER=solver):
-        os.environ.pop("PYTEST_CURRENT_TEST", None)
-        run_command(Commands.INSTALL, context.root_prefix, "--dry-run", "scipy", no_capture=True)
+    with pytest.raises(CondaEnvironmentError):
+        current_test = os.environ.pop("PYTEST_CURRENT_TEST", None)
+        try:
+            run_command(
+                Commands.INSTALL,
+                context.root_prefix,
+                "--dry-run",
+                "scipy",
+                "--experimental-solver",
+                solver,
+                no_capture=True,
+            )
+        finally:
+            if current_test is not None:
+                os.environ["PYTEST_CURRENT_TEST"] = current_test
 
 
 def test_logging():
