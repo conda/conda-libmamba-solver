@@ -58,8 +58,7 @@ jobs:
                         --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow' &&
-                   cd /opt/conda-libmamba-solver-src/tests && bash testserver.sh"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
 
   macos:
     name: MacOS, Python ${{ matrix.python-version }}
@@ -128,8 +127,6 @@ jobs:
         run: |
           eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
           python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
-          cd ${GITHUB_WORKSPACE}/conda-libmamba-solver/tests/
-          bash testserver.sh
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}

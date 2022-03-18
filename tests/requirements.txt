@@ -1,2 +1,3 @@
 conda-content-trust
 rich
+conda-forge::pytest-xtest
