@@ -32,7 +32,13 @@ def test_protection_for_base_env(solver):
         current_test = os.environ.pop("PYTEST_CURRENT_TEST", None)
         try:
             run_command(
-                Commands.INSTALL, context.root_prefix, "--dry-run", "scipy", no_capture=True,
+                Commands.INSTALL,
+                context.root_prefix,
+                "--dry-run",
+                "scipy",
+                "--experimental-solver",
+                solver,
+                no_capture=True,
             )
         finally:
             if current_test is not None:

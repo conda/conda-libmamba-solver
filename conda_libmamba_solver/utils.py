@@ -61,8 +61,8 @@ class CaptureStreamToFile:
         try:
             self.start()
             return self
-        except Exception:
-            traceback.print_exception(file=sys.stdout)
+        except Exception as exc:
+            traceback.print_exception(type(exc), exc, None, file=sys.stdout)
             raise
 
     def __exit__(self, exc_type, exc_value, tb):

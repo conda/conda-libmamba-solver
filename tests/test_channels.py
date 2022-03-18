@@ -111,6 +111,8 @@ def command(channel):
         channel,
         "test-package",
         "--json",
+        # no_capture is needed so it doesn't interfere with
+        # our own capturing mechanism for libmamba logging!
         no_capture=True,
     )
 

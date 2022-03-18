@@ -69,7 +69,14 @@ def test_a_warmup(prefix_and_channels, solver_args):
 def test_update_python(prefix_and_channels, solver_args):
     prefix, channels = prefix_and_channels
     try:
-        run_command(Commands.UPDATE, prefix, *_channels_as_args(channels), *solver_args, "python")
+        run_command(
+            Commands.UPDATE,
+            prefix,
+            *_channels_as_args(channels),
+            *solver_args,
+            "python",
+            no_capture=True,
+        )
     except DryRunExit:
         assert True
     else:
@@ -88,6 +95,7 @@ def test_install_python_update_deps(prefix_and_channels, solver_args):
             *solver_args,
             "python",
             "--update-deps",
+            no_capture=True,
         )
     except DryRunExit:
         assert True
@@ -100,7 +108,14 @@ def test_install_python_update_deps(prefix_and_channels, solver_args):
 def test_update_all(prefix_and_channels, solver_args):
     prefix, channels = prefix_and_channels
     try:
-        run_command(Commands.UPDATE, prefix, *_channels_as_args(channels), *solver_args, "--all")
+        run_command(
+            Commands.UPDATE,
+            prefix,
+            *_channels_as_args(channels),
+            *solver_args,
+            "--all",
+            no_capture=True,
+        )
     except DryRunExit:
         assert True
     else:
@@ -122,6 +137,7 @@ def test_install_vaex_from_conda_forge_and_defaults(solver_args):
             "defaults",
             "python=3.9",
             "vaex",
+            no_capture=True,
         )
     except DryRunExit:
         assert True
