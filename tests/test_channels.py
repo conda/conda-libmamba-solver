@@ -2,12 +2,12 @@ import pathlib
 import os
 import sys
 import socket
+import subprocess
 
 import pytest
 from xprocess import ProcessStarter
 
-from conda import CondaExitZero
-from conda.testing.integration import run_command, Commands, _get_temp_prefix
+from conda.testing.integration import _get_temp_prefix
 
 
 def _mock_server(xprocess, name, port, auth="none", user=None, password=None, token=None):
@@ -101,38 +101,37 @@ def server_auth_token(xprocess):
 
 
 def command(channel):
-    return run_command(
-        Commands.CREATE,
-        _get_temp_prefix(),
-        "--experimental-solver=libmamba",
-        "--override-channels",
-        "--download-only",
-        "-c",
-        channel,
-        "test-package",
-        "--json",
-        # no_capture is needed so it doesn't interfere with
-        # our own capturing mechanism for libmamba logging!
-        no_capture=True,
+    return subprocess.check_call(
+        [
+            sys.executable,
+            "-m",
+            "conda",
+            "create",
+            "-p",
+            _get_temp_prefix(),
+            "--experimental-solver=libmamba",
+            "--override-channels",
+            "--download-only",
+            "-c",
+            channel,
+            "test-package",
+            "--json",
+        ]
     )
 
 
 def test_server_auth_none(server_auth_none):
-    with pytest.raises(CondaExitZero):
-        command(server_auth_none)
+    command(server_auth_none)
 
 
 def test_server_auth_basic(server_auth_basic):
-    with pytest.raises(CondaExitZero):
-        command(server_auth_basic)
+    command(server_auth_basic)
 
 
 def test_server_auth_basic_email(server_auth_basic_email):
-    with pytest.raises(CondaExitZero):
-        command(server_auth_basic_email)
+    command(server_auth_basic_email)
 
 
 def test_server_auth_token(server_auth_token):
-    with pytest.raises(CondaExitZero):
-        command(server_auth_token)
+    command(server_auth_token)
 
