@@ -82,7 +82,9 @@ jobs:
           -e TEST_GROUP
           -e CONDA_EXPERIMENTAL_SOLVER
           ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
-          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
+          bash -c "sudo env CONDA_EXPERIMENTAL_SOLVER=classic \
+                        /opt/conda/condabin/conda install -p /opt/conda \
+                        --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    $run_test_cmd"
 
@@ -137,6 +139,10 @@ jobs:
       - name: Setup environment
         shell: bash -l {0}
         working-directory: conda
+        env:
+          # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
+          # otherwise it will error out because it can't be imported yet!
+          CONDA_EXPERIMENTAL_SOLVER: classic
         run: |
           set -euxo pipefail
           # restoring the default for changeps1 to have parity with dev
@@ -233,6 +239,10 @@ jobs:
       - name: Setup environment
         shell: cmd
         working-directory: conda
+        env:
+          # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
+          # otherwise it will error out because it can't be imported yet!
+          CONDA_EXPERIMENTAL_SOLVER: classic
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
