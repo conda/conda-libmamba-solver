@@ -29,6 +29,7 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
     CondaEnvironmentError,
+    InvalidMatchSpec,
 )
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
@@ -658,9 +659,11 @@ class LibMambaSolver(Solver):
             if value and field not in supported:
                 unsupported_but_set.append(field)
         if unsupported_but_set:
-            raise ValueError(
+            raise InvalidMatchSpec(
+                match_spec,
                 "Libmamba only supports a subset of the MatchSpec interface for now. "
-                f"You can only use {supported}, but you tried to use {unsupported_but_set}."
+                f"You can only use {supported}, but you tried to use "
+                f"{tuple(unsupported_but_set)}.",
             )
 
     def _reset(self):
