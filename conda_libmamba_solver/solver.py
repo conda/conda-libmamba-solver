@@ -520,7 +520,9 @@ class LibMambaSolver(Solver):
         # Protect history and aggressive updates from being uninstalled if possible
         for name, record in out_state.records.items():
             if name in in_state.history or name in in_state.aggressive_updates:
-                spec = str(record.to_match_spec())
+                # MatchSpecs constructed from PackageRecords get parsed too
+                # strictly if exported via str(). Use .conda_build_form() directly.
+                spec = record.to_match_spec().conda_build_form()
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(spec)
 
         # No complications here: delete requested and their deps
