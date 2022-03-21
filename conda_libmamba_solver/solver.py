@@ -646,7 +646,13 @@ class LibMambaSolver(Solver):
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
             # installed counterpart (richer in info)
             already_installed_record = in_state.installed.get(record.name)
-            if already_installed_record and record.sha256 == already_installed_record.sha256:
+            if (
+                already_installed_record
+                and record.subdir == "noarch"
+                and already_installed_record.subdir == "noarch"
+                and record.version == already_installed_record.version
+                and record.build == already_installed_record.build
+            ):
                 # Replace repodata-only record with local-info-rich record counterpart
                 record = already_installed_record
 
