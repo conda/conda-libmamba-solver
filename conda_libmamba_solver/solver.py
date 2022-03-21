@@ -45,7 +45,7 @@ from .mamba_utils import (
     mamba_version,
 )
 from .state import SolverInputState, SolverOutputState, IndexHelper
-from .utils import CaptureStreamToFile, safe_conda_build_form
+from .utils import CaptureStreamToFile
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -310,7 +310,7 @@ class LibMambaSolver(Solver):
             for name, record in out_state.records.items():
                 print(
                     " ",
-                    safe_conda_build_form(record.to_match_spec()),
+                    str(record.to_match_spec()),
                     "# reasons=",
                     out_state.records._reasons.get(name, "<None>"),
                     file=sys.stderr,
@@ -449,7 +449,7 @@ class LibMambaSolver(Solver):
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
-            spec_str = safe_conda_build_form(spec)
+            spec_str = str(spec)
             key = "INSTALL", api.SOLVER_INSTALL
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
@@ -461,7 +461,7 @@ class LibMambaSolver(Solver):
                 key = "UPDATE", api.SOLVER_UPDATE
                 # ## Protect if installed AND history
                 if name in protected:
-                    installed_spec = safe_conda_build_form(installed.to_match_spec())
+                    installed_spec = str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
                     # conflict resolution. We do this because these are "protected" packages
@@ -520,7 +520,7 @@ class LibMambaSolver(Solver):
         # Protect history and aggressive updates from being uninstalled if possible
         for name, record in out_state.records.items():
             if name in in_state.history or name in in_state.aggressive_updates:
-                spec = safe_conda_build_form(record.to_match_spec())
+                spec = str(record.to_match_spec())
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(spec)
 
         # No complications here: delete requested and their deps
@@ -531,7 +531,7 @@ class LibMambaSolver(Solver):
         key = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
         for name, spec in in_state.requested.items():
             self._check_spec_compat(spec)
-            tasks[key].append(safe_conda_build_form(spec))
+            tasks[key].append(str(spec))
 
         return tasks
 

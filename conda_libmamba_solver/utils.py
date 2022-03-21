@@ -72,18 +72,3 @@ class CaptureStreamToFile:
             if exc_type is not None:
                 traceback.print_exception(exc_type, exc_value, tb, file=sys.stdout)
                 raise exc_type(exc_value)
-
-
-def safe_conda_build_form(match_spec: "conda.models.match_spec.MatchSpec"):
-    """Safe workaround for https://github.com/conda/conda/issues/11347"""
-    kwargs = {"name": match_spec.get_exact_value("name")}
-    version = match_spec.get_raw_value("version")
-    build = match_spec.get_raw_value("build")
-
-    if build:
-        kwargs["build"] = build
-        kwargs["version"] = version or "*"  # this is the key fix
-    elif version:
-        kwargs["version"] = version
-
-    return type(match_spec)(**kwargs).conda_build_form()
