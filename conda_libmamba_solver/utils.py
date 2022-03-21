@@ -3,7 +3,6 @@ import sys
 import traceback
 import tempfile
 from typing import Callable, Optional
-from copy import copy
 
 
 class CaptureStreamToFile:
