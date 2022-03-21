@@ -445,9 +445,10 @@ class LibMambaSolver(Solver):
         )
         tasks = defaultdict(list)
         for name, spec in out_state.specs.items():
-            spec_str = safe_conda_build_form(spec)
             if name.startswith("__"):
                 continue
+            self._check_spec_compat(spec)
+            spec_str = safe_conda_build_form(spec)
             key = "INSTALL", api.SOLVER_INSTALL
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
@@ -528,6 +529,7 @@ class LibMambaSolver(Solver):
         # --deps-only
         key = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
         for name, spec in in_state.requested.items():
+            self._check_spec_compat(spec)
             tasks[key].append(safe_conda_build_form(spec))
 
         return tasks
@@ -647,6 +649,19 @@ class LibMambaSolver(Solver):
 
         with CaptureStreamToFile(callback=log.debug):
             del transaction
+
+    def _check_spec_compat(self, match_spec):
+        supported = "name", "version", "build"
+        unsupported_but_set = []
+        for field in match_spec.FIELD_NAMES:
+            value = match_spec.get_raw_value(field)
+            if value and field not in supported:
+                unsupported_but_set.append(field)
+        if unsupported_but_set:
+            raise ValueError(
+                "Libmamba only supports a subset of the MatchSpec interface for now. "
+                f"You can only use {supported}, but you tried to use {unsupported_but_set}."
+            )
 
     def _reset(self):
         self.solver = None
