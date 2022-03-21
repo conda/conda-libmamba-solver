@@ -640,6 +640,16 @@ class LibMambaSolver(Solver):
             if key not in channel_lookup:
                 raise ValueError(f"missing key {key} in channels {channel_lookup}")
             record = to_package_record_from_subjson(channel_lookup[key], filename, json_str)
+
+            # We need this check below to make sure noarch package get reinstalled
+            #  record metadata coming from libmamba is incomplete and won't pass the
+            # noarch checks -- to fix it, we swap the metadata-only record with its locally
+            # installed counterpart (richer in info)
+            already_installed_record = in_state.installed.get(record.name)
+            if already_installed_record and record.sha256 == already_installed_record.sha256:
+                # Replace repodata-only record with local-info-rich record counterpart
+                record = already_installed_record
+
             out_state.records.set(
                 record.name, record, reason="Part of solution calculated by libmamba"
             )
