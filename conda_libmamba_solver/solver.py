@@ -223,7 +223,7 @@ class LibMambaSolver(Solver):
             api_ctx = init_api_context(verbosity=max(2, context.verbosity))
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
-                channels=self._channels,
+                channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
                 subdirs=self.subdirs,
             )
 
@@ -652,7 +652,13 @@ class LibMambaSolver(Solver):
             del transaction
 
     def _check_spec_compat(self, match_spec):
-        supported = "name", "version", "build"
+        """
+        Make sure we are not silently ingesting MatchSpec fields we are not
+        doing anything with!
+
+        TODO: We currently allow `subdir` but we are not handling it right now.
+        """
+        supported = "name", "version", "build", "channel", "subdir"
         unsupported_but_set = []
         for field in match_spec.FIELD_NAMES:
             value = match_spec.get_raw_value(field)
