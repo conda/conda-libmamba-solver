@@ -53,7 +53,11 @@ def test_python_downgrade_reinstalls_noarch_packages():
     Reported in https://github.com/conda/conda/issues/11346
 
     See also test_create::test_noarch_python_package_reinstall_on_pyver_change
-    in conda/conda test suite.
+    in conda/conda test suite. Note that we use conda-forge here deliberately;
+    defaults at the time of writing (March 2022) packages pip as a non-noarch
+    build, which means it has a different name across Python versions. conda-forge
+    uses noarch here, so the package is the same across Python versions. Probably
+    why upstream didn't catch this error before.
     """
     with make_temp_env(
         "--override-channels",
