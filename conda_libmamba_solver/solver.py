@@ -107,7 +107,7 @@ class LibMambaIndexHelper(IndexHelper):
             # This fixes test_activate_deactivate_modify_path_bash
             # and other local channels (path to url) issues
             urls = []
-            for url in channel.urls():
+            for url in channel.urls(with_credentials=True):
                 url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
                 urls.append(escape_channel_url(url))
             # deduplicate

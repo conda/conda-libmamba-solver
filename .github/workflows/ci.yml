@@ -54,7 +54,8 @@ jobs:
           ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
           bash -c "sudo env CONDA_EXPERIMENTAL_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
-                        --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
+                        --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
+                        --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
@@ -108,6 +109,7 @@ jobs:
           conda install --yes \
             --file tests/requirements.txt \
             --file ../conda-libmamba-solver/dev/requirements.txt \
+            --file ../conda-libmamba-solver/tests/requirements.txt \
             python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
           conda info
@@ -170,6 +172,7 @@ jobs:
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
+          type ..\conda-libmamba-solver\tests\requirements.txt >> .\tests\requirements.txt
           if errorlevel 1 exit 1
           :: initialize conda dev
           call .\dev\windows\setup.bat
