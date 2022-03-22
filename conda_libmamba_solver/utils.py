@@ -3,6 +3,11 @@ import sys
 import traceback
 import tempfile
 from typing import Callable, Optional
+from io import UnsupportedOperation
+from logging import getLogger
+
+
+log = getLogger(f"conda.{__name__}")
 
 
 class CaptureStreamToFile:
@@ -37,13 +42,18 @@ class CaptureStreamToFile:
         self.text = None
         self._callback = callback
         self._keep_captured = keep
+        self._started = False
 
     def start(self):
+        self._started = False
         self._original_fileno = self._original_stream.fileno()
         self._saved_original_fileno = os.dup(self._original_fileno)
         os.dup2(self._file.fileno(), self._original_fileno)
+        self._started = True
 
     def stop(self):
+        if not self._started:
+            return
         os.dup2(self._saved_original_fileno, self._original_fileno)
         os.close(self._saved_original_fileno)
         try:
@@ -61,8 +71,15 @@ class CaptureStreamToFile:
         try:
             self.start()
             return self
+<<<<<<< fix-auth
         except Exception as exc:
             traceback.print_exception(type(exc), exc, None, file=sys.stdout)
+=======
+        except UnsupportedOperation:
+            log.warning("Cannot capture stream! Bypassing ...", exc_info=True)
+        except Exception:
+            traceback.print_exception(file=sys.stdout)
+>>>>>>> main
             raise
 
     def __exit__(self, exc_type, exc_value, tb):
