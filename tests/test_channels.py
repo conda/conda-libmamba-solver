@@ -1,9 +1,9 @@
 import json
 import pathlib
 import os
-import sys
 import socket
 import subprocess
+import sys
 
 import pytest
 from xprocess import ProcessStarter
