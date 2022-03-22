@@ -142,6 +142,7 @@ class SolverInputState:
         Internal only. Whether ``PrefixData`` will also expose packages not installed by
         ``conda`` (e.g. ``pip`` and others can put Python packages in the prefix).
     """
+
     _ENUM_STR_MAP = {
         "NOT_SET": DepsModifier.NOT_SET,
         "NO_DEPS": DepsModifier.NO_DEPS,
@@ -367,6 +368,22 @@ class SolverInputState:
     @property
     def prune(self) -> bool:
         return self._prune
+
+    #  Utility methods
+
+    def channels_from_specs(self):
+        """
+        Collect all channels added with the `channel::package=*` syntax. For now,
+        we only collect those specifically requested by the user in the current command
+        (same as conda), but we should investigate whether history keeps channels around
+        too.
+        """
+        channels = []
+        for spec in self.requested.values():
+            channel = spec.get_exact_value("channel")
+            if channel:
+                channels.append(channel)
+        return channels
 
 
 class SolverOutputState:

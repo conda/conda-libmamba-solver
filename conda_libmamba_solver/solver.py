@@ -29,6 +29,7 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
     CondaEnvironmentError,
+    InvalidMatchSpec,
 )
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
@@ -45,6 +46,7 @@ from .mamba_utils import (
 )
 from .state import SolverInputState, SolverOutputState, IndexHelper
 from .utils import CaptureStreamToFile
+
 
 log = logging.getLogger(f"conda.{__name__}")
 BLURB_COUNT = 0
@@ -221,7 +223,7 @@ class LibMambaSolver(Solver):
             api_ctx = init_api_context(verbosity=max(2, context.verbosity))
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
-                channels=self._channels,
+                channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
                 subdirs=self.subdirs,
             )
 
@@ -308,7 +310,7 @@ class LibMambaSolver(Solver):
             for name, record in out_state.records.items():
                 print(
                     " ",
-                    record.to_match_spec().conda_build_form(),
+                    str(record.to_match_spec()),
                     "# reasons=",
                     out_state.records._reasons.get(name, "<None>"),
                     file=sys.stderr,
@@ -444,9 +446,10 @@ class LibMambaSolver(Solver):
         )
         tasks = defaultdict(list)
         for name, spec in out_state.specs.items():
-            spec_str = spec.conda_build_form()
             if name.startswith("__"):
                 continue
+            self._check_spec_compat(spec)
+            spec_str = str(spec)
             key = "INSTALL", api.SOLVER_INSTALL
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
@@ -458,7 +461,7 @@ class LibMambaSolver(Solver):
                 key = "UPDATE", api.SOLVER_UPDATE
                 # ## Protect if installed AND history
                 if name in protected:
-                    installed_spec = installed.to_match_spec().conda_build_form()
+                    installed_spec = str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
                     # conflict resolution. We do this because these are "protected" packages
@@ -517,6 +520,8 @@ class LibMambaSolver(Solver):
         # Protect history and aggressive updates from being uninstalled if possible
         for name, record in out_state.records.items():
             if name in in_state.history or name in in_state.aggressive_updates:
+                # MatchSpecs constructed from PackageRecords get parsed too
+                # strictly if exported via str(). Use .conda_build_form() directly.
                 spec = record.to_match_spec().conda_build_form()
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(spec)
 
@@ -527,7 +532,8 @@ class LibMambaSolver(Solver):
         # --deps-only
         key = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
         for name, spec in in_state.requested.items():
-            tasks[key].append(spec.conda_build_form())
+            self._check_spec_compat(spec)
+            tasks[key].append(str(spec))
 
         return tasks
 
@@ -662,6 +668,27 @@ class LibMambaSolver(Solver):
 
         with CaptureStreamToFile(callback=log.debug):
             del transaction
+
+    def _check_spec_compat(self, match_spec):
+        """
+        Make sure we are not silently ingesting MatchSpec fields we are not
+        doing anything with!
+
+        TODO: We currently allow `subdir` but we are not handling it right now.
+        """
+        supported = "name", "version", "build", "channel", "subdir"
+        unsupported_but_set = []
+        for field in match_spec.FIELD_NAMES:
+            value = match_spec.get_raw_value(field)
+            if value and field not in supported:
+                unsupported_but_set.append(field)
+        if unsupported_but_set:
+            raise InvalidMatchSpec(
+                match_spec,
+                "Libmamba only supports a subset of the MatchSpec interface for now. "
+                f"You can only use {supported}, but you tried to use "
+                f"{tuple(unsupported_but_set)}.",
+            )
 
     def _reset(self):
         self.solver = None
