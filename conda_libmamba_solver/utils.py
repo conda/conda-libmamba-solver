@@ -71,15 +71,10 @@ class CaptureStreamToFile:
         try:
             self.start()
             return self
-<<<<<<< fix-auth
-        except Exception as exc:
-            traceback.print_exception(type(exc), exc, None, file=sys.stdout)
-=======
         except UnsupportedOperation:
             log.warning("Cannot capture stream! Bypassing ...", exc_info=True)
-        except Exception:
-            traceback.print_exception(file=sys.stdout)
->>>>>>> main
+        except Exception as exc:
+            traceback.print_exception(type(exc), exc, None, file=sys.stdout)
             raise
 
     def __exit__(self, exc_type, exc_value, tb):
