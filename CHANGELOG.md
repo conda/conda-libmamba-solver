@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-> and this project adheres to [calendar versioning](https://calver.org/).
+> and this project adheres to [calendar versioning](https://calver.org/) in the `YY.M.MICRO`format.
 
 ## [Unreleased]
 
@@ -25,7 +25,7 @@ copy to its corresponding section, deleting empty sections if any.
 ### Security
 
 
-## [22.3.1] - 2022.03.23
+## [22.3.1] - 2022-03-23
 
 ### Fixed
 
@@ -33,11 +33,11 @@ copy to its corresponding section, deleting empty sections if any.
 * Accept star-only version specs (e.g. `libblas=*=*mkl`) and fix support for `channel::package` syntax (#25)
 * Enable support for authenticated channels (#23)
 
-## [22.3.0] - 2022.03.09
+## [22.3.0] - 2022-03-09
 
 _First public release_
 
-## [22.2.0] - 2022.02.01
+## [22.2.0] - 2022-02-01
 
 _Internal pre-release as a separate repository._
 
