@@ -7,5 +7,5 @@ TEST_GROUP="${TEST_GROUP:-1}"
 
 eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
 conda info
-mamba --version
+python -c "from mamba import __version__; print('mamba', __version__)"
 python -m pytest -v tests/core/test_solve.py
