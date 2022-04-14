@@ -25,6 +25,7 @@ from conda.common.url import (
     remove_auth,
 )
 from conda.exceptions import (
+    NoPackagesFoundError,  # conda-build compat
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
@@ -601,6 +602,9 @@ class LibMambaSolver(Solver):
             line = line.strip()
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
+                # TODO: Remove this hack for conda-build compatibility >_<
+                if "conda_build.environ" in sys.modules:
+                    raise NoPackagesFoundError([packages])
                 raise PackagesNotFoundError([" ".join(packages)])
         raise LibMambaUnsatisfiableError(problems)
 
