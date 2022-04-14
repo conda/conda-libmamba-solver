@@ -600,11 +600,11 @@ class LibMambaSolver(Solver):
         for line in problems.splitlines():
             line = line.strip()
             if line.startswith("- nothing provides requested"):
-                packages = line.split()[4:]
+                packages = " ".join(line.split()[4:])
                 # TODO: Remove this hack for conda-build compatibility >_<
                 if "conda_build.environ" in sys.modules:
-                    raise NoPackagesFoundError([packages])
-                raise PackagesNotFoundError([" ".join(packages)])
+                    raise NoPackagesFoundError([[packages]])
+                raise PackagesNotFoundError([packages])
         raise LibMambaUnsatisfiableError(problems)
 
     def _export_solved_records(
