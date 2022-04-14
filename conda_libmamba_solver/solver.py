@@ -186,6 +186,7 @@ class LibMambaSolver(Solver):
 
     @staticmethod
     def user_agent():
+        """Expose this identifier to allow conda to extend its user agent if required"""
         return f"conda-libmamba-solver/{__version__} libmambapy/{mamba_version()}"
 
     def solve_final_state(
