@@ -36,6 +36,7 @@ from conda.models.records import PackageRecord
 from conda.core.solve import Solver
 import libmambapy as api
 
+from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .mamba_utils import (
     load_channels,
@@ -181,6 +182,10 @@ class LibMambaSolver(Solver):
         # These three attributes are set during ._setup_solver()
         self.solver = None
         self._solver_options = None
+
+    @staticmethod
+    def user_agent():
+        return f"conda-libmamba-solver/{__version__} libmambapy/{mamba_version()}"
 
     def solve_final_state(
         self,
