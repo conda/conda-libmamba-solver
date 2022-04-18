@@ -24,7 +24,6 @@ from conda.common.url import (
     remove_auth,
 )
 from conda.exceptions import (
-    ResolvePackageNotFound,  # conda-build compat
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
@@ -84,6 +83,8 @@ class LibMambaIndexHelper(IndexHelper):
         if subdirs is None:
             subdirs = context.subdirs
 
+        self._channels = channels
+        self._subdirs = subdirs
         self._index = load_channels(
             pool=self._pool,
             channels=self._channel_urls(channels),
@@ -95,6 +96,13 @@ class LibMambaIndexHelper(IndexHelper):
 
         self._query = api.Query(self._pool)
         self._format = api.QueryFormat.JSON
+
+    @property
+    def _channel_lookup(self):
+        return {
+            info["channel"].platform_url(info["platform"], with_credentials=False): info
+            for _, info in self._index
+        }
 
     @staticmethod
     def _channel_urls(channels: Iterable[Union[Channel, str]]):
@@ -221,10 +229,21 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         with CaptureStreamToFile(callback=log.debug):
             api_ctx = init_api_context(verbosity=max(2, context.verbosity))
+            subdirs = self.subdirs
+            if "conda_build" in sys.modules and getattr(self, "_index", None):
+                # conda build exports its own index through `conda.plan.install_actions`
+                # and "forgets" about noarch on purpose when creating the build/host
+                #  environments, since it merges both as if they were only part of the native subdir.
+                # this causes package-not-found errors because we are not ingesting the patched index
+                # passed to conda.plan.install_actions. the fix seems easy: just add noarch to subdirs.
+                # we can detect whether to apply the fix by checking whether Solver._index has been
+                # patched. note we do not use that private attribute of the base class for anything.
+                if "noarch" not in subdirs:
+                    subdirs = *subdirs, "noarch"
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
-                subdirs=self.subdirs,
+                subdirs=subdirs,
             )
 
         with Spinner(
@@ -576,10 +595,10 @@ class LibMambaSolver(Solver):
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         conflicts = self._problems_to_specs_parser(problems)
+        self._maybe_raise_for_conda_build(conflicts)
+
         previous_set = set(previous.values())
         current_set = set(conflicts.values())
-
-        self._maybe_raise_for_conda_build(current_set)
 
         diff = current_set.difference(previous_set)
         if len(diff) > 1 and "python" in conflicts:
@@ -610,16 +629,25 @@ class LibMambaSolver(Solver):
                 raise PackagesNotFoundError([packages])
         raise LibMambaUnsatisfiableError(problems)
 
-    def _maybe_raise_for_conda_build(self, conflicting_specs: Iterable[MatchSpec]):
+    def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<
         # conda-build expects a slightly different exception format
         # good news is that we don't need to retry much, because all
         # conda-build envs are fresh - if we found a conflict, we report
         # right away to let conda build handle it
-        if "conda_build.environ" not in sys.modules:
+        if "conda_build" not in sys.modules:
+            # conda build has not been imported, nothing to do
+            return
+        if not getattr(self, "_index", None):
+            # conda build was imported, but Solver._index was not patched
+            # so probably some other tool is using it? nothing to do
             return
 
-        raise ResolvePackageNotFound([conflicting_specs])
+        from conda_build.exceptions import DependencyNeedsBuildingError
+
+        exc = DependencyNeedsBuildingError(packages=list(conflicting_specs.keys()))
+        exc.matchspecs = list(conflicting_specs.values())
+        raise exc
 
     def _export_solved_records(
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
@@ -636,11 +664,6 @@ class LibMambaSolver(Solver):
         if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
             print("TO_LINK", to_link, file=sys.stderr)
             print("TO_UNLINK", to_unlink, file=sys.stderr)
-
-        channel_lookup = {}
-        for _, entry in index._index:
-            key = entry["channel"].platform_url(entry["platform"], with_credentials=False)
-            channel_lookup[key] = entry
 
         for _, filename in to_unlink:
             for name, record in in_state.installed.items():
@@ -660,12 +683,12 @@ class LibMambaSolver(Solver):
                 key = channel
             else:
                 key = split_anaconda_token(remove_auth(channel))[0]
-            if key not in channel_lookup:
-                raise ValueError(f"missing key {key} in channels {channel_lookup}")
-            record = to_package_record_from_subjson(channel_lookup[key], filename, json_str)
+            if key not in index._channel_lookup:
+                raise ValueError(f"missing key {key} in channels {index._channel_lookup}")
+            record = to_package_record_from_subjson(index._channel_lookup[key], filename, json_str)
 
             # We need this check below to make sure noarch package get reinstalled
-            #  record metadata coming from libmamba is incomplete and won't pass the
+            # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
             # installed counterpart (richer in info)
             already_installed_record = in_state.installed.get(record.name)
