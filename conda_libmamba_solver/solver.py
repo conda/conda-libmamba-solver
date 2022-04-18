@@ -647,6 +647,14 @@ class LibMambaSolver(Solver):
 
         exc = DependencyNeedsBuildingError(packages=list(conflicting_specs.keys()))
         exc.matchspecs = list(conflicting_specs.values())
+        # the patched index should contain the arch we are building this env for
+        for pkg_record in self._index.values():
+            if pkg_record.subdir != "noarch":
+                exc.subdir = pkg_record.subdir
+                break
+        else:
+            # if the index is empty, we default to whatever platform we are running on
+            exc.subdir = context.subdir
         raise exc
 
     def _export_solved_records(
