@@ -25,7 +25,7 @@ from conda.common.url import (
     remove_auth,
 )
 from conda.exceptions import (
-    NoPackagesFoundError,  # conda-build compat
+    ResolvePackageNotFound,  # conda-build compat
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
@@ -538,10 +538,8 @@ class LibMambaSolver(Solver):
 
         return tasks
 
-    def _problems_to_specs(self, problems: str, previous: Mapping[str, MatchSpec]):
-        if self.solver is None:
-            raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
-
+    @staticmethod
+    def _problems_to_specs_parser(problems: str) -> Mapping[str, MatchSpec]:
         dashed_specs = []  # e.g. package-1.2.3-h5487548_0
         conda_build_specs = []  # e.g. package 1.2.8.*
         for line in problems.splitlines():
@@ -572,6 +570,15 @@ class LibMambaSolver(Solver):
                 kwargs["build"] = conflict[2].rstrip(",")
             conflicts[kwargs["name"]] = MatchSpec(**kwargs)
 
+        return conflicts
+
+    def _problems_to_specs(self, problems: str, previous: Mapping[str, MatchSpec]):
+        if self.solver is None:
+            raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
+
+        conflicts = self._problems_to_specs_parser(problems)
+        self._maybe_raise_for_conda_build(conflicts)
+
         previous_set = set(previous.values())
         current_set = set(conflicts.values())
 
@@ -592,21 +599,28 @@ class LibMambaSolver(Solver):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
-        # TODO: merge this with parse_problems somehow
-        # e.g. return a dict of exception type -> specs involved
-        # and we raise it here
         if problems is None:
             problems = self.solver.problems_to_str()
 
+        # TODO: Figure out a way to have ._problems_to_specs_parser
+        # return the most adequate exception type instead of reparsing here
         for line in problems.splitlines():
             line = line.strip()
             if line.startswith("- nothing provides requested"):
                 packages = " ".join(line.split()[4:])
-                # TODO: Remove this hack for conda-build compatibility >_<
-                if "conda_build.environ" in sys.modules:
-                    raise NoPackagesFoundError([[packages]])
                 raise PackagesNotFoundError([packages])
         raise LibMambaUnsatisfiableError(problems)
+
+    def _maybe_raise_for_conda_build(self, conflicting_specs: Iterable[MatchSpec]):
+        # TODO: Remove this hack for conda-build compatibility >_<
+        # conda-build expects a slightly different exception format
+        # good news is that we don't need to retry much, because all
+        # conda-build envs are fresh - if we found a conflict, we report
+        # right away to let conda build handle it
+        if "conda_build.environ" not in sys.modules:
+            return
+
+        raise ResolvePackageNotFound([conflicting_specs])
 
     def _export_solved_records(
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
