@@ -577,10 +577,10 @@ class LibMambaSolver(Solver):
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         conflicts = self._problems_to_specs_parser(problems)
-        self._maybe_raise_for_conda_build(conflicts)
-
         previous_set = set(previous.values())
         current_set = set(conflicts.values())
+
+        self._maybe_raise_for_conda_build(current_set)
 
         diff = current_set.difference(previous_set)
         if len(diff) > 1 and "python" in conflicts:
