@@ -11,6 +11,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
+import re
 
 from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
@@ -230,16 +231,16 @@ class LibMambaSolver(Solver):
         with CaptureStreamToFile(callback=log.debug):
             api_ctx = init_api_context(verbosity=max(2, context.verbosity))
             subdirs = self.subdirs
-            if "conda_build" in sys.modules and getattr(self, "_index", None):
-                # conda build exports its own index through `conda.plan.install_actions`
-                # and "forgets" about noarch on purpose when creating the build/host
-                #  environments, since it merges both as if they were only part of the native subdir.
-                # this causes package-not-found errors because we are not ingesting the patched index
-                # passed to conda.plan.install_actions. the fix seems easy: just add noarch to subdirs.
-                # we can detect whether to apply the fix by checking whether Solver._index has been
-                # patched. note we do not use that private attribute of the base class for anything.
+            if self._called_from_conda_build():
+                log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
+                # Problem: Conda build generates a custom index which happens to "forget" about
+                # noarch on purpose when creating the build/host environments, since it merges
+                # both as if they were all in the native subdir. this causes package-not-found
+                # errors because we are not using the patched index.
+                # Fix: just add noarch to subdirs.
                 if "noarch" not in subdirs:
                     subdirs = *subdirs, "noarch"
+
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
@@ -274,6 +275,7 @@ class LibMambaSolver(Solver):
     def _solving_loop(
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
+        solved = False
         for attempt in range(1, max(1, len(in_state.installed)) + 1):
             log.debug("Starting solver attempt %s", attempt)
             if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
@@ -452,6 +454,8 @@ class LibMambaSolver(Solver):
         log.debug("Creating tasks for %s specs", len(out_state.specs))
         if in_state.is_removing:
             return self._specs_to_tasks_remove(in_state, out_state)
+        if self._called_from_conda_build():
+            return self._specs_to_tasks_conda_build(in_state, out_state)
         return self._specs_to_tasks_add(in_state, out_state)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
@@ -529,7 +533,7 @@ class LibMambaSolver(Solver):
 
             tasks[key].append(spec_str)
 
-        return tasks
+        return dict(tasks)
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
@@ -554,7 +558,36 @@ class LibMambaSolver(Solver):
             self._check_spec_compat(spec)
             tasks[key].append(str(spec))
 
-        return tasks
+        return dict(tasks)
+
+    def _specs_to_tasks_conda_build(
+        self, in_state: SolverInputState, out_state: SolverOutputState
+    ):
+        only_dot_or_digit_re = re.compile(r"^[\d\.]+$")
+
+        def fix_version_field(spec: MatchSpec):
+            """Fix taken from mambabuild"""
+            if spec.version:
+                version_str = str(spec.version)
+                if re.match(only_dot_or_digit_re, version_str):
+                    spec_fields = spec.conda_build_form().split()
+                    if version_str.count(".") <= 1:
+                        spec_fields[1] = version_str + ".*"
+                    else:
+                        spec_fields[1] = version_str + "*"
+                    return MatchSpec(" ".join(spec_fields))
+            return spec
+
+        tasks = defaultdict(list)
+        key = "INSTALL", api.SOLVER_INSTALL
+        for name, spec in out_state.specs.items():
+            if name.startswith("__"):
+                continue
+            self._check_spec_compat(spec)
+            spec = fix_version_field(spec)
+            tasks[key].append(spec.conda_build_form())
+
+        return dict(tasks)
 
     @staticmethod
     def _problems_to_specs_parser(problems: str) -> Mapping[str, MatchSpec]:
@@ -635,12 +668,7 @@ class LibMambaSolver(Solver):
         # good news is that we don't need to retry much, because all
         # conda-build envs are fresh - if we found a conflict, we report
         # right away to let conda build handle it
-        if "conda_build" not in sys.modules:
-            # conda build has not been imported, nothing to do
-            return
-        if not getattr(self, "_index", None):
-            # conda build was imported, but Solver._index was not patched
-            # so probably some other tool is using it? nothing to do
+        if not self._called_from_conda_build():
             return
 
         from conda_build.exceptions import DependencyNeedsBuildingError
@@ -741,3 +769,12 @@ class LibMambaSolver(Solver):
     def _reset(self):
         self.solver = None
         self._solver_options = None
+
+    def _called_from_conda_build(self):
+        """
+        conda build calls the solver via `conda.plan.install_actions`, which
+        overrides Solver._index (populated in the classic solver, but empty for us)
+        with a custom index. We can use this to detect whether conda build is in use
+        and apply some compatibility fixes.
+        """
+        return "conda_build" in sys.modules and getattr(self, "_index", None)
