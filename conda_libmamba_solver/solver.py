@@ -14,7 +14,7 @@ from textwrap import dedent
 import re
 
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
+from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
@@ -24,6 +24,7 @@ from conda.common.url import (
     escape_channel_url,
     split_anaconda_token,
     remove_auth,
+    percent_decode,
 )
 from conda.exceptions import (
     PackagesNotFoundError,
@@ -742,6 +743,12 @@ class LibMambaSolver(Solver):
             out_state.records.set(
                 record.name, record, reason="Part of solution calculated by libmamba"
             )
+
+        # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
+        if on_win and self._called_from_conda_build():
+            for record in out_state.records.values():
+                record.channel.location = percent_decode(record.channel.location)
+                record.channel.name = percent_decode(record.channel.name)
 
         with CaptureStreamToFile(callback=log.debug):
             del transaction
