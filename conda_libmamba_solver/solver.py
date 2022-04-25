@@ -454,6 +454,7 @@ class LibMambaSolver(Solver):
         # ## installed package to result in a conflict before we get to actually solve everything
         # ## A workaround is to let all python-depending specs to "float" (no build constrain) if
         # ## the python version was found to change
+        python_version_might_change = False
         installed_python = in_state.installed.get("python")
         to_be_installed_python = out_state.specs.get("python")
         if installed_python is not None and to_be_installed_python is not None:
