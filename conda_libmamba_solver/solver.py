@@ -452,8 +452,8 @@ class LibMambaSolver(Solver):
         # ## When the Python version changes, this implies all packages depending on
         # ## python will be reinstalled too. This can mean that we'll have to try for every
         # ## installed package to result in a conflict before we get to actually solve everything
-        # ## A workaround is to let all python-depending specs to "float" (no build constrain) if
-        # ## the python version was found to change
+        # ## A workaround is to let all non-noarch python-depending specs to "float" by marking
+        # ## them as a conflict preemptively
         python_version_might_change = False
         installed_python = in_state.installed.get("python")
         to_be_installed_python = out_state.specs.get("python")
@@ -469,8 +469,11 @@ class LibMambaSolver(Solver):
             installed = in_state.installed.get(name)
             key = "INSTALL", api.SOLVER_INSTALL
 
-            ## Fast-track python version changes
+            # Fast-track Python version changes: mark non-noarch Python-depending packages as
+            #  conflicting (see `python_version_might_change` definition above for more details)
             if python_version_might_change and installed is not None:
+                if installed.noarch is not None:
+                    continue
                 for dep in installed.depends:
                     dep_spec = MatchSpec(dep)
                     if dep_spec.name in ("python", "python_abi"):
