@@ -255,7 +255,10 @@ class LibMambaSolver(Solver):
     def _solving_loop(
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
-        for attempt in range(1, max(1, len(in_state.installed)) + 1):
+        max_attempts = max(
+            2, int(os.environ.get("CONDA_LIBMAMBA_MAX_ATTEMPTS", len(in_state.installed))) + 1,
+        )
+        for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
             if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
                 print("----- Starting solver attempt", attempt, "------", file=sys.stderr)
