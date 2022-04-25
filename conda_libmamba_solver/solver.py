@@ -447,23 +447,50 @@ class LibMambaSolver(Solver):
             + list(in_state.history.keys())
             + list(in_state.aggressive_updates.keys())
         )
+
+        # Fast-track python version changes
+        # ## When the Python version changes, this implies all packages depending on
+        # ## python will be reinstalled too. This can mean that we'll have to try for every
+        # ## installed package to result in a conflict before we get to actually solve everything
+        # ## A workaround is to let all python-depending specs to "float" (no build constrain) if
+        # ## the python version was found to change
+        installed_python = in_state.installed.get("python")
+        to_be_installed_python = out_state.specs.get("python")
+        if installed_python is not None and to_be_installed_python is not None:
+            python_version_might_change = not to_be_installed_python.match(installed_python)
+
         tasks = defaultdict(list)
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
             spec_str = str(spec)
+            installed = in_state.installed.get(name)
             key = "INSTALL", api.SOLVER_INSTALL
+
+            ## Fast-track python version changes
+            if python_version_might_change and installed is not None:
+                for dep in installed.depends:
+                    dep_spec = MatchSpec(dep)
+                    if dep_spec.name in ("python", "python_abi"):
+                        out_state.conflicts.update(
+                            {name: spec},
+                            reason="Python version might change and this package depends on Python",
+                            overwrite=False,
+                        )
+                        break
+
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
                 tasks[("DISFAVOR", api.SOLVER_DISFAVOR)].append(spec_str)
                 tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
-            if name in in_state.installed:
-                installed = in_state.installed[name]
+
+            if installed is not None:
                 # ## Regular task ###
                 key = "UPDATE", api.SOLVER_UPDATE
+
                 # ## Protect if installed AND history
-                if name in protected:
+                if name in protected and name:
                     installed_spec = str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
