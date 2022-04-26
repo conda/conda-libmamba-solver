@@ -58,6 +58,7 @@ class LibMambaIndexHelper(IndexHelper):
         installed_records: Iterable[PackageRecord] = (),
         channels: Iterable[Union[Channel, str]] = None,
         subdirs: Iterable[str] = None,
+        repodata_fn: str = REPODATA_FN,
     ):
 
         self._repos = []
@@ -91,6 +92,7 @@ class LibMambaIndexHelper(IndexHelper):
             prepend=False,
             use_local=context.use_local,
             platform=subdirs,
+            repodata_fn=repodata_fn,
         )
 
         self._query = api.Query(self._pool)
@@ -183,6 +185,11 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+        # we want to support arbitrary repodata fns, but we ignore current_repodata
+        if self._repodata_fn == "current_repodata.json":
+            log.debug(f"Ignoring repodata_fn='current_repodata.json', defaulting to {REPODATA_FN}")
+            self._repodata_fn = REPODATA_FN
+
     def solve_final_state(
         self,
         update_modifier=NULL,
@@ -225,10 +232,11 @@ class LibMambaSolver(Solver):
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
                 subdirs=self.subdirs,
+                repodata_fn=self._repodata_fn,
             )
 
         with Spinner(
-            "Collect all metadata",
+            f"Collect all metadata ({self._repodata_fn})",
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
