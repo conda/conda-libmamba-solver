@@ -608,8 +608,14 @@ class LibMambaSolver(Solver):
             line = line.strip()
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
-                raise PackagesNotFoundError([" ".join(packages)])
-        raise LibMambaUnsatisfiableError(problems)
+                exc = PackagesNotFoundError([" ".join(packages)])
+                break
+        else:  # we didn't break, raise the "normal" exception
+            exc = LibMambaUnsatisfiableError(problems)
+
+        # do not allow conda.cli.install to try more things
+        exc.allow_retry = False
+        raise exc
 
     def _export_solved_records(
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
