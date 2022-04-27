@@ -4,7 +4,11 @@
 # - /opt/conda-src -> repo for conda/conda
 # - /opt/conda-libmamba-src -> repo for conda-incubator/conda-libmamba-solver
 
-set -euo pipefail
+set -e
+restore_e() {
+    set +e
+}
+trap restore_e EXIT
 
 sudo /opt/conda/condabin/conda install -y -p /opt/conda \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
@@ -14,6 +18,9 @@ cd /opt/conda-libmamba-solver-src
 sudo env FLIT_ROOT_INSTALL=1 /opt/conda/bin/python -m flit install --symlink --deps=none
 
 cd /opt/conda-src
+export RUNNING_ON_DEVCONTAINER=${RUNNING_ON_DEVCONTAINER:-}
 source /opt/conda-src/dev/linux/bashrc.sh
 
 cd /opt/conda-libmamba-solver-src
+
+set +e
