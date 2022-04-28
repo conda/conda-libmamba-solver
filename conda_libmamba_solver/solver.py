@@ -194,11 +194,14 @@ class LibMambaSolver(Solver):
         # Fix bug in conda.common.arg2spec and MatchSpec.__str__
         fixed_specs = []
         for spec in specs_to_add:
-            spec_str = str(spec)
-            if "::" in spec_str:
-                for arg in sys.argv:
-                    if spec_str in arg:
-                        spec = MatchSpec(arg)
+            if isinstance(spec, PackageRecord):
+                spec = MatchSpec(str(spec))
+            else:
+                spec_str = str(spec)
+                if "::" in spec_str:
+                    for arg in sys.argv:
+                        if spec_str in arg:
+                            spec = MatchSpec(arg)
             fixed_specs.append(spec)
         self.specs_to_add = frozenset(fixed_specs)
 
