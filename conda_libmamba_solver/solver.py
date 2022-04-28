@@ -203,7 +203,7 @@ class LibMambaSolver(Solver):
                         if spec_str in arg:
                             spec = MatchSpec(arg)
             fixed_specs.append(spec)
-        self.specs_to_add = frozenset(fixed_specs)
+        self.specs_to_add = frozenset(MatchSpec.merge(s for s in fixed_specs))
 
     def solve_final_state(
         self,
