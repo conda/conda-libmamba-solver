@@ -167,6 +167,7 @@ def init_api_context(verbosity: int = context.verbosity, use_mamba_experimental:
     api_ctx.json = context.json
     api_ctx.dry_run = context.dry_run
     if context.json:
+        api.cancel_json_output()
         context.always_yes = True
         context.quiet = True
         if use_mamba_experimental:
