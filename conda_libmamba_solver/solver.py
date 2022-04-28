@@ -191,6 +191,17 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+        # Fix bug in conda.common.arg2spec and MatchSpec.__str__
+        fixed_specs = []
+        for spec in specs_to_add:
+            spec_str = str(spec)
+            if "::" in spec_str:
+                for arg in sys.argv:
+                    if spec_str in arg:
+                        spec = MatchSpec(arg)
+            fixed_specs.append(spec)
+        self.specs_to_add = frozenset(fixed_specs)
+
     def solve_final_state(
         self,
         update_modifier=NULL,
@@ -443,6 +454,12 @@ class LibMambaSolver(Solver):
             return self._specs_to_tasks_remove(in_state, out_state)
         return self._specs_to_tasks_add(in_state, out_state)
 
+    @staticmethod
+    def _spec_to_str(spec):
+        if spec.original_spec_str and spec.original_spec_str.startswith("file://"):
+            return spec.original_spec_str
+        return str(spec)
+
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
         # These packages receive special protection, since they will be
         # exempt from conflict treatment (ALLOWUNINSTALL) and if installed
@@ -457,7 +474,7 @@ class LibMambaSolver(Solver):
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
-            spec_str = str(spec)
+            spec_str = self._spec_to_str(spec)
             key = "INSTALL", api.SOLVER_INSTALL
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
