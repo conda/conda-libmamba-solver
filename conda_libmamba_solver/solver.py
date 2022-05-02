@@ -494,7 +494,7 @@ class LibMambaSolver(Solver):
                 key = "UPDATE", api.SOLVER_UPDATE
 
                 # ## Protect if installed AND history
-                if name in protected and name:
+                if name and name in protected:
                     installed_spec = str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
