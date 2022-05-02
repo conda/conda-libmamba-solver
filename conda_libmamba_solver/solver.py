@@ -457,7 +457,7 @@ class LibMambaSolver(Solver):
         python_version_might_change = False
         installed_python = in_state.installed.get("python")
         to_be_installed_python = out_state.specs.get("python")
-        if installed_python is not None and to_be_installed_python is not None:
+        if installed_python and to_be_installed_python:
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
         tasks = defaultdict(list)
@@ -494,7 +494,7 @@ class LibMambaSolver(Solver):
                 key = "UPDATE", api.SOLVER_UPDATE
 
                 # ## Protect if installed AND history
-                if name and name in protected:
+                if name in protected:
                     installed_spec = str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
