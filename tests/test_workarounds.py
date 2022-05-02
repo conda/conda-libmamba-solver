@@ -1,5 +1,6 @@
 import sys
-from subprocess import check_call
+from subprocess import check_call, check_output
+import json
 
 
 def test_matchspec_star_version():
@@ -24,3 +25,27 @@ def test_matchspec_star_version():
             "activate_deactivate_package=*=*0",
         ]
     )
+
+
+def test_build_string_filters():
+    output = check_output(
+        [
+            sys.executable,
+            "-m",
+            "conda",
+            "create",
+            "-p",
+            "UNUSED",
+            "--dry-run",
+            "--experimental-solver=libmamba",
+            "numpy=*=*py38*",
+            "--json",
+        ]
+    )
+    data = json.loads(output)
+    assert data["success"]
+    for pkg in data["actions"]["LINK"]:
+        if pkg["name"] == "python":
+            assert pkg["version"].startswith("3.8")
+        if pkg["name"] == "numpy":
+            assert "py38" in pkg["build_string"]
