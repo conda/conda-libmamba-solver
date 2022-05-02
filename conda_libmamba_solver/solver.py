@@ -21,7 +21,6 @@ from conda.common.io import Spinner
 from conda.common.serialize import json_dump, json_load
 from conda.common.path import paths_equal
 from conda.common.url import (
-    escape_channel_url,
     split_anaconda_token,
     remove_auth,
 )
@@ -47,7 +46,7 @@ from .mamba_utils import (
     mamba_version,
 )
 from .state import SolverInputState, SolverOutputState, IndexHelper
-from .utils import CaptureStreamToFile
+from .utils import CaptureStreamToFile, escape_channel_url
 
 
 log = logging.getLogger(f"conda.{__name__}")
