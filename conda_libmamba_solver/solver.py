@@ -448,6 +448,8 @@ class LibMambaSolver(Solver):
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
+            if spec.get("build") and not spec.get("version"):
+                spec = MatchSpec(spec, version="*")
             spec_str = str(spec)
             key = "INSTALL", api.SOLVER_INSTALL
             # ## Low-prio task ###

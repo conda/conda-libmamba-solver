@@ -1,5 +1,5 @@
 import sys
-from subprocess import check_call, check_output
+from subprocess import check_call, run, PIPE
 import json
 
 
@@ -28,7 +28,7 @@ def test_matchspec_star_version():
 
 
 def test_build_string_filters():
-    output = check_output(
+    process = run(
         [
             sys.executable,
             "-m",
@@ -40,9 +40,13 @@ def test_build_string_filters():
             "--experimental-solver=libmamba",
             "numpy=*=*py38*",
             "--json",
-        ]
+        ],
+        stdout=PIPE,
+        text=True,
     )
-    data = json.loads(output)
+    print(process.stdout)
+    process.check_returncode()
+    data = json.loads(process.stdout)
     assert data["success"]
     for pkg in data["actions"]["LINK"]:
         if pkg["name"] == "python":
