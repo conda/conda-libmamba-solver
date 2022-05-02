@@ -11,6 +11,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
+from functools import lru_cache
 
 from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
@@ -184,6 +185,7 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+    @lru_cache(maxsize=None)
     @staticmethod
     def user_agent():
         """Expose this identifier to allow conda to extend its user agent if required"""
