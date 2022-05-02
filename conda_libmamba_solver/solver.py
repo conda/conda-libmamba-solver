@@ -256,7 +256,7 @@ class LibMambaSolver(Solver):
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         max_attempts = max(
-            2, int(os.environ.get("CONDA_LIBMAMBA_MAX_ATTEMPTS", len(in_state.installed))) + 1,
+            2, int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
         )
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
@@ -470,7 +470,7 @@ class LibMambaSolver(Solver):
             key = "INSTALL", api.SOLVER_INSTALL
 
             # Fast-track Python version changes: mark non-noarch Python-depending packages as
-            #  conflicting (see `python_version_might_change` definition above for more details)
+            # conflicting (see `python_version_might_change` definition above for more details)
             if python_version_might_change and installed is not None:
                 if installed.noarch is not None:
                     continue
