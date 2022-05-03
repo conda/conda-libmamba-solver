@@ -21,7 +21,6 @@ from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.path import get_major_minor_version, paths_equal
 from conda.common.url import (
-    escape_channel_url,
     split_anaconda_token,
     remove_auth,
 )
@@ -38,6 +37,8 @@ from conda.models.version import VersionOrder
 from conda.core.solve import Solver, get_pinned_specs
 
 from .exceptions import LibMambaUnsatisfiableError
+from .utils import escape_channel_url
+
 log = getLogger(f"conda.{__name__}")
 
 
@@ -74,7 +75,9 @@ class LibMambaSolverDraft(Solver):
         if not context.json and not context.quiet:
             print("------ USING EXPERIMENTAL LIBMAMBA INTEGRATIONS ------")
 
-        if "PYTEST_CURRENT_TEST" not in os.environ and paths_equal(self.prefix, context.root_prefix):
+        if "PYTEST_CURRENT_TEST" not in os.environ and paths_equal(
+            self.prefix, context.root_prefix
+        ):
             raise CondaEnvironmentError(
                 f"{self.__class__.__name__} is not allowed on the base environment during "
                 "the experimental release phase. Try using it on a non-base environment!"
@@ -94,8 +97,7 @@ class LibMambaSolverDraft(Solver):
         # Tasks that do not require a solver can be tackled right away
         # This returns either None (did nothing) or a final state
         none_or_final_state = self._early_exit_tasks(
-            update_modifier=kwargs["update_modifier"],
-            force_remove=kwargs["force_remove"],
+            update_modifier=kwargs["update_modifier"], force_remove=kwargs["force_remove"],
         )
         if none_or_final_state is not None:
             return none_or_final_state
@@ -422,8 +424,7 @@ class LibMambaSolverDraft(Solver):
             if p.name in installed_names
         ]
         solver.add_jobs(
-            list(set(chain(self._history_specs(), aggresive_updates))),
-            api.SOLVER_USERINSTALLED,
+            list(set(chain(self._history_specs(), aggresive_updates))), api.SOLVER_USERINSTALLED,
         )
         specs = [s.conda_build_form() for s in self.specs_to_remove]
         solver.add_jobs(specs, api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
@@ -903,11 +904,7 @@ class LibMambaSolverDraft(Solver):
         index = state["index"]
         installed_pkgs = state["installed_pkgs"]
 
-        transaction = api.Transaction(
-            solver,
-            api.MultiPackageCache(context.pkgs_dirs),
-            state["repos"],
-        )
+        transaction = api.Transaction(solver, api.MultiPackageCache(context.pkgs_dirs),)
         (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
         # What follows below is taken from mamba.utils.to_txn with some patches
