@@ -206,8 +206,8 @@ class LibMambaSolver(Solver):
             fixed_specs.append(spec)
         self.specs_to_add = frozenset(MatchSpec.merge(s for s in fixed_specs))
 
-    @lru_cache(maxsize=None)
     @staticmethod
+    @lru_cache(maxsize=None)
     def user_agent():
         """
         Expose this identifier to allow conda to extend its user agent if required
