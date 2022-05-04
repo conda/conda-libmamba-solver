@@ -75,6 +75,7 @@ from conda.common.io import dashlist
 from conda.common.path import get_major_minor_version, paths_equal
 from conda.exceptions import PackagesNotFoundError, SpecsConfigurationConflictError
 from conda.history import History
+from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 from conda.models.prefix_graph import PrefixGraph
@@ -382,6 +383,9 @@ class SolverInputState:
         for spec in self.requested.values():
             channel = spec.get_exact_value("channel")
             if channel:
+                if spec.original_spec_str and spec.original_spec_str.startswith("file://"):
+                    # Handle MatchSpec roundtrip issue with local channels
+                    channel = Channel(spec.original_spec_str.split("::")[0])
                 channels.append(channel)
         return channels
 

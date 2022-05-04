@@ -11,6 +11,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
+from functools import lru_cache
 
 from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
@@ -20,7 +21,6 @@ from conda.common.io import Spinner
 from conda.common.serialize import json_dump, json_load
 from conda.common.path import paths_equal
 from conda.common.url import (
-    escape_channel_url,
     split_anaconda_token,
     remove_auth,
 )
@@ -37,6 +37,7 @@ from conda.models.records import PackageRecord
 from conda.core.solve import Solver
 import libmambapy as api
 
+from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .mamba_utils import (
     load_channels,
@@ -45,7 +46,7 @@ from .mamba_utils import (
     mamba_version,
 )
 from .state import SolverInputState, SolverOutputState, IndexHelper
-from .utils import CaptureStreamToFile
+from .utils import CaptureStreamToFile, escape_channel_url
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -65,6 +66,7 @@ class LibMambaIndexHelper(IndexHelper):
 
         # export installed records to a temporary json file
         exported_installed = {"packages": {}}
+        additional_infos = {}
         for record in installed_records:
             exported_installed["packages"][record.fn] = {
                 **record.dist_fields_dump(),
@@ -72,9 +74,16 @@ class LibMambaIndexHelper(IndexHelper):
                 "constrains": record.constrains,
                 "build": record.build,
             }
+            info = api.ExtraPkgInfo()
+            if record.noarch:
+                info.noarch = record.noarch.value
+            if record.url:
+                info.repo_url = record.url
+            additional_infos[record.name] = info
         with NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
             f.write(json_dump(exported_installed))
         installed = api.Repo(self._pool, "installed", f.name, "")
+        installed.add_extra_pkg_info(additional_infos)
         installed.set_installed()
         self._repos.append(installed)
         os.unlink(f.name)
@@ -183,6 +192,28 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+        # Fix bug in conda.common.arg2spec and MatchSpec.__str__
+        fixed_specs = []
+        for spec in specs_to_add:
+            if isinstance(spec, PackageRecord):
+                spec = MatchSpec(str(spec))
+            else:
+                spec_str = str(spec)
+                if "::" in spec_str:
+                    for arg in sys.argv:
+                        if spec_str in arg:
+                            spec = MatchSpec(arg)
+            fixed_specs.append(spec)
+        self.specs_to_add = frozenset(MatchSpec.merge(s for s in fixed_specs))
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def user_agent():
+        """
+        Expose this identifier to allow conda to extend its user agent if required
+        """
+        return f"conda-libmamba-solver/{__version__} libmambapy/{mamba_version()}"
+
     def solve_final_state(
         self,
         update_modifier=NULL,
@@ -256,7 +287,8 @@ class LibMambaSolver(Solver):
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         max_attempts = max(
-            2, int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
+            2,
+            int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
         )
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
@@ -438,6 +470,12 @@ class LibMambaSolver(Solver):
             return self._specs_to_tasks_remove(in_state, out_state)
         return self._specs_to_tasks_add(in_state, out_state)
 
+    @staticmethod
+    def _spec_to_str(spec):
+        if spec.original_spec_str and spec.original_spec_str.startswith("file://"):
+            return spec.original_spec_str
+        return str(spec)
+
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
         # These packages receive special protection, since they will be
         # exempt from conflict treatment (ALLOWUNINSTALL) and if installed
@@ -465,8 +503,9 @@ class LibMambaSolver(Solver):
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
-            spec_str = str(spec)
+            spec_str = self._spec_to_str(spec)
             installed = in_state.installed.get(name)
+
             key = "INSTALL", api.SOLVER_INSTALL
 
             # Fast-track Python version changes: mark non-noarch Python-depending packages as
@@ -645,9 +684,7 @@ class LibMambaSolver(Solver):
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         with CaptureStreamToFile(callback=log.debug):
-            transaction = api.Transaction(
-                self.solver, api.MultiPackageCache(context.pkgs_dirs), index._repos,
-            )
+            transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
             (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
         if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
