@@ -30,11 +30,14 @@ def _mock_server(xprocess, name, port, auth="none", user=None, password=None, to
             str(curdir / "_reposerver.py"),
             "-d",
             str(curdir / "data" / "mamba_repo"),
-            "--auth",
-            auth,
             "--port",
             str(port),
         ]
+        if auth == "token":
+            assert token
+            args += ["--token", token]
+        elif auth:
+            args += ["--auth", auth]
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
         if user and password:
@@ -155,6 +158,7 @@ def test_channel_matchspec():
             "python=3.9",
         ]
     )
+    print(out)
     result = json.loads(out)
     assert result["success"] is True
     for record in result["actions"]["LINK"]:
