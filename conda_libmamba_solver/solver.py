@@ -468,8 +468,16 @@ class LibMambaSolver(Solver):
 
     @staticmethod
     def _spec_to_str(spec):
+        """
+        Workarounds for Matchspec str-roundtrip limitations.
+
+        Note: this might still fail for specs with local channels and version=*:
+            file://path/to/channel::package_name=*=*buildstr*
+        """
         if spec.original_spec_str and spec.original_spec_str.startswith("file://"):
             return spec.original_spec_str
+        if spec.get("build") and not spec.get("version"):
+            spec = MatchSpec(spec, version="*")
         return str(spec)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
@@ -486,8 +494,6 @@ class LibMambaSolver(Solver):
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
-            if spec.get("build") and not spec.get("version"):
-                spec = MatchSpec(spec, version="*")
             spec_str = self._spec_to_str(spec)
             key = "INSTALL", api.SOLVER_INSTALL
             # ## Low-prio task ###
@@ -500,7 +506,7 @@ class LibMambaSolver(Solver):
                 key = "UPDATE", api.SOLVER_UPDATE
                 # ## Protect if installed AND history
                 if name in protected:
-                    installed_spec = str(installed.to_match_spec())
+                    installed_spec = self._spec_to_str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
                     # conflict resolution. We do this because these are "protected" packages
@@ -545,7 +551,9 @@ class LibMambaSolver(Solver):
                         )
                     else:
                         # NOTE: This is ugly and there should be another way
-                        spec_str = f"{name} !={installed.version}"
+                        spec_str = self._spec_to_str(
+                            MatchSpec(spec, version=f"!={installed.version}")
+                        )
 
             tasks[key].append(spec_str)
 
