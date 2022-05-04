@@ -2,8 +2,8 @@
 Helper module/script to launch a conda channel/server
 for local testing.
 
-Copied from https://github.com/mamba-org/mamba/blob/bff16c2/mamba/tests/reposerver.py
-on Mar 17 2022
+Copied from https://github.com/mamba-org/mamba/blob/53eb28d/mamba/tests/reposerver.py
+on Apr 27 2022
 
 See data/mamba_repo/LICENSE for full details
 """
@@ -16,30 +16,62 @@ import shutil
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
-import conda_content_trust.authentication as cct_authentication
-import conda_content_trust.common as cct_common
-import conda_content_trust.metadata_construction as cct_metadata_construction
-import conda_content_trust.root_signing as cct_root_signing
-import conda_content_trust.signing as cct_signing
-import rich.console
+try:
+    import conda_content_trust.authentication as cct_authentication
+    import conda_content_trust.common as cct_common
+    import conda_content_trust.metadata_construction as cct_metadata_construction
+    import conda_content_trust.root_signing as cct_root_signing
+    import conda_content_trust.signing as cct_signing
 
-console = rich.console.Console()
+    conda_content_trust_available = True
+except ImportError:
+    conda_content_trust_available = False
 
+if os.environ.get("TESTPWD"):
+    default_user, default_password = os.environ.get("TESTPWD").split(":")
+else:
+    default_user, default_password = None, None
 
 parser = argparse.ArgumentParser(description="Start a simple conda package server.")
 parser.add_argument("-p", "--port", type=int, default=8000, help="Port to use.")
 parser.add_argument(
-    "-d", "--directory", type=str, default=os.getcwd(), help="Root directory for serving.",
+    "-d",
+    "--directory",
+    type=str,
+    default=os.getcwd(),
+    help="Root directory for serving.",
 )
 parser.add_argument(
-    "-a", "--auth", default="none", type=str, help="auth method (none, basic, or token)",
+    "-a",
+    "--auth",
+    default=None,
+    type=str,
+    help="auth method (none, basic, or token)",
 )
 parser.add_argument(
-    "--sign", action="store_true", help="Sign repodata (note: run generate_gpg_keys.sh before)",
+    "--sign",
+    action="store_true",
+    help="Sign repodata (note: run generate_gpg_keys.sh before)",
+)
+parser.add_argument(
+    "--token",
+    type=str,
+    default=None,
+    help="Use token as API Key",
+)
+parser.add_argument(
+    "--user",
+    type=str,
+    default=default_user,
+    help="Use token as API Key",
+)
+parser.add_argument(
+    "--password",
+    type=str,
+    default=default_password,
+    help="Use token as API Key",
 )
 args = parser.parse_args()
-
-api_key = "xy-12345678-1234-1234-1234-123456789012"
 
 
 def get_fingerprint(gpg_output):
@@ -74,7 +106,6 @@ class RepoSigner:
             for el in iv:
                 if isinstance(el, str):
                     el = el.lower()
-                    print(el)
                     keyval = cct_root_signing.fetch_keyval_from_gpg(el)
                     res = {"fingerprint": el, "public": keyval}
                 elif isinstance(el, dict):
@@ -114,18 +145,22 @@ class RepoSigner:
             fout.write(root_md_serialized_unsigned)
 
         # This overwrites the file with a signed version of the file.
-        cct_root_signing.sign_root_metadata_via_gpg(root_filepath, root_keys[0]["fingerprint"])
+        cct_root_signing.sign_root_metadata_via_gpg(
+            root_filepath, root_keys[0]["fingerprint"]
+        )
 
         # Load untrusted signed root metadata.
         signed_root_md = cct_common.load_metadata_from_file(root_filepath)
 
         cct_authentication.verify_signable(signed_root_md, root_pubkeys, 1, gpg=True)
 
-        console.print("[green]Root metadata signed & verified!")
+        print("[reposigner] Root metadata signed & verified!")
 
     def create_key_mgr(self, keys):
 
-        private_key_key_mgr = cct_common.PrivateKey.from_hex(keys["key_mgr"][0]["private"])
+        private_key_key_mgr = cct_common.PrivateKey.from_hex(
+            keys["key_mgr"][0]["private"]
+        )
         pkg_mgr_pub_keys = [k["public"] for k in keys["pkg_mgr"]]
         key_mgr = cct_metadata_construction.build_delegating_metadata(
             metadata_type="key_mgr",  # 'root' or 'key_mgr'
@@ -146,7 +181,9 @@ class RepoSigner:
 
         # let's run a verification
         root_metadata = cct_common.load_metadata_from_file(self.folder / "1.root.json")
-        key_mgr_metadata = cct_common.load_metadata_from_file(self.folder / "key_mgr.json")
+        key_mgr_metadata = cct_common.load_metadata_from_file(
+            self.folder / "key_mgr.json"
+        )
 
         cct_common.checkformat_signable(root_metadata)
 
@@ -156,13 +193,15 @@ class RepoSigner:
         root_delegations = root_metadata["signed"]["delegations"]  # for brevity
         cct_common.checkformat_delegations(root_delegations)
         if "key_mgr" not in root_delegations:
-            raise ValueError('Missing expected delegation to "key_mgr" in root metadata.')
+            raise ValueError(
+                'Missing expected delegation to "key_mgr" in root metadata.'
+            )
         cct_common.checkformat_delegation(root_delegations["key_mgr"])
 
         # Doing delegation processing.
         cct_authentication.verify_delegation("key_mgr", key_mgr_metadata, root_metadata)
 
-        console.print("[green]Success: key mgr metadata verified based on root metadata.")
+        print("[reposigner] success: key mgr metadata verified based on root metadata.")
 
         return key_mgr
 
@@ -177,7 +216,7 @@ class RepoSigner:
 
         pkg_mgr_key = keys["pkg_mgr"][0]["private"]
         cct_signing.sign_all_in_repodata(str(final_fn), pkg_mgr_key)
-        console.print(f"[green]Signed [bold]{final_fn}[/bold]")
+        print(f"[reposigner] Signed {final_fn}")
 
     def __init__(self, in_folder=args.directory):
 
@@ -193,9 +232,9 @@ class RepoSigner:
             os.mkdir(self.folder)
 
         self.keys = self.normalize_keys(self.keys)
-        console.print("Using keys:", self.keys)
+        print("[reposigner] Using keys:", self.keys)
 
-        console.print("Using folder:", self.folder)
+        print("[reposigner] Using folder:", self.folder)
 
         self.create_root(self.keys)
         self.create_key_mgr(self.keys)
@@ -205,6 +244,12 @@ class RepoSigner:
 
 class BasicAuthHandler(SimpleHTTPRequestHandler):
     """Main class to present webpages and authentication."""
+
+    user = args.user
+    password = args.password
+    key = base64.b64encode(bytes(f"{args.user}:{args.password}", "utf-8")).decode(
+        "ascii"
+    )
 
     def do_HEAD(self):
         self.send_response(200)
@@ -218,15 +263,14 @@ class BasicAuthHandler(SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        key = os.environ["TESTPWD"]
-        key = base64.b64encode(bytes(key, "utf-8")).decode("ascii")
-        """ Present frontpage with user authentication. """
+        """Present frontpage with user authentication."""
         auth_header = self.headers.get("Authorization", "")
+
         if not auth_header:
             self.do_AUTHHEAD()
             self.wfile.write(b"no auth header received")
             pass
-        elif auth_header == "Basic " + key:
+        elif auth_header == "Basic " + self.key:
             SimpleHTTPRequestHandler.do_GET(self)
             pass
         else:
@@ -239,17 +283,17 @@ class BasicAuthHandler(SimpleHTTPRequestHandler):
 class CondaTokenHandler(SimpleHTTPRequestHandler):
     """Main class to present webpages and authentication."""
 
+    api_key = args.token
     token_pattern = re.compile("^/t/([^/]+?)/")
 
     def do_GET(self):
         """Present frontpage with user authentication."""
-        global api_key
         match = self.token_pattern.search(self.path)
         if match:
             prefix_length = len(match.group(0)) - 1
             new_path = self.path[prefix_length:]
             found_api_key = match.group(1)
-            if found_api_key == api_key:
+            if found_api_key == self.api_key:
                 self.path = new_path
                 return SimpleHTTPRequestHandler.do_GET(self)
 
@@ -260,16 +304,19 @@ class CondaTokenHandler(SimpleHTTPRequestHandler):
 
 
 if args.sign:
+    if not conda_content_trust_available:
+        print("Conda content trust not installed!")
+        exit(1)
     signer = RepoSigner()
     os.chdir(signer.folder)
 else:
     os.chdir(args.directory)
 
-if not args.auth or args.auth == "none":
+if args.auth == "none":
     handler = SimpleHTTPRequestHandler
-elif not args.auth or args.auth == "basic":
+elif args.auth == "basic" or (args.user and args.password):
     handler = BasicAuthHandler
-elif not args.auth or args.auth == "token":
+elif args.auth == "token" or args.token:
     handler = CondaTokenHandler
 
 PORT = args.port

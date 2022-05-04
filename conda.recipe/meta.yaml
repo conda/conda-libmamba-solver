@@ -19,14 +19,14 @@ requirements:
     - flit-core >=3.2,<4
   run:
     - python >=3.6
-    - libmambapy >=0.22
-    - conda >=4.11
+    - libmambapy >=0.23
+    - conda >=4.12
 
 test:
   imports:
     - conda_libmamba_solver
   commands:
-    - CONDA_SOLVER_LOGIC=libmamba conda create -n test --dry-run scipy
+    - CONDA_EXPERIMENTAL_SOLVER=libmamba conda create -n test --dry-run scipy
 
 about:
   home: https://github.com/conda-incubator/conda-libmamba-solver
