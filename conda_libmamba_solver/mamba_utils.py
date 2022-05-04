@@ -249,6 +249,9 @@ def init_api_context(verbosity: int = context.verbosity, use_mamba_experimental:
     elif context.channel_priority is ChannelPriority.DISABLED:
         api_ctx.channel_priority = api.ChannelPriority.kDisabled
 
+    if hasattr(api_ctx, "user_agent"):
+        api_ctx.user_agent = context.user_agent
+
     return api_ctx
 
 

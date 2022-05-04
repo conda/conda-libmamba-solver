@@ -11,6 +11,7 @@ import sys
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
+from functools import lru_cache
 
 from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
@@ -36,6 +37,7 @@ from conda.models.records import PackageRecord
 from conda.core.solve import Solver
 import libmambapy as api
 
+from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .mamba_utils import (
     load_channels,
@@ -203,6 +205,14 @@ class LibMambaSolver(Solver):
                             spec = MatchSpec(arg)
             fixed_specs.append(spec)
         self.specs_to_add = frozenset(MatchSpec.merge(s for s in fixed_specs))
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def user_agent():
+        """
+        Expose this identifier to allow conda to extend its user agent if required
+        """
+        return f"conda-libmamba-solver/{__version__} libmambapy/{mamba_version()}"
 
     def solve_final_state(
         self,
