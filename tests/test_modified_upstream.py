@@ -468,7 +468,11 @@ def test_freeze_deps_1(tmpdir):
         pprint(convert_to_dist_str(unlink_precs))
         pprint(convert_to_dist_str(link_precs))
         unlink_order = add_subdir_to_iter(
-            ("channel-2::six-1.7.3-py34_0", "channel-2::python-3.4.5-0", "channel-2::xz-5.2.3-0",)
+            (
+                "channel-2::six-1.7.3-py34_0",
+                "channel-2::python-3.4.5-0",
+                "channel-2::xz-5.2.3-0",
+            )
         )
         link_order = add_subdir_to_iter(
             (
@@ -1167,7 +1171,10 @@ def test_priority_1(tmpdir):
             final_state_3 = solver.solve_final_state()
             pprint(convert_to_dist_str(final_state_3))
             order = add_subdir_to_iter(
-                ("channel-2::python-2.7.13-0", "channel-2::pandas-0.20.3-py27_0",)
+                (
+                    "channel-2::python-2.7.13-0",
+                    "channel-2::pandas-0.20.3-py27_0",
+                )
             )
             for spec in order:
                 assert spec in convert_to_dist_str(final_state_3)
@@ -1184,7 +1191,10 @@ def test_priority_1(tmpdir):
             final_state_4 = solver.solve_final_state()
             pprint(convert_to_dist_str(final_state_4))
             order = add_subdir_to_iter(
-                ("channel-2::python-2.7.13-0", "channel-2::six-1.9.0-py27_0",)
+                (
+                    "channel-2::python-2.7.13-0",
+                    "channel-2::six-1.9.0-py27_0",
+                )
             )
             for spec in order:
                 assert spec in convert_to_dist_str(final_state_4)
@@ -1248,4 +1258,3 @@ def test_downgrade_python_prevented_with_sane_message(tmpdir):
         assert "Encountered problems while solving" in error_msg
         assert "package unsatisfiable-with-py26-1.0-0 requires scikit-learn 0.13" in error_msg
         ## /MODIFIED
-
