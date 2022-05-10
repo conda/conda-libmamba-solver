@@ -127,8 +127,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: conda/conda
-          ref: master
+          repository: jaimergp/conda
+          ref: user-agent-ignore-importerror
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -225,8 +225,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: conda/conda
-          ref: master
+          repository: jaimergp/conda
+          ref: user-agent-ignore-importerror
           path: conda
 
       - name: Set temp dirs correctly
