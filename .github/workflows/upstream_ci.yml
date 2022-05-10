@@ -84,7 +84,6 @@ jobs:
           ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
           bash -c "sudo env CONDA_EXPERIMENTAL_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
-                        conda conda-build \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    $run_test_cmd"
