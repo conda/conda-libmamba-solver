@@ -297,7 +297,11 @@ class LibMambaSolver(Solver):
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
     ):
-        for attempt in range(1, max(1, len(in_state.installed)) + 1):
+        max_attempts = max(
+            2,
+            int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
+        )
+        for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
             if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
                 print("----- Starting solver attempt", attempt, "------", file=sys.stderr)
@@ -503,21 +507,53 @@ class LibMambaSolver(Solver):
             + list(in_state.history.keys())
             + list(in_state.aggressive_updates.keys())
         )
+
+        # Fast-track python version changes
+        # ## When the Python version changes, this implies all packages depending on
+        # ## python will be reinstalled too. This can mean that we'll have to try for every
+        # ## installed package to result in a conflict before we get to actually solve everything
+        # ## A workaround is to let all non-noarch python-depending specs to "float" by marking
+        # ## them as a conflict preemptively
+        python_version_might_change = False
+        installed_python = in_state.installed.get("python")
+        to_be_installed_python = out_state.specs.get("python")
+        if installed_python and to_be_installed_python:
+            python_version_might_change = not to_be_installed_python.match(installed_python)
+
         tasks = defaultdict(list)
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
             spec_str = self._spec_to_str(spec)
+            installed = in_state.installed.get(name)
+
             key = "INSTALL", api.SOLVER_INSTALL
+
+            # Fast-track Python version changes: mark non-noarch Python-depending packages as
+            # conflicting (see `python_version_might_change` definition above for more details)
+            if python_version_might_change and installed is not None:
+                if installed.noarch is not None:
+                    continue
+                for dep in installed.depends:
+                    dep_spec = MatchSpec(dep)
+                    if dep_spec.name in ("python", "python_abi"):
+                        out_state.conflicts.update(
+                            {name: spec},
+                            reason="Python version might change and this package depends on Python",
+                            overwrite=False,
+                        )
+                        break
+
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
                 tasks[("DISFAVOR", api.SOLVER_DISFAVOR)].append(spec_str)
                 tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
-            if name in in_state.installed:
-                installed = in_state.installed[name]
+
+            if installed is not None:
                 # ## Regular task ###
                 key = "UPDATE", api.SOLVER_UPDATE
+
                 # ## Protect if installed AND history
                 if name in protected:
                     installed_spec = self._spec_to_str(installed.to_match_spec())
