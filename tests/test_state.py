@@ -27,7 +27,8 @@ env = temp_simple_env
 
 
 @pytest.mark.parametrize(
-    "default_packages", ["", "python,jupyter", "python=3",],
+    "default_packages",
+    ["", "python,jupyter", "python=3"],
 )
 def test_create_empty(default_packages):
     """

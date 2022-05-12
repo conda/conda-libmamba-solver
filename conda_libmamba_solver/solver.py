@@ -61,6 +61,7 @@ class LibMambaIndexHelper(IndexHelper):
         installed_records: Iterable[PackageRecord] = (),
         channels: Iterable[Union[Channel, str]] = None,
         subdirs: Iterable[str] = None,
+        repodata_fn: str = REPODATA_FN,
     ):
 
         self._repos = []
@@ -104,6 +105,7 @@ class LibMambaIndexHelper(IndexHelper):
             prepend=False,
             use_local=context.use_local,
             platform=subdirs,
+            repodata_fn=repodata_fn,
         )
 
         self._query = api.Query(self._pool)
@@ -203,6 +205,11 @@ class LibMambaSolver(Solver):
         self.solver = None
         self._solver_options = None
 
+        # we want to support arbitrary repodata fns, but we ignore current_repodata
+        if self._repodata_fn == "current_repodata.json":
+            log.debug(f"Ignoring repodata_fn='current_repodata.json', defaulting to {REPODATA_FN}")
+            self._repodata_fn = REPODATA_FN
+
         # Fix bug in conda.common.arg2spec and MatchSpec.__str__
         fixed_specs = []
         for spec in specs_to_add:
@@ -278,10 +285,11 @@ class LibMambaSolver(Solver):
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
                 subdirs=subdirs,
+                repodata_fn=self._repodata_fn,
             )
 
         with Spinner(
-            "Collect all metadata",
+            f"Collect all metadata ({self._repodata_fn})",
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
@@ -309,7 +317,11 @@ class LibMambaSolver(Solver):
         self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         solved = False
-        for attempt in range(1, max(1, len(in_state.installed)) + 1):
+        max_attempts = max(
+            2,
+            int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
+        )
+        for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
             if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
                 print("----- Starting solver attempt", attempt, "------", file=sys.stderr)
@@ -493,8 +505,16 @@ class LibMambaSolver(Solver):
 
     @staticmethod
     def _spec_to_str(spec):
+        """
+        Workarounds for Matchspec str-roundtrip limitations.
+
+        Note: this might still fail for specs with local channels and version=*:
+            file://path/to/channel::package_name=*=*buildstr*
+        """
         if spec.original_spec_str and spec.original_spec_str.startswith("file://"):
             return spec.original_spec_str
+        if spec.get("build") and not spec.get("version"):
+            spec = MatchSpec(spec, version="*")
         return str(spec)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
@@ -506,24 +526,56 @@ class LibMambaSolver(Solver):
             + list(in_state.history.keys())
             + list(in_state.aggressive_updates.keys())
         )
+
+        # Fast-track python version changes
+        # ## When the Python version changes, this implies all packages depending on
+        # ## python will be reinstalled too. This can mean that we'll have to try for every
+        # ## installed package to result in a conflict before we get to actually solve everything
+        # ## A workaround is to let all non-noarch python-depending specs to "float" by marking
+        # ## them as a conflict preemptively
+        python_version_might_change = False
+        installed_python = in_state.installed.get("python")
+        to_be_installed_python = out_state.specs.get("python")
+        if installed_python and to_be_installed_python:
+            python_version_might_change = not to_be_installed_python.match(installed_python)
+
         tasks = defaultdict(list)
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
             spec_str = self._spec_to_str(spec)
+            installed = in_state.installed.get(name)
+
             key = "INSTALL", api.SOLVER_INSTALL
+
+            # Fast-track Python version changes: mark non-noarch Python-depending packages as
+            # conflicting (see `python_version_might_change` definition above for more details)
+            if python_version_might_change and installed is not None:
+                if installed.noarch is not None:
+                    continue
+                for dep in installed.depends:
+                    dep_spec = MatchSpec(dep)
+                    if dep_spec.name in ("python", "python_abi"):
+                        out_state.conflicts.update(
+                            {name: spec},
+                            reason="Python version might change and this package depends on Python",
+                            overwrite=False,
+                        )
+                        break
+
             # ## Low-prio task ###
             if name in out_state.conflicts and name not in protected:
                 tasks[("DISFAVOR", api.SOLVER_DISFAVOR)].append(spec_str)
                 tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
-            if name in in_state.installed:
-                installed = in_state.installed[name]
+
+            if installed is not None:
                 # ## Regular task ###
                 key = "UPDATE", api.SOLVER_UPDATE
+
                 # ## Protect if installed AND history
                 if name in protected:
-                    installed_spec = str(installed.to_match_spec())
+                    installed_spec = self._spec_to_str(installed.to_match_spec())
                     tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
                     # This is "just" an essential job, so it gets higher priority in the solver
                     # conflict resolution. We do this because these are "protected" packages
@@ -568,7 +620,9 @@ class LibMambaSolver(Solver):
                         )
                     else:
                         # NOTE: This is ugly and there should be another way
-                        spec_str = f"{name} !={installed.version}"
+                        spec_str = self._spec_to_str(
+                            MatchSpec(spec, version=f"!={installed.version}")
+                        )
 
             tasks[key].append(spec_str)
 
@@ -697,9 +751,15 @@ class LibMambaSolver(Solver):
         for line in problems.splitlines():
             line = line.strip()
             if line.startswith("- nothing provides requested"):
-                packages = " ".join(line.split()[4:])
-                raise PackagesNotFoundError([packages])
-        raise LibMambaUnsatisfiableError(problems)
+                packages = line.split()[4:]
+                exc = PackagesNotFoundError([" ".join(packages)])
+                break
+        else:  # we didn't break, raise the "normal" exception
+            exc = LibMambaUnsatisfiableError(problems)
+
+        # do not allow conda.cli.install to try more things
+        exc.allow_retry = False
+        raise exc
 
     def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<

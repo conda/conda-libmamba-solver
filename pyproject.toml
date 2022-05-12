@@ -38,6 +38,15 @@ build-backend = "flit_core.buildapi"
 [tool.flit.module]
 name = "conda_libmamba_solver"
 
+[tool.black]
+line-length = 99
+exclude = '''
+(
+      ^/conda_libmamba_solver/_libmamba\.py
+    | ^/tests/_reposerver\.py
+)
+'''
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = [
