@@ -12,7 +12,7 @@ def test_build_recipes():
 
     See /tests/data/conda_build_recipes/LICENSE for more details
     """
-    recipes_dir = Path(__file__).parent / "conda_build_recipes"
+    recipes_dir = Path(__file__).parent / "data" / "conda_build_recipes"
 
     recipes = [str(x) for x in recipes_dir.iterdir() if x.is_dir()]
     env = os.environ.copy()
