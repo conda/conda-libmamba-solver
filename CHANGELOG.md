@@ -24,6 +24,23 @@ copy to its corresponding section, deleting empty sections if any.
 
 ### Security
 
+## [22.5.0] - 2022-05-19
+
+### Added
+
+* Custom user agent (#29)
+* Compatibility with conda-build (#30)
+
+### Changed
+
+* Enable support for user-defined `repodata_fn` while ignoring `current_repodata.json` (#34)
+* Faster Python version changes (#33)
+
+### Fixed
+
+* Fix libmamba 0.23 compatibility (#35)
+* Fix handling of `*`-enabled build strings (#36)
+* Fix `escape_channel_url` problems (#32)
 
 ## [22.3.1] - 2022-03-23
 
