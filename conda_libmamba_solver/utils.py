@@ -7,6 +7,7 @@ from io import UnsupportedOperation
 from logging import getLogger
 from urllib.parse import quote
 
+from conda import CondaError
 from conda.common.compat import on_win
 from conda.common.url import urlparse
 
@@ -78,16 +79,18 @@ class CaptureStreamToFile:
         except UnsupportedOperation:
             log.warning("Cannot capture stream! Bypassing ...", exc_info=True)
         except Exception as exc:
-            traceback.print_exception(type(exc), exc, None, file=sys.stdout)
-            raise
+            if not isinstance(exc, CondaError):
+                traceback.print_exception(type(exc), exc, None, file=sys.stdout)
+            raise exc
 
     def __exit__(self, exc_type, exc_value, tb):
         try:
             self.stop()
         finally:
             if exc_type is not None:
-                traceback.print_exception(exc_type, exc_value, tb, file=sys.stdout)
-                raise exc_type(exc_value)
+                if not isinstance(exc_value, CondaError):
+                    traceback.print_exception(exc_type, exc_value, tb, file=sys.stdout)
+                raise exc_value
 
 
 def escape_channel_url(channel):
