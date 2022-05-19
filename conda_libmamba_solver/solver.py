@@ -30,6 +30,7 @@ from conda.exceptions import (
     UnsatisfiableError,
     CondaEnvironmentError,
     InvalidMatchSpec,
+    ChannelError,
 )
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
@@ -61,6 +62,19 @@ class LibMambaIndexHelper(IndexHelper):
         subdirs: Iterable[str] = None,
         repodata_fn: str = REPODATA_FN,
     ):
+        # Check channel support
+        if channels is None:
+            channels = context.channels
+        if subdirs is None:
+            subdirs = context.subdirs
+
+        checked_channels = []
+        for channel in channels:
+            channel = Channel(channel)
+            if channel.scheme == "s3":
+                raise ChannelError(f"'{channel}' is not yet supported on conda-libmamba-solver")
+            checked_channels.append(channel)
+        channel_urls = self._channel_urls(channels)
 
         self._repos = []
         self._pool = api.Pool()
@@ -89,14 +103,9 @@ class LibMambaIndexHelper(IndexHelper):
         self._repos.append(installed)
         os.unlink(f.name)
 
-        if channels is None:
-            channels = context.channels
-        if subdirs is None:
-            subdirs = context.subdirs
-
         self._index = load_channels(
             pool=self._pool,
-            channels=self._channel_urls(channels),
+            channels=channel_urls,
             repos=self._repos,
             prepend=False,
             use_local=context.use_local,
@@ -125,7 +134,7 @@ class LibMambaIndexHelper(IndexHelper):
             urls = list(OrderedDict.fromkeys(urls))
             return urls
 
-        channels = [url for c in channels for url in _channel_to_url_or_name(Channel(c))]
+        channels = [url for channel in channels for url in _channel_to_url_or_name(channel)]
         if context.restore_free_channel and "https://repo.anaconda.com/pkgs/free" not in channels:
             channels.append("https://repo.anaconda.com/pkgs/free")
 
