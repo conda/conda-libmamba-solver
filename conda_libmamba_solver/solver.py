@@ -74,7 +74,7 @@ class LibMambaIndexHelper(IndexHelper):
             if channel.scheme == "s3":
                 raise ChannelError(f"'{channel}' is not yet supported on conda-libmamba-solver")
             checked_channels.append(channel)
-        channel_urls = self._channel_urls(channels)
+        channel_urls = self._channel_urls(checked_channels)
 
         self._repos = []
         self._pool = api.Pool()
