@@ -13,6 +13,7 @@ from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
 import re
 from functools import lru_cache
+from inspect import stack
 
 from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier, on_win
@@ -889,4 +890,15 @@ class LibMambaSolver(Solver):
         with a custom index. We can use this to detect whether conda build is in use
         and apply some compatibility fixes.
         """
-        return "conda_build" in sys.modules and getattr(self, "_index", None)
+        return (
+            # conda_build.environ.get_install_actions will always pass a custom 'index'
+            # which conda.plan.install_actions uses to override our null Solver._index
+            getattr(self, "_index", None)
+            # Is conda build in use? In that case, it should have been imported
+            and "conda_build" in sys.modules
+            # Confirm conda_build.environ's 'get_install_actions' and conda.plan's
+            # 'install_actions' are in the call stack. We don't check order or
+            # contiguousness, but what are the chances at this point...?
+            # frame[3] contains the name of the function in that frame of the stack
+            and {"install_actions", "get_install_actions"} <= {frame[3] for frame in stack()}
+        )
