@@ -79,6 +79,11 @@ class CaptureStreamToFile:
         except UnsupportedOperation:
             log.warning("Cannot capture stream! Bypassing ...", exc_info=True)
         except Exception as exc:
+            # If there's an exception, we might never see the traceback
+            # because STDERR has been captured already. Workaround: print it
+            # manually to STDOUT. Note we only do this if the exception is
+            # not part of the CondaError family - these exceptions are designed
+            # to never print the traceback!
             if not isinstance(exc, CondaError):
                 traceback.print_exception(type(exc), exc, None, file=sys.stdout)
             raise exc
@@ -87,6 +92,11 @@ class CaptureStreamToFile:
         try:
             self.stop()
         finally:
+            # If there's an exception, we might never see the traceback
+            # because STDERR has not been released yet. Workaround: print it
+            # manually to STDOUT. Note we only do this if the exception is
+            # not part of the CondaError family - these exceptions are designed
+            # to never print the traceback!
             if exc_type is not None:
                 if not isinstance(exc_value, CondaError):
                     traceback.print_exception(exc_type, exc_value, tb, file=sys.stdout)
