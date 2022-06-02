@@ -677,20 +677,6 @@ class LibMambaSolver(Solver):
     def _specs_to_tasks_conda_build(
         self, in_state: SolverInputState, out_state: SolverOutputState
     ):
-        only_dot_or_digit_re = re.compile(r"^[\d\.]+$")
-
-        def fix_version_field(spec: MatchSpec):
-            """Fix taken from mambabuild"""
-            if spec.version:
-                version_str = str(spec.version)
-                if re.match(only_dot_or_digit_re, version_str):
-                    spec_fields = spec.conda_build_form().split()
-                    if version_str.count(".") <= 1:
-                        spec_fields[1] = version_str + ".*"
-                    else:
-                        spec_fields[1] = version_str + "*"
-                    return MatchSpec(" ".join(spec_fields))
-            return spec
 
         tasks = defaultdict(list)
         key = "INSTALL", api.SOLVER_INSTALL
@@ -698,10 +684,25 @@ class LibMambaSolver(Solver):
             if name.startswith("__"):
                 continue
             self._check_spec_compat(spec)
-            spec = fix_version_field(spec)
+            spec = self._fix_version_field_for_conda_build(spec)
             tasks[key].append(spec.conda_build_form())
 
         return dict(tasks)
+
+    @staticmethod
+    def _fix_version_field_for_conda_build(spec: MatchSpec):
+        """Fix taken from mambabuild"""
+        if spec.version:
+            only_dot_or_digit_re = re.compile(r"^[\d\.]+$")
+            version_str = str(spec.version)
+            if re.match(only_dot_or_digit_re, version_str):
+                spec_fields = spec.conda_build_form().split()
+                if version_str.count(".") <= 1:
+                    spec_fields[1] = version_str + ".*"
+                else:
+                    spec_fields[1] = version_str + "*"
+                return MatchSpec(" ".join(spec_fields))
+        return spec
 
     @staticmethod
     def _problems_to_specs_parser(problems: str) -> Mapping[str, MatchSpec]:
