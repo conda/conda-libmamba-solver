@@ -326,7 +326,7 @@ def get_installed_jsonfile(prefix):
 ### repoquery API ###
 def repoquery_search(query, pool, fmt=api.QueryFormat.JSON):
     q = api.Query(pool)
-    res = q.search(query, fmt)
+    res = q.find(query, fmt)
     return json.loads(res)
 
 
