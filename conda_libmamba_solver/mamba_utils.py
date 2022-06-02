@@ -321,3 +321,22 @@ def get_installed_jsonfile(prefix):
     installed_json_f.write(json_dump(output))
     installed_json_f.flush()
     return installed_json_f, installed_pkg_recs
+
+
+### repoquery API ###
+def repoquery_search(query, pool, fmt=api.QueryFormat.JSON):
+    q = api.Query(pool)
+    res = q.search(query, pool, fmt)
+    return json.loads(res)
+
+
+def repoquery_depends(query, pool, fmt=api.QueryFormat.JSON):
+    q = api.Query(pool)
+    res = q.depends(query, pool, fmt)
+    return json.loads(res)
+
+
+def repoquery_whoneeds(query, pool, fmt=api.QueryFormat.JSON):
+    q = api.Query(pool)
+    res = q.whoneeds(query, pool, fmt)
+    return json.loads(res)
