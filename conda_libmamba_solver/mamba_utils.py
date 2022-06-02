@@ -326,17 +326,17 @@ def get_installed_jsonfile(prefix):
 ### repoquery API ###
 def repoquery_search(query, pool, fmt=api.QueryFormat.JSON):
     q = api.Query(pool)
-    res = q.search(query, pool, fmt)
+    res = q.search(query, fmt)
     return json.loads(res)
 
 
 def repoquery_depends(query, pool, fmt=api.QueryFormat.JSON):
     q = api.Query(pool)
-    res = q.depends(query, pool, fmt)
+    res = q.depends(query, fmt)
     return json.loads(res)
 
 
 def repoquery_whoneeds(query, pool, fmt=api.QueryFormat.JSON):
     q = api.Query(pool)
-    res = q.whoneeds(query, pool, fmt)
+    res = q.whoneeds(query, fmt)
     return json.loads(res)
