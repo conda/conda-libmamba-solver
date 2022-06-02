@@ -1,0 +1,33 @@
+{% set version = "0.17.2" %}
+
+package:
+  name: jedi
+  version: {{ version }}
+
+source:
+  url: https://pypi.io/packages/source/j/jedi/jedi-{{ version }}.tar.gz
+  sha256: 86ed7d9b750603e4ba582ea8edc678657fb4007894a12bcf6f4bb97892f31d20
+
+build:
+  number: 1
+  script: {{ PYTHON }} -m pip install . --no-deps
+
+requirements:
+  host:
+    - python
+    - pip
+  run:
+    - python
+    - parso >=0.7.0,<0.8.0
+
+test:
+  imports:
+    - jedi
+    - jedi.api
+    - jedi.common
+    - jedi.inference
+    - jedi.inference.compiled
+    - jedi.inference.compiled.subprocess
+    - jedi.inference.gradual
+    - jedi.inference.value
+    - jedi.plugins

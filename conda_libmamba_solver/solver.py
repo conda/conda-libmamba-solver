@@ -11,10 +11,12 @@ import sys
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Mapping, Optional, Union
 from textwrap import dedent
+import re
 from functools import lru_cache
+from inspect import stack
 
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier
+from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
@@ -23,6 +25,7 @@ from conda.common.path import paths_equal
 from conda.common.url import (
     split_anaconda_token,
     remove_auth,
+    percent_decode,
 )
 from conda.exceptions import (
     PackagesNotFoundError,
@@ -103,6 +106,13 @@ class LibMambaIndexHelper(IndexHelper):
         self._repos.append(installed)
         os.unlink(f.name)
 
+        if channels is None:
+            channels = context.channels
+        if subdirs is None:
+            subdirs = context.subdirs
+
+        self._channels = channels
+        self._subdirs = subdirs
         self._index = load_channels(
             pool=self._pool,
             channels=channel_urls,
@@ -115,6 +125,13 @@ class LibMambaIndexHelper(IndexHelper):
 
         self._query = api.Query(self._pool)
         self._format = api.QueryFormat.JSON
+
+    @property
+    def _channel_lookup(self):
+        return {
+            info["channel"].platform_url(info["platform"], with_credentials=False): info
+            for _, info in self._index
+        }
 
     @staticmethod
     def _channel_urls(channels: Iterable[Union[Channel, str]]):
@@ -268,10 +285,21 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         with CaptureStreamToFile(callback=log.debug):
             api_ctx = init_api_context(verbosity=max(2, context.verbosity))
+            subdirs = self.subdirs
+            if self._called_from_conda_build():
+                log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
+                # Problem: Conda build generates a custom index which happens to "forget" about
+                # noarch on purpose when creating the build/host environments, since it merges
+                # both as if they were all in the native subdir. this causes package-not-found
+                # errors because we are not using the patched index.
+                # Fix: just add noarch to subdirs.
+                if "noarch" not in subdirs:
+                    subdirs = *subdirs, "noarch"
+
             index = LibMambaIndexHelper(
                 installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
                 channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
-                subdirs=self.subdirs,
+                subdirs=subdirs,
                 repodata_fn=self._repodata_fn,
             )
 
@@ -306,6 +334,7 @@ class LibMambaSolver(Solver):
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
     ):
+        solved = False
         max_attempts = max(
             2,
             int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
@@ -491,6 +520,8 @@ class LibMambaSolver(Solver):
         log.debug("Creating tasks for %s specs", len(out_state.specs))
         if in_state.is_removing:
             return self._specs_to_tasks_remove(in_state, out_state)
+        if self._called_from_conda_build():
+            return self._specs_to_tasks_conda_build(in_state, out_state)
         return self._specs_to_tasks_add(in_state, out_state)
 
     @staticmethod
@@ -616,7 +647,7 @@ class LibMambaSolver(Solver):
 
             tasks[key].append(spec_str)
 
-        return tasks
+        return dict(tasks)
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
@@ -641,12 +672,40 @@ class LibMambaSolver(Solver):
             self._check_spec_compat(spec)
             tasks[key].append(str(spec))
 
-        return tasks
+        return dict(tasks)
 
-    def _problems_to_specs(self, problems: str, previous: Mapping[str, MatchSpec]):
-        if self.solver is None:
-            raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
+    def _specs_to_tasks_conda_build(
+        self, in_state: SolverInputState, out_state: SolverOutputState
+    ):
 
+        tasks = defaultdict(list)
+        key = "INSTALL", api.SOLVER_INSTALL
+        for name, spec in out_state.specs.items():
+            if name.startswith("__"):
+                continue
+            self._check_spec_compat(spec)
+            spec = self._fix_version_field_for_conda_build(spec)
+            tasks[key].append(spec.conda_build_form())
+
+        return dict(tasks)
+
+    @staticmethod
+    def _fix_version_field_for_conda_build(spec: MatchSpec):
+        """Fix taken from mambabuild"""
+        if spec.version:
+            only_dot_or_digit_re = re.compile(r"^[\d\.]+$")
+            version_str = str(spec.version)
+            if re.match(only_dot_or_digit_re, version_str):
+                spec_fields = spec.conda_build_form().split()
+                if version_str.count(".") <= 1:
+                    spec_fields[1] = version_str + ".*"
+                else:
+                    spec_fields[1] = version_str + "*"
+                return MatchSpec(" ".join(spec_fields))
+        return spec
+
+    @staticmethod
+    def _problems_to_specs_parser(problems: str) -> Mapping[str, MatchSpec]:
         dashed_specs = []  # e.g. package-1.2.3-h5487548_0
         conda_build_specs = []  # e.g. package 1.2.8.*
         for line in problems.splitlines():
@@ -677,6 +736,15 @@ class LibMambaSolver(Solver):
                 kwargs["build"] = conflict[2].rstrip(",")
             conflicts[kwargs["name"]] = MatchSpec(**kwargs)
 
+        return conflicts
+
+    def _problems_to_specs(self, problems: str, previous: Mapping[str, MatchSpec]):
+        if self.solver is None:
+            raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
+
+        conflicts = self._problems_to_specs_parser(problems)
+        self._maybe_raise_for_conda_build(conflicts)
+
         previous_set = set(previous.values())
         current_set = set(conflicts.values())
 
@@ -697,12 +765,11 @@ class LibMambaSolver(Solver):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
-        # TODO: merge this with parse_problems somehow
-        # e.g. return a dict of exception type -> specs involved
-        # and we raise it here
         if problems is None:
             problems = self.solver.problems_to_str()
 
+        # TODO: Figure out a way to have ._problems_to_specs_parser
+        # return the most adequate exception type instead of reparsing here
         for line in problems.splitlines():
             line = line.strip()
             if line.startswith("- nothing provides requested"):
@@ -714,6 +781,29 @@ class LibMambaSolver(Solver):
 
         # do not allow conda.cli.install to try more things
         exc.allow_retry = False
+        raise exc
+
+    def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
+        # TODO: Remove this hack for conda-build compatibility >_<
+        # conda-build expects a slightly different exception format
+        # good news is that we don't need to retry much, because all
+        # conda-build envs are fresh - if we found a conflict, we report
+        # right away to let conda build handle it
+        if not self._called_from_conda_build():
+            return
+
+        from conda_build.exceptions import DependencyNeedsBuildingError
+
+        exc = DependencyNeedsBuildingError(packages=list(conflicting_specs.keys()))
+        exc.matchspecs = list(conflicting_specs.values())
+        # the patched index should contain the arch we are building this env for
+        for pkg_record in self._index.values():
+            if pkg_record.subdir != "noarch":
+                exc.subdir = pkg_record.subdir
+                break
+        else:
+            # if the index is empty, we default to whatever platform we are running on
+            exc.subdir = context.subdir
         raise exc
 
     def _export_solved_records(
@@ -733,11 +823,6 @@ class LibMambaSolver(Solver):
             print("TO_LINK", to_link, file=sys.stderr)
             print("TO_UNLINK", to_unlink, file=sys.stderr)
 
-        channel_lookup = {}
-        for _, entry in index._index:
-            key = entry["channel"].platform_url(entry["platform"], with_credentials=False)
-            channel_lookup[key] = entry
-
         for _, filename in to_unlink:
             for name, record in in_state.installed.items():
                 if record.is_unmanageable:
@@ -756,12 +841,12 @@ class LibMambaSolver(Solver):
                 key = channel
             else:
                 key = split_anaconda_token(remove_auth(channel))[0]
-            if key not in channel_lookup:
-                raise ValueError(f"missing key {key} in channels {channel_lookup}")
-            record = to_package_record_from_subjson(channel_lookup[key], filename, json_str)
+            if key not in index._channel_lookup:
+                raise ValueError(f"missing key {key} in channels {index._channel_lookup}")
+            record = to_package_record_from_subjson(index._channel_lookup[key], filename, json_str)
 
             # We need this check below to make sure noarch package get reinstalled
-            #  record metadata coming from libmamba is incomplete and won't pass the
+            # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
             # installed counterpart (richer in info)
             already_installed_record = in_state.installed.get(record.name)
@@ -778,6 +863,12 @@ class LibMambaSolver(Solver):
             out_state.records.set(
                 record.name, record, reason="Part of solution calculated by libmamba"
             )
+
+        # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
+        if on_win and self._called_from_conda_build():
+            for record in out_state.records.values():
+                record.channel.location = percent_decode(record.channel.location)
+                record.channel.name = percent_decode(record.channel.name)
 
         with CaptureStreamToFile(callback=log.debug):
             del transaction
@@ -806,3 +897,23 @@ class LibMambaSolver(Solver):
     def _reset(self):
         self.solver = None
         self._solver_options = None
+
+    def _called_from_conda_build(self):
+        """
+        conda build calls the solver via `conda.plan.install_actions`, which
+        overrides Solver._index (populated in the classic solver, but empty for us)
+        with a custom index. We can use this to detect whether conda build is in use
+        and apply some compatibility fixes.
+        """
+        return (
+            # conda_build.environ.get_install_actions will always pass a custom 'index'
+            # which conda.plan.install_actions uses to override our null Solver._index
+            getattr(self, "_index", None)
+            # Is conda build in use? In that case, it should have been imported
+            and "conda_build" in sys.modules
+            # Confirm conda_build.environ's 'get_install_actions' and conda.plan's
+            # 'install_actions' are in the call stack. We don't check order or
+            # contiguousness, but what are the chances at this point...?
+            # frame[3] contains the name of the function in that frame of the stack
+            and {"install_actions", "get_install_actions"} <= {frame[3] for frame in stack()}
+        )

@@ -54,6 +54,7 @@ jobs:
           ghcr.io/conda/conda-ci:master-linux-python${{ matrix.python-version }}
           bash -c "sudo env CONDA_EXPERIMENTAL_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
+                        --repodata-fn=repodata.json --update-specs \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
                         --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
@@ -115,7 +116,7 @@ jobs:
             python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
           conda info
-          python -c "from mamba import __version__; print('mamba', __version__)"
+          python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
 
       - name: Install conda-libmamba-solver
         shell: bash -l {0}
@@ -181,7 +182,7 @@ jobs:
           if errorlevel 1 exit 1
           call .\dev-init.bat
           if errorlevel 1 exit 1
-          python -c "from mamba import __version__; print('mamba', __version__)"
+          python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
           if errorlevel 1 exit 1
           conda info -a
           if errorlevel 1 exit 1

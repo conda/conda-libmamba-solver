@@ -37,6 +37,7 @@ from conda.models.version import VersionOrder
 from conda.core.solve import Solver, get_pinned_specs
 
 from .exceptions import LibMambaUnsatisfiableError
+from .mamba_utils import repoquery_search, repoquery_depends
 from .utils import escape_channel_url
 
 log = getLogger(f"conda.{__name__}")
@@ -545,12 +546,10 @@ class LibMambaSolverDraft(Solver):
                 specs_map[pkg_name] = MatchSpec(pkg_name, target=spec_in_prefix.dist_str())
 
         # Section 4: Check pinned packages
-        from mamba.repoquery import depends as mamba_depends
-
         pin_overrides = set()
         explicit_pool = set()
         for spec in self.specs_to_add:
-            result = mamba_depends(spec.dist_str(), pool=state["pool"])
+            result = repoquery_depends(spec.dist_str(), pool=state["pool"])
             explicit_pool.update([p["name"] for p in result["result"]["pkgs"]])
 
         specs_to_add_map = {s.name: s for s in self.specs_to_add}
@@ -634,8 +633,6 @@ class LibMambaSolverDraft(Solver):
         # Unfreezes the indirect specs that otherwise conflict
         # with the update of the explicitly requested spec
         elif update_modifier == UpdateModifier.UPDATE_SPECS:
-            from mamba.repoquery import search as mamba_search
-
             potential_conflicts = []
             for spec in self.specs_to_add:  # requested by the user
                 in_pins = spec.name not in pin_overrides and spec.name in pinned
@@ -649,7 +646,7 @@ class LibMambaSolverDraft(Solver):
                 if installed_record:
                     # Check the index for available updates
                     installed_version = VersionOrder(installed_record.version)
-                    query = mamba_search(f"{spec.name} >={installed_version}", pool=state["pool"])
+                    query = repoquery_search(f"{spec.name} >={installed_version}", pool=state["pool"])
                     for pkg_record in query["result"]["pkgs"]:
                         if pkg_record["channel"] == "installed":
                             continue
