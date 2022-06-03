@@ -126,7 +126,17 @@ def check_user_agent_requests(stdout, solver, request_type="repodata"):
 
     See `check_user_agent_libmamba` docstring for more details.
     """
-    data = json.loads(stdout)
+    # the output might contain more than one json dict
+    # tip: conda separates json payloads with nul (\x00)
+    # we split by nul and keep the last chunk surrounded by {}
+    payload = None
+    for chunk in stdout.split("\x00"):
+        chunk = chunk.strip()
+        if chunk.startswith("{") and chunk.endswith("}"):
+            payload = chunk
+    if payload is None:
+        raise ValueError(f"Could not find a JSON payload in the output: {stdout}")
+    data = json.loads(payload)
     if request_type == "repodata":
         assert data["exception_name"] == "UnavailableInvalidChannel"
         assert data["reason"] == "FILE NOT FOUND"
@@ -184,7 +194,10 @@ def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
         text=True,
         env=env,
     )
+    print("-- STDOUT --")
     print(process.stdout)
+    print("-- STDERR --")
+    print(process.stderr)
     check_user_agent_requests(process.stdout, solver="libmamba", request_type="packages")
 
 
@@ -212,8 +225,8 @@ def test_user_agent_classic_packages(server_auth_none_debug_packages):
         text=True,
         env=env,
     )
+    print("-- STDOUT --")
     print(process.stdout)
-    # the output contains two json dicts, one for the fetch, and one for the error
-    # tip: conda separates json payloads with nul (\x00), so we split and keep the 2nd
-    stdout = process.stdout.split("\x00")[1]
-    check_user_agent_requests(stdout, solver="classic", request_type="packages")
+    print("-- STDERR --")
+    print(process.stderr)
+    check_user_agent_requests(process.stdout, solver="classic", request_type="packages")
