@@ -184,6 +184,7 @@ def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
         text=True,
         env=env,
     )
+    print(process.stdout)
     check_user_agent_requests(process.stdout, solver="libmamba", request_type="packages")
 
 
@@ -211,6 +212,7 @@ def test_user_agent_classic_packages(server_auth_none_debug_packages):
         text=True,
         env=env,
     )
+    print(process.stdout)
     # the output contains two json dicts, one for the fetch, and one for the error
     # tip: conda separates json payloads with nul (\x00), so we split and keep the 2nd
     stdout = process.stdout.split("\x00")[1]
