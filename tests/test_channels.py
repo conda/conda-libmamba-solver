@@ -4,7 +4,13 @@ import sys
 
 from conda.testing.integration import _get_temp_prefix
 
-from .channel_testing_utils import create_with_channel
+from .channel_testing_utils import (
+    create_with_channel,
+    server_auth_basic,
+    server_auth_basic_email,
+    server_auth_none,
+    server_auth_token,
+)
 
 
 def test_server_auth_none(server_auth_none):
