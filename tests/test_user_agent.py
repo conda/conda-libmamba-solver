@@ -174,7 +174,7 @@ def test_user_agent_libmamba_repodata(server_auth_none_debug_repodata):
 def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
     # make sure we download to a temporary location so there's no cache
     env = os.environ.copy()
-    env["CONDA_PKGS_DIR"] = _get_temp_prefix()
+    env["CONDA_PKGS_DIRS"] = _get_temp_prefix()
     process = create_with_channel(
         server_auth_none_debug_packages,
         solver="libmamba",
@@ -201,7 +201,7 @@ def test_user_agent_classic_repodata(server_auth_none_debug_repodata):
 
 def test_user_agent_classic_packages(server_auth_none_debug_packages):
     env = os.environ.copy()
-    env["CONDA_PKGS_DIR"] = _get_temp_prefix()
+    env["CONDA_PKGS_DIRS"] = _get_temp_prefix()
     process = create_with_channel(
         server_auth_none_debug_packages,
         solver="classic",

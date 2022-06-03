@@ -47,7 +47,6 @@ def test_channel_matchspec():
             "python=3.9",
         ]
     )
-    print(out)
     result = json.loads(out)
     assert result["success"] is True
     for record in result["actions"]["LINK"]:
