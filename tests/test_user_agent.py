@@ -48,6 +48,7 @@ import json
 import sys
 from subprocess import run, check_output, PIPE
 from importlib_metadata import version
+from tempfile import TemporaryDirectory
 
 import pytest
 
@@ -182,15 +183,19 @@ def test_user_agent_libmamba_repodata(server_auth_none_debug_repodata):
 
 
 def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
-    run([sys.executable, "-m", "conda", "clean", "--tarballs", "--yes"])
-    process = create_with_channel(
-        server_auth_none_debug_packages,
-        solver="libmamba",
-        check=False,
-        stdout=PIPE,
-        stderr=PIPE,
-        text=True,
-    )
+    run([sys.executable, "-m", "conda", "clean", "--tarballs", "--packages", "--yes"])
+    with TemporaryDirectory() as tmpdir:
+        env = os.environ.copy()
+        env["CONDA_PKGS_DIRS"] = tmpdir
+        process = create_with_channel(
+            server_auth_none_debug_packages,
+            solver="libmamba",
+            check=False,
+            stdout=PIPE,
+            stderr=PIPE,
+            text=True,
+            env=env,
+        )
     print("-- STDOUT --")
     print(process.stdout)
     print("-- STDERR --")
@@ -211,15 +216,20 @@ def test_user_agent_classic_repodata(server_auth_none_debug_repodata):
 
 
 def test_user_agent_classic_packages(server_auth_none_debug_packages):
-    run([sys.executable, "-m", "conda", "clean", "--tarballs", "--yes"])
-    process = create_with_channel(
-        server_auth_none_debug_packages,
-        solver="classic",
-        check=False,
-        stdout=PIPE,
-        stderr=PIPE,
-        text=True,
-    )
+    run([sys.executable, "-m", "conda", "clean", "--tarballs", "--packages", "--yes"])
+
+    with TemporaryDirectory() as tmpdir:
+        env = os.environ.copy()
+        env["CONDA_PKGS_DIRS"] = tmpdir
+        process = create_with_channel(
+            server_auth_none_debug_packages,
+            solver="classic",
+            check=False,
+            stdout=PIPE,
+            stderr=PIPE,
+            text=True,
+            env=env,
+        )
     print("-- STDOUT --")
     print(process.stdout)
     print("-- STDERR --")
