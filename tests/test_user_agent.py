@@ -45,12 +45,12 @@ When using `mamba` directly in the CLI, its user agent will start with `mamba/<v
 import base64
 import os
 import json
-from subprocess import check_output, PIPE
+import sys
+from subprocess import run, check_output, PIPE
 from importlib_metadata import version
 
 import pytest
 
-from conda.testing.integration import _get_temp_prefix
 
 from .channel_testing_utils import (
     create_with_channel,
@@ -182,9 +182,7 @@ def test_user_agent_libmamba_repodata(server_auth_none_debug_repodata):
 
 
 def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
-    # make sure we download to a temporary location so there's no cache
-    env = os.environ.copy()
-    env["CONDA_PKGS_DIRS"] = _get_temp_prefix(use_restricted_unicode=True)
+    run([sys.executable, "-m", "conda", "clean", "--tarballs", "--yes"])
     process = create_with_channel(
         server_auth_none_debug_packages,
         solver="libmamba",
@@ -192,7 +190,6 @@ def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
         stdout=PIPE,
         stderr=PIPE,
         text=True,
-        env=env,
     )
     print("-- STDOUT --")
     print(process.stdout)
@@ -214,8 +211,7 @@ def test_user_agent_classic_repodata(server_auth_none_debug_repodata):
 
 
 def test_user_agent_classic_packages(server_auth_none_debug_packages):
-    env = os.environ.copy()
-    env["CONDA_PKGS_DIRS"] = _get_temp_prefix(use_restricted_unicode=True)
+    run([sys.executable, "-m", "conda", "clean", "--tarballs", "--yes"])
     process = create_with_channel(
         server_auth_none_debug_packages,
         solver="classic",
@@ -223,7 +219,6 @@ def test_user_agent_classic_packages(server_auth_none_debug_packages):
         stdout=PIPE,
         stderr=PIPE,
         text=True,
-        env=env,
     )
     print("-- STDOUT --")
     print(process.stdout)
