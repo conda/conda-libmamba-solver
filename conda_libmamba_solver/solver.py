@@ -260,7 +260,6 @@ class LibMambaSolver(Solver):
         global BLURB_COUNT
         if not BLURB_COUNT:
             self._print_info()
-            self._check_env_is_base()
         BLURB_COUNT += 1
 
         in_state = SolverInputState(
@@ -434,16 +433,6 @@ class LibMambaSolver(Solver):
         log.info("Command: %s", sys.argv)
         log.info("Specs to add: %s", self.specs_to_add)
         log.info("Specs to remove: %s", self.specs_to_remove)
-
-    def _check_env_is_base(self):
-        if "PYTEST_CURRENT_TEST" in os.environ:
-            return
-
-        if paths_equal(self.prefix, context.root_prefix):
-            raise CondaEnvironmentError(
-                f"{self.__class__.__name__} is not allowed on the base environment during "
-                "the experimental release phase. Try using it on a non-base environment!"
-            )
 
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [

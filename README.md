@@ -101,12 +101,6 @@ If you don't want to use the experimental solver anymore, you can uninstall it w
 $ conda remove conda-libmamba-solver
 ```
 
-### Why can't I use the experimental solver on the `base` environment?
-
-This decision has been made to protect your `base` installation from unexpected changes. This
-package is still in a experimental phase and, as a result, you can only use it in non-base
-environments for now.
-
 ### How do I configure conda to use the experimental solver permanently?
 
 Use the following command:
