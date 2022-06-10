@@ -76,14 +76,6 @@ class LibMambaSolverDraft(Solver):
         if not context.json and not context.quiet:
             print("------ USING EXPERIMENTAL LIBMAMBA INTEGRATIONS ------")
 
-        if "PYTEST_CURRENT_TEST" not in os.environ and paths_equal(
-            self.prefix, context.root_prefix
-        ):
-            raise CondaEnvironmentError(
-                f"{self.__class__.__name__} is not allowed on the base environment during "
-                "the experimental release phase. Try using it on a non-base environment!"
-            )
-
         # 0. Identify strategies
         kwargs = self._merge_signature_flags_with_context(
             update_modifier=update_modifier,
