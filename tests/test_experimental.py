@@ -26,6 +26,7 @@ def print_and_check_output(*args, **kwargs):
     return process
 
 
+@pytest.mark.xfail(reason="base protections not enabled anymore")
 @pytest.mark.parametrize("solver", ("libmamba", "libmamba-draft"))
 def test_protection_for_base_env(solver):
     with pytest.raises(CondaEnvironmentError), fresh_context(CONDA_EXPERIMENTAL_SOLVER=solver):
