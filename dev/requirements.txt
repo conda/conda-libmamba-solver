@@ -1,3 +1,1 @@
-conda-forge::libmambapy>=0.23
-conda-forge::libcurl
-conda-forge::libarchive
+libmambapy>=0.23
