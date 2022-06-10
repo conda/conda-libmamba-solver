@@ -233,4 +233,3 @@ def test_user_agent_classic_packages(server_auth_none_debug_packages, tmp_path):
     print("-- STDERR --")
     print(process.stderr)
     assert_requests_user_agent(process.stdout, solver="classic", request_type="packages")
-
