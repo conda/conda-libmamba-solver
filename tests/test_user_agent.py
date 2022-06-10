@@ -75,7 +75,7 @@ def test_user_agent_conda_info(solver):
         assert f"libmambapy/{version('libmambapy')}" in info["user_agent"]
 
 
-def check_user_agent_libmamba(stdout):
+def assert_libmamba_user_agent(stdout):
     """
     Conda's network stack (based on requests) has a nice way of reporting connection
     errors, which includes the headers as part of the report. All we need to do is force
@@ -106,7 +106,7 @@ def check_user_agent_libmamba(stdout):
             headers = base64.b64decode(b64_headers).decode("utf-8")
             break
     else:
-        raise RuntimeError("Couldn't find the error message containing payload")
+        raise AssertionError("Couldn't find the error message containing payload")
 
     for line in headers.splitlines():
         if line.startswith("User-Agent:"):
@@ -117,15 +117,15 @@ def check_user_agent_libmamba(stdout):
             assert "libcurl/" in line
             break
     else:
-        raise RuntimeError("Couldn't find the User-Agent info in headers!")
+        raise AssertionError("Couldn't find the User-Agent info in headers!")
 
 
-def check_user_agent_requests(stdout, solver, request_type="repodata"):
+def assert_requests_user_agent(stdout, solver, request_type="repodata"):
     """
     With conda classic, the request handler uses `requests`. An invalid response from the server
     will raise an exception that already contains the User-Agent headers in the payload.
 
-    See `check_user_agent_libmamba` docstring for more details.
+    See `assert_libmamba_user_agent` docstring for more details.
     """
     # the output might contain more than one json dict
     # tip: conda separates json payloads with nul (\x00)
@@ -136,7 +136,7 @@ def check_user_agent_requests(stdout, solver, request_type="repodata"):
         if chunk.startswith("{") and chunk.endswith("}"):
             payload = chunk
     if payload is None:
-        raise ValueError(f"Could not find a JSON payload in the output: {stdout}")
+        raise AssertionError(f"Could not find a JSON payload in the output: {stdout}")
     data = json.loads(payload)
     if request_type == "repodata":
         assert data["exception_name"] == "UnavailableInvalidChannel"
@@ -167,7 +167,7 @@ def check_user_agent_requests(stdout, solver, request_type="repodata"):
                     assert "requests/" in line
             break
     else:
-        raise RuntimeError("Couldn't find the User-Agent info in headers!")
+        raise AssertionError("Couldn't find the User-Agent info in headers!")
 
 
 def test_user_agent_libmamba_repodata(server_auth_none_debug_repodata):
@@ -179,28 +179,27 @@ def test_user_agent_libmamba_repodata(server_auth_none_debug_repodata):
         stderr=PIPE,
         text=True,
     )
-    check_user_agent_libmamba(process.stdout)
+    assert_libmamba_user_agent(process.stdout)
 
 
-def test_user_agent_libmamba_packages(server_auth_none_debug_packages):
+def test_user_agent_libmamba_packages(server_auth_none_debug_packages, tmp_path):
     run([sys.executable, "-m", "conda", "clean", "--tarballs", "--packages", "--yes"])
-    with TemporaryDirectory() as tmpdir:
-        env = os.environ.copy()
-        env["CONDA_PKGS_DIRS"] = tmpdir
-        process = create_with_channel(
-            server_auth_none_debug_packages,
-            solver="libmamba",
-            check=False,
-            stdout=PIPE,
-            stderr=PIPE,
-            text=True,
-            env=env,
-        )
+    env = os.environ.copy()
+    env["CONDA_PKGS_DIRS"] = str(tmp_path)
+    process = create_with_channel(
+        server_auth_none_debug_packages,
+        solver="libmamba",
+        check=False,
+        stdout=PIPE,
+        stderr=PIPE,
+        text=True,
+        env=env,
+    )
     print("-- STDOUT --")
     print(process.stdout)
     print("-- STDERR --")
     print(process.stderr)
-    check_user_agent_requests(process.stdout, solver="libmamba", request_type="packages")
+    assert_requests_user_agent(process.stdout, solver="libmamba", request_type="packages")
 
 
 def test_user_agent_classic_repodata(server_auth_none_debug_repodata):
@@ -212,26 +211,26 @@ def test_user_agent_classic_repodata(server_auth_none_debug_repodata):
         stderr=PIPE,
         text=True,
     )
-    check_user_agent_requests(process.stdout, solver="classic")
+    assert_requests_user_agent(process.stdout, solver="classic")
 
 
-def test_user_agent_classic_packages(server_auth_none_debug_packages):
+def test_user_agent_classic_packages(server_auth_none_debug_packages, tmp_path):
     run([sys.executable, "-m", "conda", "clean", "--tarballs", "--packages", "--yes"])
 
-    with TemporaryDirectory() as tmpdir:
-        env = os.environ.copy()
-        env["CONDA_PKGS_DIRS"] = tmpdir
-        process = create_with_channel(
-            server_auth_none_debug_packages,
-            solver="classic",
-            check=False,
-            stdout=PIPE,
-            stderr=PIPE,
-            text=True,
-            env=env,
-        )
+    env = os.environ.copy()
+    env["CONDA_PKGS_DIRS"] = str(tmp_path)
+    process = create_with_channel(
+        server_auth_none_debug_packages,
+        solver="classic",
+        check=False,
+        stdout=PIPE,
+        stderr=PIPE,
+        text=True,
+        env=env,
+    )
     print("-- STDOUT --")
     print(process.stdout)
     print("-- STDERR --")
     print(process.stderr)
-    check_user_agent_requests(process.stdout, solver="classic", request_type="packages")
+    assert_requests_user_agent(process.stdout, solver="classic", request_type="packages")
+
