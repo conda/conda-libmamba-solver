@@ -35,41 +35,26 @@ else:
 parser = argparse.ArgumentParser(description="Start a simple conda package server.")
 parser.add_argument("-p", "--port", type=int, default=8000, help="Port to use.")
 parser.add_argument(
-    "-d",
-    "--directory",
-    type=str,
-    default=os.getcwd(),
-    help="Root directory for serving.",
+    "-d", "--directory", type=str, default=os.getcwd(), help="Root directory for serving.",
 )
 parser.add_argument(
     "-a",
     "--auth",
     default=None,
     type=str,
-    help="auth method (none, basic, or token)",
+    help="auth method (none, none-debug-repodata, none-debug-packages, basic, or token)",
 )
 parser.add_argument(
-    "--sign",
-    action="store_true",
-    help="Sign repodata (note: run generate_gpg_keys.sh before)",
+    "--sign", action="store_true", help="Sign repodata (note: run generate_gpg_keys.sh before)",
 )
 parser.add_argument(
-    "--token",
-    type=str,
-    default=None,
-    help="Use token as API Key",
+    "--token", type=str, default=None, help="Use token as API Key",
 )
 parser.add_argument(
-    "--user",
-    type=str,
-    default=default_user,
-    help="Use token as API Key",
+    "--user", type=str, default=default_user, help="Use token as API Key",
 )
 parser.add_argument(
-    "--password",
-    type=str,
-    default=default_password,
-    help="Use token as API Key",
+    "--password", type=str, default=default_password, help="Use token as API Key",
 )
 args = parser.parse_args()
 
@@ -145,9 +130,7 @@ class RepoSigner:
             fout.write(root_md_serialized_unsigned)
 
         # This overwrites the file with a signed version of the file.
-        cct_root_signing.sign_root_metadata_via_gpg(
-            root_filepath, root_keys[0]["fingerprint"]
-        )
+        cct_root_signing.sign_root_metadata_via_gpg(root_filepath, root_keys[0]["fingerprint"])
 
         # Load untrusted signed root metadata.
         signed_root_md = cct_common.load_metadata_from_file(root_filepath)
@@ -158,9 +141,7 @@ class RepoSigner:
 
     def create_key_mgr(self, keys):
 
-        private_key_key_mgr = cct_common.PrivateKey.from_hex(
-            keys["key_mgr"][0]["private"]
-        )
+        private_key_key_mgr = cct_common.PrivateKey.from_hex(keys["key_mgr"][0]["private"])
         pkg_mgr_pub_keys = [k["public"] for k in keys["pkg_mgr"]]
         key_mgr = cct_metadata_construction.build_delegating_metadata(
             metadata_type="key_mgr",  # 'root' or 'key_mgr'
@@ -181,9 +162,7 @@ class RepoSigner:
 
         # let's run a verification
         root_metadata = cct_common.load_metadata_from_file(self.folder / "1.root.json")
-        key_mgr_metadata = cct_common.load_metadata_from_file(
-            self.folder / "key_mgr.json"
-        )
+        key_mgr_metadata = cct_common.load_metadata_from_file(self.folder / "key_mgr.json")
 
         cct_common.checkformat_signable(root_metadata)
 
@@ -193,9 +172,7 @@ class RepoSigner:
         root_delegations = root_metadata["signed"]["delegations"]  # for brevity
         cct_common.checkformat_delegations(root_delegations)
         if "key_mgr" not in root_delegations:
-            raise ValueError(
-                'Missing expected delegation to "key_mgr" in root metadata.'
-            )
+            raise ValueError('Missing expected delegation to "key_mgr" in root metadata.')
         cct_common.checkformat_delegation(root_delegations["key_mgr"])
 
         # Doing delegation processing.
@@ -242,14 +219,40 @@ class RepoSigner:
             self.sign_repodata(Path(f), self.keys)
 
 
+class RepodataHeadersHandler(SimpleHTTPRequestHandler):
+    """
+    This handler is used to debug requests to repodata.json files. We
+    make them error out with a failed redirection to a URL that
+    contains the client headers in the URL, encoded as base64.
+    """
+
+    path_suffix_to_debug = "repodata.json"
+
+    def do_GET(self) -> None:
+        """
+        HACK: if a repodata.json is requested, redirect
+        to a fake address which encodes the client headers
+        as b64. This way, we can parse the exception message in a test.
+        """
+        if not self.path.endswith(self.path_suffix_to_debug):
+            return super().do_GET()
+        headers_b64 = base64.b64encode(str(self.headers).encode("utf-8"))
+        self.send_response(307)  # redirect
+        self.send_header("Location", f"/headers/{headers_b64.decode('utf-8')}")
+        self.end_headers()
+
+
+class PackagesHeadersHandler(RepodataHeadersHandler):
+    "Same as RepodataHeadersHandler, but it fails when tarballs are requested"
+    path_suffix_to_debug = ".tar.bz2"
+
+
 class BasicAuthHandler(SimpleHTTPRequestHandler):
     """Main class to present webpages and authentication."""
 
     user = args.user
     password = args.password
-    key = base64.b64encode(bytes(f"{args.user}:{args.password}", "utf-8")).decode(
-        "ascii"
-    )
+    key = base64.b64encode(bytes(f"{args.user}:{args.password}", "utf-8")).decode("ascii")
 
     def do_HEAD(self):
         self.send_response(200)
@@ -314,6 +317,10 @@ else:
 
 if args.auth == "none":
     handler = SimpleHTTPRequestHandler
+elif args.auth == "none-debug-repodata":
+    handler = RepodataHeadersHandler
+elif args.auth == "none-debug-packages":
+    handler = PackagesHeadersHandler
 elif args.auth == "basic" or (args.user and args.password):
     handler = BasicAuthHandler
 elif args.auth == "token" or args.token:
