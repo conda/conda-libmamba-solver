@@ -37,5 +37,4 @@ jobs:
           anaconda-org-channel: conda-canary
           anaconda-org-label: ${{ github.event.repository.name }}-dev
           anaconda-org-token: ${{ secrets.CONDA_CANARY_ANACONDA_ORG_TOKEN }}
-          conda-build-arguments: '--override-channels -c conda-canary/label/conda-conda-pr-11193 -c conda-forge -c defaults'
-
+          conda-build-arguments: '--override-channels -c conda-forge -c defaults'
