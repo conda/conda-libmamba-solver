@@ -24,7 +24,7 @@ copy to its corresponding section, deleting empty sections if any.
 
 ### Security
 
-## [22.6.0] - 2022-06-01
+## [22.6.0] - 2022-06-14
 
 ### Added
 
@@ -35,6 +35,7 @@ copy to its corresponding section, deleting empty sections if any.
 
 * Enable support for user-defined `repodata_fn` while ignoring `current_repodata.json` (#34)
 * Faster Python version changes (#33)
+* Remove base environment protection (#43)
 
 ### Fixed
 
