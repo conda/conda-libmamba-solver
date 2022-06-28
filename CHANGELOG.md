@@ -24,7 +24,7 @@ copy to its corresponding section, deleting empty sections if any.
 
 ### Security
 
-## [22.6.0] - 2022-06-14
+## [22.6.0] - 2022-06-28
 
 ### Added
 
