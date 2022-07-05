@@ -20,7 +20,7 @@ requirements:
   run:
     - python >=3.6
     - libmambapy >=0.23
-    - conda >=4.12
+    - conda >=4.13
 
 test:
   imports:
