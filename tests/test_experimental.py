@@ -27,7 +27,7 @@ def print_and_check_output(*args, **kwargs):
 
 
 @pytest.mark.xfail(reason="base protections not enabled anymore")
-def test_protection_for_base_env(solver):
+def test_protection_for_base_env():
     with pytest.raises(CondaEnvironmentError), fresh_context(CONDA_EXPERIMENTAL_SOLVER="libmamba"):
         current_test = os.environ.pop("PYTEST_CURRENT_TEST", None)
         try:
@@ -36,8 +36,7 @@ def test_protection_for_base_env(solver):
                 context.root_prefix,
                 "--dry-run",
                 "scipy",
-                "--experimental-solver",
-                solver,
+                "--experimental-solver=libmamba",
                 no_capture=True,
             )
         finally:
