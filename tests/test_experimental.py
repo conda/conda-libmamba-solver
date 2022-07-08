@@ -113,8 +113,9 @@ def test_cli_flag_in_help():
 
 def cli_flag_and_env_var_settings():
     env_no_var = os.environ.copy()
-    env_libmamba = os.environ.copy()
-    env_classic = os.environ.copy()
+    env_no_var.pop("CONDA_EXPERIMENTAL_SOLVER", None)
+    env_libmamba = env_no_var.copy()
+    env_classic = env_no_var.copy()
     env_libmamba["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
     env_classic["CONDA_EXPERIMENTAL_SOLVER"] = "classic"
     command = [
