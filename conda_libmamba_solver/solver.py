@@ -21,7 +21,6 @@ from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
 from conda.common.serialize import json_dump, json_load
-from conda.common.path import paths_equal
 from conda.common.url import (
     split_anaconda_token,
     remove_auth,
@@ -31,7 +30,6 @@ from conda.exceptions import (
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
-    CondaEnvironmentError,
     InvalidMatchSpec,
     ChannelError,
 )
@@ -50,7 +48,7 @@ from .mamba_utils import (
     mamba_version,
 )
 from .state import SolverInputState, SolverOutputState, IndexHelper
-from .utils import CaptureStreamToFile, escape_channel_url
+from .utils import escape_channel_url
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -282,25 +280,24 @@ class LibMambaSolver(Solver):
             return none_or_final_state
 
         # From now on we _do_ require a solver and the index
-        with CaptureStreamToFile(callback=log.debug):
-            api_ctx = init_api_context(verbosity=max(2, context.verbosity))
-            subdirs = self.subdirs
-            if self._called_from_conda_build():
-                log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
-                # Problem: Conda build generates a custom index which happens to "forget" about
-                # noarch on purpose when creating the build/host environments, since it merges
-                # both as if they were all in the native subdir. this causes package-not-found
-                # errors because we are not using the patched index.
-                # Fix: just add noarch to subdirs.
-                if "noarch" not in subdirs:
-                    subdirs = *subdirs, "noarch"
+        api_ctx = init_api_context()
+        subdirs = self.subdirs
+        if self._called_from_conda_build():
+            log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
+            # Problem: Conda build generates a custom index which happens to "forget" about
+            # noarch on purpose when creating the build/host environments, since it merges
+            # both as if they were all in the native subdir. this causes package-not-found
+            # errors because we are not using the patched index.
+            # Fix: just add noarch to subdirs.
+            if "noarch" not in subdirs:
+                subdirs = *subdirs, "noarch"
 
-            index = LibMambaIndexHelper(
-                installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
-                channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
-                subdirs=subdirs,
-                repodata_fn=self._repodata_fn,
-            )
+        index = LibMambaIndexHelper(
+            installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
+            channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
+            subdirs=subdirs,
+            repodata_fn=self._repodata_fn,
+        )
 
         with Spinner(
             f"Collect all metadata ({self._repodata_fn})",
@@ -328,10 +325,7 @@ class LibMambaSolver(Solver):
         return out_state.current_solution
 
     def _solving_loop(
-        self,
-        in_state: SolverInputState,
-        out_state: SolverOutputState,
-        index: LibMambaIndexHelper,
+        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         solved = False
         max_attempts = max(
@@ -399,9 +393,6 @@ class LibMambaSolver(Solver):
 
                     1. Go to https://github.com/conda/conda/issues/new/choose
                     2. Choose the "Libmamba Solver Feedback (Experimental Feature)" option
-                    3. Attach the log file found in the following path:
-
-                    {context._logfile_path}
 
                     Thank you for your help!
 
@@ -430,14 +421,10 @@ class LibMambaSolver(Solver):
         if context.channel_priority is ChannelPriority.STRICT:
             solver_options.append((api.SOLVER_FLAG_STRICT_REPO_PRIORITY, 1))
 
-        with CaptureStreamToFile(callback=log.debug):
-            self.solver = api.Solver(index._pool, self._solver_options)
+        self.solver = api.Solver(index._pool, self._solver_options)
 
     def _solve_attempt(
-        self,
-        in_state: SolverInputState,
-        out_state: SolverOutputState,
-        index: LibMambaIndexHelper,
+        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         self._setup_solver(index)
 
@@ -459,17 +446,12 @@ class LibMambaSolver(Solver):
 
         # ## Convert to tasks
         tasks = self._specs_to_tasks(in_state, out_state)
-        tasks_list_as_str = "\n".join(
-            [f"  {task_str}: {', '.join(specs)}" for (task_str, _), specs in tasks.items()]
-        )
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            with CaptureStreamToFile(callback=log.debug):
-                self.solver.add_jobs(specs, task_type)
+            self.solver.add_jobs(specs, task_type)
 
         # ## Run solver
-        with CaptureStreamToFile(callback=log.debug):
-            solved = self.solver.solve()
+        solved = self.solver.solve()
 
         if solved:
             out_state.conflicts.clear(reason="Solution found")
@@ -773,17 +755,13 @@ class LibMambaSolver(Solver):
         raise exc
 
     def _export_solved_records(
-        self,
-        in_state: SolverInputState,
-        out_state: SolverOutputState,
-        index: LibMambaIndexHelper,
+        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
-        with CaptureStreamToFile(callback=log.debug):
-            transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
-            (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
+        transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
+        (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
         for _, filename in to_unlink:
             for name, record in in_state.installed.items():
@@ -831,9 +809,6 @@ class LibMambaSolver(Solver):
             for record in out_state.records.values():
                 record.channel.location = percent_decode(record.channel.location)
                 record.channel.name = percent_decode(record.channel.name)
-
-        with CaptureStreamToFile(callback=log.debug):
-            del transaction
 
     def _check_spec_compat(self, match_spec):
         """

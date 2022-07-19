@@ -161,7 +161,7 @@ def load_channels(
     return index
 
 
-def init_api_context(verbosity: int = context.verbosity, use_mamba_experimental: bool = False):
+def init_api_context(use_mamba_experimental: bool = False):
     api_ctx = api.Context()
 
     api_ctx.json = context.json
@@ -173,10 +173,8 @@ def init_api_context(verbosity: int = context.verbosity, use_mamba_experimental:
         if use_mamba_experimental:
             context.json = False
 
-    # we want verbosity by default, we'll control stdout in our logging
-    # but the file logs will be DEBUG
-    api_ctx.verbosity = verbosity
-    api_ctx.set_verbosity(verbosity)
+    api_ctx.verbosity = context.verbosity
+    api_ctx.set_verbosity(context.verbosity)
     api_ctx.quiet = context.quiet
     api_ctx.offline = context.offline
     api_ctx.local_repodata_ttl = context.local_repodata_ttl
