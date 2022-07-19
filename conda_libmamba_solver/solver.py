@@ -769,8 +769,9 @@ class LibMambaSolver(Solver):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
-        transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
-        (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
+        with CaptureStreamToFile(callback=log.debug):
+            transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
+            (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
         for _, filename in to_unlink:
             for name, record in in_state.installed.items():
