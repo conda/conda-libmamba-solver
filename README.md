@@ -103,14 +103,14 @@ $ conda remove conda-libmamba-solver
 
 ### How do I configure conda to use the experimental solver permanently?
 
-Use the following command:
+Use the following command to always use `libmamba` as your default solver:
 
 ```
-$ conda config --set experimental_solver libmamba --env
+$ conda config --set experimental_solver libmamba
 ```
 
-Note that we are using the `--env` flag so the setting is only applied to the active
-environment. Otherwise it will have a global effect on all your environments, including `base`,
-which is now protected. As such, we strongly recommend to enable this setting in a case by case
-basis or, even better, on a command by command basis by setting the corresponding command line flags
-or environment variables when needed.
+To undo this change permanently, run:
+
+```
+$ conda config --remove-key experimental_solver
+```
