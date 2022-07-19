@@ -340,8 +340,6 @@ class LibMambaSolver(Solver):
         )
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
-            if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-                print("----- Starting solver attempt", attempt, "------", file=sys.stderr)
             try:
                 solved = self._solve_attempt(in_state, out_state, index)
                 if solved:
@@ -360,8 +358,6 @@ class LibMambaSolver(Solver):
                 )
         if not solved:
             log.debug("Last attempt: reporting all installed as conflicts")
-            if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-                print("------ Last attempt! ------", file=sys.stderr)
             out_state.conflicts.update(
                 {
                     name: record.to_match_spec()
@@ -387,17 +383,6 @@ class LibMambaSolver(Solver):
 
         # Run post-solve tasks
         out_state.post_solve(solver=self)
-
-        if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-            print("SOLUTION for command", self._command, ":", file=sys.stderr)
-            for name, record in out_state.records.items():
-                print(
-                    " ",
-                    str(record.to_match_spec()),
-                    "# reasons=",
-                    out_state.records._reasons.get(name, "<None>"),
-                    file=sys.stderr,
-                )
 
         return out_state
 
@@ -458,10 +443,6 @@ class LibMambaSolver(Solver):
 
         log.debug("New solver attempt")
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
-        if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-            print(
-                "Current conflicts (including learnt ones):", out_state.conflicts, file=sys.stderr
-            )
 
         # ## First, we need to obtain the list of specs ###
         try:
@@ -475,16 +456,12 @@ class LibMambaSolver(Solver):
                 raise exc
 
         log.debug("Computed specs: %s", out_state.specs)
-        if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-            print("Computed specs:", out_state.specs, file=sys.stderr)
 
         # ## Convert to tasks
         tasks = self._specs_to_tasks(in_state, out_state)
         tasks_list_as_str = "\n".join(
             [f"  {task_str}: {', '.join(specs)}" for (task_str, _), specs in tasks.items()]
         )
-        if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-            print("Created %s tasks:\n%s" % (len(tasks), tasks_list_as_str), file=sys.stderr)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
             with CaptureStreamToFile(callback=log.debug):
@@ -807,10 +784,6 @@ class LibMambaSolver(Solver):
         with CaptureStreamToFile(callback=log.debug):
             transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
             (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
-
-        if not context.json and not context.quiet and os.environ.get("EXTRA_DEBUG_TO_STDOUT"):
-            print("TO_LINK", to_link, file=sys.stderr)
-            print("TO_UNLINK", to_unlink, file=sys.stderr)
 
         for _, filename in to_unlink:
             for name, record in in_state.installed.items():
