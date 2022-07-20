@@ -101,7 +101,7 @@ class LibMambaIndexHelper(IndexHelper):
         for channel in self._channels:
             # channel can be str or Channel; make sure it's Channel!
             channel_obj = Channel(channel)
-            channel_urls = channel.urls(with_credentials=True)
+            channel_urls = channel.urls(with_credentials=True, subdirs=self._subdirs)
             if channel_obj.scheme and not channel_obj.scheme in self._LIBMAMBA_PROTOCOLS:
                 # These channels are loaded with conda
                 log.debug(
@@ -162,10 +162,11 @@ class LibMambaIndexHelper(IndexHelper):
         for channel in self._channels:
             for url in channels_to_urls[channel]:
                 # Not all calculated URLs have to exist! Some platforms might be missing
-                index_entry = full_index.get(url)
+                # Also, the URL might have been escaped for proper curl handling; try with that too
+                index_entry = full_index.get(url, full_index.get(escape_channel_url(url)))
                 if index_entry is None:
                     log.debug(
-                        f"URL {url} for channel {channel} does not exist or could not be fetched. "
+                        f"URL '{url}' for channel '{channel}' does not exist or could not be fetched. "
                         "Skipping..."
                     )
                 else:
@@ -173,7 +174,7 @@ class LibMambaIndexHelper(IndexHelper):
 
         # This one is added above by us, but it's not in 'self._channels'; add manually again
         if free_channel in libmamba_urls:
-            for url in Channel(free_channel).urls(with_credentials=True):
+            for url in Channel(free_channel).urls(with_credentials=True, subdirs=self._subdirs):
                 # in this case all urls are guaranteed to exist in the free channel
                 prioritized_index.append(full_index[url])
 
