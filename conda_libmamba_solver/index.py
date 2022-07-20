@@ -56,7 +56,7 @@ class LibMambaIndexHelper(IndexHelper):
     @staticmethod
     def _generate_channel_lookup(index):
         return {
-            info["channel"].platform_url(info["platform"], with_credentials=True): info
+            info["channel"].platform_url(info["platform"], with_credentials=False): info
             for _, info in index
         }
 
@@ -92,12 +92,33 @@ class LibMambaIndexHelper(IndexHelper):
         return installed
 
     def _load_channels(self):
+        """
+        Handle all types of channels with a hybrid approach that uses
+        libmamba whenever possible, but delegates to conda internals as
+        a fallback. The important bit is to maintain order so priorities
+        are computed adequately. This is not as easy as it looks, given
+        the unspecified Channel spec.
+
+        A user can pass a channel in several ways:
+        - By name (e.g. defaults or conda-forge).
+        - By URL (e.g. https://conda.anaconda.org/pytorch)
+        - By URL + subdir (e.g. https://conda.anaconda.org/pytorch/noarch)
+
+        All of those are acceptable, but libmamba will eventually expect a list
+        of URLs with subdirs so it can delegate to libcurl. libcurl expects
+        _escaped_ URLs (with %-encoded espaces, for example: %20). This means
+        that libmamba will see a different URL compared to the user-provided one.
+        libmamba might also modify the URL to include tokens.
+
+        To sum up, we might obtain a different URL back, so we can't just blindly
+        use the input URLs as dictionary keys to keep references. Instead, we will
+        have to rely on the input order, very carefully.
+        """
         # Libmamba only supports a subset of the protocols offered in conda
         # We first filter the channel list to use the appropriate loaders
         # We will finally merge everything together in the right order
-        libmamba_urls = []
-        conda_urls = []
-        channels_to_urls = defaultdict(list)
+        urls_by_loader = []
+        _libmamba_urls = []
         for channel in self._channels:
             # channel can be str or Channel; make sure it's Channel!
             channel_obj = Channel(channel)
@@ -109,80 +130,72 @@ class LibMambaIndexHelper(IndexHelper):
                     channel_obj,
                 )
                 for url in channel_urls:
-                    channels_to_urls[channel].append(url)
-                    conda_urls.append(url)
+                    urls_by_loader.append(["conda", url])
             else:
                 # These channels are loaded with libmamba
                 for url in channel_urls:
                     # This fixes test_activate_deactivate_modify_path_bash
                     # and other local channels (path to url) issues
-                    channels_to_urls[channel].append(url)
                     url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
                     url = escape_channel_url(url)
-                    libmamba_urls.append(url)
+                    urls_by_loader.append(["libmamba", url])
+                    _libmamba_urls.append(url)
 
         free_channel = "https://repo.anaconda.com/pkgs/free"
-        if context.restore_free_channel and free_channel not in libmamba_urls:
-            libmamba_urls.append(free_channel)
+        if context.restore_free_channel and free_channel not in _libmamba_urls:
+            urls_by_loader.append(["libmamba", free_channel])
 
-        # delegate to libmamba loaders
-        full_index = {
-            entry["url"]: (subdir, entry)
-            for (subdir, entry) in get_index(
-                channel_urls=libmamba_urls,
-                prepend=False,
-                use_local=context.use_local,
-                platform=self._subdirs,
-                repodata_fn=self._repodata_fn,
-            )
-        }
+        # now we stack contiguous blocks together so the loader can operate in batches
+        # [(A, 1), (A, 2), (A, 3), (B, 1), (A, 4)] -> [(A, [1, 2, 3]), (B, [1]), (A, [4])]
+        contiguous_urls_by_loader = [[urls_by_loader[0][0], urls_by_loader[0][1:]]]
+        for loader, url in urls_by_loader[1:]:
+            print(contiguous_urls_by_loader)
+            current_loader = contiguous_urls_by_loader[-1][0]
+            if loader == current_loader:
+                contiguous_urls_by_loader[-1][1].append(url)
+            else:
+                contiguous_urls_by_loader.append([loader, [url]])
 
-        # load channels with conda, if needed
-        for url in conda_urls:
-            with Spinner(
-                url,
-                enabled=not context.verbosity and not context.quiet,
-                json=context.json,
-            ):
-                subdir_data = SubdirData(url, repodata_fn=self._repodata_fn)
-                subdir_data.load()
-                channel = Channel(url)
-                repo = self._load_from_records(self._pool, url, subdir_data.iter_records())
-                full_index[url] = (
-                    repo,
-                    {
-                        "platform": channel.subdir,
-                        "url": url,
-                        "channel": channel,
-                        "loaded_with": "conda.core.subdir_data.SubdirData",
-                    },
+        full_index = []
+        for loader, urls in contiguous_urls_by_loader:
+            if loader == "libmamba":
+                # delegate to libmamba loaders
+                full_index += get_index(
+                    channel_urls=urls,
+                    prepend=False,
+                    use_local=context.use_local,
+                    platform=self._subdirs,
+                    repodata_fn=self._repodata_fn,
                 )
+            else:
+                # load channels with conda, if needed
+                for url in urls:
+                    with Spinner(
+                        url,
+                        enabled=not context.verbosity and not context.quiet,
+                        json=context.json,
+                    ):
+                        subdir_data = SubdirData(url, repodata_fn=self._repodata_fn)
+                        subdir_data.load()
+                        channel = Channel(url)
+                        repo = self._load_from_records(self._pool, url, subdir_data.iter_records())
+                        full_index.append(
+                            (
+                                repo,
+                                {
+                                    "platform": channel.subdir,
+                                    "url": url,
+                                    "channel": channel,
+                                    "loaded_with": "conda.core.subdir_data.SubdirData",
+                                },
+                            )
+                        )
 
-        prioritized_index = []
-        for channel in self._channels:
-            for url in channels_to_urls[channel]:
-                # Not all calculated URLs have to exist! Some platforms might be missing
-                # Also, the URL might have been escaped for proper curl handling; try with that too
-                index_entry = full_index.get(url, full_index.get(escape_channel_url(url)))
-                if index_entry is None:
-                    log.debug(
-                        f"URL '{url}' for channel '{channel}' does not exist or could not be fetched. "
-                        "Skipping..."
-                    )
-                else:
-                    prioritized_index.append(index_entry)
+        set_channel_priorities(self._pool, full_index, self._repos)
 
-        # This one is added above by us, but it's not in 'self._channels'; add manually again
-        if free_channel in libmamba_urls:
-            for url in Channel(free_channel).urls(with_credentials=True, subdirs=self._subdirs):
-                # in this case all urls are guaranteed to exist in the free channel
-                prioritized_index.append(full_index[url])
+        self._channel_lookup = self._generate_channel_lookup(full_index)
 
-        set_channel_priorities(self._pool, prioritized_index, self._repos)
-
-        self._channel_lookup = self._generate_channel_lookup(prioritized_index)
-
-        return prioritized_index
+        return full_index
 
     def whoneeds(self, query: str):
         return self._query.whoneeds(query, self._format)
