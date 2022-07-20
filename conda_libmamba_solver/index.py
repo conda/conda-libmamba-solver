@@ -149,7 +149,6 @@ class LibMambaIndexHelper(IndexHelper):
         # [(A, 1), (A, 2), (A, 3), (B, 1), (A, 4)] -> [(A, [1, 2, 3]), (B, [1]), (A, [4])]
         contiguous_urls_by_loader = [[urls_by_loader[0][0], urls_by_loader[0][1:]]]
         for loader, url in urls_by_loader[1:]:
-            print(contiguous_urls_by_loader)
             current_loader = contiguous_urls_by_loader[-1][0]
             if loader == current_loader:
                 contiguous_urls_by_loader[-1][1].append(url)
