@@ -101,7 +101,7 @@ class LibMambaIndexHelper(IndexHelper):
         for channel in self._channels:
             # channel can be str or Channel; make sure it's Channel!
             channel_obj = Channel(channel)
-            channel_urls = channel.urls(with_credentials=True, subdirs=self._subdirs)
+            channel_urls = channel_obj.urls(with_credentials=True, subdirs=self._subdirs)
             if channel_obj.scheme and not channel_obj.scheme in self._LIBMAMBA_PROTOCOLS:
                 # These channels are loaded with conda
                 log.debug(
