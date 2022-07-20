@@ -161,10 +161,20 @@ class LibMambaIndexHelper(IndexHelper):
         prioritized_index = []
         for channel in self._channels:
             for url in channels_to_urls[channel]:
-                prioritized_index.append(full_index[url])
+                # Not all calculated URLs have to exist! Some platforms might be missing
+                index_entry = full_index.get(url)
+                if index_entry is None:
+                    log.debug(
+                        f"URL {url} for channel {channel} does not exist or could not be fetched. "
+                        "Skipping..."
+                    )
+                else:
+                    prioritized_index.append(index_entry)
+
         # This one is added above by us, but it's not in 'self._channels'; add manually again
         if free_channel in libmamba_urls:
             for url in Channel(free_channel).urls(with_credentials=True):
+                # in this case all urls are guaranteed to exist in the free channel
                 prioritized_index.append(full_index[url])
 
         set_channel_priorities(self._pool, prioritized_index, self._repos)
