@@ -1,5 +1,6 @@
 import os
 import logging
+from collections import defaultdict
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
@@ -46,16 +47,17 @@ class LibMambaIndexHelper(IndexHelper):
         installed_repo = self._load_from_records(self._pool, "installed", installed_records)
         self._repos.append(installed_repo)
 
+        self._channel_lookup = None
         self._index = self._load_channels()
 
         self._query = api.Query(self._pool)
         self._format = api.QueryFormat.JSON
 
-    @property
-    def _channel_lookup(self):
+    @staticmethod
+    def _generate_channel_lookup(index):
         return {
-            info["channel"].platform_url(info["platform"], with_credentials=False): info
-            for _, info in self._index
+            info["channel"].platform_url(info["platform"], with_credentials=True): info
+            for _, info in index
         }
 
     @staticmethod
@@ -94,79 +96,82 @@ class LibMambaIndexHelper(IndexHelper):
         # We first filter the channel list to use the appropriate loaders
         # We will finally merge everything together in the right order
         libmamba_urls = []
-        subdirdata_channels = []
-        channel_loaders = []
+        conda_urls = []
+        channels_to_urls = defaultdict(list)
         for channel in self._channels:
             # channel can be str or Channel; make sure it's Channel!
-            channel = Channel(channel)
-            if channel.scheme and not channel.scheme in self._LIBMAMBA_PROTOCOLS:
-                # protocol not supported by libmamba
+            channel_obj = Channel(channel)
+            channel_urls = channel.urls(with_credentials=True)
+            if channel_obj.scheme and not channel_obj.scheme in self._LIBMAMBA_PROTOCOLS:
+                # These channels are loaded with conda
                 log.debug(
-                    "Channel %s not supported by libmamba. Using conda.core.SubdirData", channel
+                    "Channel %s not supported by libmamba. Using conda.core.SubdirData",
+                    channel_obj,
                 )
-                for url in channel.urls(with_credentials=True):
-                    channel_with_subdir = Channel(url)
-                    subdirdata_channels.append(channel_with_subdir)
-                    channel_loaders.append("conda")
+                for url in channel_urls:
+                    channels_to_urls[channel].append(url)
+                    conda_urls.append(url)
             else:
-                # This fixes test_activate_deactivate_modify_path_bash
-                # and other local channels (path to url) issues
-                for url in channel.urls(with_credentials=True):
+                # These channels are loaded with libmamba
+                for url in channel_urls:
+                    # This fixes test_activate_deactivate_modify_path_bash
+                    # and other local channels (path to url) issues
+                    channels_to_urls[channel].append(url)
                     url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
                     url = escape_channel_url(url)
-                    if url not in libmamba_urls:
-                        libmamba_urls.append(url)
-                        channel_loaders.append("libmamba")
+                    libmamba_urls.append(url)
 
         free_channel = "https://repo.anaconda.com/pkgs/free"
         if context.restore_free_channel and free_channel not in libmamba_urls:
             libmamba_urls.append(free_channel)
-            channel_loaders.append("libmamba")
 
         # delegate to libmamba loaders
-        libmamba_index = get_index(
-            channel_urls=libmamba_urls,
-            prepend=False,
-            use_local=context.use_local,
-            platform=self._subdirs,
-            repodata_fn=self._repodata_fn,
-        )
+        full_index = {
+            entry["url"]: (subdir, entry)
+            for (subdir, entry) in get_index(
+                channel_urls=libmamba_urls,
+                prepend=False,
+                use_local=context.use_local,
+                platform=self._subdirs,
+                repodata_fn=self._repodata_fn,
+            )
+        }
 
         # load channels with conda, if needed
-        conda_index = []
-        for channel in subdirdata_channels:
+        for url in conda_urls:
             with Spinner(
-                channel,
+                url,
                 enabled=not context.verbosity and not context.quiet,
                 json=context.json,
             ):
-                subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
+                subdir_data = SubdirData(url, repodata_fn=self._repodata_fn)
                 subdir_data.load()
-                repo = self._load_from_records(
-                    self._pool, channel.name, subdir_data.iter_records()
-                )
-                conda_index.append(
-                    (
-                        repo,
-                        {
-                            "platform": channel.subdir,
-                            "url": channel.url(with_credentials=True),
-                            "channel": channel,
-                            "loaded_with": "conda.core.subdir_data.SubdirData",
-                        },
-                    )
+                channel = Channel(url)
+                repo = self._load_from_records(self._pool, url, subdir_data.iter_records())
+                full_index[url] = (
+                    repo,
+                    {
+                        "platform": channel.subdir,
+                        "url": url,
+                        "channel": channel,
+                        "loaded_with": "conda.core.subdir_data.SubdirData",
+                    },
                 )
 
-        full_index = []
-        iter_conda_index = iter(conda_index)
-        iter_libmamba_index = iter(libmamba_index)
-        for loader in channel_loaders:
-            if loader == "conda":
-                full_index.append(next(iter_conda_index))
-            else:
-                full_index.append(next(iter_libmamba_index))
-        set_channel_priorities(self._pool, full_index, self._repos)
-        return full_index
+        prioritized_index = []
+        for channel in self._channels:
+            for url in channels_to_urls[channel]:
+                prioritized_index.append(full_index[url])
+        # This one is added above by us, but it's not in 'self._channels'; add manually again
+        if free_channel in libmamba_urls:
+            for url in Channel(free_channel).urls(with_credentials=True):
+                prioritized_index.append(full_index[url])
+
+        set_channel_priorities(self._pool, prioritized_index, self._repos)
+
+        self._channel_lookup = self._generate_channel_lookup(prioritized_index)
+
+        return prioritized_index
 
     def whoneeds(self, query: str):
         return self._query.whoneeds(query, self._format)
