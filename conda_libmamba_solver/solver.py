@@ -198,7 +198,10 @@ class LibMambaSolver(Solver):
         return out_state.current_solution
 
     def _solving_loop(
-        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+        index: LibMambaIndexHelper,
     ):
         solved = False
         max_attempts = max(
@@ -297,7 +300,10 @@ class LibMambaSolver(Solver):
         self.solver = api.Solver(index._pool, self._solver_options)
 
     def _solve_attempt(
-        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+        index: LibMambaIndexHelper,
     ):
         self._setup_solver(index)
 
@@ -628,7 +634,10 @@ class LibMambaSolver(Solver):
         raise exc
 
     def _export_solved_records(
-        self, in_state: SolverInputState, out_state: SolverOutputState, index: LibMambaIndexHelper,
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+        index: LibMambaIndexHelper,
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
