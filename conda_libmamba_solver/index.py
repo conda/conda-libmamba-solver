@@ -113,11 +113,14 @@ class LibMambaIndexHelper(IndexHelper):
                 # and other local channels (path to url) issues
                 for url in channel.urls(with_credentials=True):
                     url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
-                    libmamba_urls.append(escape_channel_url(url))
-                    channel_loaders.append("libmamba")
+                    url = escape_channel_url(url)
+                    if url not in libmamba_urls:
+                        libmamba_urls.append(url)
+                        channel_loaders.append("libmamba")
 
-        if context.restore_free_channel:
-            libmamba_urls.append("https://repo.anaconda.com/pkgs/free")
+        free_channel = "https://repo.anaconda.com/pkgs/free"
+        if context.restore_free_channel and free_channel not in libmamba_urls:
+            libmamba_urls.append(free_channel)
             channel_loaders.append("libmamba")
 
         # delegate to libmamba loaders
