@@ -22,7 +22,7 @@ log = logging.getLogger(f"conda.{__name__}")
 
 
 class LibMambaIndexHelper(IndexHelper):
-    _LIBMAMBA_PROTOCOLS = ("http://", "https://", "file://")
+    _LIBMAMBA_PROTOCOLS = ("http", "https", "file")
 
     def __init__(
         self,
@@ -96,10 +96,10 @@ class LibMambaIndexHelper(IndexHelper):
         libmamba_urls = []
         subdirdata_channels = []
         channel_loaders = []
-        for i, channel in enumerate(self._channels):
+        for channel in self._channels:
             # channel can be str or Channel; make sure it's Channel!
             channel = Channel(channel)
-            if channel.scheme and not channel.scheme.startswith(self._LIBMAMBA_PROTOCOLS):
+            if channel.scheme and not channel.scheme in self._LIBMAMBA_PROTOCOLS:
                 # protocol not supported by libmamba
                 log.debug(
                     "Channel %s not supported by libmamba. Using conda.core.SubdirData", channel
