@@ -8,11 +8,12 @@ from subprocess import run
 from conda.common.compat import on_mac
 from conda.exceptions import CondaExitZero
 from conda.gateways.connection.adapters.s3 import S3Adapter
-from conda.testing.integration import _get_temp_prefix
+from conda.testing.integration import _get_temp_prefix, run_command
 import pytest
 
 from .channel_testing_utils import (
     create_with_channel,
+    create_with_channel_in_process,
     http_server_auth_basic,
     http_server_auth_basic_email,
     http_server_auth_none,
@@ -22,23 +23,19 @@ from .channel_testing_utils import (
 
 
 def test_http_server_auth_none(http_server_auth_none):
-    with pytest.raises(CondaExitZero):
-        create_with_channel(http_server_auth_none)
+    create_with_channel(http_server_auth_none)
 
 
 def test_http_server_auth_basic(http_server_auth_basic):
-    with pytest.raises(CondaExitZero):
-        create_with_channel(http_server_auth_basic)
+    create_with_channel(http_server_auth_basic)
 
 
 def test_http_server_auth_basic_email(http_server_auth_basic_email):
-    with pytest.raises(CondaExitZero):
-        create_with_channel(http_server_auth_basic_email)
+    create_with_channel(http_server_auth_basic_email)
 
 
 def test_http_server_auth_token(http_server_auth_token):
-    with pytest.raises(CondaExitZero):
-        create_with_channel(http_server_auth_token)
+    create_with_channel(http_server_auth_token)
 
 
 def prepare_s3_server(endpoint, bucket_name):
@@ -140,7 +137,7 @@ def _s3_adapter_send_boto3_patch_factory(endpoint):
     return _send_boto3
 
 
-@pytest.skipif(
+@pytest.mark.skipif(
     run(["minio", "-v"], check=False).returncode != 0,
     reason="Minio server not available on PATH",
 )
@@ -151,27 +148,22 @@ def test_s3_server(s3_server):
     with pytest.raises(CondaExitZero), patch.object(
         S3Adapter, "_send_boto3", _s3_adapter_send_boto3_patch_factory(endpoint)
     ):
-        create_with_channel(f"s3://{bucket_name}", no_capture=True)
+        create_with_channel_in_process(f"s3://{bucket_name}", no_capture=True)
 
 
 def test_channel_matchspec():
-    out = subprocess.check_output(
-        [
-            sys.executable,
-            "-m",
-            "conda",
-            "create",
-            _get_temp_prefix(),
-            "--experimental-solver=libmamba",
-            "--json",
-            "--override-channels",
-            "-c",
-            "defaults",
-            "conda-forge::libblas=*=*openblas",
-            "python=3.9",
-        ]
+    stdout, stderr, _ = run_command(
+        "create",
+        _get_temp_prefix(),
+        "--experimental-solver=libmamba",
+        "--json",
+        "--override-channels",
+        "-c",
+        "defaults",
+        "conda-forge::libblas=*=*openblas",
+        "python=3.9",
     )
-    result = json.loads(out)
+    result = json.loads(stdout)
     assert result["success"] is True
     for record in result["actions"]["LINK"]:
         if record["name"] == "numpy":
