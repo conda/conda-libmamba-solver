@@ -4,7 +4,6 @@ from unittest.mock import patch
 from subprocess import run
 
 from conda.exceptions import CondaExitZero
-from conda.gateways.connection.adapters.s3 import S3Adapter
 from conda.testing.integration import _get_temp_prefix, run_command
 import pytest
 
@@ -81,72 +80,30 @@ def prepare_s3_server(endpoint, bucket_name):
         client.upload_file(str(path), bucket_name, str(key), ExtraArgs={"ACL": "public-read"})
 
 
-def _s3_adapter_send_boto3_patch_factory(endpoint):
-    def _send_boto3(self, boto3, resp, request):
-        """
-        We use this to patch S3Adapter._send_boto3 function so
-        it connects to our local instance. All we are changing here
-        is the call to `session.resource(...)`.
-        """
-        from botocore.exceptions import BotoCoreError, ClientError
-        from botocore.client import Config
-        from conda.common.compat import ensure_binary
-        from conda.common.url import url_to_s3_info
-        from conda.gateways.connection import CaseInsensitiveDict
-
-        bucket_name, key_string = url_to_s3_info(request.url)
-        # https://github.com/conda/conda/issues/8993
-        # creating a separate boto3 session to make this thread safe
-        session = boto3.session.Session()
-        # create a resource client using this thread's session object
-        s3 = session.resource(
-            "s3",
-            endpoint_url=endpoint,
-            aws_access_key_id="minioadmin",
-            aws_secret_access_key="minioadmin",
-            config=Config(signature_version="s3v4"),
-            region_name="us-east-1",
-        )
-        # finally get the S3 object
-        key = s3.Object(bucket_name, key_string[1:])
-
-        try:
-            response = key.get()
-        except (BotoCoreError, ClientError) as e:
-            resp.status_code = 404
-            message = {
-                "error": "error downloading file from s3",
-                "path": request.url,
-                "exception": repr(e),
-            }
-            resp.raw = self._write_tempfile(lambda x: x.write(ensure_binary(json.dumps(message))))
-            resp.close = resp.raw.close
-            return resp
-
-        key_headers = response["ResponseMetadata"]["HTTPHeaders"]
-        resp.headers = CaseInsensitiveDict(
-            {
-                "Content-Type": key_headers.get("content-type", "text/plain"),
-                "Content-Length": key_headers["content-length"],
-                "Last-Modified": key_headers["last-modified"],
-            }
-        )
-
-        resp.raw = self._write_tempfile(key.download_fileobj)
-        resp.close = resp.raw.close
-
-        return resp
-
-    return _send_boto3
-
-
 @pytest.mark.skipif(not have_minio, reason="Minio server not available")
 def test_s3_server(s3_server):
+    import boto3
+    from botocore.client import Config
+
     endpoint, bucket_name = s3_server.rsplit("/", 1)
     prepare_s3_server(endpoint, bucket_name)
 
+    # We patch the default kwargs values in boto3.session.Session.resource(...)
+    # which is used in conda.gateways.connection.s3.S3Adapter to initialize the S3
+    # connection; otherwise it would default to a real AWS instance
+    patched_defaults = (
+        "us-east-1",  # region_name
+        None,  # api_version
+        True,  # use_ssl
+        None,  # verify
+        endpoint,  # endpoint_url
+        "minioadmin",  # aws_access_key_id
+        "minioadmin",  # aws_secret_access_key
+        None,  # aws_session_token
+        Config(signature_version="s3v4"),  # config
+    )
     with pytest.raises(CondaExitZero), patch.object(
-        S3Adapter, "_send_boto3", _s3_adapter_send_boto3_patch_factory(endpoint)
+        boto3.session.Session.resource, "__defaults__", patched_defaults
     ):
         create_with_channel_in_process(f"s3://{bucket_name}", no_capture=True)
 
