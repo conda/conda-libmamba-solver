@@ -5,6 +5,7 @@ import tempfile
 import sys
 from pathlib import Path
 import subprocess
+from typing import Tuple
 
 import pytest
 from xprocess import ProcessStarter
@@ -174,8 +175,32 @@ def http_server_auth_token(xprocess):
     )
 
 
-def create_with_channel(channel, solver="libmamba", **kwargs):
-    return run_command(
+def create_with_channel(
+    channel, solver="libmamba", check=True, **kwargs
+) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "conda",
+            "create",
+            "-p",
+            _get_temp_prefix(),
+            f"--experimental-solver={solver}",
+            "--json",
+            "--override-channels",
+            "--download-only",
+            "-c",
+            channel,
+            "test-package",
+        ],
+        check=check,
+        **kwargs,
+    )
+
+
+def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> Tuple[str, str, int]:
+    stdout, stderr, returncode = run_command(
         "create",
         _get_temp_prefix(),
         f"--experimental-solver={solver}",
@@ -187,3 +212,4 @@ def create_with_channel(channel, solver="libmamba", **kwargs):
         "test-package",
         **kwargs,
     )
+    return stdout, stderr, returncode
