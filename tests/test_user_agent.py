@@ -1,6 +1,6 @@
 """
 This file tests for the different user-agents conda and conda-libmamba-solver
-might present to a server. We mock the server via `_reposerver.py`.
+might present to a server. We mock the server via `_repo_http_server.py`.
 
 There are two request backend we can end up using:
 * libcurl, via libmamba
@@ -79,7 +79,7 @@ def assert_libmamba_user_agent(stdout):
     """
     Conda's network stack (based on requests) has a nice way of reporting connection
     errors, which includes the headers as part of the report. All we need to do is force
-    an error on the server side (see _reposerver.py 'none-debug-*' mockup servers) and we
+    an error on the server side (see _repo_http_server.py 'none-debug-*' mockup servers) and we
     will see how the client is viewed by the server! Awesome! See `check_user_agent_requests``
     for the easy way out :)
 

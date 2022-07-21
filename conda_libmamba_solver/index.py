@@ -55,10 +55,14 @@ class LibMambaIndexHelper(IndexHelper):
 
     @staticmethod
     def _generate_channel_lookup(index):
-        return {
-            info["channel"].platform_url(info["platform"], with_credentials=False): info
-            for _, info in index
-        }
+        lookup = {}
+        for _, info in index:
+            try:  # libmamba api
+                url = info["channel"].platform_url(info["platform"], with_credentials=False)
+            except AttributeError:  # conda api
+                url = info["channel"].urls(with_credentials=False, subdirs=(info["platform"],))[0]
+            lookup[url] = info
+        return lookup
 
     @staticmethod
     def _load_from_records(
@@ -174,9 +178,9 @@ class LibMambaIndexHelper(IndexHelper):
                         enabled=not context.verbosity and not context.quiet,
                         json=context.json,
                     ):
-                        subdir_data = SubdirData(url, repodata_fn=self._repodata_fn)
-                        subdir_data.load()
                         channel = Channel(url)
+                        subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
+                        subdir_data.load()
                         repo = self._load_from_records(self._pool, url, subdir_data.iter_records())
                         full_index.append(
                             (
