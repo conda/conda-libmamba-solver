@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import patch
 from subprocess import run
 
-from conda.common.compat import on_mac
 from conda.exceptions import CondaExitZero
 from conda.gateways.connection.adapters.s3 import S3Adapter
 from conda.testing.integration import _get_temp_prefix, run_command
@@ -20,6 +19,12 @@ from .channel_testing_utils import (
     http_server_auth_token,
     s3_server,
 )
+
+try:
+    run(["minio", "-v"], check=True)
+    have_minio = True
+except Exception:
+    have_minio = False
 
 
 def test_http_server_auth_none(http_server_auth_none):
@@ -137,10 +142,7 @@ def _s3_adapter_send_boto3_patch_factory(endpoint):
     return _send_boto3
 
 
-@pytest.mark.skipif(
-    run(["minio", "-v"], check=False).returncode != 0,
-    reason="Minio server not available on PATH",
-)
+@pytest.mark.skipif(have_minio, reason="Minio server not available")
 def test_s3_server(s3_server):
     endpoint, bucket_name = s3_server.rsplit("/", 1)
     prepare_s3_server(endpoint, bucket_name)
