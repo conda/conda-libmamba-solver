@@ -1,6 +1,4 @@
 import json
-import subprocess
-import sys
 from pathlib import Path
 from unittest.mock import patch
 from subprocess import run
@@ -142,7 +140,7 @@ def _s3_adapter_send_boto3_patch_factory(endpoint):
     return _send_boto3
 
 
-@pytest.mark.skipif(have_minio, reason="Minio server not available")
+@pytest.mark.skipif(not have_minio, reason="Minio server not available")
 def test_s3_server(s3_server):
     endpoint, bucket_name = s3_server.rsplit("/", 1)
     prepare_s3_server(endpoint, bucket_name)
