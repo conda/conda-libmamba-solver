@@ -49,8 +49,6 @@ $ conda create -n demo scipy --dry-run
 $ conda create -n demo scipy --dry-run --experimental-solver=classic
 # Using libmamba integrations
 $ conda create -n demo scipy --dry-run --experimental-solver=libmamba
-# Using old proof-of-concept, debugging-only libmamba integrations
-$ conda create -n demo scipy --dry-run --experimental-solver=libmamba-draft
 ```
 
 > Hint: You can also enable the experimental solver with the `CONDA_EXPERIMENTAL_SOLVER`
