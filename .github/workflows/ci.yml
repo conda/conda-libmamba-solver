@@ -121,13 +121,6 @@ jobs:
           conda info
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
 
-      - name: Download Minio server
-        shell: bash -l {0}
-        run: |
-          curl -LO https://dl.min.io/server/minio/release/darwin-amd64/minio
-          chmod +x minio
-          mv minio $CONDA_PREFIX/bin/minio
-
       - name: Install conda-libmamba-solver
         shell: bash -l {0}
         working-directory: conda-libmamba-solver
