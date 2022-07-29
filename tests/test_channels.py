@@ -1,11 +1,6 @@
 import json
-from pathlib import Path
-from unittest.mock import patch
-from subprocess import run
 
-from conda.exceptions import CondaExitZero
 from conda.testing.integration import _get_temp_prefix, run_command
-import pytest
 
 from .channel_testing_utils import (
     create_with_channel,
