@@ -71,50 +71,6 @@ def _mock_http_server(xprocess, name, port, auth="none", user=None, password=Non
     xprocess.getinfo(name).terminate()
 
 
-def _mock_s3_server(xprocess, name, port=9000):
-    temp = tempfile.TemporaryDirectory()
-    (Path(temp.name) / "s3-channel").mkdir()
-
-    print("Starting mock_s3_server")
-
-    class Starter(ProcessStarter):
-
-        pattern = "https://docs.min.io"
-        terminate_on_interrupt = True
-        timeout = 10
-        args = [
-            "minio",
-            "server",
-            f"--address=:{port}",
-            str(temp.name),
-        ]
-
-        def startup_check(self, port=port):
-            s = socket.socket()
-            address = "localhost"
-            error = False
-            try:
-                s.connect((address, port))
-            except Exception as e:
-                print("something's wrong with %s:%d. Exception is %s" % (address, port, e))
-                error = True
-            finally:
-                s.close()
-
-            return not error
-
-    logfile = xprocess.ensure(name, Starter)
-
-    yield f"http://localhost:{port}/s3-channel"
-
-    xprocess.getinfo(name).terminate()
-
-
-@pytest.fixture
-def s3_server(xprocess):
-    yield from _mock_s3_server(xprocess, name="s3_server", port=9000)
-
-
 @pytest.fixture
 def http_server_auth_none(xprocess):
     yield from _mock_http_server(xprocess, name="http_server_auth_none", port=8000, auth="none")
