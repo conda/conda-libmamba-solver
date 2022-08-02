@@ -1,6 +1,5 @@
 import os
 import logging
-from collections import defaultdict
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
@@ -88,7 +87,9 @@ class LibMambaIndexHelper(IndexHelper):
                 value = getattr(record, optional_field, None)
                 if value is not None:
                     record_data[optional_field] = value
-            record_data["timestamp"] = int(getattr(record, "timestamp", 0) * 1000)
+            if hasattr(record, "timestamp"):
+                # .dump() takes care of converting back to milliseconds
+                record_data["timestamp"] = record.timestamp.dump()
             record_data["channel"] = record.channel.base_url
             exported["packages"][record.fn] = record_data
             info = api.ExtraPkgInfo()

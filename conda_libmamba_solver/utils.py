@@ -1,13 +1,6 @@
-import os
-import sys
-import traceback
-import tempfile
-from typing import Callable, Optional
-from io import UnsupportedOperation
 from logging import getLogger
 from urllib.parse import quote
 
-from conda import CondaError
 from conda.common.compat import on_win
 from conda.common.url import urlparse
 

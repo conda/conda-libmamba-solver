@@ -7,7 +7,6 @@
 
 import json
 import os
-import tempfile
 import urllib.parse
 from collections import OrderedDict
 
@@ -18,10 +17,8 @@ except ImportError:
 
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
-from conda.common.serialize import json_dump
 from conda.common.url import join_url
-from conda.core.index import _supplement_index_with_system, check_whitelist
-from conda.core.prefix_data import PrefixData
+from conda.core.index import check_whitelist
 from conda.gateways.connection.session import CondaHttpAuth
 from conda.models.channel import Channel as CondaChannel
 from conda.models.records import PackageRecord
