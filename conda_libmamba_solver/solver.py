@@ -664,7 +664,9 @@ class LibMambaSolver(Solver):
             else:
                 key = split_anaconda_token(remove_auth(channel))[0]
             if key not in index._channel_lookup:
-                raise ValueError(f"missing key {key} in channels {index._channel_lookup}")
+                raise KeyError(
+                    f"missing key '{key}' in channel map: {index._channel_lookup.keys()}"
+                )
             record = to_package_record_from_subjson(index._channel_lookup[key], filename, json_str)
 
             # We need this check below to make sure noarch package get reinstalled
