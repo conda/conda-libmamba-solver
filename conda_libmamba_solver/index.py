@@ -66,7 +66,7 @@ class LibMambaIndexHelper(IndexHelper):
 
     @staticmethod
     def _fix_channel_url(url):
-        url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
+        url = Channel(url).base_url
         return escape_channel_url(url)
 
     def _repo_from_records(
