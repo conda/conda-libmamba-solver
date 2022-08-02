@@ -66,7 +66,15 @@ class LibMambaIndexHelper(IndexHelper):
 
     @staticmethod
     def _fix_channel_url(url):
-        url = Channel(url).base_url
+        """
+        Two fixes here:
+        1. The subdir is sometimes appended to the channel URL, but this causes errors in
+           test_activate_deactivate_modify_path_bash and local channels (path to url) issues
+        2. Escape the URL so is %-encoded (spaces as %20, etc), so libcurl doesn't choke
+        """
+        parts = url.rstrip("/").rsplit("/", 1)  # try to remove subdir from url, if present
+        if len(parts) == 2 and parts[1] in context.known_subdirs:
+            url = parts[0]
         return escape_channel_url(url)
 
     def _repo_from_records(
