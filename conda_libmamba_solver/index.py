@@ -14,7 +14,7 @@ from conda.models.records import PackageRecord
 import libmambapy as api
 
 from . import __version__
-from .mamba_utils import get_index, set_channel_priorities
+from .mamba_utils import get_index as get_index_libmamba, set_channel_priorities
 from .state import IndexHelper
 from .utils import escape_channel_url
 
@@ -22,7 +22,7 @@ log = logging.getLogger(f"conda.{__name__}")
 
 
 class LibMambaIndexHelper(IndexHelper):
-    _LIBMAMBA_PROTOCOLS = ("http", "https", "file")
+    _LIBMAMBA_PROTOCOLS = ("http", "https", "file", "", None)
 
     def __init__(
         self,
@@ -64,18 +64,28 @@ class LibMambaIndexHelper(IndexHelper):
             lookup[url] = info
         return lookup
 
+    @staticmethod
+    def _fix_channel_url(url):
+        url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
+        return escape_channel_url(url)
+
     def _repo_from_records(
         self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
     ) -> api.Repo:
-        # export installed records to a temporary json file
+        """
+        Build a libmamba 'Repo' object from conda 'PackageRecord' objects.
+
+        This is done by rebuilding a repodata.json-like dictionary, which is
+        then exported to a temporary file that will be loaded with 'libmambapy.Repo'.
+        """
         exported = {"packages": {}}
         additional_infos = {}
         for record in records:
             record_data = dict(record.dump())
             # These fields are expected by libmamba, but they don't always appear
-            # in the record.dump() dict :shrug:
+            # in the record.dump() dict (e.g. exporting from S3 channels)
             # ref: https://github.com/mamba-org/mamba/blob/ad46f318b/libmamba/src/core/package_info.cpp#L276-L318
-            for optional_field in (
+            for field in (
                 "sha256",
                 "track_features",
                 "license",
@@ -83,15 +93,18 @@ class LibMambaIndexHelper(IndexHelper):
                 "url",
                 "noarch",
                 "platform",
+                "timestamp",
             ):
-                value = getattr(record, optional_field, None)
+                if field in record_data:
+                    continue  # do not overwrite
+                value = getattr(record, field, None)
                 if value is not None:
-                    record_data[optional_field] = value
-            if hasattr(record, "timestamp"):
-                # .dump() takes care of converting back to milliseconds
-                record_data["timestamp"] = record.timestamp.dump()
-            record_data["channel"] = record.channel.base_url
+                    if field == "timestamp" and value:
+                        value = int(value * 1000)  # from s to ms
+                    record_data[field] = value
             exported["packages"][record.fn] = record_data
+
+            # extra info for libmamba
             info = api.ExtraPkgInfo()
             if record.noarch:
                 info.noarch = record.noarch.value
@@ -109,8 +122,42 @@ class LibMambaIndexHelper(IndexHelper):
         return repo
 
     @staticmethod
-    def _repo_from_json_path(pool: api.Pool, repo_name: str, path: str) -> api.Repo:
-        return api.Repo(pool, repo_name, path, "")
+    def _repo_from_json_path(pool: api.Pool, repo_name: str, path: str, url: str = "") -> api.Repo:
+        return api.Repo(pool, repo_name, path, url)
+
+    def _fetch_channel_url_with_conda(self, url):
+        channel = Channel.from_url(url)
+        # We could load from subdir_data.iter_records(), but that means
+        # re-exporting everything to a temporary JSON path and well,
+        # `subdir_data.load()` already did!
+        try:
+            subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
+            subdir_data.load()
+            loaded_with = "conda_libmamba_solver.index.DownloadOnlySubdirData"
+        except Exception as exc:
+            log.debug(
+                "Optimized DownloadOnlySubdirData call failed: %s\n"
+                "Retrying with conda's SubdirData.",
+                exc,
+            )
+            subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
+            subdir_data.load()
+            loaded_with = "conda.core.subdir_data.SubdirData"
+        repo = self._repo_from_json_path(
+            self._pool,
+            url,
+            subdir_data.cache_path_json,
+            url=url,
+        )
+        return (
+            repo,
+            {
+                "platform": channel.subdir,
+                "url": url,
+                "channel": channel,
+                "loaded_with": loaded_with,
+            },
+        )
 
     def _load_channels(self):
         """
@@ -139,100 +186,50 @@ class LibMambaIndexHelper(IndexHelper):
         # We first filter the channel list to use the appropriate loaders
         # We will finally merge everything together in the right order
         urls_by_loader = []
-        _libmamba_urls = []
+        seen = set()
         for channel in self._channels:
             # channel can be str or Channel; make sure it's Channel!
-            channel_obj = Channel(channel)
-            channel_urls = channel_obj.urls(with_credentials=True, subdirs=self._subdirs)
-            if channel_obj.scheme and channel_obj.scheme not in self._LIBMAMBA_PROTOCOLS:
-                # These channels are loaded with conda
-                log.debug(
-                    "Channel %s not supported by libmamba. Using conda.core.SubdirData",
-                    channel_obj,
-                )
-                for url in channel_urls:
-                    urls_by_loader.append(["conda", url])
-            else:
-                # These channels are loaded with libmamba
-                for url in channel_urls:
-                    # This fixes test_activate_deactivate_modify_path_bash
-                    # and other local channels (path to url) issues
-                    url = url.rstrip("/").rsplit("/", 1)[0]  # remove subdir
-                    url = escape_channel_url(url)
-                    urls_by_loader.append(["libmamba", url])
-                    _libmamba_urls.append(url)
+            channel = Channel(channel)
+            loader = "conda" if channel.scheme not in self._LIBMAMBA_PROTOCOLS else "libmamba"
+
+            # We want the URLs grouped by loader, but interleaved if needed
+            # Example: [('conda', (A, B)), ('libmamba', (C, D, E)), ('conda', (F,))]
+            for url in channel.urls(with_credentials=True, subdirs=self._subdirs):
+                if url in seen:
+                    continue
+                seen.add(url)
+                if not urls_by_loader or urls_by_loader[-1][0] != loader:
+                    # first iteration or different loader than previous url? new group!
+                    urls_by_loader.append((loader, [url]))
+                    continue
+                # if we got here, then it MUST be the same loader as previous url
+                urls_by_loader[-1][1].append(url)
 
         free_channel = "https://repo.anaconda.com/pkgs/free"
-        if context.restore_free_channel and free_channel not in _libmamba_urls:
-            urls_by_loader.append(["libmamba", free_channel])
-
-        # now we stack contiguous blocks together so the loader can operate in batches
-        # [(A, 1), (A, 2), (A, 3), (B, 1), (A, 4)] -> [(A, [1, 2, 3]), (B, [1]), (A, [4])]
-        seen = set(*urls_by_loader[0][1:])
-        contiguous_urls_by_loader = [[urls_by_loader[0][0], urls_by_loader[0][1:]]]
-        for loader, url in urls_by_loader[1:]:
-            if url in seen:
-                continue
-            seen.add(url)
-            current_loader = contiguous_urls_by_loader[-1][0]
-            if loader == current_loader:
-                current_urls = contiguous_urls_by_loader[-1][1]
-                if url not in contiguous_urls_by_loader[-1][1]:
-                    current_urls.append(url)
+        if context.restore_free_channel and free_channel not in seen:
+            if urls_by_loader[-1][0] == "libmamba":
+                urls_by_loader[-1][1].append(free_channel)
             else:
-                contiguous_urls_by_loader.append([loader, [url]])
+                urls_by_loader.append(["libmamba", free_channel])
 
         full_index = []
-        for loader, urls in contiguous_urls_by_loader:
+        for loader, urls in urls_by_loader:
             if loader == "libmamba":
-                # delegate to libmamba loaders
-                full_index += get_index(
-                    channel_urls=urls,
+                full_index += get_index_libmamba(
+                    channel_urls=[self._fix_channel_url(url) for url in urls],
                     prepend=False,
                     use_local=context.use_local,
                     platform=self._subdirs,
                     repodata_fn=self._repodata_fn,
                 )
             else:
-                # load channels with conda, if needed
                 for url in urls:
                     with Spinner(
                         url,
                         enabled=not context.verbosity and not context.quiet,
                         json=context.json,
                     ):
-                        channel = Channel.from_url(url)
-                        # We could load from subdir_data.iter_records(), but that means
-                        # re-exporting everything to a temporary JSON path and well,
-                        # `subdir_data.load()` already did!
-                        try:
-                            subdir_data = DownloadOnlySubdirData(
-                                channel, repodata_fn=self._repodata_fn
-                            )
-                            subdir_data.load()
-                            loaded_with = "conda_libmamba_solver.index.DownloadOnlySubdirData"
-                        except Exception:
-                            log.debug(
-                                "Optimized DownloadOnlySubdirData call failed!"
-                                "Retrying with conda's SubdirData."
-                            )
-                            subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
-                            subdir_data.load()
-                            loaded_with = "conda.core.subdir_data.SubdirData"
-                        repo = self._repo_from_json_path(
-                            self._pool, url, subdir_data.cache_path_json
-                        )
-                        full_index.append(
-                            (
-                                repo,
-                                {
-                                    "platform": channel.subdir,
-                                    "url": url,
-                                    "channel": channel,
-                                    "loaded_with": loaded_with,
-                                },
-                            )
-                        )
+                        full_index.append(self._fetch_channel_url_with_conda(url))
 
         set_channel_priorities(self._pool, full_index, self._repos)
 
@@ -262,7 +259,7 @@ class LibMambaIndexHelper(IndexHelper):
         return tuple(explicit_pool)
 
 
-class DownloadOnlySubdirData(SubdirData):
+class _DownloadOnlySubdirData(SubdirData):
     _internal_state_template = {
         "_package_records": {},
         "_names_index": {},
