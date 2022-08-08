@@ -199,7 +199,7 @@ class LibMambaSolver(Solver):
             out_state = self._solving_loop(in_state, out_state, index)
 
         # Restore intended verbosity to avoid unwanted
-        # "freeing xxxx..." messages when the libmambpy objects are deleted
+        # "freeing xxxx..." messages when the libmambapy objects are deleted
         api_ctx.verbosity = context.verbosity
         api_ctx.set_verbosity(context.verbosity)
 
