@@ -782,6 +782,7 @@ class LibMambaSolver(Solver):
         if not context.notify_outdated_conda or context.quiet:
             # This check can be silenced with a specific option in the context or in quiet mode
             return
+
         current_conda_prefix_rec = PrefixData(context.conda_prefix).get("conda", None)
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
@@ -791,9 +792,15 @@ class LibMambaSolver(Solver):
         channel_name = current_conda_prefix_rec.channel.canonical_name
         if channel_name == UNKNOWN_CHANNEL:
             channel_name = "defaults"
-        # only look for a newer conda in the channel conda is currently installed from
-        # conda_newer_str = f"{channel_name}::conda>{current_conda_prefix_rec.version}"
-        conda_newer_str = f"{channel_name}::conda>4.10"
+
+        # only check the loaded index if it contains the channel conda should come from
+        # otherwise ignore
+        index_channels = set(getattr(chn, "canonical_name", chn) for chn in index._channels)
+        if channel_name in index_channels:
+            return
+
+        # we only want to check if a newer conda is available in the channel we installed it from
+        conda_newer_str = f"{channel_name}::conda>{current_conda_prefix_rec.version}"
         conda_newer_spec = MatchSpec(conda_newer_str)
 
         # if target prefix is the same conda is running from
@@ -803,7 +810,7 @@ class LibMambaSolver(Solver):
             if any(conda_newer_spec.match(record) for record in final_state):
                 return
 
-        # check if the index contains records that match a more recent conda version
+        # check if the loaded index contains records that match a more recent conda version
         conda_newer_records = index.search(conda_newer_str)
 
         # print instructions to stderr if we found a newer conda
