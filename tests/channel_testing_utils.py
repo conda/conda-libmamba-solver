@@ -11,7 +11,7 @@ from xprocess import ProcessStarter
 from conda.testing.integration import _get_temp_prefix, run_command
 
 
-def _mock_http_server(xprocess, name, port, auth="none", user=None, password=None, token=None):
+def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=None, token=None):
     """
     Adapted from
     https://github.com/mamba-org/powerloader/blob/effe2b7e1/test/helpers.py#L11
@@ -71,12 +71,12 @@ def _mock_http_server(xprocess, name, port, auth="none", user=None, password=Non
 
 @pytest.fixture
 def http_server_auth_none(xprocess):
-    yield from _mock_http_server(xprocess, name="http_server_auth_none", port=8000, auth="none")
+    yield from _dummy_http_server(xprocess, name="http_server_auth_none", port=8000, auth="none")
 
 
 @pytest.fixture
 def http_server_auth_none_debug_repodata(xprocess):
-    yield from _mock_http_server(
+    yield from _dummy_http_server(
         xprocess,
         name="http_server_auth_none_debug_repodata",
         port=8000,
@@ -86,7 +86,7 @@ def http_server_auth_none_debug_repodata(xprocess):
 
 @pytest.fixture
 def http_server_auth_none_debug_packages(xprocess):
-    yield from _mock_http_server(
+    yield from _dummy_http_server(
         xprocess,
         name="http_server_auth_none_debug_packages",
         port=8000,
@@ -96,7 +96,7 @@ def http_server_auth_none_debug_packages(xprocess):
 
 @pytest.fixture
 def http_server_auth_basic(xprocess):
-    yield from _mock_http_server(
+    yield from _dummy_http_server(
         xprocess,
         name="http_server_auth_basic",
         port=8000,
@@ -108,7 +108,7 @@ def http_server_auth_basic(xprocess):
 
 @pytest.fixture
 def http_server_auth_basic_email(xprocess):
-    yield from _mock_http_server(
+    yield from _dummy_http_server(
         xprocess,
         name="http_server_auth_basic_email",
         port=8000,
@@ -120,7 +120,7 @@ def http_server_auth_basic_email(xprocess):
 
 @pytest.fixture
 def http_server_auth_token(xprocess):
-    yield from _mock_http_server(
+    yield from _dummy_http_server(
         xprocess,
         name="http_server_auth_token",
         port=8000,
