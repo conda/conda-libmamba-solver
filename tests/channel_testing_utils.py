@@ -17,7 +17,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
     https://github.com/mamba-org/powerloader/blob/effe2b7e1/test/helpers.py#L11
     """
     curdir = pathlib.Path(__file__).parent
-    print("Starting mock_http_server")
+    print("Starting dummy_http_server")
 
     class Starter(ProcessStarter):
 
