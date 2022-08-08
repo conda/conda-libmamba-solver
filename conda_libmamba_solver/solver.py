@@ -8,17 +8,25 @@ from itertools import chain
 from collections import defaultdict
 import logging
 import sys
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Iterable
 from textwrap import dedent
 import re
 from functools import lru_cache
 from inspect import stack
 
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, ChannelPriority, DepsModifier, UpdateModifier, on_win
+from conda.base.constants import (
+    REPODATA_FN,
+    ChannelPriority,
+    DepsModifier,
+    UpdateModifier,
+    on_win,
+    UNKNOWN_CHANNEL,
+)
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
+from conda.common.path import paths_equal
 from conda.common.url import (
     split_anaconda_token,
     remove_auth,
@@ -32,6 +40,8 @@ from conda.exceptions import (
 )
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
+from conda.models.version import VersionOrder
+from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 import libmambapy as api
 
@@ -195,7 +205,13 @@ class LibMambaSolver(Solver):
 
         self.neutered_specs = tuple(out_state.neutered.values())
 
-        return out_state.current_solution
+        solution = out_state.current_solution
+
+        # Check whether conda can be updated; this is normally done in .solve_for_diff()
+        # but we are doing it now so we can reuse in_state and friends
+        self._notify_conda_outdated(None, index, solution)
+
+        return solution
 
     def _solving_loop(
         self,
@@ -738,3 +754,74 @@ class LibMambaSolver(Solver):
             # frame[3] contains the name of the function in that frame of the stack
             and {"install_actions", "get_install_actions"} <= {frame[3] for frame in stack()}
         )
+
+    def _notify_conda_outdated(
+        self,
+        link_precs,
+        index: LibMambaIndexHelper = None,
+        final_state: Iterable[PackageRecord] = None,
+    ):
+        """
+        We are overriding the base class implementation, which gets called in
+        Solver.solve_for_diff() once 'link_precs' is available. However, we
+        are going to call it before (in .solve_final_state(), right after the solve).
+        That way we can reuse the IndexHelper and SolverOutputState instances we have
+        around, which contains the channel and env information we need, before losing them.
+        """
+        if index is None and final_state is None:
+            # The parent class 'Solver.solve_for_diff()' method will call this method again
+            # with only 'link_precs' as the argument, because that's the original method signature.
+            # We have added two optional kwargs (index and final_state) so we can call this method
+            # earlier, in .solve_final_state(), while we still have access to the index helper
+            # (which allows us to query the available packages in the channels quickly, without
+            # reloading the channels with conda) and the final_state (which gives the list of
+            # packages to be installed). So, if both index and final_state are None, we return
+            # because that means that the method is being called from .solve_for_diff() and at
+            # that point we will have already called it from .solve_for_state().
+            return
+        if not context.notify_outdated_conda or context.quiet:
+            # This check can be silenced with a specific option in the context or in quiet mode
+            return
+        current_conda_prefix_rec = PrefixData(context.conda_prefix).get("conda", None)
+        if not current_conda_prefix_rec:
+            # We are checking whether conda can be found in the environment conda is
+            # running from. Unless something is really wrong, this should never happen.
+            return
+
+        channel_name = current_conda_prefix_rec.channel.canonical_name
+        if channel_name == UNKNOWN_CHANNEL:
+            channel_name = "defaults"
+        # only look for a newer conda in the channel conda is currently installed from
+        # conda_newer_str = f"{channel_name}::conda>{current_conda_prefix_rec.version}"
+        conda_newer_str = f"{channel_name}::conda>4.10"
+        conda_newer_spec = MatchSpec(conda_newer_str)
+
+        # if target prefix is the same conda is running from
+        # maybe the solution we are proposing already contains
+        # an updated conda! in that case, we don't need to check further
+        if paths_equal(self.prefix, context.conda_prefix):
+            if any(conda_newer_spec.match(record) for record in final_state):
+                return
+
+        # check if the index contains records that match a more recent conda version
+        conda_newer_records = index.search(conda_newer_str)
+
+        # print instructions to stderr if we found a newer conda
+        if conda_newer_records:
+            newest = max(conda_newer_records, key=lambda x: VersionOrder(x.version))
+            print(
+                dedent(
+                    f"""
+
+                    ==> WARNING: A newer version of conda exists. <==
+                        current version: {_conda_version}
+                        latest version: {newest.version}
+
+                    Please update conda by running
+
+                        $ conda update -n base -c {channel_name} conda
+
+                    """
+                ),
+                file=sys.stderr,
+            )
