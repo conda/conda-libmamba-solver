@@ -245,14 +245,17 @@ class LibMambaIndexHelper(IndexHelper):
 
         return full_index
 
-    def whoneeds(self, query: str):
-        return self._query.whoneeds(query, self._format)
+    def whoneeds(self, query: str, records=True):
+        result_str = self._query.whoneeds(query, self._format)
+        return self._process_query_result(result_str, records=records)
 
-    def depends(self, query: str):
-        return self._query.depends(query, self._format)
+    def depends(self, query: str, records=True):
+        result_str = self._query.depends(query, self._format)
+        return self._process_query_result(result_str, records=records)
 
-    def search(self, query: str):
-        return self._query.find(query, self._format)
+    def search(self, query: str, records=True):
+        result_str = self._query.find(query, self._format)
+        return self._process_query_result(result_str, records=records)
 
     def explicit_pool(self, specs: Iterable[MatchSpec]) -> Iterable[str]:
         """
@@ -260,11 +263,25 @@ class LibMambaIndexHelper(IndexHelper):
         """
         explicit_pool = set()
         for spec in specs:
-            result_str = self.depends(spec.dist_str())
-            result = json_load(result_str)
-            for pkg in result["result"]["pkgs"]:
-                explicit_pool.add(pkg["name"])
+            pkg_records = self.depends(spec.dist_str())
+            for record in pkg_records:
+                explicit_pool.add(record.name)
         return tuple(explicit_pool)
+
+    def _process_query_result(self, result_str, records=True):
+        result = json_load(result_str)
+        if result.get("result", {}).get("status") != "OK":
+            query_type = result.get("query", {}).get("type", "<Unknown>")
+            query = result.get("query", {}).get("query", "<Unknown>")
+            error_msg = result.get("result", {}).get("msg", f"Faulty response: {result_str}")
+            raise ValueError(f"{query_type} query '{query}' failed: {error_msg}")
+        if records:
+            pkg_records = []
+            for pkg in result["result"]["pkgs"]:
+                record = PackageRecord(**pkg)
+                pkg_records.append(record)
+            return pkg_records
+        return result
 
 
 class _DownloadOnlySubdirData(SubdirData):
