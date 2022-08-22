@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 <!--
 Populate these categories as PRs are merged to `main`. When a release is cut,
 copy to its corresponding section, deleting empty sections if any.
+Remember to update the hyperlinks at the bottom.
 --->
 
 ### Added
@@ -23,6 +24,24 @@ copy to its corresponding section, deleting empty sections if any.
 ### Fixed
 
 ### Security
+
+## [22.8.0] - 2022-08-22
+
+### Added
+
+* Check if conda is outdated with `libmamba` instead of relying on conda's implementation (#46)
+
+### Changed
+
+* Rely on conda's `SubdirData` as a fallback for channel protocols not supported by `libmamba` (#49)
+
+### Deprecated
+
+* Deprecate `libmamba-draft` solver variant (#45)
+
+### Removed
+
+* Remove legacy debugging code and file-logging based on stream capture (#48)
 
 ## [22.6.0] - 2022-06-28
 
@@ -62,7 +81,9 @@ _Internal pre-release as a separate repository._
 
 <!-- Hyperlinks --->
 
-[Unreleased]: https://github.com/conda-incubator/conda-libmamba-solver/compare/22.3.1..main
+[Unreleased]: https://github.com/conda-incubator/conda-libmamba-solver/compare/22.8.0..main
 [22.3.1]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.3.1
 [22.3.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.3.0
 [22.2.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.2.0
+[22.6.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.6.0
+[22.8.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.8.0
