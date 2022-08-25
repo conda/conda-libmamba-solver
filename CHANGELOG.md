@@ -25,7 +25,13 @@ Remember to update the hyperlinks at the bottom.
 
 ### Security
 
-## [22.8.0] - 2022-08-22
+## [22.8.1] - 2022-08-25
+
+### Fixed
+
+* Amend packaging metadata
+
+## [22.8.0] - 2022-08-24
 
 ### Added
 
