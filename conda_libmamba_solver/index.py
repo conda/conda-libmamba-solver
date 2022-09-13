@@ -51,11 +51,14 @@ class LibMambaIndexHelper(IndexHelper):
         # See https://github.com/conda/conda/issues/11790
         channels_from_installed = []
         for record in installed_records:
-            if record.channel.auth or record.channel.token or record.channel.name == "@":
+            if record.channel.auth or record.channel.token:
                 # skip if the channel has authentication info, because
                 # it might cause issues with expired tokens and what not
-                # if the name is @, that means is a virtual package -- skip it too
                 continue
+            if record.channel.name in ("@", "<develop>", "pypi"):
+               # These "channels" are not really channels, more like
+               # metadata placeholders
+               continue
             if record.channel.subdir_url not in channels_from_installed:
                 channels_from_installed.append(record.channel.subdir_url)
         if channels_from_installed:
