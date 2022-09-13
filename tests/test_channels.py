@@ -58,7 +58,7 @@ def test_channels_prefixdata():
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env("conda-forge::xz", "python") as prefix:
+    with make_temp_env("conda-forge::xz", "python", use_restricted_unicode=True) as prefix:
         output = check_output(
             [
                 sys.executable,
