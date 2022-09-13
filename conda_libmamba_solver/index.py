@@ -58,8 +58,8 @@ class LibMambaIndexHelper(IndexHelper):
                 continue
             if record.channel.subdir_url not in channels_from_installed:
                 channels_from_installed.append(record.channel.subdir_url)
-        if channels_from_installed:
-            self._channels = [*self._channels, *channels_from_installed]
+        # if channels_from_installed:
+        #     self._channels = [*self._channels, *channels_from_installed]
 
         self._channel_lookup = None
         self._index = self._load_channels()

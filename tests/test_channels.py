@@ -1,6 +1,8 @@
 import json
+import sys
+from subprocess import check_output, STDOUT
 
-from conda.testing.integration import _get_temp_prefix, run_command
+from conda.testing.integration import _get_temp_prefix, run_command, make_temp_env
 
 from .channel_testing_utils import (
     create_with_channel,
@@ -47,3 +49,33 @@ def test_channel_matchspec():
             assert record["channel"] == "conda-forge"
         elif record["name"] == "python":
             assert record["channel"] == "pkgs/main"
+
+
+def test_channels_prefixdata():
+    """
+    Make sure libmamba does not complain about missing channels
+    used in previous commands.
+
+    See https://github.com/conda/conda/issues/11790
+    """
+    with make_temp_env("conda-forge::xz", "python") as prefix:
+        output = check_output(
+            [
+                sys.executable,
+                "-m",
+                "conda",
+                "install",
+                "-yp",
+                prefix,
+                "pytest",
+                "--experimental-solver=libmamba",
+            ],
+            stderr=STDOUT,
+            text=True,
+        )
+        print(output)
+        assert (
+            "Selected channel specific (or force-reinstall) job, "
+            "but package is not available from channel. "
+            "Solve job will fail." not in output
+        )
