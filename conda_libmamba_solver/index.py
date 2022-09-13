@@ -56,9 +56,9 @@ class LibMambaIndexHelper(IndexHelper):
                 # it might cause issues with expired tokens and what not
                 continue
             if record.channel.name in ("@", "<develop>", "pypi"):
-               # These "channels" are not really channels, more like
-               # metadata placeholders
-               continue
+                # These "channels" are not really channels, more like
+                # metadata placeholders
+                continue
             if record.channel.subdir_url not in channels_from_installed:
                 channels_from_installed.append(record.channel.subdir_url)
         if channels_from_installed:
