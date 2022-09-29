@@ -43,9 +43,26 @@ class LibMambaIndexHelper(IndexHelper):
         self._repos = []
         self._pool = api.Pool()
 
+        installed_records = list(installed_records)  # in case we are passed a lazy iterator
         installed_repo = self._repo_from_records(self._pool, "installed", installed_records)
         installed_repo.set_installed()
         self._repos.append(installed_repo)
+
+        # See https://github.com/conda/conda/issues/11790
+        channels_from_installed = []
+        for record in installed_records:
+            if record.channel.auth or record.channel.token:
+                # skip if the channel has authentication info, because
+                # it might cause issues with expired tokens and what not
+                continue
+            if record.channel.name in ("@", "<develop>", "pypi"):
+                # These "channels" are not really channels, more like
+                # metadata placeholders
+                continue
+            if record.channel.subdir_url not in channels_from_installed:
+                channels_from_installed.append(record.channel.subdir_url)
+        if channels_from_installed:
+            self._channels = [*self._channels, *channels_from_installed]
 
         self._channel_lookup = None
         self._index = self._load_channels()
