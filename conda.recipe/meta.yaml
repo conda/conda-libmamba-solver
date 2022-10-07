@@ -27,7 +27,7 @@ test:
   imports:
     - conda_libmamba_solver
   commands:
-    - CONDA_EXPERIMENTAL_SOLVER=libmamba conda create -n test --dry-run scipy
+    - CONDA_SOLVER=libmamba conda create -n test --dry-run scipy
 
 about:
   home: https://github.com/conda-incubator/conda-libmamba-solver

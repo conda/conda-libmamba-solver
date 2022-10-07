@@ -17,7 +17,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CONDA_EXPERIMENTAL_SOLVER: libmamba
+  CONDA_SOLVER: libmamba
 
 jobs:
   linux:
@@ -59,7 +59,7 @@ jobs:
           -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
           -e TEST_GROUP
-          -e CONDA_EXPERIMENTAL_SOLVER
+          -e CONDA_SOLVER
           ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}
           bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&

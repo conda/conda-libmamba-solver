@@ -35,7 +35,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_EXPERIMENTAL_SOLVER: "libmamba"
+      CONDA_SOLVER: "libmamba"
 
     steps:
       - name: Checkout our source
@@ -74,9 +74,9 @@ jobs:
           -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
           -e TEST_GROUP
-          -e CONDA_EXPERIMENTAL_SOLVER
+          -e CONDA_SOLVER
           ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}
-          bash -c "sudo env CONDA_EXPERIMENTAL_SOLVER=classic \
+          bash -c "sudo env CONDA_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
@@ -102,7 +102,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_EXPERIMENTAL_SOLVER: libmamba
+      CONDA_SOLVER: libmamba
 
     steps:
       - name: Checkout our source
@@ -121,7 +121,7 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         env:
-          CONDA_EXPERIMENTAL_SOLVER: classic
+          CONDA_SOLVER: classic
         with:
           activate-environment: conda-test-env
           use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
@@ -132,7 +132,7 @@ jobs:
         env:
           # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
           # otherwise it will error out because it can't be imported yet!
-          CONDA_EXPERIMENTAL_SOLVER: classic
+          CONDA_SOLVER: classic
         run: |
           ./dev/macos/setup.sh
           conda install --yes \
@@ -189,7 +189,7 @@ jobs:
       PYTHON: ${{ matrix.python-version }}
       TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_EXPERIMENTAL_SOLVER: libmamba
+      CONDA_SOLVER: libmamba
 
     steps:
       - name: Checkout our source
@@ -219,7 +219,7 @@ jobs:
         env:
           # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
           # otherwise it will error out because it can't be imported yet!
-          CONDA_EXPERIMENTAL_SOLVER: classic
+          CONDA_SOLVER: classic
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt

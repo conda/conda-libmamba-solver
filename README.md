@@ -46,13 +46,13 @@ option:
 # Using default (classic) solver
 $ conda create -n demo scipy --dry-run
 # This is equivalent
-$ conda create -n demo scipy --dry-run --experimental-solver=classic
+$ conda create -n demo scipy --dry-run --solver=classic
 # Using libmamba integrations
-$ conda create -n demo scipy --dry-run --experimental-solver=libmamba
+$ conda create -n demo scipy --dry-run --solver=libmamba
 ```
 
-> Hint: You can also enable the experimental solver with the `CONDA_EXPERIMENTAL_SOLVER`
-> environment variable: `CONDA_EXPERIMENTAL_SOLVER=libmamba conda install ...`
+> Hint: You can also enable the experimental solver with the `CONDA_SOLVER`
+> environment variable: `CONDA_SOLVER=libmamba conda install ...`
 
 3. Use `time` to measure how different solvers perform. Take into account that repodata
 retrieval is cached across attempts, so only consider timings after warming that up:
@@ -61,9 +61,9 @@ retrieval is cached across attempts, so only consider timings after warming that
 # Warm up the repodata cache
 $ conda create -n demo scipy --dry-run
 # Timings for original solver
-$ time conda create -n demo scipy --dry-run --experimental-solver=classic
+$ time conda create -n demo scipy --dry-run --solver=classic
 # Timings for libmamba integrations
-$ time conda create -n demo scipy --dry-run --experimental-solver=libmamba
+$ time conda create -n demo scipy --dry-run --solver=libmamba
 ```
 
 > `conda create` commands will have similar performance because it's a very simple action! However,
@@ -75,7 +75,7 @@ might get too long for your terminal buffer, so consider using a pager like `les
 
 ```bash
 # Verbosity can be expressed with 1, 2 or 3 `v`
-$ conda create -n demo scipy --dry-run -vvv --experimental-solver=libmamba  2>&1 | less
+$ conda create -n demo scipy --dry-run -vvv --solver=libmamba  2>&1 | less
 ```
 
 ## FAQ
