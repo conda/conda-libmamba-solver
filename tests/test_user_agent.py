@@ -62,7 +62,7 @@ from .channel_testing_utils import (
 @pytest.mark.parametrize("solver", ("classic", "libmamba"))
 def test_user_agent_conda_info(solver):
     env = os.environ.copy()
-    env["CONDA_EXPERIMENTAL_SOLVER"] = solver
+    env["CONDA_SOLVER"] = solver
     out = check_output(["conda", "info", "--json"], env=env)
     info = json.loads(out)
     assert "conda/" in info["user_agent"]

@@ -137,12 +137,7 @@ class LibMambaSolver(Solver):
         force_remove=NULL,
         should_retry_solve=False,
     ):
-        # Temporary, only during experimental phase to ease debugging
-        global BLURB_COUNT
-        if not BLURB_COUNT:
-            self._print_info()
-        BLURB_COUNT += 1
-
+        self._log_info()
         in_state = SolverInputState(
             prefix=self.prefix,
             requested=self.specs_to_add or self.specs_to_remove,
@@ -272,29 +267,8 @@ class LibMambaSolver(Solver):
 
         return out_state
 
-    def _print_info(self):
-        if not context.json and not context.quiet:
-            print(
-                dedent(
-                    f"""
-                    ***
-
-                    NOTE: You are using the EXPERIMENTAL libmamba solver integration.
-
-                    If something is not working as expected, please:
-
-                    1. Go to https://github.com/conda/conda/issues/new/choose
-                    2. Choose the "Libmamba Solver Feedback (Experimental Feature)" option
-
-                    Thank you for your help!
-
-                    ***
-                    """
-                )
-            )
-
-        log.info("Using experimental libmamba integrations")
-        log.info("Logfile path: %s", context._logfile_path)
+    def _log_info(self):
+        log.info("Using libmamba integrations")
         log.info("Conda version: %s", _conda_version)
         log.info("Mamba version: %s", mamba_version())
         log.info("Target prefix: %s", self.prefix)

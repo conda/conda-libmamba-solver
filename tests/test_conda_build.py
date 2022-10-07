@@ -16,7 +16,7 @@ def test_build_recipes():
 
     recipes = [str(x) for x in recipes_dir.iterdir() if x.is_dir()]
     env = os.environ.copy()
-    env["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
+    env["CONDA_SOLVER"] = "libmamba"
     expected_fail_recipes = ["baddeps"]
     for recipe in recipes:
         recipe_name = Path(recipe).name

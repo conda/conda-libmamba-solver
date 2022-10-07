@@ -9,7 +9,7 @@ import pytest
 from conda.testing.integration import make_temp_env, run_command, Commands, _get_temp_prefix
 from conda.common.io import env_var
 from conda.base.context import context
-from conda.base.constants import ExperimentalSolverChoice
+from conda.base.constants import SolverChoice
 from conda.exceptions import DryRunExit
 
 platform = context.subdir
@@ -53,10 +53,10 @@ def prefix_and_channels(request):
 
 
 @pytest.fixture(
-    scope="function", params=[ExperimentalSolverChoice.LIBMAMBA, ExperimentalSolverChoice.CLASSIC]
+    scope="function", params=[SolverChoice.LIBMAMBA, SolverChoice.CLASSIC]
 )
 def solver_args(request):
-    yield ("--dry-run", "--experimental-solver", request.param.value)
+    yield ("--dry-run", "--solver", request.param.value)
 
 
 @pytest.mark.slow

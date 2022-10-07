@@ -7,7 +7,6 @@ from subprocess import run
 
 import pytest
 
-from conda.base.constants import on_win
 from conda.base.context import fresh_context, context
 from conda.exceptions import CondaEnvironmentError
 from conda.testing.integration import run_command, Commands, _get_temp_prefix
@@ -28,7 +27,7 @@ def print_and_check_output(*args, **kwargs):
 
 @pytest.mark.xfail(reason="base protections not enabled anymore")
 def test_protection_for_base_env():
-    with pytest.raises(CondaEnvironmentError), fresh_context(CONDA_EXPERIMENTAL_SOLVER="libmamba"):
+    with pytest.raises(CondaEnvironmentError), fresh_context(CONDA_SOLVER="libmamba"):
         current_test = os.environ.pop("PYTEST_CURRENT_TEST", None)
         try:
             run_command(
@@ -36,7 +35,7 @@ def test_protection_for_base_env():
                 context.root_prefix,
                 "--dry-run",
                 "scipy",
-                "--experimental-solver=libmamba",
+                "--solver=libmamba",
                 no_capture=True,
             )
         finally:
@@ -56,7 +55,7 @@ def test_cli_flag_in_help():
     )
     for command in commands_with_flag:
         process = print_and_check_output([sys.executable, "-m", "conda"] + command + ["--help"])
-        assert "--experimental-solver" in process.stdout
+        assert "--solver" in process.stdout
 
     commands_without_flag = (
         ["config"],
@@ -67,16 +66,16 @@ def test_cli_flag_in_help():
     )
     for command in commands_without_flag:
         process = print_and_check_output([sys.executable, "-m", "conda"] + command + ["--help"])
-        assert "--experimental-solver" not in process.stdout
+        assert "--solver" not in process.stdout
 
 
 def cli_flag_and_env_var_settings():
     env_no_var = os.environ.copy()
-    env_no_var.pop("CONDA_EXPERIMENTAL_SOLVER", None)
+    env_no_var.pop("CONDA_SOLVER", None)
     env_libmamba = env_no_var.copy()
     env_classic = env_no_var.copy()
-    env_libmamba["CONDA_EXPERIMENTAL_SOLVER"] = "libmamba"
-    env_classic["CONDA_EXPERIMENTAL_SOLVER"] = "classic"
+    env_libmamba["CONDA_SOLVER"] = "libmamba"
+    env_classic["CONDA_SOLVER"] = "classic"
     command = [
         sys.executable,
         "-m",
@@ -88,8 +87,8 @@ def cli_flag_and_env_var_settings():
         "--dry-run",
         "xz",
     ]
-    cli_libmamba = ["--experimental-solver=libmamba"]
-    cli_classic = ["--experimental-solver=classic"]
+    cli_libmamba = ["--solver=libmamba"]
+    cli_classic = ["--solver=classic"]
     tests = [
         ["no flag, no env", command, env_no_var, "classic"],
         ["no flag, env classic", command, env_classic, "classic"],
@@ -107,7 +106,4 @@ def cli_flag_and_env_var_settings():
 @pytest.mark.parametrize("name, command, env, solver", cli_flag_and_env_var_settings())
 def test_cli_flag_and_env_var(name, command, env, solver):
     process = print_and_check_output(command, env=env)
-    if solver == "libmamba":
-        assert "You are using the EXPERIMENTAL libmamba solver integration" in process.stdout
-    else:
-        assert "You are using the EXPERIMENTAL libmamba solver integration" not in process.stdout
+    assert "You are using the EXPERIMENTAL libmamba solver integration" not in process.stdout

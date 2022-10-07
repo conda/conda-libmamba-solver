@@ -57,7 +57,7 @@ def test_python_downgrade_reinstalls_noarch_packages():
         "--override-channels",
         "-c",
         "conda-forge",
-        "--experimental-solver=libmamba",
+        "--solver=libmamba",
         "pip",
         "python=3.10",
         name=f"conda_libmamba_solver-{uuid4()}",  # shebangs cannot contain spaces - override!
@@ -74,7 +74,7 @@ def test_python_downgrade_reinstalls_noarch_packages():
         run_command(
             Commands.INSTALL,
             prefix,
-            "--experimental-solver=libmamba",
+            "--solver=libmamba",
             "--override-channels",
             "-c",
             "conda-forge",
