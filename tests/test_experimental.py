@@ -101,9 +101,3 @@ def cli_flag_and_env_var_settings():
         ["flag classic, env classic", command + cli_classic, env_classic, "classic"],
     ]
     return tests
-
-
-@pytest.mark.parametrize("name, command, env, solver", cli_flag_and_env_var_settings())
-def test_cli_flag_and_env_var(name, command, env, solver):
-    process = print_and_check_output(command, env=env)
-    assert "You are using the EXPERIMENTAL libmamba solver integration" not in process.stdout
