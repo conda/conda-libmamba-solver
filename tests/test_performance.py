@@ -52,9 +52,7 @@ def prefix_and_channels(request):
     shutil.rmtree(prefix)
 
 
-@pytest.fixture(
-    scope="function", params=[SolverChoice.LIBMAMBA, SolverChoice.CLASSIC]
-)
+@pytest.fixture(scope="function", params=[SolverChoice.LIBMAMBA, SolverChoice.CLASSIC])
 def solver_args(request):
     yield ("--dry-run", "--solver", request.param.value)
 
