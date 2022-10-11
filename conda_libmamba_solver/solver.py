@@ -268,7 +268,7 @@ class LibMambaSolver(Solver):
         return out_state
 
     def _log_info(self):
-        log.info("Using libmamba integrations")
+        log.info("Using libmamba solver")
         log.info("Conda version: %s", _conda_version)
         log.info("Mamba version: %s", mamba_version())
         log.info("Target prefix: %s", self.prefix)

@@ -47,7 +47,7 @@ option:
 $ conda create -n demo scipy --dry-run
 # This is equivalent
 $ conda create -n demo scipy --dry-run --solver=classic
-# Using libmamba integrations
+# Using libmamba solver
 $ conda create -n demo scipy --dry-run --solver=libmamba
 ```
 
