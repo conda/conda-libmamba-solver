@@ -1,2 +1,2 @@
-libmambapy>=0.25
-conda>=22.9
+libmambapy>=0.23
+conda>=4.13
