@@ -17,11 +17,16 @@ Remember to update the hyperlinks at the bottom.
 
 ### Changed
 
+* The index will also load channels only listed as part the installed packages in the active prefix. (#52)
+* Adopt the new `solver` name in lieu of `experimental-solver`. (#53)
+
 ### Deprecated
 
 ### Removed
 
 ### Fixed
+
+* If missing or empty, package records will have their `subdir` field populated by the channel platform. (#53)
 
 ### Security
 
