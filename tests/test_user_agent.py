@@ -142,9 +142,12 @@ def assert_requests_user_agent(stdout, solver, request_type="repodata"):
         assert data["reason"] == "FILE NOT FOUND"
         details = data["response_details"]
     elif request_type == "packages":
-        assert data["exception_name"] == "CondaHTTPError"
-        assert data["reason"] == "FILE NOT FOUND"
-        details = data["response_details"]
+        assert data["error"] == "Multiple Errors Encountered."
+        assert data["exception_name"] == "CondaMultiError"
+        error = data["errors"][0]
+        assert error["exception_name"] == "CondaHTTPError"
+        assert error["reason"] == "FILE NOT FOUND"
+        details = error["response_details"]
 
     for line in details.splitlines():
         if line.startswith("> User-Agent:"):
