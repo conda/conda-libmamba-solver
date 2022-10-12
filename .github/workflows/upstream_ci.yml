@@ -48,8 +48,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: jaimergp/conda
-          ref: debug-offline-clone
+          repository: conda/conda
+          ref: 07e9fb58f64482dcc5ff6ebe2854fd4d70073e8d
           path: conda
 
       - name: Define test type and override pytest settings
@@ -115,8 +115,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: jaimergp/conda
-          ref: debug-offline-clone
+          repository: conda/conda
+          ref: 07e9fb58f64482dcc5ff6ebe2854fd4d70073e8d
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -202,8 +202,8 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: jaimergp/conda
-          ref: debug-offline-clone
+          repository: conda/conda
+          ref: 07e9fb58f64482dcc5ff6ebe2854fd4d70073e8d
           path: conda
 
       - name: Set temp dirs correctly
