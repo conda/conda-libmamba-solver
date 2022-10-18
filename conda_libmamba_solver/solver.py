@@ -57,7 +57,6 @@ from .state import SolverInputState, SolverOutputState
 
 
 log = logging.getLogger(f"conda.{__name__}")
-BLURB_COUNT = 0
 
 
 class LibMambaSolver(Solver):

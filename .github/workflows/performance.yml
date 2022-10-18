@@ -48,7 +48,6 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: libmamba
           path: conda
 
       - name: Run performance tests

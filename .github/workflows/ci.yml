@@ -41,8 +41,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: jaimergp/conda  # TEMP! revert 
-          ref: non-experimental-solver  # TEMP! revert
+          repository: conda/conda
           path: conda
 
       - name: Python ${{ matrix.python-version }}
@@ -87,8 +86,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: jaimergp/conda  # TEMP! revert 
-          ref: non-experimental-solver  # TEMP! revert
+          repository: conda/conda
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -157,8 +155,7 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: jaimergp/conda  # TEMP! revert 
-          ref: non-experimental-solver  # TEMP! revert
+          repository: conda/conda
           path: conda
 
       - name: Set temp dirs correctly
