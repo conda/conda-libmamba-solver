@@ -54,6 +54,9 @@ $ conda create -n demo scipy --dry-run --solver=libmamba
 > Hint: You can also enable the experimental solver with the `CONDA_SOLVER`
 > environment variable: `CONDA_SOLVER=libmamba conda install ...`
 
+> Note: This option is called `--experimental-solver` and
+> `CONDA_EXPERIMENTAL_SOLVER` in conda < 22.11.0.
+
 3. Use `time` to measure how different solvers perform. Take into account that repodata
 retrieval is cached across attempts, so only consider timings after warming that up:
 
