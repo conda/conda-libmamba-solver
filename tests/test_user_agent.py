@@ -62,7 +62,7 @@ from .channel_testing_utils import (
 @pytest.mark.parametrize("solver", ("classic", "libmamba"))
 def test_user_agent_conda_info(solver):
     env = os.environ.copy()
-    env["CONDA_EXPERIMENTAL_SOLVER"] = solver
+    env["CONDA_SOLVER"] = solver
     out = check_output(["conda", "info", "--json"], env=env)
     info = json.loads(out)
     assert "conda/" in info["user_agent"]
@@ -141,7 +141,6 @@ def assert_requests_user_agent(stdout, solver, request_type="repodata"):
         assert data["exception_name"] == "UnavailableInvalidChannel"
         assert data["reason"] == "FILE NOT FOUND"
         details = data["response_details"]
-
     elif request_type == "packages":
         assert data["error"] == "Multiple Errors Encountered."
         assert data["exception_name"] == "CondaMultiError"

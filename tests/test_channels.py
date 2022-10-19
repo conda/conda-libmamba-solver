@@ -34,7 +34,7 @@ def test_channel_matchspec():
     stdout, stderr, _ = run_command(
         "create",
         _get_temp_prefix(),
-        "--experimental-solver=libmamba",
+        "--solver=libmamba",
         "--json",
         "--override-channels",
         "-c",
@@ -68,7 +68,7 @@ def test_channels_prefixdata():
                 "-yp",
                 prefix,
                 "pytest",
-                "--experimental-solver=libmamba",
+                "--solver=libmamba",
             ],
             stderr=STDOUT,
             text=True,

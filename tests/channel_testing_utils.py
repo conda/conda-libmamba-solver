@@ -140,7 +140,7 @@ def create_with_channel(
             "create",
             "-p",
             _get_temp_prefix(),
-            f"--experimental-solver={solver}",
+            f"--solver={solver}",
             "--json",
             "--override-channels",
             "--download-only",
@@ -157,7 +157,7 @@ def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> Tupl
     stdout, stderr, returncode = run_command(
         "create",
         _get_temp_prefix(),
-        f"--experimental-solver={solver}",
+        f"--solver={solver}",
         "--json",
         "--override-channels",
         "--download-only",

@@ -21,7 +21,7 @@ def test_matchspec_star_version():
             "--override-channels",
             "-c",
             "conda-test",
-            "--experimental-solver=libmamba",
+            "--solver=libmamba",
             "activate_deactivate_package=*=*0",
         ]
     )
@@ -37,7 +37,7 @@ def test_build_string_filters():
             "-p",
             "UNUSED",
             "--dry-run",
-            "--experimental-solver=libmamba",
+            "--solver=libmamba",
             "numpy=*=*py38*",
             "--json",
         ],
