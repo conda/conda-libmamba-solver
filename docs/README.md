@@ -11,6 +11,6 @@ If the repository README was not enough, here you can find some more details!
 
 ## Developer guide
 
-* How to setup your development environment
-* Implementation details
+* [How to setup your development environment](./dev-setup.md)
+* [Implementation details](./dev-implementation.md)
 * The hairy parts
