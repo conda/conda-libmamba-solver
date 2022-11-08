@@ -2,7 +2,7 @@
 This module fixes some tests found across conda/conda's suite to
 check the "spirit" of the test, instead of making explicit comparisons
 in stdout messages, overly strict solver checks and other differences
-that do not result in incompatible behaviour.
+that do not result in incompatible behavior.
 
 We are copying those offending tests instead of patching them to keep
 conda/conda code base as unaffected by this work as possible, but it is

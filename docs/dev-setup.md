@@ -1,4 +1,4 @@
-# How to setup your development environment
+# How to set up your development environment
 
 ## With `conda/conda` Docker images
 

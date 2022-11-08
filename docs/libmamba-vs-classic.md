@@ -31,7 +31,7 @@ If you don't care about that much detail, just know that:
   `conda-libmamba-solver` tries to delegate to the `libmamba` and `libsolv` compiled libraries as soon as possible to minimize the Python overhead.
 * `classic` has a more involved retry-logic than can incur in more time-consuming solver attempts, especially for existing environments.
 * Both options use SAT solvers, but they invoke them differently.
-  `classic` uses a multi-step, multi-objective optimization scheme, which resembles a global optimization scheme.
+  `classic` uses a multistep, multi-objective optimization scheme, which resembles a global optimization scheme.
   `libsolv` opts for a backtracking alternative, closer to a local optimization scheme.
   This can result in `libmamba` choosing a different member of the whole solution ensemble.
 
@@ -76,7 +76,7 @@ We ended up with an implementation a bit higher up in the abstraction tree:
   `libmamba` relies on this C project directly to handle the solving steps. 
   The conda-specific logic is implemented in the [`conda.c`][conda.c] file.
 
-The implementation details reveal some of the reasons for the performance:
+The implementation details reveal some of the reasons for the performance differences:
 
 * `classic` uses many Python layers before it finally reaches the compiled code (`picosat`): 
     * Tens of `MatchSpec` objects reflect the input state: installed packages, system constraints and user-requested packages
@@ -141,7 +141,7 @@ All of these changes make the overall logic simpler and faster, which compounds 
 
 #### SAT algorithms
 
-Given a set of `MatchSpec` objects, `classic` will apply a multi-step, multi-objective optimization strategy that invokes the actual SAT solver several times:
+Given a set of `MatchSpec` objects, `classic` will apply a multistep, multi-objective optimization strategy that invokes the actual SAT solver several times:
 
 * [`conda.resolve.Resolve.solve()`][Resolve.solve] will optimize several objective metrics. 
   In no particular order, some of these rules are:

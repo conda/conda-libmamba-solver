@@ -1,6 +1,6 @@
 # Typical development workflows
 
-> Check ["How to setup your development environment"](./dev-setup.md) if you haven't yet!
+> Check ["How to set up your development environment"](./dev-setup.md) if you haven't yet!
 
 ## Testing
 
@@ -27,6 +27,6 @@ $ CONDA_SOLVER=libmamba pytest
 ```
 
 Note we [deselect some upstream tests in our `pyproject.toml`](../pyproject.toml) for a number of reasons.
-The CI workflows override `conda`'s pytest settings in `setup.cfg` with the ones present in`conda-libmamba-solver`'s `pyproject.toml`.
-This allows us to apply the ignore filters automatically.
+The CI workflows override `conda`'s PyTest settings in `setup.cfg` with the ones present in`conda-libmamba-solver`'s `pyproject.toml`.
+This allows us to apply the ignored filters automatically.
 You can replace the files as well in your debugging sessions, but remember to revert once you are done!

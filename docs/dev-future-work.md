@@ -4,7 +4,7 @@
 
 * `MatchSpec` preparation logic contains too many exceptions for `libmamba` (e.g. differences in `update` vs `install`)
 * Clean-up `MatchSpec` exchange fixes and workarounds
-* Channel names and URLs need pre- and post- treatment (e.g. URL escaping) to workaround escaping issues, etc
+* Channel names and URLs need pre- and post- treatment (e.g. URL escaping) to workaround escaping issues, etc.
 * Investigate better usage of `libsolv` and `libmamba` flags
 * Error parsing and reporting could be more robust, and better tested
 * Better condense retry logic and conflict handling; we lack the "Optional" feature `classic` has

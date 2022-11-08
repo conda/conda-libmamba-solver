@@ -6,7 +6,7 @@ but there are certain tricks you can use to make it even faster!
 These tips apply to both solvers:
 
 - **Explicit is better**.
-  Instead of letting the solve do all the work, specify target versions for your packages.
+  Instead of letting the solver do all the work, specify target versions for your packages.
   `conda install python=3.11 numpy` is way better than `conda install python numpy`.
 * Use `--strict-channel-priority`.
   Strict channel priority drastically reduces the solver search space when you are mixing channels.

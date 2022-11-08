@@ -11,13 +11,13 @@ both within the `conda_libmamba_solver` package itself, and as a `conda` plugin.
 * `recipe/`: The conda-build recipe used for the PR build previews. It should be kept in sync with `conda-forge` and `defaults`.
 * `dev/`: Supporting scripts and configuration files to set up development environments.
 * `docs/`: Documentation sources.
-* `tests/`: Pytest testing infrastructure.
+* `tests/`: PyTest testing infrastructure.
 * `pyproject.toml`: Project metadata. See below for details.
 
 ## Project metadata
 
 The `pyproject.toml` file stores the required packaging metadata, 
-as well as some the configuration for some tools (`black`, `pytest`, etc).
+as well as some the configuration for some tools (`black`, `pytest`, etc.).
 
 Some peculiarities:
 
@@ -62,7 +62,7 @@ In `conda` classic, this logic is spread across the different layers, but in `co
 This is the `conda_libmamba_solver.state` module, which contains the `SolverInputState` and `SolverOutputState` classes.
 
 * `SolverInputState` deals with the collection and management of the `MatchSpec` objects.
-* `SolverOutputState` will assist the `Solver` class  maintain its state through the different solving attempts, 
+* `SolverOutputState` will assist the `Solver` class maintain its state through the different solving attempts, 
   and will finally export a list of `PackageRecords`. 
   The early exit and post-solve logics are also expressed here.
 
@@ -105,7 +105,7 @@ def _get_solver_class(key=None):
     raise ValueError(...)
 ```
 
-The `key` values were hardcoded in `conda.base.constants`. Not very extensible! 
+The `key` values were hard-coded in `conda.base.constants`. Not very extensible! 
 This was only meant to be temporary as we iterated on the `conda-libmamba-solver` side.
 We had one more `get_solver_class()` function in `conda_libmamba_solver` so we could easily change the `Solver` object import path without changing `conda` itself.
 

@@ -10,7 +10,7 @@
 
 ## Developer guide
 
-* [How to setup your development environment](./dev-setup.md)
+* [How to set up your development environment](./dev-setup.md)
 * [Development workflows](./dev-workflows.md)
 * [Implementation details](./dev-implementation.md)
 * [Future work](./dev-future-work.md)
