@@ -22,7 +22,7 @@ You should probably still use `classic` in the following scenarios:
 Ok, so we know `conda-libmamba-solver` brings a faster solver to `conda`. 
 But, why is that? Or, in other words, why couldn't `classic` become faster on its own? 
 
-The following sections provide deeper technical details about the reasons, both at the implementation and algorithimic level.
+The following sections provide deeper technical details about the reasons, both at the implementation and algorithmic level.
 If you don't care about that much detail, just know that:
 
 * Deep within, both `classic` and `conda-libmamba` rely on C-based code to solve the SAT problem.

@@ -9,7 +9,7 @@ function is to serve read-only information to the solver and its other helpers.
     - The local state on disk, namely the prefix state. This includes the
       already installed packages in the prefix (if any), the explicit requests
       made in that prefix in the past (history), its pinned specs, packages
-      configured as aggresive updates and others.
+      configured as aggressive updates and others.
     - The runtime context, determined by the configuration file(s),
       `CONDA_*` environment variables, command line flags and the requested
       specs (if any).
@@ -594,7 +594,7 @@ class SolverOutputState:
         # The constructor should have prepared the _basics_ of the specs / records maps. Now we
         # we will try to refine the version constrains to minimize changes in the environment
         # whenever possible. Take into account this is done iteratively together with the
-        # solver! self.records starts with the initial prefix state (if any), but acumulates
+        # solver! self.records starts with the initial prefix state (if any), but accumulates
         # solution attempts after each retry.
 
         # ## Refine specs that match currently proposed solution
@@ -714,7 +714,7 @@ class SolverOutputState:
 
         elif sis.update_modifier.UPDATE_ALL:
             # NOTE: This logic is VERY similar to what we are doing in the class constructor (?)
-            # NOTE: we are REDEFINING the specs acumulated so far
+            # NOTE: we are REDEFINING the specs accumulated so far
             old_specs = self.specs._data.copy()
             self.specs.clear(reason="Redefining from scratch due to --update-all")
             if sis.history:
@@ -760,7 +760,7 @@ class SolverOutputState:
                         )
 
         elif sis.update_modifier.UPDATE_SPECS:
-            # this is the default behaviour if no flags are passed
+            # this is the default behavior if no flags are passed
             # NOTE: This _anticipates_ conflicts; we can also wait for the next attempt and
             # get the real solver conflicts as part of self.conflicts -- that would simplify
             # this logic a bit
@@ -801,7 +801,7 @@ class SolverOutputState:
                     "and no conflicts",
                 )
             else:
-                # will our prefix record conflict with any explict spec?  If so, don't add
+                # will our prefix record conflict with any explicit spec?  If so, don't add
                 # anything here - let python float when it hasn't been explicitly specified
                 spec = self.specs.get("python", MatchSpec("python"))
                 if spec.get("version"):
@@ -1031,7 +1031,7 @@ class SolverOutputState:
             # (like dict.pop())
             would_remove = graph.remove_youngest_descendant_nodes_with_specs()
 
-            # We need to distinguish the behaviour between `conda remove` and the rest
+            # We need to distinguish the behavior between `conda remove` and the rest
             to_remove = []
             if sis.is_removing:
                 for record in would_remove:

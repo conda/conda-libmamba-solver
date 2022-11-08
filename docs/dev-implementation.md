@@ -67,7 +67,7 @@ This is the `conda_libmamba_solver.state` module, which contains the `SolverInpu
   The early exit and post-solve logics are also expressed here.
 
 Both `SolverInputState` and `SolverOutputState` classes are supported by the `TrackedMap` dictionary subclass,
-which logs its own changes for better debugging and developer experience while analizing solver problems.
+which logs its own changes for better debugging and developer experience while analyzing solver problems.
 
 ### libmamba-specific parts
 

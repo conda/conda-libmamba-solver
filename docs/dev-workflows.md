@@ -28,5 +28,5 @@ $ CONDA_SOLVER=libmamba pytest
 
 Note we [deselect some upstream tests in our `pyproject.toml`](../pyproject.toml) for a number of reasons.
 The CI workflows override `conda`'s pytest settings in `setup.cfg` with the ones present in`conda-libmamba-solver`'s `pyproject.toml`.
-This allows us to apply the ignore filters automtically.
+This allows us to apply the ignore filters automatically.
 You can replace the files as well in your debugging sessions, but remember to revert once you are done!
