@@ -815,7 +815,7 @@ class SolverOutputState:
                 # report?
                 # specs = (spec, ) + tuple(sis.requested.values())
                 # if sis.get_conflicting_specs(specs, sis.requested.values()):
-                #     if not sis.installing:  # TODO: repodata checks?
+                #     if not sis.installing:  # TODO: repodata checks?
                 #         # raises a hopefully helpful error message
                 #         sis.find_conflicts(specs)  # this might call the solver -- remove?
                 #     else:
@@ -968,7 +968,7 @@ class SolverOutputState:
         # After a solve, we still need to do some refinement
         sis = self.solver_input_state
 
-        # ## Record history ###
+        # ## Record history ###
         # user requested specs need to be annotated in history
         # we control that in .for_history
         self.for_history.update(sis.requested, reason="User requested specs recorded to history")

@@ -19,7 +19,7 @@ These tips apply to both solvers:
 * Experimental: `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS=0`.
   Setting this environment variable will disable the retry loop, making it behave more like `mamba`.
 
-## For conda `classic`
+## For conda `classic`
 
 The above tips also apply to `classic`, but you can supplement them with:
 

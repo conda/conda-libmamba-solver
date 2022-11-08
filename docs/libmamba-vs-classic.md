@@ -190,7 +190,7 @@ In both cases, `conda-libmamba-solver` will be able to benefit from both!
 
 If you want to read (even more) about this, please check the following resources:
 
-* ["Deep dive: solvers" guide in the `conda` documentation][deep-dives]
+* ["Deep dive: solvers" guide in the `conda` documentation][deep-dive]
 * ["Package resolution" in the `mamba` documentation][mamba-pkg-resolution]
 * [Libsolv documentation][libsolv-docs]
 * [Explore ways to use other solvers instead of interacting with SAT solver directly][conda-solvers-issue] (`conda` issue)
@@ -212,5 +212,5 @@ If you want to read (even more) about this, please check the following resources
 [deep-dive]: https://docs.conda.io/projects/conda/en/stable/dev-guide/deep-dive-solvers.html
 [mamba-pkg-resolution]: https://mamba.readthedocs.io/en/latest/advanced_usage/package_resolution.html
 [libsolv-docs]: https://github.com/openSUSE/libsolv/tree/master/doc
-[libsolf-issue]: https://github.com/openSUSE/libsolv/issues/284
+[libsolv-issue]: https://github.com/openSUSE/libsolv/issues/284
 [conda-solvers-issue]: https://github.com/conda/conda/issues/7808#issuecomment-429805392

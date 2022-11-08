@@ -91,8 +91,8 @@ class PatchedCondaTestCreate(BaseTestCase):
             # Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
             # Instead we only pin whatever the solver decided to install
             # Original lines were:
-            ### run_command(Commands.CONFIG, prefix,
-            ###             "--add", "pinned_packages", "python=3.6.5")
+            ### run_command(Commands.CONFIG, prefix,
+            ###             "--add", "pinned_packages", "python=3.6.5")
             python = next(PrefixData(prefix).query("python"))
             run_command(
                 Commands.CONFIG, prefix, "--add", "pinned_packages", f"python={python.version}"

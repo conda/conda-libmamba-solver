@@ -2,7 +2,7 @@
 
 ## User guide
 
-* [Getting started: Installation and usage](./getting_started.md)
+* [Getting started: Installation and usage](./getting-started.md)
 * [`libmamba` vs `classic`](./libmamba-vs-classic.md)
 * [Tips and tricks for even more performance](./performance.md)
 * [FAQ](./faq.md)
