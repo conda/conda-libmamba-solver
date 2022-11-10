@@ -770,7 +770,7 @@ class LibMambaSolver(Solver):
 
         # only check the loaded index if it contains the channel conda should come from
         # otherwise ignore
-        index_channels = set(getattr(chn, "canonical_name", chn) for chn in index._channels)
+        index_channels = {getattr(chn, "canonical_name", chn) for chn in index._channels}
         if channel_name in index_channels:
             return
 
