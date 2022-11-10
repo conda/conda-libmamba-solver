@@ -1,3 +1,7 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
 [project]
 name = "conda-libmamba-solver"
 description = "The fast mamba solver, now in conda"
@@ -20,7 +24,7 @@ classifiers = [
 ]
 requires-python = ">=3.6"
 dependencies = [
-  "conda >=4.13",
+  "conda >=22.11.0",
   "libmambapy >=0.23",
   "importlib-metadata"
 ]
@@ -31,9 +35,8 @@ dynamic = [
 [project.urls]
 homepage = "https://github.com/conda/conda-libmamba-solver"
 
-[build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+[project.entry-points.conda]
+conda-libmamba-solver = "conda_libmamba_solver.plugin"
 
 [tool.flit.module]
 name = "conda_libmamba_solver"
