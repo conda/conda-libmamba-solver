@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 This module fixes some tests found across conda/conda's suite to
 check the "spirit" of the test, instead of making explicit comparisons

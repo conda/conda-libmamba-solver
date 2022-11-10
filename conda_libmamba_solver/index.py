@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 import os
 import logging
 from tempfile import NamedTemporaryFile

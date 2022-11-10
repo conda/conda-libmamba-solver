@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 import sys
 from subprocess import check_call, run, PIPE
 import json

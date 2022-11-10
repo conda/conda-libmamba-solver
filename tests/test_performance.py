@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Measure the speed and memory usage of the different backend solvers
 """

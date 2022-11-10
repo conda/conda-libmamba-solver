@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Solver-agnostic logic to compose the requests passed to the solver
 and accumulate its results.

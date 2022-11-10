@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 from collections import defaultdict
 from collections.abc import MutableMapping
 from enum import Enum

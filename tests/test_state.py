@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Test the Solver API helpers. These objects are solver-agnostic
 but encode most of the logic needed to expose a prefix state,

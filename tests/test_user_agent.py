@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 This file tests for the different user-agents conda and conda-libmamba-solver
 might present to a server. We mock the server via `_reposerver.py`.
