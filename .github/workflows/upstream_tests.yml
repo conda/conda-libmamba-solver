@@ -1,4 +1,4 @@
-name: Upstream
+name: Tests / Upstream
 
 on:
   push:
