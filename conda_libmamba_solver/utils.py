@@ -6,7 +6,6 @@ from urllib.parse import quote
 from conda.common.compat import on_win
 from conda.common.url import urlparse
 
-
 log = getLogger(f"conda.{__name__}")
 
 

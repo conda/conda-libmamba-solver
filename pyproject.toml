@@ -102,3 +102,7 @@ markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",
 ]
+
+[tool.isort]
+profile = "black"
+filter_files = true

@@ -28,11 +28,16 @@ repos:
       - id: pyupgrade
         args: ["--py37-plus"]
         exclude: ^conda/exports.py
-  - repo: https://github.com/akaihola/darker
-    rev: 1.5.1
+  - repo: https://github.com/psf/black
+    rev: 22.10.0
     hooks:
-      - id: darker
-        additional_dependencies: [black]
+      - id: black
+        exclude: tests/_reposerver\.py
+  - repo: https://github.com/pycqa/isort
+    rev: 5.8.0
+    hooks:
+      - id: isort
+        exclude: tests/_reposerver\.py
   - repo: https://github.com/asottile/blacken-docs
     rev: v1.12.1
     hooks:

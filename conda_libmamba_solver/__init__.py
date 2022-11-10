@@ -3,6 +3,7 @@
 __version__ = "22.8.1"
 
 from warnings import warn as _warn
+
 from .solver import LibMambaSolver
 
 

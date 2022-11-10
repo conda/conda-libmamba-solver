@@ -7,12 +7,16 @@ import os
 import shutil
 
 import pytest
-
-from conda.testing.integration import make_temp_env, run_command, Commands, _get_temp_prefix
-from conda.common.io import env_var
-from conda.base.context import context
 from conda.base.constants import SolverChoice
+from conda.base.context import context
+from conda.common.io import env_var
 from conda.exceptions import DryRunExit
+from conda.testing.integration import (
+    Commands,
+    _get_temp_prefix,
+    make_temp_env,
+    run_command,
+)
 
 platform = context.subdir
 

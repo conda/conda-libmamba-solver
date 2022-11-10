@@ -8,10 +8,9 @@ import sys
 from subprocess import run
 
 import pytest
-
-from conda.base.context import fresh_context, context
+from conda.base.context import context, fresh_context
 from conda.exceptions import CondaEnvironmentError
-from conda.testing.integration import run_command, Commands, _get_temp_prefix
+from conda.testing.integration import Commands, _get_temp_prefix, run_command
 
 
 def _get_temp_prefix_safe():

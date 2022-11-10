@@ -12,13 +12,12 @@ logic into discrete, composable parts.
 """
 
 import pytest
-
 from conda.base.context import context, fresh_context
 from conda.models.match_spec import MatchSpec
 from conda.testing.solver_helpers import (
     SimpleEnvironment,
-    index_packages,
     empty_prefix,
+    index_packages,
     temp_simple_env,
 )
 

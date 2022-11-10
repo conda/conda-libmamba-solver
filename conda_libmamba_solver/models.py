@@ -1,11 +1,11 @@
 # Copyright (C) 2022 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
+import logging
+import sys
 from collections import defaultdict
 from collections.abc import MutableMapping
 from enum import Enum
-from typing import Any, Hashable, Iterable, Union, Optional, Tuple
-import sys
-import logging
+from typing import Any, Hashable, Iterable, Optional, Tuple, Union
 
 log = logging.getLogger(f"conda.{__name__}")
 

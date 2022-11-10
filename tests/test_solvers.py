@@ -9,9 +9,9 @@ from subprocess import check_call
 from uuid import uuid4
 
 from conda.common.compat import on_win
-from conda.testing.solver_helpers import SolverTests
-from conda.testing.integration import make_temp_env, run_command, Commands
 from conda.core.prefix_data import get_python_version_for_prefix
+from conda.testing.integration import Commands, make_temp_env, run_command
+from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
 

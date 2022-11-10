@@ -45,19 +45,18 @@ When using `mamba` directly in the CLI, its user agent will start with `mamba/<v
 """
 
 import base64
-import os
 import json
+import os
 import sys
-from subprocess import run, check_output, PIPE
-from importlib_metadata import version
+from subprocess import PIPE, check_output, run
 
 import pytest
-
+from importlib_metadata import version
 
 from .channel_testing_utils import (
     create_with_channel,
-    http_server_auth_none_debug_repodata,
     http_server_auth_none_debug_packages,
+    http_server_auth_none_debug_repodata,
 )
 
 

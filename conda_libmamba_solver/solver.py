@@ -5,58 +5,49 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
 """
-import os
-from itertools import chain
-from collections import defaultdict
 import logging
-import sys
-from typing import Mapping, Optional, Iterable
-from textwrap import dedent
+import os
 import re
+import sys
+from collections import defaultdict
 from functools import lru_cache
 from inspect import stack
+from itertools import chain
+from textwrap import dedent
+from typing import Iterable, Mapping, Optional
 
+import libmambapy as api
 from conda import __version__ as _conda_version
 from conda.base.constants import (
     REPODATA_FN,
+    UNKNOWN_CHANNEL,
     ChannelPriority,
     DepsModifier,
     UpdateModifier,
     on_win,
-    UNKNOWN_CHANNEL,
 )
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
 from conda.common.path import paths_equal
-from conda.common.url import (
-    split_anaconda_token,
-    remove_auth,
-    percent_decode,
-)
+from conda.common.url import percent_decode, remove_auth, split_anaconda_token
+from conda.core.prefix_data import PrefixData
+from conda.core.solve import Solver
 from conda.exceptions import (
+    InvalidMatchSpec,
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
-    InvalidMatchSpec,
 )
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 from conda.models.version import VersionOrder
-from conda.core.prefix_data import PrefixData
-from conda.core.solve import Solver
-import libmambapy as api
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper
-from .mamba_utils import (
-    to_package_record_from_subjson,
-    init_api_context,
-    mamba_version,
-)
+from .mamba_utils import init_api_context, mamba_version, to_package_record_from_subjson
 from .state import SolverInputState, SolverOutputState
-
 
 log = logging.getLogger(f"conda.{__name__}")
 
