@@ -233,3 +233,42 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
+  build:
+    name: Canary Build
+    needs: [analyze]
+    # only build canary build if
+    # only build canary build if
+    # - prior steps succeeded,
+    # - this is the main repo, and
+    # - we are on the main (or feature) branch
+    if: >-
+      success()
+      && !github.event.repository.fork
+      && (
+        github.ref_name == 'main'
+        || startsWith(github.ref_name, 'feature/')
+      )
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            subdir: noarch
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # Clean checkout of specific git ref needed for package metadata version
+      # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          clean: true
+          fetch-depth: 0
+
+      - name: Create and upload canary build
+        uses: conda/actions/canary-release@v22.10.0
+        with:
+          package-name: ${{ github.event.repository.name }}
+          subdir: ${{ matrix.subdir }}
+          anaconda-org-channel: conda-canary
+          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+          anaconda-org-token: ${{ secrets.ANACONDA_ORG_CONDA_CANARY_TOKEN }}
+          conda-build-arguments: '--override-channels -c conda-forge -c defaults'
