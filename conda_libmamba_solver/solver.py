@@ -396,9 +396,10 @@ class LibMambaSolver(Solver):
                 for dep in installed.depends:
                     dep_spec = MatchSpec(dep)
                     if dep_spec.name in ("python", "python_abi"):
+                        reason = "Python version might change and this package depends on Python"
                         out_state.conflicts.update(
                             {name: spec},
-                            reason="Python version might change and this package depends on Python",
+                            reason=reason,
                             overwrite=False,
                         )
                         break
