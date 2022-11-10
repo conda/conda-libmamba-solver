@@ -30,7 +30,7 @@ test:
     - CONDA_SOLVER=libmamba conda create -n test --dry-run scipy
 
 about:
-  home: https://github.com/conda-incubator/conda-libmamba-solver
+  home: https://github.com/conda/conda-libmamba-solver
   license: BSD-3-Clause
   license_family: BSD
   license_file: LICENSE

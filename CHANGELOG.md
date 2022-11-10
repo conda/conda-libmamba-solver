@@ -92,10 +92,10 @@ _Internal pre-release as a separate repository._
 
 <!-- Hyperlinks --->
 
-[Unreleased]: https://github.com/conda-incubator/conda-libmamba-solver/compare/22.8.1..main
-[22.3.1]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.3.1
-[22.3.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.3.0
-[22.2.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.2.0
-[22.6.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.6.0
-[22.8.0]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.8.0
-[22.8.1]: https://github.com/conda-incubator/conda-libmamba-solver/releases/tag/22.8.1
+[Unreleased]: https://github.com/conda/conda-libmamba-solver/compare/22.8.1..main
+[22.3.1]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.3.1
+[22.3.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.3.0
+[22.2.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.2.0
+[22.6.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.6.0
+[22.8.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.0
+[22.8.1]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.1
