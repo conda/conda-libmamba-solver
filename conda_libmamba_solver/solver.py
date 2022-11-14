@@ -169,37 +169,36 @@ class LibMambaSolver(Solver):
             if "noarch" not in subdirs:
                 subdirs = *subdirs, "noarch"
 
-        index = LibMambaIndexHelper(
-            installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
-            channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
-            subdirs=subdirs,
-            repodata_fn=self._repodata_fn,
-        )
-
         with Spinner(
             f"Collect all metadata ({self._repodata_fn})",
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            self._setup_solver(index)
+            index = LibMambaIndexHelper(
+                installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
+                channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
+                subdirs=subdirs,
+                repodata_fn=self._repodata_fn,
+            )
 
         with Spinner(
             "Solving environment",
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
+            self._setup_solver(index)
             # This function will copy and mutate `out_state`
             # Make sure we get the latest copy to return the correct solution below
             out_state = self._solving_loop(in_state, out_state, index)
 
-        # Restore intended verbosity to avoid unwanted
-        # "freeing xxxx..." messages when the libmambapy objects are deleted
-        api_ctx.verbosity = context.verbosity
-        api_ctx.set_verbosity(context.verbosity)
+            # Restore intended verbosity to avoid unwanted
+            # "freeing xxxx..." messages when the libmambapy objects are deleted
+            api_ctx.verbosity = context.verbosity
+            api_ctx.set_verbosity(context.verbosity)
 
-        self.neutered_specs = tuple(out_state.neutered.values())
+            self.neutered_specs = tuple(out_state.neutered.values())
 
-        solution = out_state.current_solution
+            solution = out_state.current_solution
 
         # Check whether conda can be updated; this is normally done in .solve_for_diff()
         # but we are doing it now so we can reuse in_state and friends

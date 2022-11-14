@@ -5,7 +5,7 @@ from typing import Iterable, Union
 
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context
-from conda.common.io import Spinner
+from conda.common.io import ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
@@ -14,7 +14,7 @@ from conda.models.records import PackageRecord
 import libmambapy as api
 
 from . import __version__
-from .mamba_utils import get_index as get_index_libmamba, set_channel_priorities
+from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
 from .utils import escape_channel_url
 
@@ -31,13 +31,8 @@ class LibMambaIndexHelper(IndexHelper):
         subdirs: Iterable[str] = None,
         repodata_fn: str = REPODATA_FN,
     ):
-        # Check channel support
-        if channels is None:
-            channels = context.channels
-        self._channels = channels
-        if subdirs is None:
-            subdirs = context.subdirs
-        self._subdirs = subdirs
+        self._channels = context.channels if channels is None else channels
+        self._subdirs = context.subdirs if subdirs is None else subdirs
         self._repodata_fn = repodata_fn
 
         self._repos = []
@@ -49,7 +44,6 @@ class LibMambaIndexHelper(IndexHelper):
         self._repos.append(installed_repo)
 
         # See https://github.com/conda/conda/issues/11790
-        channels_from_installed = []
         for record in installed_records:
             if record.channel.auth or record.channel.token:
                 # skip if the channel has authentication info, because
@@ -59,10 +53,11 @@ class LibMambaIndexHelper(IndexHelper):
                 # These "channels" are not really channels, more like
                 # metadata placeholders
                 continue
-            if record.channel.subdir_url not in channels_from_installed:
-                channels_from_installed.append(record.channel.subdir_url)
-        if channels_from_installed:
-            self._channels = [*self._channels, *channels_from_installed]
+            self._channels.append(record.channel.subdir_url)
+
+        free_channel = "https://repo.anaconda.com/pkgs/free"
+        if context.restore_free_channel:
+            self._channels.append(Channel(free_channel))
 
         self._channel_lookup = None
         self._index = self._load_channels()
@@ -150,11 +145,11 @@ class LibMambaIndexHelper(IndexHelper):
     def _repo_from_json_path(pool: api.Pool, repo_name: str, path: str, url: str = "") -> api.Repo:
         return api.Repo(pool, repo_name, path, url)
 
-    def _fetch_channel_url_with_conda(self, url):
-        channel = Channel.from_url(url)
+    def _fetch_channel_url_with_conda(self, url: str):
         # We could load from subdir_data.iter_records(), but that means
         # re-exporting everything to a temporary JSON path and well,
         # `subdir_data.load()` already did!
+        channel = Channel(url)
         try:
             subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
             subdir_data.load()
@@ -207,54 +202,17 @@ class LibMambaIndexHelper(IndexHelper):
         use the input URLs as dictionary keys to keep references. Instead, we will
         have to rely on the input order, very carefully.
         """
-        # Libmamba only supports a subset of the protocols offered in conda
-        # We first filter the channel list to use the appropriate loaders
-        # We will finally merge everything together in the right order
-        urls_by_loader = []
-        seen = set()
-        for channel in self._channels:
-            # channel can be str or Channel; make sure it's Channel!
-            channel = Channel(channel)
-            loader = "conda" if channel.scheme not in self._LIBMAMBA_PROTOCOLS else "libmamba"
-
-            # We want the URLs grouped by loader, but interleaved if needed
-            # Example: [('conda', (A, B)), ('libmamba', (C, D, E)), ('conda', (F,))]
-            for url in channel.urls(with_credentials=True, subdirs=self._subdirs):
-                if url in seen:
-                    continue
-                seen.add(url)
-                if not urls_by_loader or urls_by_loader[-1][0] != loader:
-                    # first iteration or different loader than previous url? new group!
-                    urls_by_loader.append((loader, [url]))
-                    continue
-                # if we got here, then it MUST be the same loader as previous url
-                urls_by_loader[-1][1].append(url)
-
-        free_channel = "https://repo.anaconda.com/pkgs/free"
-        if context.restore_free_channel and free_channel not in seen:
-            if urls_by_loader[-1][0] == "libmamba":
-                urls_by_loader[-1][1].append(free_channel)
-            else:
-                urls_by_loader.append(["libmamba", free_channel])
+        urls = [
+            url
+            for c in self._channels
+            for url in Channel(c).urls(with_credentials=True, subdirs=self._subdirs)
+        ]
+        urls = tuple(dict.fromkeys(urls))  # de-duplicate
 
         full_index = []
-        for loader, urls in urls_by_loader:
-            if loader == "libmamba":
-                full_index += get_index_libmamba(
-                    channel_urls=[self._fix_channel_url(url) for url in urls],
-                    prepend=False,
-                    use_local=context.use_local,
-                    platform=self._subdirs,
-                    repodata_fn=self._repodata_fn,
-                )
-            else:
-                for url in urls:
-                    with Spinner(
-                        url,
-                        enabled=not context.verbosity and not context.quiet,
-                        json=context.json,
-                    ):
-                        full_index.append(self._fetch_channel_url_with_conda(url))
+        with ThreadLimitedThreadPoolExecutor() as executor:
+            for fetched in executor.map(self._fetch_channel_url_with_conda, urls):
+                full_index.append(fetched)
 
         set_channel_priorities(self._pool, full_index, self._repos)
 
