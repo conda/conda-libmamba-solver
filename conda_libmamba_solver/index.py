@@ -198,17 +198,24 @@ class LibMambaIndexHelper(IndexHelper):
         try:
             quiet = api.Context().quiet
             api.Context().quiet = True  # avoid stdout during the spinner
+            cache_dirs = [os.path.dirname(subdir_data.cache_path_json), *context.pkgs_dirs]
             sd = api.SubdirData(
                 api.Channel(url), 
                 channel.subdir, 
                 url, 
-                api.MultiPackageCache([create_cache_dir()]), 
+                api.MultiPackageCache(cache_dirs), 
                 self._repodata_fn,
             )
             api.Context().quiet = quiet
             return sd.create_repo(pool)
         except (RuntimeError, api.MambaNativeException) as exc:  # fallback for faulty JSONs
-            log.warning("api.SubdirData failed: '%s'. Using api.Repo.", exc)
+            log.warning(
+                "api.SubdirData loading for '%s' failed: '%s'. "
+                "Falling back to api.Repo with '%s'.", 
+                exc,
+                url,
+                subdir_data.cache_path_json
+            )
             return api.Repo(pool, url, subdir_data.cache_path_json, url)
 
     def _fetch_channel_with_conda(self, url: str) -> api.Repo:
