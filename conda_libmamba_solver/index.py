@@ -266,14 +266,14 @@ class _DownloadOnlySubdirData(SubdirData):
         "_track_features_index": {},
     }
 
-    def _read_local_repdata(self, etag, mod_stamp):
+    def _read_local_repdata(self, *args):
         return self._internal_state_template
 
-    def _process_raw_repodata_str(self, raw_repodata_str):
+    def _process_raw_repodata_str(self, *args):
         return self._internal_state_template
 
-    def _process_raw_repodata(self, repodata):
+    def _process_raw_repodata(self, *args):
         return self._internal_state_template
 
-    def _pickle_me(self):
+    def _pickle_me(self, *args):
         return
