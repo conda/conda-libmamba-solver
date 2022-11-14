@@ -249,6 +249,16 @@ class LibMambaIndexHelper(IndexHelper):
         # 3. Configure priorities
         set_channel_priorities(index)
 
+        # 4. Clean up the conda SubdirData cache. We bypassed the post-processing
+        # so now the parent class has a cached instance with no data, which breaks
+        # some tests.
+        clear_these = []
+        for key, cache in SubdirData._cache_.items():
+            if isinstance(cache, _DownloadOnlySubdirData):
+                clear_these.append(key)
+        for key in clear_these:
+            del SubdirData._cache_[key]
+
         return index
     
     def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
