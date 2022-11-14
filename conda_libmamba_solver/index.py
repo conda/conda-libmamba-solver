@@ -218,6 +218,14 @@ class LibMambaIndexHelper(IndexHelper):
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
+        
+        # Workaround some testing issues - TODO: REMOVE
+        # Fix conda.testing.helpers._patch_for_local_exports by removing last line
+        maybe_cached = SubdirData._cache_.get((url, self._repodata_fn))
+        if maybe_cached and maybe_cached._mtime == float("inf"):
+            del SubdirData._cache_[(url, self._repodata_fn)]
+        # /Workaround
+
         subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
         subdir_data.load()
 
@@ -256,6 +264,7 @@ class LibMambaIndexHelper(IndexHelper):
         for key, cache in SubdirData._cache_.items():
             if isinstance(cache, _DownloadOnlySubdirData):
                 clear_these.append(key)
+
         for key in clear_these:
             del SubdirData._cache_[key]
 
