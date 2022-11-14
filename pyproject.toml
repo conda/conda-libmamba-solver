@@ -24,8 +24,8 @@ classifiers = [
 ]
 requires-python = ">=3.6"
 dependencies = [
-  "conda >=22.11.0",
-  "libmambapy >=0.23",
+  "conda >=22.11",
+  "libmambapy >=1.0",
   "importlib-metadata"
 ]
 dynamic = [
