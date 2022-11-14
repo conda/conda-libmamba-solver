@@ -77,7 +77,7 @@ from conda.base.constants import REPODATA_FN
 from conda.base.context import context
 from conda.common.io import ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
-from conda.core.subdir_data import SubdirData
+from conda.core.subdir_data import SubdirData, create_cache_dir
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -202,12 +202,12 @@ class LibMambaIndexHelper(IndexHelper):
                 api.Channel(url), 
                 channel.subdir, 
                 url, 
-                api.MultiPackageCache(context.pkgs_dirs), 
+                api.MultiPackageCache([create_cache_dir()]), 
                 self._repodata_fn,
             )
             api.Context().quiet = quiet
             return sd.create_repo(pool)
-        except RuntimeError as exc:  # fallback for faulty JSONs
+        except (RuntimeError, api.MambaNativeException) as exc:  # fallback for faulty JSONs
             log.warning("api.SubdirData failed: '%s'. Using api.Repo.", exc)
             return api.Repo(pool, url, subdir_data.cache_path_json, url)
 
