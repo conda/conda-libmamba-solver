@@ -1,6 +1,6 @@
 import json
 import sys
-from subprocess import check_output, STDOUT
+from subprocess import check_output, STDOUT, CalledProcessError
 
 from conda.testing.integration import _get_temp_prefix, run_command, make_temp_env
 
@@ -58,8 +58,9 @@ def test_channels_prefixdata():
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env("conda-forge::xz", "python", use_restricted_unicode=True) as prefix:
-        output = check_output(
+    with make_temp_env("conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+        try:
+            output = check_output(
             [
                 sys.executable,
                 "-m",
@@ -73,6 +74,9 @@ def test_channels_prefixdata():
             stderr=STDOUT,
             text=True,
         )
+        except CalledProcessError as exc:
+            print(exc.output)
+            raise exc
         print(output)
         assert (
             "Selected channel specific (or force-reinstall) job, "

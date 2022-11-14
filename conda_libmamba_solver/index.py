@@ -1,5 +1,75 @@
-import os
+"""
+This module provides a convenient interface between `libmamba.Solver`
+and conda's `PrefixData`. In other words, it allows to expose channels
+loaded in `conda` to the `libmamba` machinery without using the
+`libmamba` networking stack.
+
+Internally, the `libmamba`'s index is made of:
+
+- A 'Pool' object, exposed to libsolv.
+- The pool is made of `Repo` objects.
+- Each repo corresponds to a repodata.json file.
+- Each repodata comes from a channel+subdir combination.
+
+Some notes about channels
+-------------------------
+
+In a way, conda channels are an abstraction over a collection of
+channel subdirs. For example, when the user wants 'conda-forge', it
+actually means 'repodata.json' files from the configured platform subdir
+and 'noarch'. Some channels are actually 'MultiChannel', which provide
+a collection of channels. The most common example is 'defaults', which
+includes 'main', 'r' and 'msys2'.
+
+So, for conda-forge on Linux amd64 we get:
+
+- https://conda.anaconda.org/conda-forge/linux-64
+- https://conda.anaconda.org/conda-forge/noarch
+
+For defaults on macOS with Apple Silicon (M1 and friends):
+
+- https://repo.anaconda.org/main/osx-arm64
+- https://repo.anaconda.org/main/noarch
+- https://repo.anaconda.org/r/osx-arm64
+- https://repo.anaconda.org/r/noarch
+- https://repo.anaconda.org/msys2/osx-arm64
+- https://repo.anaconda.org/msys2/noarch
+
+However, users will just say 'defaults' or 'conda-forge', for convenience.
+This means that we need to deal with several formats of channel information,
+which ultimately lead to a collection of subdir-specific URLs:
+
+- Channel names from the CLI or configuration files / env-vars
+- Channel URLs if names are not available (channel not served in anaconda.org)
+- conda.models.channel.Channel objects
+
+Their origins can be:
+
+- Specified by the user on the command-line (-c arguments)
+- Specified by the configuration files (.condarc) or environment vars (context object)
+- Added from channel-specific MatchSpec (e.g. `conda-forge::python`)
+- Added from installed packages in target environment (e.g. a package that was installed
+  from a non-default channel remembers where it comes from)
+
+Also note that a channel URL might have authentication in the form:
+
+- https://user:password@server.com/channel
+- https://server.com/t/your_token_goes_here/channel
+
+Finally, a channel can be mounted in a local directory and referred to via
+a regular path, or a file:// URL, with or without normalization on Windows.
+
+The approach
+------------
+We pass the subdir-specific, authenticated URLs to patched conda's 'SubdirData' instances,
+which download the JSON files but do not process them to PackageRecords.
+Once the cache has bene populated, we can instantiate 'libmamba.SubdirData' objects (offline).
+These will generate the 'libmamba.Repo' objects with internal APIs.
+We maintain a map of subdir-specific URLs to `conda.model.channel.Channel` and `libmamba.Repo` objects.
+"""
 import logging
+import os
+from dataclasses import dataclass
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
@@ -11,19 +81,17 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
+from conda.common.url import split_anaconda_token, remove_auth
 import libmambapy as api
 
 from . import __version__
 from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
-from .utils import escape_channel_url
 
 log = logging.getLogger(f"conda.{__name__}")
 
 
 class LibMambaIndexHelper(IndexHelper):
-    _LIBMAMBA_PROTOCOLS = ("http", "https", "file", "", None)
-
     def __init__(
         self,
         installed_records: Iterable[PackageRecord] = (),
@@ -38,56 +106,26 @@ class LibMambaIndexHelper(IndexHelper):
         self._repos = []
         self._pool = api.Pool()
 
-        installed_records = list(installed_records)  # in case we are passed a lazy iterator
-        installed_repo = self._repo_from_records(self._pool, "installed", installed_records)
-        installed_repo.set_installed()
+        installed_repo = self._load_installed(installed_records)
         self._repos.append(installed_repo)
 
-        # See https://github.com/conda/conda/issues/11790
-        for record in installed_records:
-            if record.channel.auth or record.channel.token:
-                # skip if the channel has authentication info, because
-                # it might cause issues with expired tokens and what not
-                continue
-            if record.channel.name in ("@", "<develop>", "pypi"):
-                # These "channels" are not really channels, more like
-                # metadata placeholders
-                continue
-            self._channels.append(record.channel.subdir_url)
-
-        free_channel = "https://repo.anaconda.com/pkgs/free"
-        if context.restore_free_channel:
-            self._channels.append(Channel(free_channel))
-
-        self._channel_lookup = None
         self._index = self._load_channels()
+        self._repos += [info.repo for info in self._index.values()]
 
         self._query = api.Query(self._pool)
         self._format = api.QueryFormat.JSON
 
-    @staticmethod
-    def _generate_channel_lookup(index):
-        lookup = {}
-        for _, info in index:
-            try:  # libmamba api
-                url = info["channel"].platform_url(info["platform"], with_credentials=False)
-            except AttributeError:  # conda api
-                url = info["channel"].urls(with_credentials=False, subdirs=(info["platform"],))[0]
-            lookup[url] = info
-        return lookup
-
-    @staticmethod
-    def _fix_channel_url(url):
-        """
-        Two fixes here:
-        1. The subdir is sometimes appended to the channel URL, but this causes errors in
-           test_activate_deactivate_modify_path_bash and local channels (path to url) issues
-        2. Escape the URL so is %-encoded (spaces as %20, etc), so libcurl doesn't choke
-        """
-        parts = url.rstrip("/").rsplit("/", 1)  # try to remove subdir from url, if present
-        if len(parts) == 2 and parts[1] in context.known_subdirs:
-            url = parts[0]
-        return escape_channel_url(url)
+    def get_info(self, key: str):
+        orig_key = key
+        if not key.startswith("file://"):
+            # The conda functions (specifically remove_auth) assume the input
+            # is a url; a file uri on windows with a drive letter messes them up.
+            # For the rest, we remove all forms of authentication
+            key = split_anaconda_token(remove_auth(key))[0]
+        try:
+            return self._index[key]
+        except KeyError as exc:
+            raise KeyError(f"Channel info for {orig_key} ({key}) not found. Available keys: {list(self._index)}") from exc
 
     def _repo_from_records(
         self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
@@ -135,73 +173,65 @@ class LibMambaIndexHelper(IndexHelper):
         with NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
             f.write(json_dump(exported))
 
-        repo = self._repo_from_json_path(pool, repo_name, f.name)
-        repo.add_extra_pkg_info(additional_infos)
-        os.unlink(f.name)
+        try:
+            repo = api.Repo(pool, repo_name, f.name, "")
+            repo.add_extra_pkg_info(additional_infos)
+            return repo
+        finally:
+            os.unlink(f.name)
 
-        return repo
+    def _repo_from_cached_url(self, pool: api.Pool, url: str, subdir_data: SubdirData) -> api.Repo:
+        """
+        We just want an `api.Repo` object out of the previously downloaded repodatas.
+        We have set `libmambapy.Context().offline` and `libmambapy.Context().use_index_cache`
+        to True, effectively working without networking on the libmamba side.
 
-    @staticmethod
-    def _repo_from_json_path(pool: api.Pool, repo_name: str, path: str, url: str = "") -> api.Repo:
-        return api.Repo(pool, repo_name, path, url)
+        Ideally, we load everything with the offline api.SubdirData.
+        This method creates the api.Repo with internal APIs richer in channel metadata.
+        It also handles cached repodata better (no unnecessary SOLV rewrites)
+        However, it sometimes chokes with some JSONs during testing.
 
-    def _fetch_channel_url_with_conda(self, url: str):
+        As a fallback, we can instantiate api.Repo directly, but it's slower and less
+        integrated with the channel metadata. TODO: Revisit once internal APIs are exposed.
+        """
+        channel = Channel(url)
+        try:
+            quiet = api.Context().quiet
+            api.Context().quiet = True  # avoid stdout during the spinner
+            sd = api.SubdirData(
+                api.Channel(url), 
+                channel.subdir, 
+                url, 
+                api.MultiPackageCache(context.pkgs_dirs), 
+                self._repodata_fn,
+            )
+            api.Context().quiet = quiet
+            return sd.create_repo(pool)
+        except RuntimeError as exc:  # fallback for faulty JSONs
+            log.warning("api.SubdirData failed: '%s'. Using api.Repo.", exc)
+            return api.Repo(pool, url, subdir_data.cache_path_json, url)
+
+    def _fetch_channel_with_conda(self, url: str) -> api.Repo:
         # We could load from subdir_data.iter_records(), but that means
         # re-exporting everything to a temporary JSON path and well,
         # `subdir_data.load()` already did!
-        channel = Channel(url)
-        try:
-            subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
-            subdir_data.load()
-            loaded_with = "conda_libmamba_solver.index.DownloadOnlySubdirData"
-        except Exception as exc:
-            log.debug(
-                "Optimized DownloadOnlySubdirData call failed: %s\n"
-                "Retrying with conda's SubdirData.",
-                exc,
-            )
-            subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
-            subdir_data.load()
-            loaded_with = "conda.core.subdir_data.SubdirData"
-        repo = self._repo_from_json_path(
-            self._pool,
-            url,
-            subdir_data.cache_path_json,
-            url=url,
-        )
-        return (
-            repo,
-            {
-                "platform": channel.subdir,
-                "url": url,
-                "channel": channel,
-                "loaded_with": loaded_with,
-            },
+        channel = Channel.from_url(url)
+        if not channel.subdir:
+            raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
+        subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
+        subdir_data.load()
+
+        noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
+        repo = self._repo_from_cached_url(self._pool, url=url, subdir_data=subdir_data)
+        return _ChannelRepoInfo(
+            repo=repo,
+            channel=channel,
+            full_url=url,
+            noauth_url=noauth_url,
         )
 
     def _load_channels(self):
-        """
-        Handle all types of channels with a hybrid approach that uses
-        libmamba whenever possible, but delegates to conda internals as
-        a fallback. The important bit is to maintain order so priorities
-        are computed adequately. This is not as easy as it looks, given
-        the unspecified Channel spec.
-
-        A user can pass a channel in several ways:
-        - By name (e.g. defaults or conda-forge).
-        - By URL (e.g. https://conda.anaconda.org/pytorch)
-        - By URL + subdir (e.g. https://conda.anaconda.org/pytorch/noarch)
-
-        All of those are acceptable, but libmamba will eventually expect a list
-        of URLs with subdirs so it can delegate to libcurl. libcurl expects
-        _escaped_ URLs (with %-encoded espaces, for example: %20). This means
-        that libmamba will see a different URL compared to the user-provided one.
-        libmamba might also modify the URL to include tokens.
-
-        To sum up, we might obtain a different URL back, so we can't just blindly
-        use the input URLs as dictionary keys to keep references. Instead, we will
-        have to rely on the input order, very carefully.
-        """
+        # 1. Obtain and deduplicate URLs from channels
         urls = [
             url
             for c in self._channels
@@ -209,16 +239,22 @@ class LibMambaIndexHelper(IndexHelper):
         ]
         urls = tuple(dict.fromkeys(urls))  # de-duplicate
 
-        full_index = []
+        # 2. Fetch URLs (if needed)
         with ThreadLimitedThreadPoolExecutor() as executor:
-            for fetched in executor.map(self._fetch_channel_url_with_conda, urls):
-                full_index.append(fetched)
+            index = {
+                info.noauth_url: info
+                for info in executor.map(self._fetch_channel_with_conda, urls)
+            }
 
-        set_channel_priorities(self._pool, full_index, self._repos)
+        # 3. Configure priorities
+        set_channel_priorities(index)
 
-        self._channel_lookup = self._generate_channel_lookup(full_index)
-
-        return full_index
+        return index
+    
+    def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
+        repo = self._repo_from_records(self._pool, "installed", records)
+        repo.set_installed()
+        return repo
 
     def whoneeds(self, query: str, records=True):
         result_str = self._query.whoneeds(query, self._format)
@@ -277,3 +313,12 @@ class _DownloadOnlySubdirData(SubdirData):
 
     def _pickle_me(self, *args):
         return
+
+
+@dataclass(frozen=True)
+class _ChannelRepoInfo:
+    channel: Channel
+    repo: api.Repo
+    full_url: str
+    noauth_url: str
+

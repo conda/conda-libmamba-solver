@@ -4,11 +4,10 @@
 # TODO: Temporarily vendored from mamba.utils v0.19 on 2021.12.02
 # Decide what to do with it when we split into a plugin
 # 2022.02.15: updated vendored parts to v0.21.2
+# 2022.11.14: only keeping channel prioritization and context initialization logic now
 
-import json
+import logging
 import os
-import urllib.parse
-from collections import OrderedDict
 
 try:
     from importlib.metadata import version
@@ -17,101 +16,21 @@ except ImportError:
 
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
-from conda.common.url import join_url
-from conda.gateways.connection.session import CondaHttpAuth
-from conda.models.channel import Channel as CondaChannel
-from conda.models.records import PackageRecord
-
-try:
-    from conda.core.index import check_allowlist
-except ImportError:  # conda <4.14
-    # TODO: Remove safeguards in a later release
-    # TODO: Patch repodata of older releases to prevent a newer conda
-    #       where check_whitelist won't be available anymore
-    from conda.core.index import check_whitelist as check_allowlist
 
 import libmambapy as api
+
+
+log = logging.getLogger(f"conda.{__name__}")
 
 
 def mamba_version():
     return version("libmambapy")
 
 
-def get_index(
-    channel_urls=(),
-    prepend=True,
-    platform=None,
-    use_local=False,
-    use_cache=False,
-    unknown=None,
-    prefix=None,
-    repodata_fn="repodata.json",
-):
-    if isinstance(platform, str):
-        platform = [platform, "noarch"]
-
-    all_channels = []
-    if use_local:
-        all_channels.append("local")
-    all_channels.extend(channel_urls)
-    if prepend:
-        all_channels.extend(context.channels)
-    check_allowlist(all_channels)
-
-    # Remove duplicates but retain order
-    all_channels = list(OrderedDict.fromkeys(all_channels))
-
-    dlist = api.DownloadTargetList()
-
-    index = []
-
-    def fixup_channel_spec(spec):
-        at_count = spec.count("@")
-        if at_count > 1:
-            first_at = spec.find("@")
-            spec = spec[:first_at] + urllib.parse.quote(spec[first_at]) + spec[first_at + 1 :]
-        if platform:
-            spec = spec + "[" + ",".join(platform) + "]"
-        return spec
-
-    all_channels = list(map(fixup_channel_spec, all_channels))
-    pkgs_dirs = api.MultiPackageCache(context.pkgs_dirs)
-    api.create_cache_dir(str(pkgs_dirs.first_writable_path))
-
-    for channel in api.get_channels(all_channels):
-        for channel_platform, url in channel.platform_urls(with_credentials=True):
-            full_url = CondaHttpAuth.add_binstar_token(url)
-
-            subdir_data = api.SubdirData(
-                channel, channel_platform, full_url, pkgs_dirs, repodata_fn
-            )
-
-            index.append(
-                (
-                    subdir_data,
-                    {
-                        "platform": channel_platform,
-                        "url": url,
-                        "channel": channel,
-                        "loaded_with": "libmambapy.SubdirData",
-                    },
-                )
-            )
-            dlist.add(subdir_data)
-
-    is_downloaded = dlist.download(api.MAMBA_DOWNLOAD_FAILFAST)
-
-    if not is_downloaded:
-        raise RuntimeError("Error downloading repodata.")
-
-    return index
-
-
-def set_channel_priorities(pool, index, repos, has_priority=None):
+def set_channel_priorities(index, has_priority=None):
     """
-    This function was part of load_channels originally. We just split it to reuse it a bit better.
-    We also added some logic to handle an index made of subdirdatas and/or repos already
-    (check `subdir_or_repo` object).
+    This function was part of load_channels originally. 
+    We just split it to reuse it a bit better.
     """
     if has_priority is None:
         has_priority = context.channel_priority in [
@@ -121,17 +40,16 @@ def set_channel_priorities(pool, index, repos, has_priority=None):
 
     subprio_index = len(index)
     if has_priority:
-        # first, count unique channels
-        n_channels = len(set([entry["channel"].canonical_name for _, entry in index]))
-        current_channel = index[0][1]["channel"].canonical_name
-        channel_prio = n_channels
+        # max channel priority value is the number of unique channels
+        channel_prio = len({info.channel.canonical_name for info in index.values()})
+        current_channel = next(iter(index.values())).channel.canonical_name
 
-    for subdir_or_repo, entry in index:
+    for info in index.values():
         # add priority here
         if has_priority:
-            if entry["channel"].canonical_name != current_channel:
+            if info.channel.canonical_name != current_channel:
                 channel_prio -= 1
-                current_channel = entry["channel"].canonical_name
+                current_channel = info.channel.canonical_name
             priority = channel_prio
         else:
             priority = 0
@@ -144,51 +62,17 @@ def set_channel_priorities(pool, index, repos, has_priority=None):
             subpriority = subprio_index
             subprio_index -= 1
 
-        if isinstance(subdir_or_repo, api.SubdirData):
-            if not subdir_or_repo.loaded() and entry["platform"] != "noarch":
-                # ignore non-loaded subdir if channel is != noarch
-                continue
-
         if context.verbosity != 0 and not context.json:
-            print(
-                "Channel: {}, platform: {}, prio: {} : {}".format(
-                    entry["channel"], entry["platform"], priority, subpriority
-                )
+            log.debug(
+                "Channel: %s, platform: %s, prio: %s : %s",
+                info.channel, 
+                info.channel.subdir, 
+                priority,
+                subpriority,
             )
-            if isinstance(subdir_or_repo, api.SubdirData):
-                print("Cache path: ", subdir_or_repo.cache_path())
-
-        if isinstance(subdir_or_repo, api.SubdirData):
-            repo = subdir_or_repo.create_repo(pool)
-        else:
-            repo = subdir_or_repo
-
-        repo.set_priority(priority, subpriority)
-        repos.append(repo)
+        info.repo.set_priority(priority, subpriority)
 
     return index
-
-
-def load_channels(
-    pool,
-    channels,
-    repos,
-    has_priority=None,
-    prepend=True,
-    platform=None,
-    use_local=False,
-    use_cache=True,
-    repodata_fn="repodata.json",
-):
-    index = get_index(
-        channel_urls=channels,
-        prepend=prepend,
-        platform=platform,
-        use_local=use_local,
-        repodata_fn=repodata_fn,
-        use_cache=use_cache,
-    )
-    return set_channel_priorities(pool, index, repos, has_priority)
 
 
 def init_api_context(use_mamba_experimental: bool = False):
@@ -206,9 +90,9 @@ def init_api_context(use_mamba_experimental: bool = False):
     api_ctx.verbosity = context.verbosity
     api_ctx.set_verbosity(context.verbosity)
     api_ctx.quiet = context.quiet
-    api_ctx.offline = context.offline
+    api_ctx.offline = True
     api_ctx.local_repodata_ttl = context.local_repodata_ttl
-    api_ctx.use_index_cache = context.use_index_cache
+    api_ctx.use_index_cache = True
     api_ctx.always_yes = context.always_yes
     api_ctx.channels = context.channels
     api_ctx.platform = context.subdir
@@ -279,32 +163,3 @@ def init_api_context(use_mamba_experimental: bool = False):
 
     if hasattr(api_ctx, "user_agent"):
         api_ctx.user_agent = context.user_agent
-
-    return api_ctx
-
-
-def to_conda_channel(channel, platform):
-    if channel.scheme == "file":
-        return CondaChannel.from_value(channel.platform_url(platform, with_credentials=False))
-
-    return CondaChannel(
-        channel.scheme,
-        channel.auth,
-        channel.location,
-        channel.token,
-        channel.name,
-        platform,
-        channel.package_filename,
-    )
-
-
-def to_package_record_from_subjson(entry, pkg, jsn_string):
-    channel_url = entry["url"]
-    info = json.loads(jsn_string)
-    info["fn"] = pkg
-    info["channel"] = to_conda_channel(entry["channel"], entry["platform"])
-    info["url"] = join_url(channel_url, pkg)
-    if not info.get("subdir"):
-        info["subdir"] = entry["platform"]
-    package_record = PackageRecord(**info)
-    return package_record

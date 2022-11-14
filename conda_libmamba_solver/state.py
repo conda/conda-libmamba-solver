@@ -372,22 +372,41 @@ class SolverInputState:
 
     #  Utility methods
 
-    def channels_from_specs(self):
+    def channels_from_specs(self) -> Iterable[Channel]:
         """
         Collect all channels added with the `channel::package=*` syntax. For now,
         we only collect those specifically requested by the user in the current command
         (same as conda), but we should investigate whether history keeps channels around
         too.
         """
-        channels = []
         for spec in self.requested.values():
             channel = spec.get_exact_value("channel")
             if channel:
                 if spec.original_spec_str and spec.original_spec_str.startswith("file://"):
                     # Handle MatchSpec roundtrip issue with local channels
                     channel = Channel(spec.original_spec_str.split("::")[0])
-                channels.append(channel)
-        return channels
+                yield channel
+    
+    def channels_from_installed(self) -> Iterable[Channel]:
+        seen_urls = set()
+        # See https://github.com/conda/conda/issues/11790
+        for record in self.installed.values():
+            if record.channel.auth or record.channel.token:
+                # skip if the channel has authentication info, because
+                # it might cause issues with expired tokens and what not
+                continue
+            if record.channel.name in ("@", "<develop>", "pypi"):
+                # These "channels" are not really channels, more like
+                # metadata placeholders
+                continue
+            subdir_url = record.channel.subdir_url 
+            if subdir_url not in seen_urls:
+                seen_urls.add(subdir_url)
+                yield record.channel
+    
+    def maybe_free_channel(self) -> Iterable[Channel]:
+        if context.restore_free_channel:
+            yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
 
 
 class SolverOutputState:
