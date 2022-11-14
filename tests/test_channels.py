@@ -4,31 +4,6 @@ from subprocess import check_output, STDOUT, CalledProcessError
 
 from conda.testing.integration import _get_temp_prefix, run_command, make_temp_env
 
-from .channel_testing_utils import (
-    create_with_channel,
-    create_with_channel_in_process,
-    http_server_auth_basic,
-    http_server_auth_basic_email,
-    http_server_auth_none,
-    http_server_auth_token,
-)
-
-
-def test_http_server_auth_none(http_server_auth_none):
-    create_with_channel(http_server_auth_none)
-
-
-def test_http_server_auth_basic(http_server_auth_basic):
-    create_with_channel(http_server_auth_basic)
-
-
-def test_http_server_auth_basic_email(http_server_auth_basic_email):
-    create_with_channel(http_server_auth_basic_email)
-
-
-def test_http_server_auth_token(http_server_auth_token):
-    create_with_channel(http_server_auth_token)
-
 
 def test_channel_matchspec():
     stdout, stderr, _ = run_command(
