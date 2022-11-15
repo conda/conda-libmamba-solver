@@ -34,6 +34,7 @@ from conda.common.url import (
     percent_decode,
     join_url,
 )
+from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
     InvalidMatchSpec,
@@ -42,6 +43,7 @@ from conda.exceptions import (
     UnsatisfiableError,
 )
 from conda.models.match_spec import MatchSpec
+
 from conda.models.records import PackageRecord
 from conda.models.version import VersionOrder
 
