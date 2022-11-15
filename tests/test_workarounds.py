@@ -1,6 +1,8 @@
-import sys
-from subprocess import check_call, run, PIPE
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 import json
+import sys
+from subprocess import PIPE, check_call, run
 
 
 def test_matchspec_star_version():

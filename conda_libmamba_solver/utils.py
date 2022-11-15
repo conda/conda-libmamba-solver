@@ -1,9 +1,10 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 from logging import getLogger
 from urllib.parse import quote
 
 from conda.common.compat import on_win
 from conda.common.url import urlparse
-
 
 log = getLogger(f"conda.{__name__}")
 

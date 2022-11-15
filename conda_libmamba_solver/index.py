@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 This module provides a convenient interface between `libmamba.Solver`
 and conda's `PrefixData`. In other words, it allows to expose channels
@@ -73,15 +75,17 @@ from dataclasses import dataclass
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
+import libmambapy as api
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context
 from conda.common.io import ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
+from conda.common.url import split_anaconda_token, remove_auth
 from conda.core.subdir_data import SubdirData, create_cache_dir
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from conda.common.url import split_anaconda_token, remove_auth
+
 import libmambapy as api
 
 from . import __version__
@@ -142,7 +146,7 @@ class LibMambaIndexHelper(IndexHelper):
             record_data = dict(record.dump())
             # These fields are expected by libmamba, but they don't always appear
             # in the record.dump() dict (e.g. exporting from S3 channels)
-            # ref: https://github.com/mamba-org/mamba/blob/ad46f318b/libmamba/src/core/package_info.cpp#L276-L318
+            # ref: https://github.com/mamba-org/mamba/blob/ad46f318b/libmamba/src/core/package_info.cpp#L276-L318  # noqa
             for field in (
                 "sha256",
                 "track_features",
