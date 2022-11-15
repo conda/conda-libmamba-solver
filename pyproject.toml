@@ -14,7 +14,6 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.6",
   "Programming Language :: Python :: 3.7",
   "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
@@ -22,7 +21,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy"
 ]
-requires-python = ">=3.6"
+requires-python = ">=3.7"
 dependencies = [
   "conda >=22.11.0",
   "libmambapy >=0.23",
@@ -43,6 +42,7 @@ name = "conda_libmamba_solver"
 
 [tool.black]
 line-length = 99
+target-version = ['py37', 'py38', 'py39', 'py310']
 exclude = '''
 (
       ^/conda_libmamba_solver/_libmamba\.py
@@ -105,3 +105,7 @@ markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",
 ]
+
+[tool.isort]
+profile = "black"
+filter_files = true

@@ -1,6 +1,9 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 __version__ = "22.8.1"
 
 from warnings import warn as _warn
+
 from .solver import LibMambaSolver
 
 

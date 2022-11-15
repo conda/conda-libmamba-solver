@@ -1,8 +1,11 @@
-import os
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 import logging
+import os
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
+import libmambapy as api
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context
 from conda.common.io import Spinner
@@ -11,10 +14,10 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-import libmambapy as api
 
-from . import __version__
-from .mamba_utils import get_index as get_index_libmamba, set_channel_priorities
+from . import __version__  # noqa
+from .mamba_utils import get_index as get_index_libmamba
+from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
 from .utils import escape_channel_url
 
@@ -109,7 +112,7 @@ class LibMambaIndexHelper(IndexHelper):
             record_data = dict(record.dump())
             # These fields are expected by libmamba, but they don't always appear
             # in the record.dump() dict (e.g. exporting from S3 channels)
-            # ref: https://github.com/mamba-org/mamba/blob/ad46f318b/libmamba/src/core/package_info.cpp#L276-L318
+            # ref: https://github.com/mamba-org/mamba/blob/ad46f318b/libmamba/src/core/package_info.cpp#L276-L318  # noqa
             for field in (
                 "sha256",
                 "track_features",

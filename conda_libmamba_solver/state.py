@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Solver-agnostic logic to compose the requests passed to the solver
 and accumulate its results.
@@ -59,11 +61,11 @@ as well as richer logging for each action.
 
 # TODO: This module could be part of conda-core once if we refactor the classic logic
 
-from itertools import chain
-from types import MappingProxyType
-from typing import Iterable, Type, Union, Optional, Mapping
-from os import PathLike
 import logging
+from itertools import chain
+from os import PathLike
+from types import MappingProxyType
+from typing import Iterable, Mapping, Optional, Type, Union
 
 from conda import CondaError
 from conda._vendor.boltons.setutils import IndexedSet
@@ -73,15 +75,15 @@ from conda.base.constants import DepsModifier, UpdateModifier
 from conda.base.context import context
 from conda.common.io import dashlist
 from conda.common.path import get_major_minor_version, paths_equal
+from conda.core.index import _supplement_index_with_system
+from conda.core.prefix_data import PrefixData
+from conda.core.solve import get_pinned_specs
 from conda.exceptions import PackagesNotFoundError, SpecsConfigurationConflictError
 from conda.history import History
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
-from conda.models.records import PackageRecord
 from conda.models.prefix_graph import PrefixGraph
-from conda.core.index import _supplement_index_with_system
-from conda.core.prefix_data import PrefixData
-from conda.core.solve import get_pinned_specs
+from conda.models.records import PackageRecord
 
 from .models import EnumAsBools, TrackedMap
 
