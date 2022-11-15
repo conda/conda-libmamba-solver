@@ -1,5 +1,7 @@
 # Copyright (C) 2022 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
+# Copyright (C) 2019 QuantStack and the Mamba contributors.
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Helper module/script to launch a conda channel/server
 for local testing.
