@@ -723,6 +723,7 @@ def test_conda_downgrade(tmpdir):
             )
             assert convert_to_dist_str(final_state_1) == order
 
+    SubdirData.clear_cached_local_channel_data()
     specs_to_add = (MatchSpec("itsdangerous"),)  # MatchSpec("conda"),
     saved_sys_prefix = sys.prefix
     try:
