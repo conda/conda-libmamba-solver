@@ -21,12 +21,25 @@ jobs:
         shell: bash -el {0}
     steps:
       - uses: actions/checkout@v3
+
+      - name: Cache conda
+        uses: actions/cache@v2
+        env:
+          # Increase this value to reset cache if docs/environment.yml has not changed
+          CACHE_NUMBER: 0
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
+            hashFiles('docs/environment.yml') }}
+
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: anaconda-client-env
+          activate-environment: conda-libmamba-solver-docs
           environment-file: docs/environment.yml
           python-version: '3.11'
-          auto-activate-base: false
+          use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
+
       - name: Build Documentation
         run: |
           cd docs
