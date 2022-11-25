@@ -11,6 +11,7 @@ restore_e() {
 trap restore_e EXIT
 
 sudo /opt/conda/condabin/conda install -y -p /opt/conda \
+    "flit-core>=3.2,<4" \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 

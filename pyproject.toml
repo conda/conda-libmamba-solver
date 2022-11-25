@@ -74,7 +74,7 @@ addopts = [
   "--deselect=tests/core/test_solve.py::test_solve_2",
   "--deselect=tests/core/test_solve.py::test_virtual_package_solver",
   "--deselect=tests/core/test_solve.py::test_broken_install",
-  # Features / nomkl involved
+  # Features / nomkl involved
   "--deselect=tests/core/test_solve.py::test_features_solve_1",
   "--deselect=tests/core/test_solve.py::test_prune_1",
   "--deselect=tests/test_create.py::IntegrationTests::test_remove_features",
