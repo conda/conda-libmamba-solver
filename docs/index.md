@@ -13,9 +13,10 @@ getting-started
 libmamba-vs-classic
 performance
 faq
+more-resources
 ```
 +++
-For more resources [see here](more-resources)..
+Found a bug? [File an issue here](https://github.com/conda/conda-libmamba-solver/issues/new/choose)
 
 :::
 
@@ -32,7 +33,7 @@ dev/implementation
 dev/future-work
 ```
 +++
-[Code of Conduct](dev/code-of-conduct), [How we use GitHub](dev/how-we-use-github), [Changelog](dev/changelog)
+[Code of Conduct](dev/code-of-conduct), [Changelog](dev/changelog)
 
 :::
 

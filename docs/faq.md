@@ -3,28 +3,31 @@
 ## What's the difference between the available solvers in `conda`?
 
 Please refer to the section "Differences between `libmamba` and `classic`" in
-the [`libmamba-vs-classic`](./libmamba-vs-classic.md) docs.
-
+the [`libmamba-vs-classic`](./libmamba-vs-classic.md#differences-between-libmamba-and-classic) docs.
 
 ## How do I uninstall it?
 
 If you don't want to use the solver anymore, follow these instructions:
 
+```{warning}
+Please make sure you __follow all steps below__ to uninstall the solver!
+```
+
 1. If you configured it as the default solver, make sure you revert it with:
 
-```bash
-$ conda config --remove-key solver
-# You might also need this:
-$ conda config --remove-key experimental_solver
-```
+    ```bash
+    $ conda config --remove-key solver
+    # You might also need this:
+    $ conda config --remove-key experimental_solver
+    ```
 
 2. Then, remove the package from `base` with:
 
-```bash
-$ conda remove -n base conda-libmamba-solver
-```
+    ```bash
+    $ conda remove -n base conda-libmamba-solver
+    ```
 
-## How do I configure conda to use the experimental solver permanently?
+## How do I configure conda to use the solver permanently?
 
 Use the following command to always use `libmamba` as your default solver:
 

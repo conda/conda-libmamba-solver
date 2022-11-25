@@ -6,8 +6,8 @@ Check out ["How to set up your development environment"](setup.md) if you haven'
 
 ## Testing
 
-The solver is a critical part of `conda` as a tool. 
-In addition to unit tests for `conda_libmamba_solver`, 
+The solver is a critical part of `conda` as a tool.
+In addition to unit tests for `conda_libmamba_solver`,
 our CI also runs the full `conda/conda` integration suite.
 
 ### Unit tests

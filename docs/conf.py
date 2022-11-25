@@ -7,9 +7,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = html_title = 'conda-libmamba-solver'
-copyright = '2022, conda-libmamba-solver contribbutors'
-author = 'conda-libmamba-solver contribbutors'
-release = '22.8.1'
+copyright = '2022, conda-libmamba-solver contributors'
+author = 'conda-libmamba-solver contributors'
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

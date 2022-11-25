@@ -43,7 +43,7 @@ Topics:
 
 "Issue Sorting" refers to the process of assessing the priority of incoming issues. Below is a high-level diagram of the flow of tickets:
 
-```{mermaid}
+```mermaid
 flowchart LR
     subgraph flow_sorting [Issue Sorting]
         board_sorting{{Sorting}}
