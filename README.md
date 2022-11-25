@@ -20,4 +20,5 @@ Additional information about the project can be found in the blog post on Anacon
 
 ## Documentation
 
-Check the [documentation](./docs/README.md) for instructions on how to install, use and make the most out our new solver!
+Check the [documentation](https://conda.github.io/conda-libmamba-solver/) for
+instructions on how to install, use and make the most out our new solver!

@@ -1,4 +1,4 @@
-# Reasons to use `conda-libmamba-solver`... or not
+# Should I use `conda-libmamba-solver`?
 
 You should definitely try `conda-libmamba-solver` if:
 
