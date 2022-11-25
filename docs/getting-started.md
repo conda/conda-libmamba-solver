@@ -22,7 +22,10 @@ To enable it for one operation, you can use the `--solver` flag, available for `
 $ conda install tensorflow --solver=libmamba
 ```
 
-> The `--solver` flag is also exposed as an environment variable, `CONDA_SOLVER`, in case you need that.
+```{note}
+The `--solver` flag is also exposed as an environment variable, `CONDA_SOLVER`,
+in case you need that.
+```
 
 ### Set as default
 
@@ -45,4 +48,7 @@ Finally, if you need to revert the default configuration back to `classic`, you 
 * Run `conda config --set solver classic` (to do your choice explicit).
 * Run `conda config --remove-key solver` to delete the `solver: libmamba` line from your `.condarc` file.
 
-> Tip: If you are unsure what configuration is being used by conda, you can inspect it with `conda config --show-sources`.
+```{admonition} Tip
+If you are unsure what configuration is being used by conda, you can inspect
+it with `conda config --show-sources`.
+```

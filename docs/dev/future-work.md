@@ -1,6 +1,8 @@
 # Future work
 
-> WIP: These will/should be expanded into issues.
+```{warning} WIP
+These will/should be expanded into issues.
+```
 
 * `MatchSpec` preparation logic contains too many exceptions for `libmamba` (e.g. differences in `update` vs `install`)
 * Clean-up `MatchSpec` exchange fixes and workarounds

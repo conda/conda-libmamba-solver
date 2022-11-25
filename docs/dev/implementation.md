@@ -39,7 +39,9 @@ The package is a flat namespace:
 * `conda_libmamba_solver.state`: Solver-agnostic objects to assist in the solver state specification and collection.
 * `conda_libmamba_solver.utils`: Other application-agnostic utility functions.
 
-> Refer to each module docstrings for further details!
+```{note}
+Refer to each module docstrings for further details!
+```
 
 ### Solver-agnostic parts
 
@@ -84,7 +86,10 @@ which logs its own changes for better debugging and developer experience while a
 
 ### First iterations
 
-> This is just here as a historical trivia item. Please check the Plugin implementation section for current details!
+```{note}
+This is just here as a historical trivia item.
+Please check the Plugin implementation section for current details!
+```
 
 The first experimental releases of `conda_libmamba_solver` used an ad-hoc mechanism based on `try/except` hooks.
 
