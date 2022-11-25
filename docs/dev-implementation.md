@@ -24,7 +24,7 @@ Some peculiarities:
 * `flit_core` is the chosen backend for the packaging (as opposed to `setuptools`).
 * The `version` is dynamically taken from `conda_libmamba_solver/__init__.py`.
 * `black` uses a line length of 99 characters.
-* PyTest configurations are extensive but mainly to deal with upstream testing. 
+* PyTest configurations are extensive but are only necessary when dealing with upstream testing. 
   Check "Development workflows" for details.
 
 ## `conda_libmamba_solver` package
