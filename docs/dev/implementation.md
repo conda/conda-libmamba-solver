@@ -5,18 +5,17 @@ both within the `conda_libmamba_solver` package itself, and as a `conda` plugin.
 
 ## Repository structure
 
-* `.github/workflows/`: CI pipelines to run unit and upstream tests, as well as linting and performance benchmarks.
-  Some extra workflows might be added by the `conda/infra` settings.
+* `.github/workflows/`: CI pipelines to run unit and upstream tests, as well as linting and performance benchmarks. Some extra workflows might be added by the `conda/infra` settings.
 * `conda_libmamba_solver/`: The Python package. Check sections below for details.
 * `recipe/`: The conda-build recipe used for the PR build previews. It should be kept in sync with `conda-forge` and `defaults`.
 * `dev/`: Supporting scripts and configuration files to set up development environments.
 * `docs/`: Documentation sources.
-* `tests/`: PyTest testing infrastructure.
+* `tests/`: pytest testing infrastructure.
 * `pyproject.toml`: Project metadata. See below for details.
 
 ## Project metadata
 
-The `pyproject.toml` file stores the required packaging metadata, 
+The `pyproject.toml` file stores the required packaging metadata,
 as well as some the configuration for some tools (`black`, `pytest`, etc.).
 
 Some peculiarities:
@@ -24,7 +23,7 @@ Some peculiarities:
 * `flit_core` is the chosen backend for the packaging (as opposed to `setuptools`).
 * The `version` is dynamically taken from `conda_libmamba_solver/__init__.py`.
 * `black` uses a line length of 99 characters.
-* PyTest configurations are extensive but are only necessary when dealing with upstream testing. 
+* Pytest configurations are extensive but are only necessary when dealing with upstream testing.
   Check "Development workflows" for details.
 
 ## `conda_libmamba_solver` package
@@ -62,8 +61,8 @@ In `conda` classic, this logic is spread across the different layers, but in `co
 This is the `conda_libmamba_solver.state` module, which contains the `SolverInputState` and `SolverOutputState` classes.
 
 * `SolverInputState` deals with the collection and management of the `MatchSpec` objects.
-* `SolverOutputState` will assist the `Solver` class maintain its state through the different solving attempts, 
-  and will finally export a list of `PackageRecords`. 
+* `SolverOutputState` will assist the `Solver` class maintain its state through the different solving attempts,
+  and will finally export a list of `PackageRecords`.
   The early exit and post-solve logics are also expressed here.
 
 Both `SolverInputState` and `SolverOutputState` classes are supported by the `TrackedMap` dictionary subclass,
@@ -73,7 +72,7 @@ which logs its own changes for better debugging and developer experience while a
 
 `conda_libmamba_solver` interfaces with `libmamba` objects through three modules only:
 
-* `.solver`, which contains the `conda.core.solve.Solver` subclass. 
+* `.solver`, which contains the `conda.core.solve.Solver` subclass.
   It relies heavily on `conda_libmamba_solver.state` in an effort to only contain the logic necessary to interface with `libmamba`.
 * `.index`, which deals with the repodata fetching and loading.
   Initially, it invoked the necessary `libmamba` objects to download and load the repodata JSON files.
@@ -99,13 +98,14 @@ def _get_solver_class(key=None):
     if key.startswith("libmamba"):
         try:
             from conda_libmamba_solver import get_solver_class
+
             return get_solver_class(key)
         except ImportError as exc:
             raise CondaImportError(...)
     raise ValueError(...)
 ```
 
-The `key` values were hard-coded in `conda.base.constants`. Not very extensible! 
+The `key` values were hard-coded in `conda.base.constants`. Not very extensible!
 This was only meant to be temporary as we iterated on the `conda-libmamba-solver` side.
 We had one more `get_solver_class()` function in `conda_libmamba_solver` so we could easily change the `Solver` object import path without changing `conda` itself.
 
@@ -117,8 +117,8 @@ The default value for the `key` was set by the `Context` object, which was popul
 
 ### With the plugin system
 
-With the plugin system, the `Context` object still provides the solver type to use. 
-The attribute is now called simply `solver` (instead of `experimental_solver`), 
+With the plugin system, the `Context` object still provides the solver type to use.
+The attribute is now called simply `solver` (instead of `experimental_solver`),
 and it is populated by the `pluggy` registry.
 
 TODO: WIP.

@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -6,9 +8,9 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = html_title = 'conda-libmamba-solver'
-copyright = '2022, conda-libmamba-solver contributors'
-author = 'conda-libmamba-solver contributors'
+project = html_title = "conda-libmamba-solver"
+copyright = "2022, conda-libmamba-solver contributors"
+author = "conda-libmamba-solver contributors"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -43,17 +45,17 @@ myst_enable_extensions = [
 ]
 
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'pydata_sphinx_theme'
-html_static_path = ['_static']
+html_theme = "pydata_sphinx_theme"
+html_static_path = ["_static"]
 
 html_css_files = [
-    'css/custom.css',
+    "css/custom.css",
 ]
 
 # Serving the robots.txt since we want to point to the sitemap.xml file
@@ -65,7 +67,7 @@ html_theme_options = {
     "navigation_depth": 1,
     "use_edit_page_button": True,
     "show_toc_level": 1,
-    "navbar_align": "left",  # [left, content, right] For testing that the navbar items align properly
+    "navbar_align": "left",
     "header_links_before_dropdown": 1,
     # "announcement": "<p>This is the documentation of the new conda-libmamba-solver plugin!</p>",
 }
