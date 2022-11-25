@@ -39,6 +39,7 @@ jobs:
           environment-file: docs/environment.yml
           python-version: '3.11'
           use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
+          auto-activate-base: false
 
       - name: Build Documentation
         run: |
