@@ -25,8 +25,7 @@ jobs:
         with:
           activate-environment: anaconda-client-env
           environment-file: docs/environment.yml
-          python-version: 3.11
-          condarc-file: etc/example-condarc.yml
+          python-version: '3.11'
           auto-activate-base: false
       - name: Build Documentation
         run: |
