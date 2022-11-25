@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 This module fixes some tests found across conda/conda's suite to
 check the "spirit" of the test, instead of making explicit comparisons
@@ -19,11 +21,10 @@ import sys
 from pprint import pprint
 
 import pytest
-
 from conda.auxlib.ish import dals
-from conda.common.io import env_var
 from conda.base.constants import UpdateModifier, on_win
-from conda.base.context import context, conda_tests_ctxt_mgmt_def_pol
+from conda.base.context import conda_tests_ctxt_mgmt_def_pol, context
+from conda.common.io import env_var
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import UnsatisfiableError
@@ -31,13 +32,6 @@ from conda.gateways.subprocess import subprocess_call_with_clean_env
 from conda.models.match_spec import MatchSpec
 from conda.models.version import VersionOrder
 from conda.testing.cases import BaseTestCase
-from conda.testing.integration import (
-    run_command,
-    Commands,
-    make_temp_env,
-    package_is_installed,
-    PYTHON_BINARY,
-)
 from conda.testing.helpers import (
     add_subdir,
     add_subdir_to_iter,
@@ -45,9 +39,16 @@ from conda.testing.helpers import (
     get_solver,
     get_solver_2,
     get_solver_4,
-    get_solver_cuda,
     get_solver_aggregate_1,
     get_solver_aggregate_2,
+    get_solver_cuda,
+)
+from conda.testing.integration import (
+    PYTHON_BINARY,
+    Commands,
+    make_temp_env,
+    package_is_installed,
+    run_command,
 )
 
 

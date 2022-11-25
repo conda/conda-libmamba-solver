@@ -1,8 +1,10 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 import json
 import sys
-from subprocess import check_output, STDOUT
+from subprocess import STDOUT, check_output
 
-from conda.testing.integration import _get_temp_prefix, run_command, make_temp_env
+from conda.testing.integration import _get_temp_prefix, make_temp_env, run_command
 
 from .channel_testing_utils import (
     create_with_channel,

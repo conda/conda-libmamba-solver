@@ -1,8 +1,8 @@
 #!/bin/bash
 # To be used with the conda/conda CI Docker images, possibly while developing locally
 # This script expects the following volumes to be present:
-# - /opt/conda-src -> repo for conda/conda
-# - /opt/conda-libmamba-src -> repo for conda-incubator/conda-libmamba-solver
+# - /opt/conda-src -> repo for conda/conda
+# - /opt/conda-libmamba-src -> repo for conda/conda-libmamba-solver
 
 set -e
 restore_e() {

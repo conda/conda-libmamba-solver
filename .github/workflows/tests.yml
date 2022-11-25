@@ -1,4 +1,4 @@
-name: Upstream
+name: Tests
 
 on:
   push:
@@ -14,28 +14,21 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+env:
+  CONDA_SOLVER: libmamba
+
 jobs:
   linux:
-    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Linux, Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7"]
-        test-group: ["1", "2", "3"]
-        test-splits: ["3"]
-        test-type: ["integration"]
-        include:
-          - python-version: "3.7"
-            test-type: "unit"
-            test-group: "1"
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
 
     env:
       OS: "linux"
       PYTHON: ${{ matrix.python-version }}
-      TEST_SPLITS: ${{ matrix.test-splits }}
-      TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER: "libmamba"
 
     steps:
       - name: Checkout our source
@@ -51,21 +44,7 @@ jobs:
           repository: conda/conda
           path: conda
 
-      - name: Define test type and override pytest settings
-        run: |
-          if [[ ${{ matrix.test-type }} == "integration" ]]; then
-            run_test_cmd="source /opt/conda-src/dev/linux/integration.sh"
-          else
-            run_test_cmd="source /opt/conda-libmamba-solver-src/dev/upstream_unit_tests_linux.sh"
-          fi
-          echo "run_test_cmd=${run_test_cmd}" >> $GITHUB_ENV
-
-          # override pytest settings
-          cp conda-libmamba-solver/pyproject.toml conda/pyproject.toml
-          rm conda/setup.cfg
-
-      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
-        working-directory: conda
+      - name: Python ${{ matrix.python-version }}
         run: >
           docker run
           --rm
@@ -77,31 +56,24 @@ jobs:
           ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}
           bash -c "sudo env CONDA_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
-                        --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
+                        --repodata-fn=repodata.json --update-specs \
+                        --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
+                        --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
-                   $run_test_cmd"
+                   source /opt/conda-src/dev/linux/bashrc.sh &&
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
 
   macos:
-    name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: MacOS, Python ${{ matrix.python-version }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8"]
-        test-group: ["1", "2", "3"]
-        test-splits: ["3"]
-        test-type: ["integration"]
-        include:
-          - python-version: "3.8"
-            test-type: "unit"
-            test-group: "1"
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
 
     env:
       OS: "macos"
       PYTHON: ${{ matrix.python-version }}
-      TEST_SPLITS: ${{ matrix.test-splits }}
-      TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER: libmamba
 
     steps:
       - name: Checkout our source
@@ -125,18 +97,26 @@ jobs:
           use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
 
       - name: Setup environment
-        shell: bash -el {0}
+        shell: bash -l {0}
         working-directory: conda
         env:
           # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
           # otherwise it will error out because it can't be imported yet!
           CONDA_SOLVER: classic
         run: |
-          ./dev/macos/setup.sh
+          set -euxo pipefail
+          # restoring the default for changeps1 to have parity with dev
+          conda config --set changeps1 true
+          # make sure the caching works correctly
+          conda config --set use_only_tar_bz2 true
+          # install all test requirements
           conda install --yes \
+            --file tests/requirements.txt \
             --file ../conda-libmamba-solver/dev/requirements.txt \
+            --file ../conda-libmamba-solver/tests/requirements.txt \
             python=${{ matrix.python-version }}
-          conda info -a
+          conda update openssl ca-certificates certifi
+          conda info
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
 
       - name: Install conda-libmamba-solver
@@ -145,49 +125,24 @@ jobs:
         run: |
           python -m pip install . -vv --no-deps
 
-      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }}
         shell: bash -l {0}
         working-directory: conda
-        if: matrix.test-type == 'integration'
         run: |
-          # override pytest settings
-          cp ../conda-libmamba-solver/pyproject.toml ./pyproject.toml
-          rm ./setup.cfg
-          # run test
-          ./dev/macos/integration.sh
-
-      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests
-        shell: bash -l {0}
-        working-directory: conda
-        if: matrix.test-type == 'unit'
-        run: |
-          # override pytest settings
-          cp ../conda-libmamba-solver/pyproject.toml ./pyproject.toml
-          rm ./setup.cfg
-          # run test
-          ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
+          eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
+          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
 
   windows:
-    name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Windows, Python ${{ matrix.python-version }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9"]
-        test-group: ["1", "2", "3"]
-        test-splits: ["3"]
-        test-type: ["integration"]
-        include:
-          - python-version: "3.9"
-            test-type: "unit"
-            test-group: "1"
+        python-version: ["3.7", "3.8", "3.9", "3.10"]
 
     env:
       OS: "windows"
       PYTHON: ${{ matrix.python-version }}
-      TEST_SPLITS: ${{ matrix.test-splits }}
-      TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_SOLVER: libmamba
 
     steps:
       - name: Checkout our source
@@ -220,6 +175,7 @@ jobs:
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
+          type ..\conda-libmamba-solver\tests\requirements.txt >> .\tests\requirements.txt
           if errorlevel 1 exit 1
           :: initialize conda dev
           call .\dev\windows\setup.bat
@@ -240,24 +196,79 @@ jobs:
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
 
-      - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }}
         shell: cmd
         working-directory: conda
-        if: matrix.test-type == 'integration'
         run: |
-          :: override pytest settings
-          copy ..\conda-libmamba-solver\pyproject.toml .\pyproject.toml
-          del .\setup.cfg
-          :: run test
-          call .\dev\windows\${{ matrix.test-type }}.bat
+          CALL dev-init.bat
+          if errorlevel 1 exit 1
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow" --timeout=600
+          if errorlevel 1 exit 1
 
-      - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests
-        shell: cmd
-        working-directory: conda
-        if: matrix.test-type == 'unit'
-        run: |
-          :: override pytest settings
-          copy ..\conda-libmamba-solver\pyproject.toml .\pyproject.toml
-          del .\setup.cfg
-          :: run test
-          call ..\conda-libmamba-solver\dev\upstream_unit_tests_win.bat
+  analyze:
+    name: Analyze test results
+    needs: [windows, linux, macos]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download test results
+        uses: actions/download-artifact@v3
+
+      - name: Upload combined test results
+        # provides one downloadable archive of all .coverage/test-report.xml files
+        # of all matrix runs for further analysis.
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results-${{ github.sha }}-all
+          path: test-results-${{ github.sha }}-*
+          retention-days: 90  # default: 90
+
+      - name: Test Summary
+        uses: test-summary/action@v2
+        with:
+          paths: ./test-results-${{ github.sha }}-**/test-report*.xml
+
+      - name: Decide whether the needed jobs succeeded or failed
+        uses: re-actors/alls-green@release/v1
+        with:
+          jobs: ${{ toJSON(needs) }}
+
+  build:
+    name: Canary Build
+    needs: [analyze]
+    # only build canary build if
+    # only build canary build if
+    # - prior steps succeeded,
+    # - this is the main repo, and
+    # - we are on the main (or feature) branch
+    if: >-
+      success()
+      && !github.event.repository.fork
+      && (
+        github.ref_name == 'main'
+        || startsWith(github.ref_name, 'feature/')
+      )
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            subdir: noarch
+    runs-on: ${{ matrix.runner }}
+    steps:
+      # Clean checkout of specific git ref needed for package metadata version
+      # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.ref }}
+          clean: true
+          fetch-depth: 0
+
+      - name: Create and upload canary build
+        uses: conda/actions/canary-release@v22.10.0
+        with:
+          package-name: ${{ github.event.repository.name }}
+          subdir: ${{ matrix.subdir }}
+          anaconda-org-channel: conda-canary
+          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+          anaconda-org-token: ${{ secrets.ANACONDA_ORG_CONDA_CANARY_TOKEN }}
+          conda-build-arguments: '--override-channels -c conda-forge -c defaults'

@@ -1,3 +1,5 @@
+# Copyright (C) 2022 Anaconda, Inc
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Test the Solver API helpers. These objects are solver-agnostic
 but encode most of the logic needed to expose a prefix state,
@@ -10,13 +12,12 @@ logic into discrete, composable parts.
 """
 
 import pytest
-
 from conda.base.context import context, fresh_context
 from conda.models.match_spec import MatchSpec
 from conda.testing.solver_helpers import (
     SimpleEnvironment,
-    index_packages,
     empty_prefix,
+    index_packages,
     temp_simple_env,
 )
 
