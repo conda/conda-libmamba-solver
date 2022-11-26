@@ -22,29 +22,18 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Cache conda
-        uses: actions/cache@v2
-        env:
-          # Increase this value to reset cache if docs/environment.yml has not changed
-          CACHE_NUMBER: 0
-        with:
-          path: ~/conda_pkgs_dir
-          key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-${{
-            hashFiles('docs/environment.yml') }}
-
       - uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: conda-libmamba-solver-docs
+          activate-environment: conda-libmamba-solver
           environment-file: docs/environment.yml
           python-version: '3.11'
-          use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
           auto-activate-base: false
 
       - name: Build Documentation
         run: |
           cd docs
           make dirhtml
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v1
         with:
