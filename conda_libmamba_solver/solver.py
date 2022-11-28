@@ -757,7 +757,7 @@ class LibMambaSolver(Solver):
             return
 
         channel_name = current_conda_prefix_rec.channel.canonical_name
-        if channel_name in (UNKNOWN_CHANNEL, "@", "<develop>", "pypi"):
+        if channel_name in (UNKNOWN_CHANNEL, "<develop>", "pypi"):
             channel_name = "defaults"
 
         # only check the loaded index if it contains the channel conda should come from
