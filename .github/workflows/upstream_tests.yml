@@ -78,6 +78,10 @@ jobs:
           bash -c "sudo env CONDA_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
+                   sudo env CONDA_SOLVER=classic \
+                        /opt/conda/condabin/conda install -p /opt/conda \
+                        -c conda-canary/label/dev \
+                        conda &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    $run_test_cmd"
 
@@ -136,6 +140,7 @@ jobs:
           conda install --yes \
             --file ../conda-libmamba-solver/dev/requirements.txt \
             python=${{ matrix.python-version }}
+          conda install --yes -c conda-canary/label/dev conda
           conda info -a
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
 

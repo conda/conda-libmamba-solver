@@ -15,6 +15,10 @@ sudo /opt/conda/condabin/conda install -y -p /opt/conda \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 
+sudo /opt/conda/condabin/conda install -y -p /opt/conda \
+    -c conda-canary/label/dev \
+    conda
+
 cd /opt/conda-libmamba-solver-src
 sudo env FLIT_ROOT_INSTALL=1 /opt/conda/bin/python -m flit install --symlink --deps=none
 

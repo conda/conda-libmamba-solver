@@ -55,6 +55,7 @@ $ cd "$REPO_LOCATION"
 $ conda install "flit-core>=3.2,<4" \
     --file "$REPO_LOCATION"/dev/requirements.txt \
     --file "$REPO_LOCATION"/tests/requirements.txt
+$ conda install -c conda-canary/label/dev conda
 ```
 
 4. Install `conda-libmamba-solver` with `flit`:

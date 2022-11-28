@@ -60,10 +60,15 @@ jobs:
           -e TEST_GROUP
           -e CONDA_SOLVER
           ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}
-          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
-                   /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
+          bash -c "sudo /opt/conda/condabin/conda install -p /opt/conda \
+                        --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
+                   sudo /opt/conda/condabin/conda install -p /opt/conda \
+                        -c conda-canary/label/dev conda &&
+                   /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src \
+                        --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv --durations=0 --timeout=1800 -m 'slow'"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src \
+                        -vv --durations=0 --timeout=1800 -m 'slow'"
 
   macos:
     if: |
@@ -115,6 +120,7 @@ jobs:
             --file tests/requirements.txt \
             --file ../conda-libmamba-solver/dev/requirements.txt \
             python=${{ matrix.python-version }}
+          conda install --yes -c conda-canary/label/dev conda
           conda update openssl ca-certificates certifi
           conda info
           python -c "from mamba import __version__; print('mamba', __version__)"

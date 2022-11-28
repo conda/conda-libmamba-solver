@@ -59,6 +59,11 @@ jobs:
                         --repodata-fn=repodata.json --update-specs \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
                         --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
+                   sudo env CONDA_SOLVER=classic \
+                        /opt/conda/condabin/conda install -p /opt/conda \
+                        --repodata-fn=repodata.json --update-specs \
+                        -c conda-canary/label/dev \
+                        conda &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
@@ -115,6 +120,7 @@ jobs:
             --file ../conda-libmamba-solver/dev/requirements.txt \
             --file ../conda-libmamba-solver/tests/requirements.txt \
             python=${{ matrix.python-version }}
+          conda install --yes -c conda-canary/label/dev conda
           conda update openssl ca-certificates certifi
           conda info
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
