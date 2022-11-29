@@ -5,7 +5,6 @@ import sys
 from subprocess import STDOUT, check_output
 
 import pytest
-
 from conda.testing.integration import _get_temp_prefix, make_temp_env, run_command
 
 from .channel_testing_utils import (
