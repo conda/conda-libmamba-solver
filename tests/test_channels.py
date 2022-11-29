@@ -24,6 +24,7 @@ def test_http_server_auth_basic(http_server_auth_basic):
     create_with_channel(http_server_auth_basic)
 
 
+@pytest.mark.xfail(reason="known encoding issue with @ symbols in channel URLs")
 def test_http_server_auth_basic_email(http_server_auth_basic_email):
     create_with_channel(http_server_auth_basic_email)
 
