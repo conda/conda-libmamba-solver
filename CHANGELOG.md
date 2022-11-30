@@ -26,6 +26,8 @@ Remember to update the hyperlinks at the bottom.
 
 ### Deprecated
 
+* Deprecate support for Python 3.6.x.
+
 ### Removed
 
 ### Fixed
