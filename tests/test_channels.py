@@ -4,6 +4,7 @@ import json
 import sys
 from subprocess import STDOUT, check_output
 
+import pytest
 from conda.testing.integration import _get_temp_prefix, make_temp_env, run_command
 
 from .channel_testing_utils import (
@@ -24,6 +25,7 @@ def test_http_server_auth_basic(http_server_auth_basic):
     create_with_channel(http_server_auth_basic)
 
 
+@pytest.mark.xfail(reason="known encoding issue with @ symbols in channel URLs")
 def test_http_server_auth_basic_email(http_server_auth_basic_email):
     create_with_channel(http_server_auth_basic_email)
 

@@ -7,7 +7,6 @@ import os
 import shutil
 
 import pytest
-from conda.base.constants import SolverChoice
 from conda.base.context import context
 from conda.common.io import env_var
 from conda.exceptions import DryRunExit
@@ -58,9 +57,9 @@ def prefix_and_channels(request):
     shutil.rmtree(prefix)
 
 
-@pytest.fixture(scope="function", params=[SolverChoice.LIBMAMBA, SolverChoice.CLASSIC])
+@pytest.fixture(scope="function", params=["libmamba", "classic"])
 def solver_args(request):
-    yield ("--dry-run", "--solver", request.param.value)
+    yield ("--dry-run", "--solver", request.param)
 
 
 @pytest.mark.slow
