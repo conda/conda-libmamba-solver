@@ -5,20 +5,24 @@ All notable changes to this project will be documented in this file.
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 > and this project adheres to [calendar versioning](https://calver.org/) in the `YY.M.MICRO`format.
 
-## [Unreleased]
-
 <!--
 Populate these categories as PRs are merged to `main`. When a release is cut,
 copy to its corresponding section, deleting empty sections if any.
 Remember to update the hyperlinks at the bottom.
 --->
 
+## [22.11.0] - 2022-11-30
+
 ### Added
+
+* Added a new documentation site: https://conda.github.io/conda-libmamba-solver/ (#58)
+* Added [CEP 4](https://github.com/conda-incubator/ceps/blob/main/cep-4.md) compatible plugin for conda's `solvers` plugin hook. (#63)
 
 ### Changed
 
+* The `conda-libmamba-solver` package is now generally available, removes the `experimental` label. (#53)
 * The index will also load channels only listed as part the installed packages in the active prefix. (#52)
-* Adopt the new `solver` name in lieu of `experimental-solver`. (#53)
+* Updated compatibility to [mamba 1.0.0](https://github.com/mamba-org/mamba/releases/tag/2022.11.01) and [conda 22.11.0](https://github.com/conda/conda/releases/tag/22.11.0). (#78)
 
 ### Deprecated
 
