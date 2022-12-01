@@ -19,7 +19,7 @@ repos:
       # ensure syntaxes are valid
       - id: check-toml
       - id: check-yaml
-        exclude: ^(conda\.recipe/meta.yaml|tests/data/)
+        exclude: ^(recipe/meta.yaml|tests/data/)
       # catch git merge/rebase problems
       - id: check-merge-conflict
   - repo: https://github.com/asottile/pyupgrade
