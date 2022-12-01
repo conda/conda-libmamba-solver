@@ -11,13 +11,7 @@ copy to its corresponding section, deleting empty sections if any.
 Remember to update the hyperlinks at the bottom.
 --->
 
-## 22.12.0 - 2022-12-01
-
-### Fixed
-
-* Fixed a wrong dependency on libmambapy. (#90)
-
-## 22.11.0 - 2022-11-30
+## [22.12.0] - 2022-12-01
 
 ### Added
 
@@ -34,13 +28,11 @@ Remember to update the hyperlinks at the bottom.
 
 * Deprecate support for Python 3.6.x.
 
-### Removed
-
 ### Fixed
 
-* If missing or empty, package records will have their `subdir` field populated by the channel platform. (#53)
+* Fixed a wrong dependency on libmambapy. (#90)
 
-### Security
+* If missing or empty, package records will have their `subdir` field populated by the channel platform. (#53)
 
 ## [22.8.1] - 2022-08-25
 
@@ -111,3 +103,4 @@ _Internal pre-release as a separate repository._
 [22.6.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.6.0
 [22.8.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.0
 [22.8.1]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.1
+[22.12.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0
