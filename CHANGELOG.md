@@ -11,13 +11,13 @@ copy to its corresponding section, deleting empty sections if any.
 Remember to update the hyperlinks at the bottom.
 --->
 
-## [22.12.0] - 2022-12-01
+## 22.12.0 - 2022-12-01
 
 ### Fixed
 
 * Fixed a wrong dependency on libmambapy. (#90)
 
-## [22.11.0] - 2022-11-30
+## 22.11.0 - 2022-11-30
 
 ### Added
 
