@@ -13,6 +13,21 @@ Remember to update the hyperlinks at the bottom.
 
 ## [22.12.0] - 2022-12-01
 
+### Upgrade notice
+To upgrade to `conda-libmamba-solver 22.12.0` please update to `conda 22.11.0` using the "classic" solver first:
+  
+```
+$ CONDA_EXPERIMENTAL_SOLVER=classic conda install -n base conda=22.11.0
+```
+
+and then install a new version of conda-libmamba-solver:
+
+```
+$ CONDA_EXPERIMENTAL_SOLVER=classic conda install -n base conda-libmamba-solver=22.12.0
+```
+  
+Afterwards, please use the new `CONDA_SOLVER` environment variable and ``--solver`` as mentioned below.
+
 ### Added
 
 * Added a new documentation site: https://conda.github.io/conda-libmamba-solver/ (#58)
