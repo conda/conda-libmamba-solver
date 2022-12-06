@@ -42,3 +42,19 @@ $ conda config --remove-key solver
 # You might also need this:
 $ conda config --remove-key experimental_solver
 ```
+
+## I get an error when I try to use the `--solver` flag
+
+If you are seeing this error:
+
+```
+CondaValueError: Key 'solver' is not a known primitive parameter.
+```
+
+It might mean you are using an old version of the conda-libmamba-solver package.
+You can check which version is installed with `conda list -n base conda-libmamba-solver`.
+
+Before version 22.12, the CLI flag was `--experimental-solver`.
+We recommend you upgrade to `conda` 22.11 or above, and then `conda-libmamba-solver` 22.12 or above.
+
+See the [22.12.0 announcement post](https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0) for more details on how to upgrade.
