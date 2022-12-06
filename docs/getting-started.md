@@ -12,7 +12,7 @@ $ conda install -n base conda-libmamba-solver
 
 ### Update from the experimental versions (22.9 and below)
 
-The instructions in this page assume you are using conda-libmamba-solver 22.12 or above. 
+The instructions in this page assume you are using conda-libmamba-solver 22.12 or above.
 Please refer to the [v22.12.0 release notes](https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0) for more details on how to update from a previous version if you were already using the experimental builds.
 
 ## Usage
