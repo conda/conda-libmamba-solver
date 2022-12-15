@@ -2,7 +2,7 @@
 
 [![Anaconda-Server Badge](https://anaconda.org/main/conda-libmamba-solver/badges/version.svg)](https://anaconda.org/main/conda-libmamba-solver)
 [![Anaconda-Server Badge](https://anaconda.org/main/conda-libmamba-solver/badges/latest_release_date.svg)](https://anaconda.org/main/conda-libmamba-solver)
-[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/conda/conda-libmamba-solver/ci.yml?branch=main?label=CI&logo=github&style=flat-square)](https://github.com/conda/conda-libmamba-solver/actions/workflows/ci.yml)
+[![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/conda/conda-libmamba-solver/ci.yml?branch=main&label=CI&logo=github&style=flat-square)](https://github.com/conda/conda-libmamba-solver/actions/workflows/ci.yml)
 [![CalVer version used YY.MM.MICRO](https://img.shields.io/badge/calver-YY.MM.MICRO-22bfda.svg?style=flat-square)](https://calver.org)
 
 The fast mamba solver, now in conda!
