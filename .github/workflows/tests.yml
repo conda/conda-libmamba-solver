@@ -234,7 +234,7 @@ jobs:
         uses: re-actors/alls-green@release/v1
         with:
           jobs: ${{ toJSON(needs) }}
-      
+
       - name: Report failures
         if: github.event_name == 'schedule' && failure()
         uses: JasonEtco/create-an-issue@v2
