@@ -14,7 +14,7 @@ from functools import lru_cache
 from inspect import stack
 from itertools import chain
 from textwrap import dedent
-from typing import Iterable, Mapping, Optional, Union, Sequence
+from typing import Iterable, Mapping, Optional, Sequence, Union
 
 import libmambapy as api
 from conda import __version__ as _conda_version
@@ -528,6 +528,7 @@ class LibMambaSolver(Solver):
         - à la conda-build, e.g. package 1.2.*
         - just names, e.g. package
         """
+
         def to_matchspec(spec: Union[str, Sequence[str]]):
             if isinstance(spec, str):
                 name, version, build = spec.rsplit("-", 2)
@@ -565,10 +566,10 @@ class LibMambaSolver(Solver):
         }
 
     def _maybe_raise_for_problems(
-            self,
-            problems: Optional[Union[str, Mapping]] = None,
-            previous_conflicts: Mapping[str, MatchSpec] = None,
-        ):
+        self,
+        problems: Optional[Union[str, Mapping]] = None,
+        previous_conflicts: Mapping[str, MatchSpec] = None,
+    ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
