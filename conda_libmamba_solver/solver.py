@@ -248,7 +248,8 @@ class LibMambaSolver(Solver):
             self._command = "last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
-                exc = LibMambaUnsatisfiableError(self.solver.problems_to_str())
+                message = getattr(self.solver, "explain_problems", self.solver.problems_to_str)()
+                exc = LibMambaUnsatisfiableError(message)
                 exc.allow_retry = False
                 raise exc
 
@@ -599,7 +600,8 @@ class LibMambaSolver(Solver):
         current_set = set(unsatisfiable.values())
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
-            exc = LibMambaUnsatisfiableError(problems)
+            message = getattr(self.solver, "explain_problems", self.solver.problems_to_str)()
+            exc = LibMambaUnsatisfiableError(message)
             # do not allow conda.cli.install to try more things
             exc.allow_retry = False
             raise exc
