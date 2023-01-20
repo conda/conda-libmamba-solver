@@ -1,12 +1,14 @@
 # Copyright (C) 2022 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
-# SPDX-License-Identifier: BSD-3-Clause
 
 from __future__ import annotations
 
 from pathlib import Path
-from subprocess import check_call
+from subprocess import check_call, check_output
 from uuid import uuid4
+import json
+import os
+import sys
 
 from conda.common.compat import on_win
 from conda.core.prefix_data import get_python_version_for_prefix
@@ -84,3 +86,41 @@ def test_python_downgrade_reinstalls_noarch_packages():
             no_capture=True,
         )
         check_call([pip, "--version"])
+
+
+def test_determinism(tmpdir):
+    "Based on https://github.com/conda/conda-libmamba-solver/issues/75"
+    env = os.environ.copy()
+    env.pop("PYTHONHASHSEED", None)
+    env["CONDA_PKGS_DIR"] = tmpdir / "pkgs"
+    installed_bokeh_versions = []
+    for i in range(10):
+        offline = ("--offline",) if i else ()
+        out = check_output(
+            [
+                sys.executable,
+                "-mconda",
+                "create",
+                "--name=unused",
+                "--dry-run",
+                "--yes",
+                "--json",
+                "--solver=libmamba",
+                "--channel=conda-forge",
+                "--override-channels",
+                *offline,
+                "python=3.8",
+                "bokeh",
+                "hvplot",
+            ],
+            env=env,
+        )
+        data = json.loads(out)
+        assert data["success"] is True
+        for pkg in data["actions"]["LINK"]:
+            if pkg["name"] == "bokeh":
+                installed_bokeh_versions.append(pkg["version"])
+                break
+        else:
+            raise AssertionError("Didn't find bokeh!")
+    assert len(set(installed_bokeh_versions)) == 1
