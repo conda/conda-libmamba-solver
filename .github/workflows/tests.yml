@@ -253,6 +253,8 @@ jobs:
         include:
           - runner: ubuntu-latest
             subdir: noarch
+    env:
+      CONDA_SOLVER: classic
     runs-on: ${{ matrix.runner }}
     steps:
       # Clean checkout of specific git ref needed for package metadata version
