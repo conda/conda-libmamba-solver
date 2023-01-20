@@ -93,7 +93,7 @@ def test_determinism(tmpdir):
     "Based on https://github.com/conda/conda-libmamba-solver/issues/75"
     env = os.environ.copy()
     env.pop("PYTHONHASHSEED", None)
-    env["CONDA_PKGS_DIR"] = tmpdir / "pkgs"
+    env["CONDA_PKGS_DIR"] = str(tmpdir / "pkgs")
     installed_bokeh_versions = []
     common_args = (
         sys.executable,
