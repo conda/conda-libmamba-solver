@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from itertools import repeat, chain, permutations
 from pathlib import Path
 from subprocess import check_call, check_output
 from uuid import uuid4
@@ -94,27 +95,25 @@ def test_determinism(tmpdir):
     env.pop("PYTHONHASHSEED", None)
     env["CONDA_PKGS_DIR"] = tmpdir / "pkgs"
     installed_bokeh_versions = []
-    for i in range(10):
+    common_args = (
+        sys.executable,
+        "-mconda",
+        "create",
+        "--name=unused",
+        "--dry-run",
+        "--yes",
+        "--json",
+        "--solver=libmamba",
+        "--channel=conda-forge",
+        "--override-channels",
+    )
+    pkgs = ("python=3.8", "bokeh", "hvplot")
+    # Two things being tested in the same loop:
+    # - Repeated attempts of the same input should give the same result
+    # - Input order (from the user side) should not matter, and should give the same result
+    for i, pkg_list in enumerate(chain(repeat(pkgs, 10), permutations(pkgs, len(pkgs)))):
         offline = ("--offline",) if i else ()
-        out = check_output(
-            [
-                sys.executable,
-                "-mconda",
-                "create",
-                "--name=unused",
-                "--dry-run",
-                "--yes",
-                "--json",
-                "--solver=libmamba",
-                "--channel=conda-forge",
-                "--override-channels",
-                *offline,
-                "python=3.8",
-                "bokeh",
-                "hvplot",
-            ],
-            env=env,
-        )
+        out = check_output([*common_args, *offline, *pkg_list], env=env)
         data = json.loads(out)
         assert data["success"] is True
         for pkg in data["actions"]["LINK"]:
