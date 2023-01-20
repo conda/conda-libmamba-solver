@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import os
 import sys
-from itertools import repeat, chain, permutations
+from itertools import chain, permutations, repeat
 from pathlib import Path
 from subprocess import check_call, check_output
 from uuid import uuid4
