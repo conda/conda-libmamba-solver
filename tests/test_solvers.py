@@ -3,12 +3,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from subprocess import check_call, check_output
-from uuid import uuid4
 import json
 import os
 import sys
+from pathlib import Path
+from subprocess import check_call, check_output
+from uuid import uuid4
 
 from conda.common.compat import on_win
 from conda.core.prefix_data import get_python_version_for_prefix
