@@ -239,9 +239,9 @@ jobs:
         if: github.event_name == 'schedule' && failure()
         uses: JasonEtco/create-an-issue@v2
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
           RUN_ID: ${{ github.run_id }}
-          TITLE: "[test-bot] Scheduled tests failed"
+          TITLE: "Scheduled tests failed"
         with:
           filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
           update_existing: true

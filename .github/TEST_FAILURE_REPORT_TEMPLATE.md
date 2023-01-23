@@ -1,6 +1,6 @@
 ---
 title: "{{ env.TITLE }}"
-labels: [bug]
+labels: [type::bug, type::testing]
 ---
 
 The {{ workflow }} workflow failed on {{ date | date("YYYY-MM-DD HH:mm") }} UTC

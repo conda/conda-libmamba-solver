@@ -9,6 +9,8 @@ on:
   pull_request:
     paths-ignore:
       - "docs/**"
+  schedule:
+    - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -80,6 +82,17 @@ jobs:
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    $run_test_cmd"
+
+      - name: Report failures
+        if: github.event_name == 'schedule' && failure()
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "Scheduled tests failed"
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: true
 
   macos:
     name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
@@ -166,6 +179,17 @@ jobs:
           rm ./setup.cfg
           # run test
           ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
+      
+      - name: Report failures
+        if: github.event_name == 'schedule' && failure()
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "Scheduled tests failed"
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: true
 
   windows:
     name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
@@ -261,3 +285,14 @@ jobs:
           del .\setup.cfg
           :: run test
           call ..\conda-libmamba-solver\dev\upstream_unit_tests_win.bat
+     
+      - name: Report failures
+        if: github.event_name == 'schedule' && failure()
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "Scheduled tests failed"
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: true
