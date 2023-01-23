@@ -179,7 +179,7 @@ jobs:
           rm ./setup.cfg
           # run test
           ../conda-libmamba-solver/dev/upstream_unit_tests_macos.sh
-      
+
       - name: Report failures
         if: github.event_name == 'schedule' && failure()
         uses: JasonEtco/create-an-issue@v2
@@ -285,7 +285,7 @@ jobs:
           del .\setup.cfg
           :: run test
           call ..\conda-libmamba-solver\dev\upstream_unit_tests_win.bat
-     
+
       - name: Report failures
         if: github.event_name == 'schedule' && failure()
         uses: JasonEtco/create-an-issue@v2
