@@ -67,8 +67,8 @@ from os import PathLike
 from types import MappingProxyType
 from typing import Iterable, Mapping, Optional, Type, Union
 
-from boltons.setutils import IndexedSet
 from conda import CondaError
+from conda._vendor.boltons.setutils import IndexedSet
 from conda.auxlib import NULL
 from conda.auxlib.ish import dals
 from conda.base.constants import DepsModifier, UpdateModifier
