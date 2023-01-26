@@ -18,6 +18,7 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 
 import libmambapy as api
 from conda import __version__ as _conda_version
+from conda._vendor.boltons.setutils import IndexedSet
 from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,
@@ -110,7 +111,8 @@ class LibMambaSolver(Solver):
                         if spec_str in arg:
                             spec = MatchSpec(arg)
             fixed_specs.append(spec)
-        self.specs_to_add = frozenset(MatchSpec.merge(s for s in fixed_specs))
+        # MatchSpec.merge sorts before merging; keep order without dups with IndexedSet
+        self.specs_to_add = IndexedSet(MatchSpec.merge(s for s in fixed_specs))
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -598,7 +600,6 @@ class LibMambaSolver(Solver):
             # This helps us prioritize neutering for other dependencies first
             unsatisfiable.pop("python")
 
-        current_set = set(unsatisfiable.values())
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
             message = getattr(self.solver, "explain_problems", self.solver.problems_to_str)()
