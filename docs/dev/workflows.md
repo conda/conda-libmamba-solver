@@ -15,7 +15,7 @@ our CI also runs the full `conda/conda` integration suite.
 From the properly mounted `conda/conda` Docker container (see ["Development environment setup"](setup.md)):
 
 ```bash
-$ cd /opt/conda-libmamba-src
+$ cd /opt/conda-libmamba-solver-src
 $ pytest
 ```
 
