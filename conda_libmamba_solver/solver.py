@@ -581,13 +581,15 @@ class LibMambaSolver(Solver):
 
         # TODO: Figure out a way to have ._problems_to_specs_parser
         # return the most adequate exception type instead of reparsing here
+        missing_from_channel = []
         for line in problems.splitlines():
             line = line.strip()
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
-                exc = PackagesNotFoundError([" ".join(packages)])
-                break
-        else:  # we didn't break, raise the "normal" exception
+                missing_from_channel += packages
+        if missing_from_channel:
+            exc = PackagesNotFoundError(missing_from_channel, self.channels)
+        else:
             exc = LibMambaUnsatisfiableError(problems)
 
         # do not allow conda.cli.install to try more things
