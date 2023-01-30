@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Fix compatability errors with newer conda versions >=23.1.0 since we are using an internal API SubdirData (#118 via #119)
+* Fix compatibility errors with newer conda versions >=23.1.0 since we are using an internal API SubdirData. (#118 via #119)
 
 ### Deprecations
 
