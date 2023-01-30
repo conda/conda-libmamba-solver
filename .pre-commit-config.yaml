@@ -34,7 +34,7 @@ repos:
       - id: black
         exclude: tests/_reposerver\.py
   - repo: https://github.com/pycqa/isort
-    rev: 5.11.4
+    rev: 5.12.0
     hooks:
       - id: isort
         exclude: tests/_reposerver\.py
@@ -60,7 +60,7 @@ repos:
         # ignore all tests, not just tests data
         exclude: ^tests/
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.4.1
+    rev: v1.4.2
     hooks:
       - id: insert-license
         files: \.py$
