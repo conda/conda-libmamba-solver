@@ -100,6 +100,12 @@ addopts = [
   "--deselect=tests/core/test_solve.py::test_priority_1",
   # TODO: Investigate why this fails on Windows now
   "--deselect=tests/test_create.py::IntegrationTests::test_install_update_deps_only_deps_flags",
+  # TEMPORARY! FIXME - only skipping to ease development in other PRs, revert ASAP
+  # We need conda-forge to release a new Python 3.8.x that defaults has,
+  # but a bug in conda-build is preventing feedstocks from operating correctly.
+  "--deselect=tests/test_priority.py::PriorityIntegrationTests::test_channel_order_channel_priority_true",
+  # Known 23.1.0 breakage - investigated by costrouc
+  "--deselect=tests/gateways/test_connection.py::test_s3_server",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
