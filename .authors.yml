@@ -2,7 +2,7 @@
   email: jaimergp@users.noreply.github.com
   aliases:
   - jaimergp
-  num_commits: 3
+  num_commits: 52
   first_commit: 2022-01-31 17:24:37
 - name: Jannis Leidel
   email: jannis@leidel.info
@@ -28,7 +28,7 @@
   email: 18747875+conda-bot@users.noreply.github.com
   aliases:
   - Conda Bot
-  num_commits: 2
+  num_commits: 3
   first_commit: 2022-11-15 16:45:31
 - name: Ken Odegard
   email: kodegard@anaconda.com
