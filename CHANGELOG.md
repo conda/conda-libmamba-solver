@@ -11,6 +11,8 @@ copy to its corresponding section, deleting empty sections if any.
 Remember to update the hyperlinks at the bottom.
 --->
 
+[//]: # (current developments)
+
 ## [22.12.0] - 2022-12-01
 
 ### Upgrade notice
