@@ -13,7 +13,7 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
-## 23.1.0 (2023-01-31)
+## [23.1.0] - 2023-01-31
 
 ### Bug fixes
 
@@ -28,15 +28,15 @@ Remember to update the hyperlinks at the bottom.
 ### Other
 
 * CI: Add scheduled runs with self-reported issues. (#60 via #106)
+* Fix typo in workflow documentation so it is consistent with the setup page. (#110)
 
 ### Contributors
 
-* @costrouc
+* @costrouc made their first contribution in #110
 * @jaimergp
 * @jezdez
 * @conda-bot
 * @pre-commit-ci[bot]
-
 
 
 ## [22.12.0] - 2022-12-01
@@ -147,3 +147,4 @@ _Internal pre-release as a separate repository._
 [22.8.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.0
 [22.8.1]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.1
 [22.12.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0
+[23.1.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/23.1.0
