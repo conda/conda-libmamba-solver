@@ -1,0 +1,36 @@
+- name: Jaime Rodríguez-Guerra
+  email: jaimergp@users.noreply.github.com
+  aliases:
+  - jaimergp
+  num_commits: 3
+  first_commit: 2022-01-31 17:24:37
+- name: Jannis Leidel
+  email: jannis@leidel.info
+  num_commits: 29
+  first_commit: 2022-02-17 14:48:48
+- name: pre-commit-ci[bot]
+  email: 66853113+pre-commit-ci[bot]@users.noreply.github.com
+  num_commits: 7
+  first_commit: 2022-11-22 08:39:31
+- name: Christopher Ostrouchov
+  email: chris.ostrouchov@gmail.com
+  num_commits: 2
+  first_commit: 2023-01-24 15:12:29
+- name: Daniel Holth
+  email: dholth@anaconda.com
+  num_commits: 1
+  first_commit: 2022-10-19 21:11:39
+- name: Matthew R. Becker
+  email: beckermr@users.noreply.github.com
+  num_commits: 1
+  first_commit: 2022-01-19 18:26:25
+- name: conda-bot
+  email: 18747875+conda-bot@users.noreply.github.com
+  aliases:
+  - Conda Bot
+  num_commits: 2
+  first_commit: 2022-11-15 16:45:31
+- name: Ken Odegard
+  email: kodegard@anaconda.com
+  num_commits: 1
+  first_commit: 2022-03-04 23:25:33
