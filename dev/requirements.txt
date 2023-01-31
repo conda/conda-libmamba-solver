@@ -1,4 +1,4 @@
 conda-forge::libmambapy>=1.2.0
 conda-forge::libarchive
-conda>=22.11.1
-importlib-metadata
+conda-forge::conda>=22.11.1
+conda-forge::importlib-metadata
