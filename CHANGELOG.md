@@ -23,7 +23,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### Docs
 
-* Mention expected versions and how to upgrade from experimental builds (#89 via #93).
+* Mention expected versions and how to upgrade from experimental builds. (#89 via #93)
 
 ### Other
 
