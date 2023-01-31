@@ -13,6 +13,32 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.1.0 (2023-01-31)
+
+### Bug fixes
+
+* Fix "Packages Not Found" error messages to be more accurate and informative. (#96 via #101)
+* Ensure solves are deterministic and input order independent. (#75 via #111)
+* Fix compatibility errors with newer conda versions >=23.1.0 since we are using an internal API SubdirData. (#118 via #119)
+
+### Docs
+
+* Mention expected versions and how to upgrade from experimental builds (#89 via #93).
+
+### Other
+
+* CI: Add scheduled runs with self-reported issues. (#60 via #106)
+
+### Contributors
+
+* @costrouc
+* @jaimergp
+* @jezdez
+* @conda-bot
+* @pre-commit-ci[bot]
+
+
+
 ## [22.12.0] - 2022-12-01
 
 ### Upgrade notice
