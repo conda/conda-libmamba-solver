@@ -1,6 +1,6 @@
 package:
   name: "conda-libmamba-solver"
-  version: {{ GIT_DESCRIBE_TAG }}.{{ GIT_BUILD_STR }}
+  version: "{{ GIT_DESCRIBE_TAG }}.{{ GIT_BUILD_STR }}"
 
 source:
   # git_url is nice in that it won't capture devenv stuff.  However, it only
@@ -28,6 +28,13 @@ test:
     - conda_libmamba_solver
   commands:
     - CONDA_SOLVER=libmamba conda create -n test --dry-run scipy
+    - >-
+      python -c
+      "import conda_libmamba_solver as cls;
+      from importlib.metadata import version;
+      assert '{{ PKG_VERSION }}' == cls.__version__ == version('conda_libmamba_solver'),
+      '{{ PKG_VERSION }}' + f', {cls.__version__}, ' + version('conda_libmamba_solver')
+      "
 
 about:
   home: https://github.com/conda/conda-libmamba-solver
