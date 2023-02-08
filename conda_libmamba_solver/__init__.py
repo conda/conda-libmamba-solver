@@ -4,7 +4,13 @@
 try:
     from ._version import version as __version__
 except ImportError:
-    __version__ = "0.0.0.unknown"
+    try:
+        from importlib_metadata import version
+
+        __version__ = version("conda_libmamba_solver")
+        del version
+    except ImportError:
+        __version__ = "0.0.0.unknown"
 
 from warnings import warn as _warn
 
