@@ -87,7 +87,6 @@ class PatchedCondaTestCreate(BaseTestCase):
 
     def test_pinned_override_with_explicit_spec(self):
         with make_temp_env("python=3.6") as prefix:
-
             ## MODIFIED
             # Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
             # Instead we only pin whatever the solver decided to install
@@ -209,7 +208,6 @@ def test_pinned_1(tmpdir):
         with get_solver(
             tmpdir, specs_to_add=specs_to_add, prefix_records=final_state_1, history_specs=specs
         ) as solver:
-
             ## MODIFIED
             # Original tests checks for SpecsConfigurationConflictError being raised
             # but libmamba will fails with UnsatisfiableError instead. Hence, we check
@@ -458,7 +456,6 @@ def test_freeze_deps_1(tmpdir):
         prefix_records=final_state_1,
         history_specs=(MatchSpec("six=1.7"), MatchSpec("python=3.4")),
     ) as solver:
-
         ## MODIFIED
         # We can obtain the same exact solve only if we ask for an explicit prune (default is False)
         # Original line:
