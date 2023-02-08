@@ -1,6 +1,10 @@
 # Copyright (C) 2022 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
-__version__ = "23.1.0"
+
+try:
+    from ._version import version as __version__
+except ImportError:
+    __version__ = "0.0.0.unknown"
 
 from warnings import warn as _warn
 
