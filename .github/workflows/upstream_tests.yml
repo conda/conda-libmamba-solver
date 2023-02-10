@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   linux:
-    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
+    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
