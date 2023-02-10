@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   linux:
-    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -27,10 +27,12 @@ jobs:
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
+        default-channel: ["conda-forge"]
         include:
           - python-version: "3.10"
             test-type: "unit"
             test-group: "1"
+            default-channel: "conda-forge"
 
     env:
       OS: "linux"
@@ -76,7 +78,7 @@ jobs:
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_SOLVER
-          ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}
+          ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
           bash -c "sudo env CONDA_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt &&
@@ -104,10 +106,12 @@ jobs:
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
+        default-channel: ["conda-forge"]
         include:
           - python-version: "3.8"
             test-type: "unit"
             test-group: "1"
+            default-channel: "conda-forge"
 
     env:
       OS: "macos"
@@ -131,11 +135,21 @@ jobs:
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
+        name: Setup miniconda for defaults
+        if: matrix.default_channel == 'defaults'
         env:
           CONDA_SOLVER: classic
         with:
           activate-environment: conda-test-env
-          use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
+
+      - uses: conda-incubator/setup-miniconda@v2
+        name: Setup miniconda for conda-forge
+        if: matrix.default_channel == 'conda-forge'
+        env:
+          CONDA_SOLVER: classic
+        with:
+          activate-environment: conda-test-env
+          miniforge-version: latest 
 
       - name: Setup environment
         shell: bash -el {0}
@@ -192,7 +206,7 @@ jobs:
           update_existing: true
 
   windows:
-    name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -201,10 +215,12 @@ jobs:
         test-group: ["1", "2", "3"]
         test-splits: ["3"]
         test-type: ["integration"]
+        default-channel: ["conda-forge"]
         include:
           - python-version: "3.9"
             test-type: "unit"
             test-group: "1"
+            default-channel: conda-forge
 
     env:
       OS: "windows"
@@ -241,6 +257,8 @@ jobs:
           # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
           # otherwise it will error out because it can't be imported yet!
           CONDA_SOLVER: classic
+          CONDA_CHANNELS: ${{ matrix.default-channel }}
+          CONDA_CHANNEL_PRIORITY: strict
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
