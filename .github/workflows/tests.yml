@@ -28,15 +28,13 @@ jobs:
       matrix:
         include:
           - python-version: "3.7"
-            default-channel: conda-forge
-          - python-version: "3.8"
-            default-channel: conda-forge
-          - python-version: "3.9"
-            default-channel: conda-forge
-          - python-version: "3.10"
-            default-channel: conda-forge
-          - python-version: "3.10"
             default-channel: defaults
+          - python-version: "3.8"
+            default-channel: defaults
+          - python-version: "3.9"
+            default-channel: defaults
+          - python-version: "3.10"
+            default-channel: conda-forge
 
     env:
       OS: "linux"
@@ -81,11 +79,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
-        default-channel: ["conda-forge"]
+        python-version: ["3.7", "3.8", "3.9"]
+        default-channel: ["defaults"]
         include:
-          - python-version: "3.9"
-            default-channel: "defaults"
+          - python-version: "3.10"
+            default-channel: "conda-forge"
 
     env:
       OS: "macos"
@@ -164,11 +162,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
-        default-channel: [conda-forge]
+        python-version: ["3.7", "3.8", "3.9"]
+        default-channel: [defaults]
         include:
-          - python-version: "3.8"
-            default-channel: defaults
+          - python-version: "3.10"
+            default-channel: conda-forge
 
     env:
       OS: "windows"
