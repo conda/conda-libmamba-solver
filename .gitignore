@@ -154,3 +154,6 @@ cython_debug/
 
 # rever
 rever/
+
+# setuptools_scm
+_version.py
