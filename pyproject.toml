@@ -1,6 +1,6 @@
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [project]
 name = "conda-libmamba-solver"
@@ -37,8 +37,8 @@ homepage = "https://github.com/conda/conda-libmamba-solver"
 [project.entry-points.conda]
 conda-libmamba-solver = "conda_libmamba_solver.plugin"
 
-[tool.flit.module]
-name = "conda_libmamba_solver"
+[tool.hatch.version]
+source = "vcs"
 
 [tool.black]
 line-length = 99
@@ -100,10 +100,6 @@ addopts = [
   "--deselect=tests/core/test_solve.py::test_priority_1",
   # TODO: Investigate why this fails on Windows now
   "--deselect=tests/test_create.py::IntegrationTests::test_install_update_deps_only_deps_flags",
-  # TEMPORARY! FIXME - only skipping to ease development in other PRs, revert ASAP
-  # We need conda-forge to release a new Python 3.8.x that defaults has,
-  # but a bug in conda-build is preventing feedstocks from operating correctly.
-  "--deselect=tests/test_priority.py::PriorityIntegrationTests::test_channel_order_channel_priority_true",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",

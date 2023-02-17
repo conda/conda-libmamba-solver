@@ -31,9 +31,11 @@ dev/setup
 dev/workflows
 dev/implementation
 dev/future-work
+dev/code-of-conduct
+dev/changelog
 ```
 +++
-[Code of Conduct](dev/code-of-conduct), [Changelog](dev/changelog)
+[Code repository](https://github.com/conda/conda-libmamba-solver), [Project board](https://github.com/orgs/conda/projects/15)
 
 :::
 
