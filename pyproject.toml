@@ -1,6 +1,6 @@
 [build-system]
-requires = ["flit_core >=3.2,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
 
 [project]
 name = "conda-libmamba-solver"
@@ -23,8 +23,8 @@ classifiers = [
 ]
 requires-python = ">=3.7"
 dependencies = [
-  "conda >=22.11",
-  "libmambapy >=1.0",
+  "conda >=22.11.0",
+  "libmambapy >=1.0.0",
   "importlib-metadata"
 ]
 dynamic = [
@@ -37,8 +37,8 @@ homepage = "https://github.com/conda/conda-libmamba-solver"
 [project.entry-points.conda]
 conda-libmamba-solver = "conda_libmamba_solver.plugin"
 
-[tool.flit.module]
-name = "conda_libmamba_solver"
+[tool.hatch.version]
+source = "vcs"
 
 [tool.black]
 line-length = 99
@@ -74,7 +74,7 @@ addopts = [
   "--deselect=tests/core/test_solve.py::test_solve_2",
   "--deselect=tests/core/test_solve.py::test_virtual_package_solver",
   "--deselect=tests/core/test_solve.py::test_broken_install",
-  # Features / nomkl involved
+  # Features / nomkl involved
   "--deselect=tests/core/test_solve.py::test_features_solve_1",
   "--deselect=tests/core/test_solve.py::test_prune_1",
   "--deselect=tests/test_create.py::IntegrationTests::test_remove_features",

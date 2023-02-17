@@ -59,7 +59,7 @@ def prefix_and_channels(request):
 
 @pytest.fixture(scope="function", params=["libmamba", "classic"])
 def solver_args(request):
-    yield ("--dry-run", "--solver", request.param.value)
+    yield ("--dry-run", "--solver", request.param)
 
 
 @pytest.mark.slow

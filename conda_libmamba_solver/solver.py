@@ -18,6 +18,7 @@ from typing import Iterable, Mapping, Optional
 
 import libmambapy as api
 from conda import __version__ as _conda_version
+from conda._vendor.boltons.setutils import IndexedSet
 from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,
@@ -117,7 +118,8 @@ class LibMambaSolver(Solver):
                         if spec_str in arg:
                             spec = MatchSpec(arg)
             fixed_specs.append(spec)
-        self.specs_to_add = frozenset(MatchSpec.merge(s for s in fixed_specs))
+        # MatchSpec.merge sorts before merging; keep order without dups with IndexedSet
+        self.specs_to_add = IndexedSet(MatchSpec.merge(s for s in fixed_specs))
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -497,7 +499,6 @@ class LibMambaSolver(Solver):
     def _specs_to_tasks_conda_build(
         self, in_state: SolverInputState, out_state: SolverOutputState
     ):
-
         tasks = defaultdict(list)
         key = "INSTALL", api.SOLVER_INSTALL
         for name, spec in out_state.specs.items():
@@ -574,7 +575,6 @@ class LibMambaSolver(Solver):
             # This helps us prioritize neutering for other dependencies first
             conflicts.pop("python")
 
-        current_set = set(conflicts.values())
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) conflicts now! Abort to avoid recursion.
             self._raise_for_problems(problems)
@@ -590,13 +590,15 @@ class LibMambaSolver(Solver):
 
         # TODO: Figure out a way to have ._problems_to_specs_parser
         # return the most adequate exception type instead of reparsing here
+        missing_from_channel = []
         for line in problems.splitlines():
             line = line.strip()
             if line.startswith("- nothing provides requested"):
                 packages = line.split()[4:]
-                exc = PackagesNotFoundError([" ".join(packages)])
-                break
-        else:  # we didn't break, raise the "normal" exception
+                missing_from_channel += packages
+        if missing_from_channel:
+            exc = PackagesNotFoundError(missing_from_channel, self.channels)
+        else:
             exc = LibMambaUnsatisfiableError(problems)
 
         # do not allow conda.cli.install to try more things
@@ -780,13 +782,13 @@ class LibMambaSolver(Solver):
             return
 
         channel_name = current_conda_prefix_rec.channel.canonical_name
-        if channel_name in (UNKNOWN_CHANNEL, "<develop>"):
+        if channel_name in (UNKNOWN_CHANNEL, "@", "<develop>", "pypi"):
             channel_name = "defaults"
 
         # only check the loaded index if it contains the channel conda should come from
         # otherwise ignore
         index_channels = {getattr(chn, "canonical_name", chn) for chn in index._channels}
-        if channel_name in index_channels:
+        if channel_name not in index_channels:
             return
 
         # we only want to check if a newer conda is available in the channel we installed it from

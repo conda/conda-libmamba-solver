@@ -5,30 +5,77 @@ All notable changes to this project will be documented in this file.
 > The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 > and this project adheres to [calendar versioning](https://calver.org/) in the `YY.M.MICRO`format.
 
-## [Unreleased]
-
 <!--
 Populate these categories as PRs are merged to `main`. When a release is cut,
 copy to its corresponding section, deleting empty sections if any.
 Remember to update the hyperlinks at the bottom.
 --->
 
+[//]: # (current developments)
+
+## [23.1.0] - 2023-01-31
+
+### Bug fixes
+
+* Fix "Packages Not Found" error messages to be more accurate and informative. (#96 via #101)
+* Ensure solves are deterministic and input order independent. (#75 via #111)
+* Fix compatibility errors with newer conda versions >=23.1.0 since we are using an internal API SubdirData. (#118 via #119)
+
+### Docs
+
+* Mention expected versions and how to upgrade from experimental builds. (#89 via #93)
+
+### Other
+
+* CI: Add scheduled runs with self-reported issues. (#60 via #106)
+* Fix typo in workflow documentation so it is consistent with the setup page. (#110)
+
+### Contributors
+
+* @costrouc made their first contribution in #110
+* @jaimergp
+* @jezdez
+* @conda-bot
+* @pre-commit-ci[bot]
+
+
+## [22.12.0] - 2022-12-01
+
+### Upgrade notice
+To upgrade to `conda-libmamba-solver 22.12.0` please update to `conda 22.11.0` using the "classic" solver first:
+
+```
+$ CONDA_EXPERIMENTAL_SOLVER=classic conda install -n base conda=22.11.0
+```
+
+and then install a new version of conda-libmamba-solver:
+
+```
+$ CONDA_EXPERIMENTAL_SOLVER=classic conda install -n base conda-libmamba-solver=22.12.0
+```
+
+Afterwards, please use the new `CONDA_SOLVER` environment variable and ``--solver`` as mentioned below.
+
 ### Added
+
+* Added a new documentation site: https://conda.github.io/conda-libmamba-solver/ (#58)
+* Added [CEP 4](https://github.com/conda-incubator/ceps/blob/main/cep-4.md) compatible plugin for conda's `solvers` plugin hook. (#63)
 
 ### Changed
 
+* The `conda-libmamba-solver` package is now generally available, removes the `experimental` label. (#53)
 * The index will also load channels only listed as part the installed packages in the active prefix. (#52)
-* Adopt the new `solver` name in lieu of `experimental-solver`. (#53)
+* Updated compatibility to [mamba 1.0.0](https://github.com/mamba-org/mamba/releases/tag/2022.11.01) and [conda 22.11.0](https://github.com/conda/conda/releases/tag/22.11.0). (#78)
 
 ### Deprecated
 
-### Removed
+* Deprecate support for Python 3.6.x.
 
 ### Fixed
 
-* If missing or empty, package records will have their `subdir` field populated by the channel platform. (#53)
+* Fixed a wrong dependency on libmambapy. (#90)
 
-### Security
+* If missing or empty, package records will have their `subdir` field populated by the channel platform. (#53)
 
 ## [22.8.1] - 2022-08-25
 
@@ -99,3 +146,5 @@ _Internal pre-release as a separate repository._
 [22.6.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.6.0
 [22.8.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.0
 [22.8.1]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.8.1
+[22.12.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0
+[23.1.0]: https://github.com/conda/conda-libmamba-solver/releases/tag/23.1.0

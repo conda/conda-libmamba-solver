@@ -332,13 +332,13 @@ class _DownloadOnlySubdirData(SubdirData):
         "_track_features_index": {},
     }
 
-    def _read_local_repdata(self, *args):
+    def _read_local_repdata(self, *args, **kwargs):
         return self._internal_state_template
 
-    def _process_raw_repodata_str(self, *args):
+    def _process_raw_repodata_str(self, *args, **kwargs):
         return self._internal_state_template
 
-    def _process_raw_repodata(self, *args):
+    def _process_raw_repodata(self, *args, **kwargs):
         return self._internal_state_template
 
     def _pickle_me(self, *args):

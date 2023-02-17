@@ -15,7 +15,7 @@ sudo /opt/conda/condabin/conda install -y -p /opt/conda \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 
 cd /opt/conda-libmamba-solver-src
-sudo env FLIT_ROOT_INSTALL=1 /opt/conda/bin/python -m flit install --symlink --deps=none
+sudo /opt/conda/bin/python -m pip install -e . --no-deps
 
 cd /opt/conda-src
 export RUNNING_ON_DEVCONTAINER=${RUNNING_ON_DEVCONTAINER:-}

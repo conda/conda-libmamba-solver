@@ -9,6 +9,8 @@ on:
   pull_request:
     paths-ignore:
       - "docs/**"
+  schedule:
+    - cron: "15 6 * * 1-5"  # Mon to Fri, 6:15am
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -233,6 +235,17 @@ jobs:
         with:
           jobs: ${{ toJSON(needs) }}
 
+      - name: Report failures
+        if: github.event_name == 'schedule' && failure()
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "Scheduled tests failed"
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: true
+
   build:
     name: Canary Build
     needs: [analyze]
@@ -253,6 +266,8 @@ jobs:
         include:
           - runner: ubuntu-latest
             subdir: noarch
+    env:
+      CONDA_SOLVER: classic
     runs-on: ${{ matrix.runner }}
     steps:
       # Clean checkout of specific git ref needed for package metadata version
@@ -264,7 +279,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create and upload canary build
-        uses: conda/actions/canary-release@v22.10.0
+        uses: conda/actions/canary-release@v22.11.1
         with:
           package-name: ${{ github.event.repository.name }}
           subdir: ${{ matrix.subdir }}
