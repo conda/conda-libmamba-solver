@@ -1,0 +1,76 @@
+name: Manual Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      conda-version:
+        description: 'Conda Version'
+        required: true
+        default: '23.1.0'
+        type: choice
+        options:
+        - 'main'
+        - '23.1.0'
+      conda-libmamba-version:
+        description: 'conda-libmamba-solver version/branch'
+        required: true
+        default: '23.1.0'
+      channel:
+        description: 'Conda Channel'
+        required: true
+        default: 'conda-forge'
+      os:
+        description: 'Operating System'
+        required: true
+        default: 'ubuntu-latest'
+        type: choice
+        options:
+          - macos-latest
+          - ubuntu-latest
+          - windows-latest
+
+jobs:
+  conda-libmamba-solver:
+    name: conda-libmamba-solver=${{ inputs.conda-libmamba-version }} os=${{ inputs.os }}
+    runs-on: ${{ inputs.os }}
+    steps:
+      - name: 'Checkout Repository'
+        uses: actions/checkout@master
+
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-activate-base: true
+          activate-environment: ""
+          conda-version: ${{ inputs.conda-version }}
+
+      - name: conda-libmamba-solver from Conda
+        shell: bash -el {0}
+        run: conda install -c conda-forge conda-libmamba-solver==${{ inputs.conda-libmamba-version }}
+        if: ${{ startsWith(inputs.conda-libmamba-version, '2') }}
+
+      - name: conda-libmamba-solver from Git Repository
+        shell: bash -el {0}
+        run: |
+          git clone https://github.com/conda/conda-libmamba-solver
+          cd conda-libmamba-solver
+          git checkout ${{ inputs.conda-libmamba-version }}
+          which conda
+          conda install -y -n base \
+             --file $PWD/dev/requirements.txt \
+             --file $PWD/tests/requirements.txt
+          python -m pip install -e . --no-deps
+        if: ${{ !startsWith(inputs.conda-libmamba-version, '2') }}
+
+      - name: Conda Info
+        shell: bash -el {0}
+        run: |
+          printf '{"channels": ["${{ inputs.channel }}"], "solver": "libmamba"}' > ~/.condarc
+          conda info
+          conda config --show
+          conda list
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 15
+        with:
+          limit-access-to-actor: true
