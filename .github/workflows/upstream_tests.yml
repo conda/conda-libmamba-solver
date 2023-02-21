@@ -294,7 +294,7 @@ jobs:
           # otherwise it will error out because it can't be imported yet!
           CONDA_SOLVER: classic
           CONDA_CHANNELS: ${{ matrix.default-channel }}
-          CONDA_CHANNEL_PRIORITY: strict
+          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || 'flexible' }}
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt
