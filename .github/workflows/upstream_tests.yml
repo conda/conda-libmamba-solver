@@ -193,7 +193,7 @@ jobs:
           CONDA_SOLVER: classic
         with:
           activate-environment: conda-test-env
-          miniforge-version: latest 
+          miniforge-version: latest
           python-version: ${{ matrix.python-version }}
 
       - name: Setup environment
