@@ -23,16 +23,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10"]
-        test-group: ["1", "2", "3"]
-        test-splits: ["3"]
-        test-type: ["integration"]
-        default-channel: ["conda-forge"]
         include:
-          - python-version: "3.10"
-            test-type: "unit"
-            test-group: "1"
-            default-channel: "conda-forge"
+          - default-channel: 'defaults'
+            python-version: '3.10'
+            test-type: 'unit'
+            test-group: '1'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.10'
+            test-type: 'unit'
+            test-group: '2'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.10'
+            test-type: 'unit'
+            test-group: '3'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.10'
+            test-type: 'integration'
+            test-group: '1'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.10'
+            test-type: 'integration'
+            test-group: '2'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.10'
+            test-type: 'integration'
+            test-group: '3'
+            test-splits: '3'
 
     env:
       OS: "linux"
@@ -68,7 +89,7 @@ jobs:
           cp conda-libmamba-solver/pyproject.toml conda/pyproject.toml
           rm conda/setup.cfg
 
-      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         working-directory: conda
         run: >
           docker run
@@ -97,21 +118,42 @@ jobs:
           update_existing: true
 
   macos:
-    name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
+    name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}, ${{ matrix.test-type }}, group ${{ matrix.test-group }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8"]
-        test-group: ["1", "2", "3"]
-        test-splits: ["3"]
-        test-type: ["integration"]
-        default-channel: ["defaults"]
         include:
-          - python-version: "3.8"
-            test-type: "unit"
-            test-group: "1"
-            default-channel: "defaults"
+          - default-channel: 'conda-forge'
+            python-version: '3.9'
+            test-type: 'unit'
+            test-group: '1'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.9'
+            test-type: 'unit'
+            test-group: '2'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.9'
+            test-type: 'unit'
+            test-group: '3'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.9'
+            test-type: 'integration'
+            test-group: '1'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.9'
+            test-type: 'integration'
+            test-group: '2'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.9'
+            test-type: 'integration'
+            test-group: '3'
+            test-splits: '3'
 
     env:
       OS: "macos"
@@ -136,20 +178,23 @@ jobs:
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
-        if: matrix.default_channel == 'defaults'
+        if: matrix.default-channel == 'defaults'
         env:
           CONDA_SOLVER: classic
         with:
           activate-environment: conda-test-env
+          miniconda-version: latest
+          python-version: ${{ matrix.python-version }}
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for conda-forge
-        if: matrix.default_channel == 'conda-forge'
+        if: matrix.default-channel == 'conda-forge'
         env:
           CONDA_SOLVER: classic
         with:
           activate-environment: conda-test-env
           miniforge-version: latest 
+          python-version: ${{ matrix.python-version }}
 
       - name: Setup environment
         shell: bash -el {0}
@@ -172,7 +217,7 @@ jobs:
         run: |
           python -m pip install . -vv --no-deps
 
-      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: bash -l {0}
         working-directory: conda
         if: matrix.test-type == 'integration'
@@ -211,16 +256,37 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9"]
-        test-group: ["1", "2", "3"]
-        test-splits: ["3"]
-        test-type: ["integration"]
-        default-channel: ["defaults"]
         include:
-          - python-version: "3.9"
-            test-type: "unit"
-            test-group: "1"
-            default-channel: defaults
+          - default-channel: 'conda-forge'
+            python-version: '3.8'
+            test-type: 'unit'
+            test-group: '1'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.8'
+            test-type: 'unit'
+            test-group: '2'
+            test-splits: '3'
+          - default-channel: 'conda-forge'
+            python-version: '3.8'
+            test-type: 'unit'
+            test-group: '3'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.8'
+            test-type: 'integration'
+            test-group: '1'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.8'
+            test-type: 'integration'
+            test-group: '2'
+            test-splits: '3'
+          - default-channel: 'defaults'
+            python-version: '3.8'
+            test-type: 'integration'
+            test-group: '3'
+            test-splits: '3'
 
     env:
       OS: "windows"
@@ -282,7 +348,7 @@ jobs:
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
 
-      - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: cmd
         working-directory: conda
         if: matrix.test-type == 'integration'
@@ -293,7 +359,7 @@ jobs:
           :: run test
           call .\dev\windows\${{ matrix.test-type }}.bat
 
-      - name: Python ${{ matrix.python-version }}, ${{ matrix.test-type }} tests
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests
         shell: cmd
         working-directory: conda
         if: matrix.test-type == 'unit'
