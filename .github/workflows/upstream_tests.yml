@@ -63,7 +63,9 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: conda/conda
+          # temporary; revert to conda/conda when done
+          repository: jaimergp/conda
+          ref: fix-repodata-mismatched-subdir
           path: conda
 
       - name: Define test type and override pytest settings
@@ -153,7 +155,9 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: conda/conda
+          # temporary; revert to conda/conda when done
+          repository: jaimergp/conda
+          ref: fix-repodata-mismatched-subdir
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -197,7 +201,7 @@ jobs:
         run: |
           python -m pip install . -vv --no-deps
 
-      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }} ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }} integration tests, group ${{ matrix.test-group }}
         shell: bash -l {0}
         working-directory: conda
         if: matrix.test-type == 'integration'
@@ -208,7 +212,7 @@ jobs:
           # run test
           ./dev/macos/integration.sh
 
-      - name: Python ${{ matrix.python-version }} ${{ matrix.test-type }} tests
+      - name: Python ${{ matrix.python-version }} unit tests
         shell: bash -l {0}
         working-directory: conda
         if: matrix.test-type == 'unit'
@@ -276,7 +280,9 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-          repository: conda/conda
+          # temporary; revert to conda/conda when done
+          repository: jaimergp/conda
+          ref: fix-repodata-mismatched-subdir
           path: conda
 
       - name: Set temp dirs correctly
@@ -318,7 +324,7 @@ jobs:
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
 
-      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, integration tests, group ${{ matrix.test-group }}
         shell: cmd
         working-directory: conda
         if: matrix.test-type == 'integration'
@@ -329,7 +335,7 @@ jobs:
           :: run test
           call .\dev\windows\${{ matrix.test-type }}.bat
 
-      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, unit tests
         shell: cmd
         working-directory: conda
         if: matrix.test-type == 'unit'
