@@ -54,13 +54,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           # temporary; revert to conda/conda when done
@@ -146,13 +146,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           # temporary; revert to conda/conda when done
@@ -271,13 +271,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           # temporary; revert to conda/conda when done
