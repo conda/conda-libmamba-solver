@@ -28,31 +28,27 @@ jobs:
             python-version: '3.10'
             test-type: 'unit'
             test-group: '1'
-          - default-channel: 'defaults'
-            python-version: '3.10'
-            test-type: 'unit'
-            test-group: '2'
-          - default-channel: 'defaults'
-            python-version: '3.10'
-            test-type: 'unit'
-            test-group: '3'
+            test-splits: '1'
           - default-channel: 'conda-forge'
             python-version: '3.10'
             test-type: 'integration'
             test-group: '1'
+            test-splits: '3'
           - default-channel: 'conda-forge'
             python-version: '3.10'
             test-type: 'integration'
             test-group: '2'
+            test-splits: '3'
           - default-channel: 'conda-forge'
             python-version: '3.10'
             test-type: 'integration'
             test-group: '3'
+            test-splits: '3'
 
     env:
       OS: "linux"
       PYTHON: ${{ matrix.python-version }}
-      TEST_SPLITS: 3
+      TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
       CONDA_SOLVER: "libmamba"
 
@@ -122,31 +118,27 @@ jobs:
             python-version: '3.9'
             test-type: 'unit'
             test-group: '1'
-          - default-channel: 'conda-forge'
-            python-version: '3.9'
-            test-type: 'unit'
-            test-group: '2'
-          - default-channel: 'conda-forge'
-            python-version: '3.9'
-            test-type: 'unit'
-            test-group: '3'
+            test-splits: '1'
           - default-channel: 'defaults'
             python-version: '3.9'
             test-type: 'integration'
             test-group: '1'
+            test-splits: '3'
           - default-channel: 'defaults'
             python-version: '3.9'
             test-type: 'integration'
             test-group: '2'
+            test-splits: '3'
           - default-channel: 'defaults'
             python-version: '3.9'
             test-type: 'integration'
             test-group: '3'
+            test-splits: '3'
 
     env:
       OS: "macos"
       PYTHON: ${{ matrix.python-version }}
-      TEST_SPLITS: 3
+      TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
       CONDA_SOLVER: libmamba
 
@@ -249,31 +241,27 @@ jobs:
             python-version: '3.8'
             test-type: 'unit'
             test-group: '1'
-          - default-channel: 'conda-forge'
-            python-version: '3.8'
-            test-type: 'unit'
-            test-group: '2'
-          - default-channel: 'conda-forge'
-            python-version: '3.8'
-            test-type: 'unit'
-            test-group: '3'
+            test-splits: '1'
           - default-channel: 'defaults'
             python-version: '3.8'
             test-type: 'integration'
             test-group: '1'
+            test-splits: '3'
           - default-channel: 'defaults'
             python-version: '3.8'
             test-type: 'integration'
             test-group: '2'
+            test-splits: '3'
           - default-channel: 'defaults'
             python-version: '3.8'
             test-type: 'integration'
             test-group: '3'
+            test-splits: '3'
 
     env:
       OS: "windows"
       PYTHON: ${{ matrix.python-version }}
-      TEST_SPLITS: 3
+      TEST_SPLITS: ${{ matrix.test-splits }}
       TEST_GROUP: ${{ matrix.test-group }}
       CONDA_SOLVER: libmamba
 
