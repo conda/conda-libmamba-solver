@@ -14,6 +14,10 @@ on:
   # NOTE: github.event context is pull_request payload:
   # https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
   pull_request:
+  # CONDA-LIBMAMBA-SOLVER CHANGE
+  schedule:
+    - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
+  # /CONDA-LIBMAMBA-SOLVER CHANGE
 
 concurrency:
   # Concurrency group that uses the workflow name and PR number if available
@@ -517,10 +521,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Decide whether the needed jobs succeeded or failed
+        id: alls-green # CONDA-LIBMAMBA-SOLVER CHANGE
         uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe
         with:
           allowed-skips: ${{ toJSON(needs) }}
           jobs: ${{ toJSON(needs) }}
+
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Report failures
+        if: github.event_name == 'schedule' && alls-green.outputs.failure
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "Scheduled tests failed"
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: true
+      # /CONDA-LIBMAMBA-SOLVER CHANGE
 
   # canary builds
   build:
