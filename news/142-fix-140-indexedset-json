@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Fixed [issue 140](https://github.com/conda/conda-libmamba-solver/issues/140) where error message could not be JSON serialized by conda
+* Fix JSON serialization errors in some exceptions. (#140 via #142)
 
 ### Deprecations
 
