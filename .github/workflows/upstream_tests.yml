@@ -1,7 +1,7 @@
 # this is the sibling workflow to docs.yml, it is required to work around
 # the skipped but required checks issue:
 #   https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/defining-the-mergeability-of-pull-requests/troubleshooting-required-status-checks#handling-skipped-but-required-checks
-name: Tests
+name: Upstream tests # CONDA-LIBMAMBA-SOLVER CHANGE
 
 on:
   # NOTE: github.event context is push payload:
