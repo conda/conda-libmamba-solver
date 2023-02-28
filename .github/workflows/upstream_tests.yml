@@ -268,75 +268,75 @@ jobs:
             test-report.xml
           retention-days: 1
 
-  # # linux-qemu test suite
-  # linux-qemu:
-  #   # only run test suite if there are code changes
-  #   needs: changes
-  #   if: needs.changes.outputs.code == 'true'
+  # linux-qemu test suite
+  linux-qemu:
+    # only run test suite if there are code changes
+    needs: changes
+    if: false # needs.changes.outputs.code == 'true' # CONDA-LIBMAMBA-SOLVER CHANGE
 
-  #   # Run one single fast test per docker+qemu emulated linux platform to test that
-  #   # test execution is possible there (container+tools+dependencies work). Can be
-  #   # changed / extended to run specific tests in case there are platform related
-  #   # things to test. Running more tests is time consuming due to emulation
-  #   # (factor 2-10x slower).
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       default-channel: ['defaults', 'conda-forge']
-  #       python-version: ['3.10']
-  #       platform: ['arm64', 'ppc64le']
-  #   env:
-  #     OS: linux-${{ matrix.platform }}
-  #     PYTHON: ${{ matrix.python-version }}
-  #   steps:
-  #     - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-  #       uses: actions/checkout@v3
-  #       with:
-  #         fetch-depth: 0
-  #         repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-  #         path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+    # Run one single fast test per docker+qemu emulated linux platform to test that
+    # test execution is possible there (container+tools+dependencies work). Can be
+    # changed / extended to run specific tests in case there are platform related
+    # things to test. Running more tests is time consuming due to emulation
+    # (factor 2-10x slower).
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        default-channel: ['defaults', 'conda-forge']
+        python-version: ['3.10']
+        platform: ['arm64', 'ppc64le']
+    env:
+      OS: linux-${{ matrix.platform }}
+      PYTHON: ${{ matrix.python-version }}
+    steps:
+      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
-  #     # CONDA-LIBMAMBA-SOLVER CHANGE
-  #     - name: Checkout conda-libmamba-solver
-  #       uses: actions/checkout@v3
-  #       with:
-  #         fetch-depth: 0
-  #         path: conda-libmamba-solver
-  #     # /CONDA-LIBMAMBA-SOLVER CHANGE
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Checkout conda-libmamba-solver
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: conda-libmamba-solver
+      # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-  #     - name: Set up QEMU
-  #       uses: docker/setup-qemu-action@v2
-  #       # Equivalent to locally run:
-  #       #   `docker run --privileged --rm tonistiigi/binfmt --install all`
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        # Equivalent to locally run:
+        #   `docker run --privileged --rm tonistiigi/binfmt --install all`
 
-  #     # CONDA-LIBMAMBA-SOLVER CHANGE
-  #     # - export CONDA_SOLVER
-  #     # -
-  #     - name: Python linux-${{ matrix.platform }} on ${{ matrix.default-channel }}, ${{ matrix.python-version }} tests
-  #       run: >
-  #         docker run
-  #         --rm
-  #         -v ${PWD}:/opt/conda-src
-  #         -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
-  #         --platform linux/${{ matrix.platform }}
-  #         -e TEST_SPLITS
-  #         -e TEST_GROUP
-  #         ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
-  #         bash -c "source /opt/conda/etc/profile.d/conda.sh; \
-  #                  pytest --cov=conda -k test_DepsModifier_contract"
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      # - export CONDA_SOLVER
+      # -
+      - name: Python linux-${{ matrix.platform }} on ${{ matrix.default-channel }}, ${{ matrix.python-version }} tests
+        run: >
+          docker run
+          --rm
+          -v ${PWD}:/opt/conda-src
+          -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
+          --platform linux/${{ matrix.platform }}
+          -e TEST_SPLITS
+          -e TEST_GROUP
+          ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
+          bash -c "source /opt/conda/etc/profile.d/conda.sh; \
+                   pytest --cov=conda -k test_DepsModifier_contract"
 
-  #     - name: Upload test results
-  #       if: always()
-  #       uses: actions/upload-artifact@v3
-  #       with:
-  #         # name has to be unique, to not overwrite uploads of other matrix runs. sha1 is optional and only to differentiate
-  #         # when locally dowloading and comparing results of different workflow runs.
-  #         name: test-results-${{ github.sha }}-linux-${{ matrix.platform }}-qemu-${{ matrix.default-channel }}-${{ matrix.python-version }}
-  #         path: |
-  #           .coverage
-  #           test-report.xml
-  #         retention-days: 1
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          # name has to be unique, to not overwrite uploads of other matrix runs. sha1 is optional and only to differentiate
+          # when locally dowloading and comparing results of different workflow runs.
+          name: test-results-${{ github.sha }}-linux-${{ matrix.platform }}-qemu-${{ matrix.default-channel }}-${{ matrix.python-version }}
+          path: |
+            .coverage
+            test-report.xml
+          retention-days: 1
 
   # macos test suite
   macos:
