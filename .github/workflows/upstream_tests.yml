@@ -136,28 +136,32 @@ jobs:
           echo "TMP=$env:USERPROFILE\AppData\Local\Temp" >> $env:GITHUB_ENV
 
       - name: Setup environment
-        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         shell: cmd
+        # CONDA-LIBMAMBA-SOLVER CHANGE
+        working-directory: conda
         env:
           CONDA_CHANNELS: ${{ matrix.default-channel }}
-          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || 'flexible' }}
-        # CONDA-LIBMAMBA-SOLVER CHANGE
+          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || '' }}
         run: |
           :: extend conda requirements with our own
-          type "%GITHUB_WORKSPACE%\conda-libmamba-solver"\dev\requirements.txt >> .\tests\requirements.txt
+          type "%GITHUB_WORKSPACE%\conda-libmamba-solver\dev\requirements.txt" >> .\tests\requirements.txt
           if errorlevel 1 exit 1
           :: initialize conda dev (original logic)
           call .\dev\windows\setup.bat
           if errorlevel 1 exit 1
           call .\dev-init.bat
           if errorlevel 1 exit 1
-          :: Install conda-libmamba +-solver
+          :: /original logic
+          :: Install conda-libmamba-solver
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
           if errorlevel 1 exit 1
           conda info -a
           if errorlevel 1 exit 1
+          :: override pytest settings
+          copy "%GITHUB_WORKSPACE%\conda-libmamba-solver\pyproject.toml" .\pyproject.toml
+          del .\setup.cfg
         # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.conda-subdir }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
@@ -444,9 +448,13 @@ jobs:
           cat ../conda-libmamba-solver/dev/requirements.txt >> tests/requirements.txt
           # original setup
           ./dev/macos/setup.sh
+          # /original setup
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
           python -m pip install ../conda-libmamba-solver -vv --no-deps
           conda info -a
+          # override pytest settings
+          cp ../conda-libmamba-solver/pyproject.toml ./pyproject.toml
+          rm ./setup.cfg
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
