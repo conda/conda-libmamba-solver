@@ -145,7 +145,7 @@ jobs:
         working-directory: conda
         env:
           CONDA_CHANNELS: ${{ matrix.default-channel }}
-          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || '' }}
+          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || 'flexible' }}
         run: |
           :: extend conda requirements with our own
           type "%GITHUB_WORKSPACE%\conda-libmamba-solver\dev\requirements.txt" >> .\tests\requirements.txt
