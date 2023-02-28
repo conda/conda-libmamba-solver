@@ -95,9 +95,12 @@ addopts = [
   "--deselect=tests/core/test_solve.py::test_python2_update",
   "--deselect=tests/core/test_solve.py::test_fast_update_with_update_modifier_not_set",
   "--deselect=tests/core/test_solve.py::test_downgrade_python_prevented_with_sane_message",
+  # These use libmamba-incompatible MatchSpecs (name[build_number=1] syntax)
+  "--deselect=tests/models/test_prefix_graph.py::test_deep_cyclical_dependency",
   # See https://github.com/conda/conda-libmamba-solver/pull/133#issuecomment-1448607110
   # These failed after enabling the whole unit test suite for `conda/conda`.
   # Errors are not critical but would require some further assessment in case fixes are obvious.
+  "--deselect=tests/cli/test_main_notices.py::test_notices_appear_once_when_running_decorated_commands",
   "--deselect=tests/cli/test_main_notices.py::test_notices_does_not_interrupt_command_on_failure",
   "--deselect=tests/conda_env/installers/test_pip.py::PipInstallerTest::test_stops_on_exception",
   "--deselect=tests/conda_env/installers/test_pip.py::PipInstallerTest::test_straight_install",
@@ -106,12 +109,12 @@ addopts = [
   "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_has_build_msg_function",
   "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_passes_kwargs_to_all_specs",
   "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_raises_exception_if_no_detection",
-  "--deselect=tests/conda_env/specs/test_requirements.py::TestRequiremets::test_environment",
-  "--deselect=tests/cli/test_main_notices.py::test_notices_appear_once_when_running_decorated_commands",
-  "--deselect=tests/models/test_prefix_graph.py::test_windows_sort_orders_1",
-  "--deselect=tests/models/test_prefix_graph.py::test_deep_cyclical_dependency",
+  # TODO: Fix upstream; they seem to assume no other solvers will be active via env var
   "--deselect=tests/plugins/test_solvers.py::test_get_solver_backend",
   "--deselect=tests/plugins/test_solvers.py::test_get_solver_backend_multiple",
+  # TODO: Investigate these, since they are solver related-ish
+  "--deselect=tests/conda_env/specs/test_requirements.py::TestRequiremets::test_environment",
+  "--deselect=tests/models/test_prefix_graph.py::test_windows_sort_orders_1",
   # TODO: These ones need further investigation
   "--deselect=tests/core/test_solve.py::test_channel_priority_churn_minimized",
   "--deselect=tests/core/test_solve.py::test_priority_1",
