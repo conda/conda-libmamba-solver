@@ -39,7 +39,7 @@ jobs:
             }
       # Clean checkout of specific git ref needed for package metadata version
       # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           ref: ${{ github.ref }}
           clean: true

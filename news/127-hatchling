@@ -16,4 +16,4 @@
 
 ### Other
 
-* CI: Add scheduled runs with self-reported issues. (#60 via #106)
+* Change the build-system to `hatchling` + `hatch-cvs` for a `setuptools-scm`-like versioning setup. (#128 via #127)

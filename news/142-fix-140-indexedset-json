@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Fix "Packages Not Found" error messages to be more accurate and informative. (#96 via #101)
+* Fix JSON serialization errors in some exceptions. (#140 via #142)
 
 ### Deprecations
 

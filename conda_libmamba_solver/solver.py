@@ -491,7 +491,6 @@ class LibMambaSolver(Solver):
     def _specs_to_tasks_conda_build(
         self, in_state: SolverInputState, out_state: SolverOutputState
     ):
-
         tasks = defaultdict(list)
         key = "INSTALL", api.SOLVER_INSTALL
         for name, spec in out_state.specs.items():

@@ -1,4 +1,7 @@
-conda-forge::libmambapy>=1.2.0
-conda-forge::libarchive
-conda-forge::conda>=22.11.1
-conda-forge::importlib-metadata
+# build-time
+pip
+# run-time
+conda>=22.11.1  # should be 22.11
+importlib-metadata
+libarchive
+libmambapy>=1.2.0
