@@ -1,3 +1,2 @@
 conda-content-trust
 conda-forge::pytest-xprocess
-flit
