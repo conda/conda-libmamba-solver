@@ -4,4 +4,6 @@ pip
 conda>=22.11
 importlib-metadata
 libarchive
-libmambapy>=1.3.0
+# TEMPORARY CHANNEL
+jaimergp/label/libmambapy-dev::libmamba>=1.3.0
+jaimergp/label/libmambapy-dev::libmambapy>=1.3.0
