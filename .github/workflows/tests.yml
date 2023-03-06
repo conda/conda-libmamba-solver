@@ -21,12 +21,20 @@ env:
 
 jobs:
   linux:
-    name: Linux, Python ${{ matrix.python-version }}
+    name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        include:
+          - python-version: "3.7"
+            default-channel: defaults
+          - python-version: "3.8"
+            default-channel: defaults
+          - python-version: "3.9"
+            default-channel: defaults
+          - python-version: "3.10"
+            default-channel: conda-forge
 
     env:
       OS: "linux"
@@ -34,13 +42,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           repository: conda/conda
@@ -55,7 +63,7 @@ jobs:
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_SOLVER
-          ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}
+          ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
           bash -c "sudo env CONDA_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
                         --repodata-fn=repodata.json --update-specs \
@@ -66,12 +74,16 @@ jobs:
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
 
   macos:
-    name: MacOS, Python ${{ matrix.python-version }}
+    name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
     runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
+        default-channel: ["conda-forge"]
+        include:
+          - python-version: "3.7"
+            default-channel: "defaults"
 
     env:
       OS: "macos"
@@ -79,27 +91,40 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           repository: conda/conda
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
+        name: Setup miniconda for defaults
+        if: matrix.default-channel == 'defaults'
         env:
           CONDA_SOLVER: classic
         with:
           activate-environment: conda-test-env
-          use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
+          miniconda-version: latest
+          python-version: ${{ matrix.python-version }}
+
+      - uses: conda-incubator/setup-miniconda@v2
+        name: Setup miniconda for conda-forge
+        if: matrix.default-channel == 'conda-forge'
+        env:
+          CONDA_SOLVER: classic
+        with:
+          activate-environment: conda-test-env
+          miniforge-version: latest
+          python-version: ${{ matrix.python-version }}
 
       - name: Setup environment
-        shell: bash -l {0}
+        shell: bash -el {0}
         working-directory: conda
         env:
           # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
@@ -109,8 +134,6 @@ jobs:
           set -euxo pipefail
           # restoring the default for changeps1 to have parity with dev
           conda config --set changeps1 true
-          # make sure the caching works correctly
-          conda config --set use_only_tar_bz2 true
           # install all test requirements
           conda install --yes \
             --file tests/requirements.txt \
@@ -122,25 +145,29 @@ jobs:
           python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
 
       - name: Install conda-libmamba-solver
-        shell: bash -l {0}
+        shell: bash -el {0}
         working-directory: conda-libmamba-solver
         run: |
           python -m pip install . -vv --no-deps
 
       - name: Python ${{ matrix.python-version }}
-        shell: bash -l {0}
+        shell: bash -el {0}
         working-directory: conda
         run: |
           eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
           python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
 
   windows:
-    name: Windows, Python ${{ matrix.python-version }}
+    name: Windows, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.9", "3.10"]
+        default-channel: [conda-forge]
+        include:
+          - python-version: "3.7"
+            default-channel: defaults
 
     env:
       OS: "windows"
@@ -148,13 +175,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
           repository: conda/conda
@@ -174,6 +201,8 @@ jobs:
           # with 4.12 out, ensure classic is used to install conda-libmamba-solver deps
           # otherwise it will error out because it can't be imported yet!
           CONDA_SOLVER: classic
+          CONDA_CHANNELS: ${{ matrix.default-channel }}
+          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || 'flexible' }}
         run: |
           :: add mamba to requirements
           type ..\conda-libmamba-solver\dev\requirements.txt >> .\tests\requirements.txt

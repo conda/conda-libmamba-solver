@@ -597,7 +597,7 @@ class LibMambaSolver(Solver):
                 packages = line.split()[4:]
                 missing_from_channel += packages
         if missing_from_channel:
-            exc = PackagesNotFoundError(missing_from_channel, self.channels)
+            exc = PackagesNotFoundError(missing_from_channel, list(self.channels))
         else:
             exc = LibMambaUnsatisfiableError(problems)
 
