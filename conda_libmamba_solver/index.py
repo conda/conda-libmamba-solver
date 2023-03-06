@@ -86,8 +86,6 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 
-import libmambapy as api
-
 from . import __version__
 from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
@@ -129,7 +127,10 @@ class LibMambaIndexHelper(IndexHelper):
         try:
             return self._index[key]
         except KeyError as exc:
-            raise KeyError(f"Channel info for {orig_key} ({key}) not found. Available keys: {list(self._index)}") from exc
+            raise KeyError(
+                f"Channel info for {orig_key} ({key}) not found. "
+                f"Available keys: {list(self._index)}"
+            ) from exc
 
     def _repo_from_records(
         self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
@@ -184,45 +185,7 @@ class LibMambaIndexHelper(IndexHelper):
         finally:
             os.unlink(f.name)
 
-    def _repo_from_cached_url(self, pool: api.Pool, url: str, subdir_data: SubdirData) -> api.Repo:
-        """
-        We just want an `api.Repo` object out of the previously downloaded repodatas.
-        We have set `libmambapy.Context().offline` and `libmambapy.Context().use_index_cache`
-        to True, effectively working without networking on the libmamba side.
-
-        Ideally, we load everything with the offline api.SubdirData.
-        This method creates the api.Repo with internal APIs richer in channel metadata.
-        It also handles cached repodata better (no unnecessary SOLV rewrites)
-        However, it sometimes chokes with some JSONs during testing.
-
-        As a fallback, we can instantiate api.Repo directly, but it's slower and less
-        integrated with the channel metadata. TODO: Revisit once internal APIs are exposed.
-        """
-        channel = Channel(url)
-        try:
-            quiet = api.Context().quiet
-            api.Context().quiet = True  # avoid stdout during the spinner
-            cache_dirs = [os.path.dirname(subdir_data.cache_path_json), *context.pkgs_dirs]
-            sd = api.SubdirData(
-                api.Channel(url), 
-                channel.subdir, 
-                url, 
-                api.MultiPackageCache(cache_dirs), 
-                self._repodata_fn,
-            )
-            api.Context().quiet = quiet
-            return sd.create_repo(pool)
-        except (RuntimeError, api.MambaNativeException) as exc:  # fallback for faulty JSONs
-            log.warning(
-                "api.SubdirData loading for '%s' failed: '%s'. "
-                "Falling back to api.Repo with '%s'.", 
-                exc,
-                url,
-                subdir_data.cache_path_json
-            )
-            return api.Repo(pool, url, subdir_data.cache_path_json, url)
-
-    def _fetch_channel_with_conda(self, url: str) -> api.Repo:
+    def _fetch_channel(self, url: str) -> api.Repo:
         # We could load from subdir_data.iter_records(), but that means
         # re-exporting everything to a temporary JSON path and well,
         # `subdir_data.load()` already did!
@@ -241,7 +204,8 @@ class LibMambaIndexHelper(IndexHelper):
         subdir_data.load()
 
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-        repo = self._repo_from_cached_url(self._pool, url=url, subdir_data=subdir_data)
+        repo = api.Repo(self._pool, url, subdir_data.cache_path_json, url)
+        repo.set_channel(api.Channel(url))
         return _ChannelRepoInfo(
             repo=repo,
             channel=channel,
@@ -262,7 +226,7 @@ class LibMambaIndexHelper(IndexHelper):
         with ThreadLimitedThreadPoolExecutor() as executor:
             index = {
                 info.noauth_url: info
-                for info in executor.map(self._fetch_channel_with_conda, urls)
+                for info in executor.map(self._fetch_channel, urls)
             }
 
         # 3. Configure priorities
@@ -332,8 +296,12 @@ class _DownloadOnlySubdirData(SubdirData):
         "_track_features_index": {},
     }
 
-    def _read_local_repdata(self, *args, **kwargs):
+    def _read_local_repodata(self, *args, **kwargs):
         return self._internal_state_template
+    
+    # Original implementation had a typo in its name which got fixed.
+    # Add alias for backwards compatibility.
+    _read_local_repdata = _read_local_repodata
 
     def _process_raw_repodata_str(self, *args, **kwargs):
         return self._internal_state_template

@@ -4,12 +4,11 @@ import json
 import sys
 from subprocess import check_output, STDOUT, CalledProcessError
 
-import pytest
 from conda.testing.integration import _get_temp_prefix, make_temp_env, run_command
 
 
 def test_channel_matchspec():
-    stdout, stderr, _ = run_command(
+    stdout, *_ = run_command(
         "create",
         _get_temp_prefix(),
         "--solver=libmamba",

@@ -686,7 +686,7 @@ class LibMambaSolver(Solver):
         Instead, it returns the instructions to build one on the Python side:
 
         channel_info: dict
-            Channel data, as built in .index.LibmambaIndexHelper._fetch_channel_with_conda()
+            Channel data, as built in .index.LibmambaIndexHelper._fetch_channel()
             This is retrieved from the .index._index mapping, keyed by channel URLs
         pkg_filename: str
             The filename (.tar.bz2 or .conda) of the selected record.
