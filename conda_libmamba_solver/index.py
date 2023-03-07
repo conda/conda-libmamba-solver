@@ -81,7 +81,7 @@ from conda.base.context import context
 from conda.common.io import ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
 from conda.common.url import split_anaconda_token, remove_auth
-from conda.core.subdir_data import SubdirData, create_cache_dir
+from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -89,6 +89,7 @@ from conda.models.records import PackageRecord
 from . import __version__
 from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
+from .utils import escape_channel_url
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -205,7 +206,7 @@ class LibMambaIndexHelper(IndexHelper):
 
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
         repo = api.Repo(self._pool, url, subdir_data.cache_path_json, url)
-        repo.set_channel(api.Channel(url))
+        repo.set_channel(api.Channel(escape_channel_url(noauth_url)))
         return _ChannelRepoInfo(
             repo=repo,
             channel=channel,
