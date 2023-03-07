@@ -69,7 +69,7 @@ $ conda install \
 
 ```bash
 $ cd $REPO_LOCATION
-$ python -m pip install --no-deps
+$ python -m pip install --no-deps -e .
 ```
 
 <!-- LINKS -->
