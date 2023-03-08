@@ -158,23 +158,23 @@ class LibMambaIndexHelper(IndexHelper):
         # We could load from subdir_data.iter_records(), but that means
         # re-exporting everything to a temporary JSON path and well,
         # `subdir_data.load()` already did!
+        subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
         try:
-            subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
-            subdir_data.load()
-            loaded_with = "conda_libmamba_solver.index.DownloadOnlySubdirData"
+            json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
+            loaded_with = "RepodataFetch"
         except Exception as exc:
             log.debug(
-                "Optimized DownloadOnlySubdirData call failed: %s\n"
-                "Retrying with conda's SubdirData.",
+                "RepodataFetch call failed: %s\n" "Retrying with conda's SubdirData.",
                 exc,
             )
             subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
             subdir_data.load()
             loaded_with = "conda.core.subdir_data.SubdirData"
+            json_path = subdir_data.cache_path_json
         repo = self._repo_from_json_path(
             self._pool,
             url,
-            subdir_data.cache_path_json,
+            str(json_path),
             url=url,
         )
         return (
@@ -302,23 +302,3 @@ class LibMambaIndexHelper(IndexHelper):
                 pkg_records.append(record)
             return pkg_records
         return result
-
-
-class _DownloadOnlySubdirData(SubdirData):
-    _internal_state_template = {
-        "_package_records": {},
-        "_names_index": {},
-        "_track_features_index": {},
-    }
-
-    def _read_local_repdata(self, *args, **kwargs):
-        return self._internal_state_template
-
-    def _process_raw_repodata_str(self, *args, **kwargs):
-        return self._internal_state_template
-
-    def _process_raw_repodata(self, *args, **kwargs):
-        return self._internal_state_template
-
-    def _pickle_me(self):
-        return
