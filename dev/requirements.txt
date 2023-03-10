@@ -1,6 +1,6 @@
 # build-time
 pip
 # run-time
-conda>=22.11
+conda>=22.9 # should be 22.11
 importlib-metadata
 libmambapy>=1.3
