@@ -27,8 +27,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - python-version: "3.7"
-            default-channel: defaults
           - python-version: "3.8"
             default-channel: defaults
           - python-version: "3.9"
@@ -79,10 +77,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.9", "3.10"]
         default-channel: ["conda-forge"]
         include:
-          - python-version: "3.7"
+          - python-version: "3.8"
             default-channel: "defaults"
 
     env:
@@ -163,10 +161,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        python-version: ["3.8", "3.10"]
         default-channel: [conda-forge]
         include:
-          - python-version: "3.7"
+          - python-version: "3.9"
             default-channel: defaults
 
     env:
