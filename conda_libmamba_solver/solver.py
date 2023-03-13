@@ -17,8 +17,8 @@ from textwrap import dedent
 from typing import Iterable, Mapping, Optional
 
 import libmambapy as api
+from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
-from conda.core.solve import IndexedSet
 from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,

@@ -22,6 +22,7 @@ requirements:
     - libmambapy >=1.0
     - conda >=22.11
     - importlib-metadata
+    - boltons
 
 test:
   imports:
