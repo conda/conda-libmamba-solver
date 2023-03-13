@@ -89,7 +89,7 @@ jobs:
           fetch-depth: 0
           repository: jaimergp/conda  # TEMP
           ref: debug-subprocess-output  # TEMP
-          # repository: jaimergp/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -356,31 +356,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - default-channel: 'conda-forge'
-            python-version: '3.9'
-            test-type: 'unit'
-            test-group: '1'
-          - default-channel: 'conda-forge'
-            python-version: '3.9'
-            test-type: 'unit'
-            test-group: '2'
-          - default-channel: 'conda-forge'
-            python-version: '3.9'
-            test-type: 'unit'
+        default-channel: ['defaults', 'conda-forge']
+        python-version: ['3.9']
+        test-type: ['unit', 'integration']
+        test-group: ['1', '2', '3']
+        # fewer test splits for quicker unit tests, keep 3 splits for integration
+        test-splits: [2, 3]
+        exclude:
+          - test-type: unit
             test-group: '3'
-          - default-channel: 'defaults'
-            python-version: '3.9'
-            test-type: 'integration'
-            test-group: '1'
-          - default-channel: 'defaults'
-            python-version: '3.9'
-            test-type: 'integration'
-            test-group: '2'
-          - default-channel: 'defaults'
-            python-version: '3.9'
-            test-type: 'integration'
-            test-group: '3'
+          - test-type: unit
+            test-splits: 3
+          - test-type: integration
+            test-splits: 2
+          # odd choice kept for parity with previous commit
+          - test-type: integration
+            default-channel: 'conda-forge'
+          - test-type: unit
+            default-channel: 'defaults'
     env:
       OS: macOS
       PYTHON: ${{ matrix.python-version }}
