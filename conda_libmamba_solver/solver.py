@@ -18,12 +18,7 @@ from typing import Iterable, Mapping, Optional
 
 import libmambapy as api
 from conda import __version__ as _conda_version
-
-try:
-    from boltons.setutils import IndexedSet
-except ImportError:
-    from conda._vendor.boltons.setutils import IndexedSet
-
+from conda.core.solve import IndexedSet
 from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,
