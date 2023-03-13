@@ -7,14 +7,22 @@ The development workflow is streamlined for Linux thanks to the `conda/conda` Do
 1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
    (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
 2. Run the `conda/conda` Docker images with the repos mounted to the following locations.
-   In this case we are using `amd64` with `python=3.9` by default, but feel free to customize if needed:
+   In this case we are using `amd64` with `python=3.10` by default, but feel free to customize if needed. If you are running on Apple Silicon, you can use the `linux/aarch64` platform instead of `linux/amd64` for faster performance. Note that some tests might fail due to the different architecture. You can choose between `defaults` or `conda-forge` based images:
 
 ```bash
+# For defaults-based images, use:
 $ docker run -it --rm \
     --platform=linux/amd64 \
     -v ~/devel/conda:/opt/conda-src \
     -v ~/devel/conda-libmamba-solver:/opt/conda-libmamba-solver-src \
-    ghcr.io/conda/conda-ci:main-linux-python3.9 \
+    ghcr.io/conda/conda-ci:main-linux-python3.10 \
+    bash
+# For conda-forge-based images, use the following instead:
+$ docker run -it --rm \
+    --platform=linux/amd64 \
+    -v ~/devel/conda:/opt/conda-src \
+    -v ~/devel/conda-libmamba-solver:/opt/conda-libmamba-solver-src \
+    ghcr.io/conda/conda-ci:main-linux-python3.10-conda-forge \
     bash
 ```
 
@@ -22,13 +30,13 @@ $ docker run -it --rm \
    mounted to `/opt/conda-src` and `/opt/conda-libmamba-solver-src`, respectively.
    `/opt/conda` contains the bundled Miniconda installation.
 
-4. Set up the development environment with `source /opt/conda-libmamba-solver-src/dev/bashrc_linux.sh`.
+4. Set up the development environment with `source /opt/conda-libmamba-solver-src/dev/linux/bashrc.sh`.
 
 5. Enjoy! Since the local repositories are mounted, you can make modifications to the source live,
    and they will be reflected in the Docker instance automatically.
    Run `pytest` or `conda` as needed, no need to reload Docker!
    However, if the debugging exercises result in a permanent modification of the development environment,
-   consider exiting Docker and starting step 2 again.
+   consider exiting Docker (via <kbd>Ctrl</kbd>+<kbd>D</kbd>) and starting step 2 again.
 
 
 ## General workflow
@@ -52,16 +60,16 @@ $ cd "$REPO_LOCATION"
 3. Install the required dependencies for `conda-libmamba-solver`:
 
 ```bash
-$ conda install "flit-core>=3.2,<4" \
+$ conda install \
     --file "$REPO_LOCATION"/dev/requirements.txt \
     --file "$REPO_LOCATION"/tests/requirements.txt
 ```
 
-4. Install `conda-libmamba-solver` with `flit`:
+4. Install `conda-libmamba-solver` with `pip`:
 
 ```bash
 $ cd $REPO_LOCATION
-$ FLIT_ROOT_INSTALL=1 python -m flit install --symlink --deps=none
+$ python -m pip install --no-deps -e .
 ```
 
 <!-- LINKS -->
