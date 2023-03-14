@@ -1,0 +1,19 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* Fix API breakage upstream: `SubdirData.cache_path_json` property changed from `str` to `PrefixPath`. Depend directly on `boltons.setutils.IndexedSet`. (#151)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>

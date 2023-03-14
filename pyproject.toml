@@ -25,7 +25,8 @@ requires-python = ">=3.7"
 dependencies = [
   "conda >=22.11.0",
   "libmambapy >=1.0.0",
-  "importlib-metadata"
+  "importlib-metadata",
+  "boltons >=23.0.0",
 ]
 dynamic = [
   "version"
@@ -68,6 +69,9 @@ addopts = [
   ### Deselect tests from conda/conda we cannot pass due to different reasons
   ### These used to be skipped or xfail'd upstream, but we are trying to
   ### keep it clean from this project's specifics
+  # This test checks for plugin errors and assumes none are present, but
+  # conda-libmamba-solver counts as one so we need to skip it.
+  "--deselect=tests/plugins/test_manager.py::test_load_entrypoints_importerror",
   # Conflict report / analysis is done differently with libmamba.
   "--deselect=tests/cli/test_cli_install.py::test_find_conflicts_called_once",
   # SolverStateContainer needed
@@ -131,3 +135,6 @@ markers = [
 [tool.isort]
 profile = "black"
 filter_files = true
+
+[tool.ruff]
+line-lenth = 99

@@ -3,7 +3,8 @@ pip
 # run-time
 conda>=22.11
 importlib-metadata
-# TEMPORARY CHANNEL
+boltons>=23.0.0
+# TODO: TEMPORARY CHANNEL
 conda-forge::libarchive
 jaimergp/label/libmambapy-dev::libmamba>=1.3.0
 jaimergp/label/libmambapy-dev::libmambapy>=1.3.0
