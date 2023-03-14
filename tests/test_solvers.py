@@ -8,7 +8,7 @@ import os
 import sys
 from itertools import chain, permutations, repeat
 from pathlib import Path
-from subprocess import check_call, check_output
+from subprocess import check_call, run
 from uuid import uuid4
 
 from conda.common.compat import on_win
@@ -113,8 +113,12 @@ def test_determinism(tmpdir):
     # - Input order (from the user side) should not matter, and should give the same result
     for i, pkg_list in enumerate(chain(repeat(pkgs, 10), permutations(pkgs, len(pkgs)))):
         offline = ("--offline",) if i else ()
-        out = check_output([*common_args, *offline, *pkg_list], env=env)
-        data = json.loads(out)
+        process = run([*common_args, *offline, *pkg_list], env=env, text=True, capture_output=True)
+        if process.returncode:
+            print(process.stdout)
+            print(process.stderr, file=sys.stderr)
+            process.check_returncode()
+        data = json.loads(process.stdout)
         assert data["success"] is True
         for pkg in data["actions"]["LINK"]:
             if pkg["name"] == "bokeh":
