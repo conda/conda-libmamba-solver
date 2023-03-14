@@ -280,7 +280,6 @@ def init_api_context(use_mamba_experimental: bool = False):
     if hasattr(api_ctx, "user_agent"):
         api_ctx.user_agent = context.user_agent
     if hasattr(api_ctx, "experimental_sat_error_message"):
-        # TODO: This is not exposed yet
         api_ctx.experimental_sat_error_message = True
 
     return api_ctx
