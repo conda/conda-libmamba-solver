@@ -174,7 +174,7 @@ class LibMambaIndexHelper(IndexHelper):
         repo = self._repo_from_json_path(
             self._pool,
             url,
-            subdir_data.cache_path_json,
+            str(subdir_data.cache_path_json),
             url=url,
         )
         return (
