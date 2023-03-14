@@ -1,0 +1,20 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* upstream Conda SubdirData.cache_path_json property changed from `str` to `PrefixPath` (#151)
+* upstream Conda deprication of IndexedSet broke Solver pluggin api (#151)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
