@@ -205,7 +205,7 @@ class LibMambaIndexHelper(IndexHelper):
         subdir_data.load()
 
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-        repo = api.Repo(self._pool, url, subdir_data.cache_path_json, url)
+        repo = api.Repo(self._pool, url, str(subdir_data.cache_path_json), url)
         repo.set_channel(api.Channel(escape_channel_url(noauth_url)))
         return _ChannelRepoInfo(
             repo=repo,
