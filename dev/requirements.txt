@@ -5,4 +5,4 @@ conda>=22.11.1
 importlib-metadata
 libarchive
 libmambapy>=1.2.0
-boltons
+boltons>=23.0.0
