@@ -14,11 +14,9 @@ try:
 except ImportError:
     from importlib_metadata import version
 
+import libmambapy as api
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
-
-import libmambapy as api
-
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -29,7 +27,7 @@ def mamba_version():
 
 def set_channel_priorities(index, has_priority=None):
     """
-    This function was part of load_channels originally. 
+    This function was part of load_channels originally.
     We just split it to reuse it a bit better.
     """
     if has_priority is None:
@@ -65,8 +63,8 @@ def set_channel_priorities(index, has_priority=None):
         if context.verbosity != 0 and not context.json:
             log.debug(
                 "Channel: %s, platform: %s, prio: %s : %s",
-                info.channel, 
-                info.channel.subdir, 
+                info.channel,
+                info.channel.subdir,
                 priority,
                 subpriority,
             )

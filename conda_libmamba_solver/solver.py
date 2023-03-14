@@ -5,6 +5,7 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
 """
+import json
 import logging
 import os
 import re
@@ -12,7 +13,6 @@ import sys
 from collections import defaultdict
 from functools import lru_cache
 from inspect import stack
-import json
 from textwrap import dedent
 from typing import Iterable, Mapping, Optional
 
@@ -31,10 +31,7 @@ from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
 from conda.common.path import paths_equal
-from conda.common.url import (
-    percent_decode,
-    join_url,
-)
+from conda.common.url import join_url, percent_decode
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
@@ -44,17 +41,13 @@ from conda.exceptions import (
     UnsatisfiableError,
 )
 from conda.models.match_spec import MatchSpec
-
 from conda.models.records import PackageRecord
 from conda.models.version import VersionOrder
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper
-from .mamba_utils import (
-    init_api_context,
-    mamba_version,
-)
+from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
 
 log = logging.getLogger(f"conda.{__name__}")

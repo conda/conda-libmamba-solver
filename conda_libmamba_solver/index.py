@@ -66,7 +66,7 @@ The approach
 We pass the subdir-specific, authenticated URLs to patched conda's 'SubdirData' instances,
 which download the JSON files but do not process them to PackageRecords.
 Once the cache has been populated, we can instantiate 'libmamba.Repo' objects directly.
-We maintain a map of subdir-specific URLs to `conda.model.channel.Channel` 
+We maintain a map of subdir-specific URLs to `conda.model.channel.Channel`
 and `libmamba.Repo` objects.
 """
 import logging
@@ -80,13 +80,12 @@ from conda.base.constants import REPODATA_FN
 from conda.base.context import context
 from conda.common.io import ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
-from conda.common.url import split_anaconda_token, remove_auth
+from conda.common.url import remove_auth, split_anaconda_token
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 
-from . import __version__
 from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
 from .utils import escape_channel_url
@@ -193,7 +192,7 @@ class LibMambaIndexHelper(IndexHelper):
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
-        
+
         # Workaround some testing issues - TODO: REMOVE
         # Fix conda.testing.helpers._patch_for_local_exports by removing last line
         maybe_cached = SubdirData._cache_.get((url, self._repodata_fn))
@@ -225,10 +224,7 @@ class LibMambaIndexHelper(IndexHelper):
 
         # 2. Fetch URLs (if needed)
         with ThreadLimitedThreadPoolExecutor() as executor:
-            index = {
-                info.noauth_url: info
-                for info in executor.map(self._fetch_channel, urls)
-            }
+            index = {info.noauth_url: info for info in executor.map(self._fetch_channel, urls)}
 
         # 3. Configure priorities
         set_channel_priorities(index)
@@ -245,7 +241,7 @@ class LibMambaIndexHelper(IndexHelper):
             del SubdirData._cache_[key]
 
         return index
-    
+
     def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
         repo = self._repo_from_records(self._pool, "installed", records)
         repo.set_installed()
@@ -299,7 +295,7 @@ class _DownloadOnlySubdirData(SubdirData):
 
     def _read_local_repodata(self, *args, **kwargs):
         return self._internal_state_template
-    
+
     # Original implementation had a typo in its name which got fixed.
     # Add alias for backwards compatibility.
     _read_local_repdata = _read_local_repodata
@@ -320,4 +316,3 @@ class _ChannelRepoInfo:
     repo: api.Repo
     full_url: str
     noauth_url: str
-

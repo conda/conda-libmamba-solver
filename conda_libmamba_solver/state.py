@@ -388,7 +388,7 @@ class SolverInputState:
                     # Handle MatchSpec roundtrip issue with local channels
                     channel = Channel(spec.original_spec_str.split("::")[0])
                 yield channel
-    
+
     def channels_from_installed(self) -> Iterable[Channel]:
         seen_urls = set()
         # See https://github.com/conda/conda/issues/11790
@@ -401,11 +401,11 @@ class SolverInputState:
                 # These "channels" are not really channels, more like
                 # metadata placeholders
                 continue
-            subdir_url = record.channel.subdir_url 
+            subdir_url = record.channel.subdir_url
             if subdir_url not in seen_urls:
                 seen_urls.add(subdir_url)
                 yield record.channel
-    
+
     def maybe_free_channel(self) -> Iterable[Channel]:
         if context.restore_free_channel:
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")

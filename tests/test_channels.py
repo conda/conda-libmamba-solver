@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 import sys
-from subprocess import check_output, STDOUT, CalledProcessError
+from subprocess import STDOUT, CalledProcessError, check_output
 
 from conda.testing.integration import _get_temp_prefix, make_temp_env, run_command
 
@@ -35,22 +35,24 @@ def test_channels_prefixdata():
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env("conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+    with make_temp_env(
+        "conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True
+    ) as prefix:
         try:
             output = check_output(
-            [
-                sys.executable,
-                "-m",
-                "conda",
-                "install",
-                "-yp",
-                prefix,
-                "pytest",
-                "--solver=libmamba",
-            ],
-            stderr=STDOUT,
-            text=True,
-        )
+                [
+                    sys.executable,
+                    "-m",
+                    "conda",
+                    "install",
+                    "-yp",
+                    prefix,
+                    "pytest",
+                    "--solver=libmamba",
+                ],
+                stderr=STDOUT,
+                text=True,
+            )
         except CalledProcessError as exc:
             print(exc.output)
             raise exc

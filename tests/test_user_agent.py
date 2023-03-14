@@ -29,7 +29,6 @@ versions of conda-libmamba-solver and libmambapy.
 When using `mamba` directly in the CLI, its user agent will start with `mamba/<version>`.
 """
 
-import os
 import json
 import os
 import sys
