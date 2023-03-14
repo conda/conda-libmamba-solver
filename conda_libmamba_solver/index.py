@@ -200,7 +200,10 @@ class LibMambaIndexHelper(IndexHelper):
             del SubdirData._cache_[(url, self._repodata_fn)]
         # /Workaround
 
-        if hasattr(SubdirData, "repo_fetch"):
+        if (
+            os.environ.get("CONDA_LIBMAMBA_SOLVER_USE_REPO_FETCH")
+            and hasattr(SubdirData, "repo_fetch")
+        ):
             # New interface
             log.debug("Fetching %s with SubdirData.repo_fetch", channel)
             subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
