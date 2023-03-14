@@ -65,9 +65,9 @@ The approach
 ------------
 We pass the subdir-specific, authenticated URLs to patched conda's 'SubdirData' instances,
 which download the JSON files but do not process them to PackageRecords.
-Once the cache has bene populated, we can instantiate 'libmamba.SubdirData' objects (offline).
-These will generate the 'libmamba.Repo' objects with internal APIs.
-We maintain a map of subdir-specific URLs to `conda.model.channel.Channel` and `libmamba.Repo` objects.
+Once the cache has been populated, we can instantiate 'libmamba.Repo' objects directly.
+We maintain a map of subdir-specific URLs to `conda.model.channel.Channel` 
+and `libmamba.Repo` objects.
 """
 import logging
 import os
