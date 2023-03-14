@@ -200,11 +200,20 @@ class LibMambaIndexHelper(IndexHelper):
             del SubdirData._cache_[(url, self._repodata_fn)]
         # /Workaround
 
-        subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
-        subdir_data.load()
+        if hasattr(SubdirData, "repo_fetch"):
+            # New interface
+            log.debug("Fetching %s with SubdirData.repo_fetch", channel)
+            subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
+            json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
+        else:
+            # Legacy interface
+            log.debug("Fetching %s with _DownloadOnlySubdirData", channel)
+            subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
+            subdir_data.load()
+            json_path = subdir_data.cache_path_json
 
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-        repo = api.Repo(self._pool, url, str(subdir_data.cache_path_json), url)
+        repo = api.Repo(self._pool, url, str(json_path), url)
         repo.set_channel(api.Channel(escape_channel_url(noauth_url)))
         return _ChannelRepoInfo(
             repo=repo,
