@@ -249,14 +249,7 @@ It runs in C, using memory-efficient data structures.
 
 ### IO differences
 
-Currently, `conda-libmamba-solver` still relies on `libmamba`'s repodata fetching logic to download the channel metadata.
-This logic can download channel repodata files in parallel.
-Some channel protocols (FTP, S3) are fetched with `conda` objects, which are usually downloaded one by one.
-
-In the future, `libmamba` will use a more efficient [`powerloader`][powerloader]-based approach.
-`classic` will also introduce faster repodata downloads in the future, thanks to the [JLAP incremental download approach][jlap].
-
-In both cases, `conda-libmamba-solver` will be able to benefit from both!
+`conda-libmamba-solver` uses the same IO stack as `conda` classic. In the past, we relied on `libmamba`'s IO for repodata fetching, but this is not the case anymore.
 
 ## More information
 
