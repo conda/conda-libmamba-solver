@@ -93,7 +93,7 @@ def test_determinism(tmpdir):
     "Based on https://github.com/conda/conda-libmamba-solver/issues/75"
     env = os.environ.copy()
     env.pop("PYTHONHASHSEED", None)
-    env["CONDA_PKGS_DIR"] = str(tmpdir / "pkgs")
+    env["CONDA_PKGS_DIRS"] = str(tmpdir / "pkgs")
     installed_bokeh_versions = []
     common_args = (
         sys.executable,
@@ -115,6 +115,7 @@ def test_determinism(tmpdir):
         offline = ("--offline",) if i else ()
         process = run([*common_args, *offline, *pkg_list], env=env, text=True, capture_output=True)
         if process.returncode:
+            print("Attempt:", i)
             print(process.stdout)
             print(process.stderr, file=sys.stderr)
             process.check_returncode()
