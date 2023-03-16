@@ -629,7 +629,7 @@ class LibMambaSolver(Solver):
                         sections[key].append(line)
                 return "\n".join(
                     [
-                        *sections['old'],
+                        *sections["old"],
                         "",
                         "***************************************************",
                         " conda has set experimental_sat_error_message=true",
@@ -638,7 +638,7 @@ class LibMambaSolver(Solver):
                         "  https://github.com/mamba-org/mamba/issues/2078",
                         "***************************************************",
                         "",
-                        *sections['new'],
+                        *sections["new"],
                     ]
                 )
             except Exception as exc:
