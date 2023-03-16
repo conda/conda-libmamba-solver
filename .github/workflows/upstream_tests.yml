@@ -87,9 +87,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          repository: jaimergp/conda  # TEMP
-          ref: debug-subprocess-output  # TEMP
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
