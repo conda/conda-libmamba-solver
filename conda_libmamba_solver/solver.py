@@ -250,7 +250,7 @@ class LibMambaSolver(Solver):
             self._command = "last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
-                message = getattr(self.solver, "explain_problems", self.solver.problems_to_str)()
+                message = self._prepare_problems_message()
                 exc = LibMambaUnsatisfiableError(message)
                 exc.allow_retry = False
                 raise exc
@@ -601,12 +601,49 @@ class LibMambaSolver(Solver):
 
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
-            message = getattr(self.solver, "explain_problems", self.solver.problems_to_str)()
+            message = self._prepare_problems_message()
             exc = LibMambaUnsatisfiableError(message)
             # do not allow conda.cli.install to try more things
             exc.allow_retry = False
             raise exc
         return unsatisfiable
+
+    def _prepare_problems_message(self):
+        if hasattr(self.solver, "explain_problems"):
+            try:
+                raw_problems = self.solver.explain_problems()
+                key = None
+                sections = {}
+                for line in raw_problems.splitlines():
+                    if line.strip().startswith("===="):
+                        title = line.strip("=").strip()
+                        if "(old)" in title:
+                            key = "old"
+                        elif "(new)" in title:
+                            key = "new"
+                        else:
+                            key = "disclaimer"
+                        sections[key] = []
+                        continue
+                    if key is not None:
+                        sections[key].append(line)
+                return "\n".join(
+                    [
+                        *sections['old'],
+                        "",
+                        "***************************************************",
+                        " conda has set experimental_sat_error_message=true",
+                        " You will now see an explanation of the conflicts.",
+                        " You can provide feedback to the libmamba team at:",
+                        "  https://github.com/mamba-org/mamba/issues/2078",
+                        "***************************************************",
+                        "",
+                        *sections['new'],
+                    ]
+                )
+            except Exception as exc:
+                log.debug("Could not parse 'explain_problems'", exc_info=exc)
+        return self.solver.problems_to_str()
 
     def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<
