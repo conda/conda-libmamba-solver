@@ -161,3 +161,7 @@ def init_api_context(use_mamba_experimental: bool = False):
 
     if hasattr(api_ctx, "user_agent"):
         api_ctx.user_agent = context.user_agent
+    if hasattr(api_ctx, "use_lockfiles"):
+        api_ctx.use_lockfiles = False
+
+    return api_ctx
