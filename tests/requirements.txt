@@ -1,2 +1,1 @@
-conda-forge::conda-content-trust
 conda-forge::pytest-xprocess

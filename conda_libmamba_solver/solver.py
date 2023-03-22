@@ -518,7 +518,20 @@ class LibMambaSolver(Solver):
         return spec
 
     @staticmethod
-    def _parse_problems(problems: str) -> Mapping[str, MatchSpec]:
+    def _str_to_matchspec(spec: Union[str, Sequence[str]]):
+        if isinstance(spec, str):
+            name, version, build = spec.rsplit("-", 2)
+            return MatchSpec(name=name, version=version, build=build)
+        else:
+            kwargs = {"name": spec[0].rstrip(",")}
+            if len(spec) >= 2:
+                kwargs["version"] = spec[1].rstrip(",")
+            if len(spec) == 3:
+                kwargs["build"] = spec[2].rstrip(",")
+            return MatchSpec(**kwargs)
+
+    @classmethod
+    def _parse_problems(cls, problems: str) -> Mapping[str, MatchSpec]:
         """
         Problems can signal either unsatisfiability or unavailability.
         First will raise LibmambaUnsatisfiableError.
@@ -530,18 +543,6 @@ class LibMambaSolver(Solver):
         - just names, e.g. package
         """
 
-        def to_matchspec(spec: Union[str, Sequence[str]]):
-            if isinstance(spec, str):
-                name, version, build = spec.rsplit("-", 2)
-                return MatchSpec(name=name, version=version, build=build)
-            else:
-                kwargs = {"name": spec[0].rstrip(",")}
-                if len(spec) >= 2:
-                    kwargs["version"] = spec[1].rstrip(",")
-                if len(spec) == 3:
-                    kwargs["build"] = spec[2].rstrip(",")
-                return MatchSpec(**kwargs)
-
         conflicts = []
         not_found = []
         for line in problems.splitlines():
@@ -552,14 +553,14 @@ class LibMambaSolver(Solver):
             if "none of the providers can be installed" in line:
                 if words[1] != "package" or words[3] != "requires":
                     raise ValueError(f"Unknown message: {line}")
-                conflicts.append(to_matchspec(words[2]))
+                conflicts.append(cls._str_to_matchspec(words[2]))
                 end = words.index("but")
-                conflicts.append(to_matchspec(words[4:end]))
+                conflicts.append(cls._str_to_matchspec(words[4:end]))
             elif "- nothing provides" in line:
                 marker = next((i for (i, w) in enumerate(words) if w == "needed"), None)
                 if marker:
-                    conflicts.append(to_matchspec(words[-1]))
-                not_found.append(to_matchspec(words[4:marker]))
+                    conflicts.append(cls._str_to_matchspec(words[-1]))
+                not_found.append(cls._str_to_matchspec(words[4:marker]))
 
         return {
             "conflicts": {s.name: s for s in conflicts},
