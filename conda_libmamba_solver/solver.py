@@ -14,7 +14,7 @@ from collections import defaultdict
 from functools import lru_cache
 from inspect import stack
 from textwrap import dedent
-from typing import Iterable, Mapping, Optional
+from typing import Iterable, Mapping, Optional, Sequence, Union
 
 import libmambapy as api
 from boltons.setutils import IndexedSet
@@ -248,8 +248,10 @@ class LibMambaSolver(Solver):
             self._command = "last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
-                # If we haven't found a solution already, we failed...
-                self._raise_for_problems()
+                message = self._prepare_problems_message()
+                exc = LibMambaUnsatisfiableError(message)
+                exc.allow_retry = False
+                raise exc
 
         # We didn't fail? Nice, let's return the calculated state
         self._export_solved_records(in_state, out_state, index)
@@ -320,7 +322,7 @@ class LibMambaSolver(Solver):
 
         problems = self.solver.problems_to_str()
         old_conflicts = out_state.conflicts.copy()
-        new_conflicts = self._problems_to_specs(problems, old_conflicts)
+        new_conflicts = self._maybe_raise_for_problems(problems, old_conflicts)
         log.debug("Attempt failed with %s conflicts", len(new_conflicts))
         out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
         return False
@@ -519,9 +521,33 @@ class LibMambaSolver(Solver):
         return spec
 
     @staticmethod
-    def _problems_to_specs_parser(problems: str) -> Mapping[str, MatchSpec]:
-        dashed_specs = []  # e.g. package-1.2.3-h5487548_0
-        conda_build_specs = []  # e.g. package 1.2.8.*
+    def _str_to_matchspec(spec: Union[str, Sequence[str]]):
+        if isinstance(spec, str):
+            name, version, build = spec.rsplit("-", 2)
+            return MatchSpec(name=name, version=version, build=build)
+        else:
+            kwargs = {"name": spec[0].rstrip(",")}
+            if len(spec) >= 2:
+                kwargs["version"] = spec[1].rstrip(",")
+            if len(spec) == 3:
+                kwargs["build"] = spec[2].rstrip(",")
+            return MatchSpec(**kwargs)
+
+    @classmethod
+    def _parse_problems(cls, problems: str) -> Mapping[str, MatchSpec]:
+        """
+        Problems can signal either unsatisfiability or unavailability.
+        First will raise LibmambaUnsatisfiableError.
+        Second will raise PackagesNotFoundError.
+
+        Libmamba can return spec strings in two formats:
+        - With dashes, e.g. package-1.2.3-h5487548_0
+        - à la conda-build, e.g. package 1.2.*
+        - just names, e.g. package
+        """
+
+        conflicts = []
+        not_found = []
         for line in problems.splitlines():
             line = line.strip()
             words = line.split()
@@ -530,73 +556,98 @@ class LibMambaSolver(Solver):
             if "none of the providers can be installed" in line:
                 if words[1] != "package" or words[3] != "requires":
                     raise ValueError(f"Unknown message: {line}")
-                dashed_specs.append(words[2])
+                conflicts.append(cls._str_to_matchspec(words[2]))
                 end = words.index("but")
-                conda_build_specs.append(words[4:end])
-            elif "- nothing provides" in line and "needed by" in line:
-                dashed_specs.append(words[-1])
+                conflicts.append(cls._str_to_matchspec(words[4:end]))
             elif "- nothing provides" in line:
-                conda_build_specs.append(words[4:])
+                marker = next((i for (i, w) in enumerate(words) if w == "needed"), None)
+                if marker:
+                    conflicts.append(cls._str_to_matchspec(words[-1]))
+                not_found.append(cls._str_to_matchspec(words[4:marker]))
 
-        conflicts = {}
-        for conflict in dashed_specs:
-            name, version, build = conflict.rsplit("-", 2)
-            conflicts[name] = MatchSpec(name=name, version=version, build=build)
-        for conflict in conda_build_specs:
-            kwargs = {"name": conflict[0].rstrip(",")}
-            if len(conflict) >= 2:
-                kwargs["version"] = conflict[1].rstrip(",")
-            if len(conflict) == 3:
-                kwargs["build"] = conflict[2].rstrip(",")
-            conflicts[kwargs["name"]] = MatchSpec(**kwargs)
+        return {
+            "conflicts": {s.name: s for s in conflicts},
+            "not_found": {s.name: s for s in not_found},
+        }
 
-        return conflicts
-
-    def _problems_to_specs(self, problems: str, previous: Mapping[str, MatchSpec]):
-        if self.solver is None:
-            raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
-
-        conflicts = self._problems_to_specs_parser(problems)
-        self._maybe_raise_for_conda_build(conflicts)
-
-        previous_set = set(previous.values())
-        current_set = set(conflicts.values())
-
-        diff = current_set.difference(previous_set)
-        if len(diff) > 1 and "python" in conflicts:
-            # Only report python as conflict if it's the only conflict reported
-            # This helps us prioritize neutering for other dependencies first
-            conflicts.pop("python")
-
-        if (previous and (previous_set == current_set)) or len(diff) >= 10:
-            # We have same or more (up to 10) conflicts now! Abort to avoid recursion.
-            self._raise_for_problems(problems)
-
-        return conflicts
-
-    def _raise_for_problems(self, problems: Optional[str] = None):
+    def _maybe_raise_for_problems(
+        self,
+        problems: Optional[Union[str, Mapping]] = None,
+        previous_conflicts: Mapping[str, MatchSpec] = None,
+    ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         if problems is None:
             problems = self.solver.problems_to_str()
+        if isinstance(problems, str):
+            problems = self._parse_problems(problems)
 
-        # TODO: Figure out a way to have ._problems_to_specs_parser
-        # return the most adequate exception type instead of reparsing here
-        missing_from_channel = []
-        for line in problems.splitlines():
-            line = line.strip()
-            if line.startswith("- nothing provides requested"):
-                packages = line.split()[4:]
-                missing_from_channel += packages
-        if missing_from_channel:
-            exc = PackagesNotFoundError(missing_from_channel, list(self.channels))
-        else:
-            exc = LibMambaUnsatisfiableError(problems)
+        self._maybe_raise_for_conda_build({**problems["conflicts"], **problems["not_found"]})
 
-        # do not allow conda.cli.install to try more things
-        exc.allow_retry = False
-        raise exc
+        unsatisfiable = problems["conflicts"]
+        not_found = problems["not_found"]
+        if not unsatisfiable and not_found:
+            # This is not a conflict, but a missing package in the channel
+            exc = PackagesNotFoundError(not_found.values(), self.channels)
+            exc.allow_retry = False
+            raise exc
+
+        previous = previous_conflicts or {}
+        previous_set = set(previous.values())
+        current_set = set(unsatisfiable.values())
+
+        diff = current_set.difference(previous_set)
+        if len(diff) > 1 and "python" in unsatisfiable:
+            # Only report python as conflict if it's the only conflict reported
+            # This helps us prioritize neutering for other dependencies first
+            unsatisfiable.pop("python")
+
+        if (previous and (previous_set == current_set)) or len(diff) >= 10:
+            # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
+            message = self._prepare_problems_message()
+            exc = LibMambaUnsatisfiableError(message)
+            # do not allow conda.cli.install to try more things
+            exc.allow_retry = False
+            raise exc
+        return unsatisfiable
+
+    def _prepare_problems_message(self):
+        if hasattr(self.solver, "explain_problems"):
+            try:
+                raw_problems = self.solver.explain_problems()
+                key = None
+                sections = {}
+                for line in raw_problems.splitlines():
+                    if line.strip().startswith("===="):
+                        title = line.strip("=").strip()
+                        if "(old)" in title:
+                            key = "old"
+                        elif "(new)" in title:
+                            key = "new"
+                        else:
+                            key = "disclaimer"
+                        sections[key] = []
+                        continue
+                    if key is not None:
+                        sections[key].append(line)
+                return "\n".join(
+                    [
+                        *sections["old"],
+                        "",
+                        "***************************************************",
+                        " conda has set experimental_sat_error_message=true",
+                        " You will now see an explanation of the conflicts.",
+                        " You can provide feedback to the libmamba team at:",
+                        "  https://github.com/mamba-org/mamba/issues/2078",
+                        "***************************************************",
+                        "",
+                        *sections["new"],
+                    ]
+                )
+            except Exception as exc:
+                log.debug("Could not parse 'explain_problems'", exc_info=exc)
+        return self.solver.problems_to_str()
 
     def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<
