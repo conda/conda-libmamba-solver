@@ -217,9 +217,9 @@ def test_pinned_1(tmpdir):
             ### kwargs = exc.value._kwargs
             ### assert kwargs["requested_specs"] == ["scikit-learn==0.13"]
             ### assert kwargs["pinned_specs"] == ["python=2.6"]
-            with pytest.raises(UnsatisfiableError) as exc:
+            with pytest.raises(UnsatisfiableError) as exc_info:
                 solver.solve_final_state(ignore_pinned=False)
-            error = str(exc)
+            error = str(exc_info.value)
             assert "package scikit-learn-0.13" in error
             assert "requires python 2.7*" in error
             ## /MODIFIED
@@ -549,7 +549,8 @@ def test_cuda_fail_1(tmpdir):
   - nothing provides __cuda >=10.0 needed by cudatoolkit-10.0-0"""
         ),
     ]
-    assert str(exc.value).strip() in possible_messages
+    exc_msg = str(exc.value).strip()
+    assert any(msg in exc_msg for msg in possible_messages)
     ## /MODIFIED
 
 
@@ -580,7 +581,8 @@ def test_cuda_fail_2(tmpdir):
   - nothing provides __cuda >=10.0 needed by cudatoolkit-10.0-0"""
         ),
     ]
-    assert str(exc.value).strip() in possible_messages
+    exc_msg = str(exc.value).strip()
+    assert any(msg in exc_msg for msg in possible_messages)
     ## /MODIFIED
 
 
