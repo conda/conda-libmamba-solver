@@ -468,10 +468,14 @@ class LibMambaSolver(Solver):
                             "UPDATE | ESSENTIAL | FORCEBEST",
                             api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL | api.SOLVER_FORCEBEST,
                         )
+                    elif self._command == "update":
+                        spec_str = self._spec_to_str(
+                            MatchSpec(spec, version=f">{installed.version}")
+                        )
                     else:
                         # NOTE: This is ugly and there should be another way
                         spec_str = self._spec_to_str(
-                            MatchSpec(spec, version=f">{installed.version}")
+                            MatchSpec(spec, version=f"!={installed.version}")
                         )
 
             tasks[key].append(spec_str)
