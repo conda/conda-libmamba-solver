@@ -87,7 +87,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMP
+          ref: pin-minio  # TEMP
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -224,7 +226,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMP
+          ref: pin-minio  # TEMP
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -300,7 +304,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMP
+          ref: pin-minio  # TEMP
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -382,7 +388,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMP
+          ref: pin-minio  # TEMP
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
