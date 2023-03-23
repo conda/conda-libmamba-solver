@@ -29,6 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # see https://github.com/conda/conda-libmamba-solver/pull/159
   MINIO_RELEASE: 'archive/minio.RELEASE.2023-03-13T19-46-17Z'
 
 jobs:
@@ -90,9 +91,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMP
-          ref: pin-minio  # TEMP
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -229,9 +228,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMP
-          ref: pin-minio  # TEMP
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -307,9 +304,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMP
-          ref: pin-minio  # TEMP
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -391,9 +386,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMP
-          ref: pin-minio  # TEMP
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
