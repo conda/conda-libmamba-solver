@@ -1,6 +1,6 @@
 ### Enhancements
 
-* Simplify exception parsing and enable new experimental conflict reports in `libmamba`. (#102 via #103)
+* Simplify exception parsing and enable new (experimental) conflict reports in `libmamba`. (#102 via #103, #160)
 
 ### Bug fixes
 
