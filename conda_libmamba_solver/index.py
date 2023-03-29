@@ -225,7 +225,7 @@ class LibMambaIndexHelper(IndexHelper):
         # 2. Fetch URLs (if needed)
         with ThreadLimitedThreadPoolExecutor() as executor:
             jsons = {url: str(path) for (url, path) in executor.map(self._fetch_channel, urls)}
-        
+
         # 3. Create repos in same order as `urls`
         index = {}
         for url in urls:
@@ -238,7 +238,7 @@ class LibMambaIndexHelper(IndexHelper):
                 full_url=url,
                 noauth_url=noauth_url,
             )
-    
+
         # 4. Configure priorities
         set_channel_priorities(index)
 
