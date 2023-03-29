@@ -1,12 +1,8 @@
 # build-time
 pip
 # run-time
+boltons>=23.0.0
 conda>=22.11.1
 importlib-metadata
-# libmambapy>=1.3
-boltons>=23.0.0
-# TODO: TEMPORARY CHANNEL
-sqlite
-conda-forge::libarchive
-jaimergp/label/libmambapy-dev::libmamba>=1.3.0
-jaimergp/label/libmambapy-dev::libmambapy>=1.3.0
+libmamba>=1.4.1
+libmambapy>=1.4.1
