@@ -164,17 +164,17 @@ class LibMambaSolver(Solver):
             if "noarch" not in subdirs:
                 subdirs = *subdirs, "noarch"
 
-        with Spinner(
-            f"Collect all metadata ({self._repodata_fn})",
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
-        ):
-            all_channels = (
+        all_channels = (
                 *self.channels,
                 *in_state.channels_from_specs(),
                 *in_state.channels_from_installed(),
                 *in_state.maybe_free_channel(),
-            )
+        )
+        with Spinner(
+            self._spinner_msg(all_channels),
+            enabled=not context.verbosity and not context.quiet,
+            json=context.json,
+        ):
             index = LibMambaIndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
                 channels=all_channels,
@@ -199,6 +199,15 @@ class LibMambaSolver(Solver):
         self._notify_conda_outdated(None, index, solution)
 
         return solution
+
+    def _spinner_msg(self, channels: Iterable["Channel"]):
+        channel_names = "\n - ".join([c.canonical_name for c in channels])
+        return (
+            f"Channels:\n"
+            f" - {channel_names}\n"
+            f"Platform: {context.subdir}\n"
+            f"Collect all metadata ({self._repodata_fn})"
+        )
 
     def _solving_loop(
         self,
