@@ -211,15 +211,7 @@ class LibMambaIndexHelper(IndexHelper):
             subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
             subdir_data.load()
             json_path = subdir_data.cache_path_json
-
-        noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-        repo = api.Repo(self._pool, noauth_url, str(json_path), escape_channel_url(noauth_url))
-        return _ChannelRepoInfo(
-            repo=repo,
-            channel=channel,
-            full_url=url,
-            noauth_url=noauth_url,
-        )
+        return url, json_path
 
     def _load_channels(self):
         # 1. Obtain and deduplicate URLs from channels
@@ -232,21 +224,36 @@ class LibMambaIndexHelper(IndexHelper):
 
         # 2. Fetch URLs (if needed)
         with ThreadLimitedThreadPoolExecutor() as executor:
-            index = {info.noauth_url: info for info in executor.map(self._fetch_channel, urls)}
-
-        # 3. Configure priorities
+            jsons = {url: str(path) for (url, path) in executor.map(self._fetch_channel, urls)}
+        
+        # 3. Create repos in same order as `urls`
+        index = {}
+        for url in urls:
+            channel = Channel.from_url(url)
+            noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
+            repo = api.Repo(self._pool, noauth_url, jsons[url], escape_channel_url(noauth_url))
+            index[noauth_url] = _ChannelRepoInfo(
+                repo=repo,
+                channel=channel,
+                full_url=url,
+                noauth_url=noauth_url,
+            )
+    
+        # 4. Configure priorities
         set_channel_priorities(index)
 
-        # 4. Clean up the conda SubdirData cache. We bypassed the post-processing
+        # 5. Clean up the conda SubdirData cache. We bypassed the post-processing
         # so now the parent class has a cached instance with no data, which breaks
         # some tests.
-        clear_these = []
-        for key, cache in SubdirData._cache_.items():
-            if isinstance(cache, _DownloadOnlySubdirData):
-                clear_these.append(key)
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            log.debug("Cleaning up SubdirData cache")
+            clear_these = []
+            for key, cache in SubdirData._cache_.items():
+                if isinstance(cache, _DownloadOnlySubdirData):
+                    clear_these.append(key)
 
-        for key in clear_these:
-            del SubdirData._cache_[key]
+            for key in clear_these:
+                del SubdirData._cache_[key]
 
         return index
 
