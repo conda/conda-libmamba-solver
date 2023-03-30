@@ -645,9 +645,9 @@ class LibMambaSolver(Solver):
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
         transaction = api.Transaction(
-            index._pool, 
-            self.solver, 
-            api.MultiPackageCache(context.pkgs_dirs)
+            index._pool,
+            self.solver,
+            api.MultiPackageCache(context.pkgs_dirs),
         )
         (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
