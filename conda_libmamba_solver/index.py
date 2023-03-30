@@ -63,7 +63,7 @@ a regular path, or a file:// URL, with or without normalization on Windows.
 
 The approach
 ------------
-We pass the subdir-specific, authenticated URLs to patched conda's 'SubdirData' instances,
+We pass the subdir-specific, authenticated URLs to conda's 'SubdirData.repo_patch',
 which download the JSON files but do not process them to PackageRecords.
 Once the cache has been populated, we can instantiate 'libmamba.Repo' objects directly.
 We maintain a map of subdir-specific URLs to `conda.model.channel.Channel`

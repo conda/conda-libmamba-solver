@@ -8,7 +8,7 @@ There are two request backend we can end up using:
 * libcurl, via libmamba
 * requests, via conda
 
-From conda-libmamba-solver 22.11, we only use conda internals (requests).
+From conda-libmamba-solver 23.3, we only use conda internals (requests).
 
 With libmamba 0.23 and conda 4.13, we can customize the user agent. The user
 agent will look slightly different depending on the network stack, so we have

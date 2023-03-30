@@ -356,11 +356,6 @@ class LibMambaSolver(Solver):
             return spec.original_spec_str
         if spec.get("build") and not spec.get("version"):
             spec = MatchSpec(spec, version="*")
-        # if spec.get("channel"):
-        #     parts = dict(spec._match_components)
-        #     channel = parts.pop("channel")._raw_value
-        #     spec_str = str(MatchSpec(**parts))
-        #     return f"{channel.subdir_url}::{spec_str}"
         return str(spec)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
