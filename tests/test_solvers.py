@@ -89,6 +89,37 @@ def test_python_downgrade_reinstalls_noarch_packages():
         check_call([pip, "--version"])
 
 
+def test_defaults_specs_work():
+    """
+    Reported in https://github.com/conda/conda/issues/11346
+
+    See also test_create::test_noarch_python_package_reinstall_on_pyver_change
+    in conda/conda test suite. Note that we use conda-forge here deliberately;
+    defaults at the time of writing (March 2022) packages pip as a non-noarch
+    build, which means it has a different name across Python versions. conda-forge
+    uses noarch here, so the package is the same across Python versions. Probably
+    why upstream didn't catch this error before.
+    """
+    out, err, rc = run_command(
+        "create",
+        "unused",
+        "--dry-run",
+        "--json",
+        "--solver=libmamba",
+        "python=3.10",
+        "defaults::libarchive",
+        use_exception_handler=True,
+    )
+    data = json.loads(out)
+    assert data["success"] is True
+    for link in data["actions"]["LINK"]:
+        if link["name"] == "libarchive":
+            assert link["channel"] in ("defaults", "pkgs/main")
+            break
+    else:
+        raise AssertionError("libarchive not found in LINK actions")
+
+
 def test_determinism(tmpdir):
     "Based on https://github.com/conda/conda-libmamba-solver/issues/75"
     env = os.environ.copy()
