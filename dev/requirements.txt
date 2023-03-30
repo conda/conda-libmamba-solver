@@ -2,7 +2,7 @@
 pip
 # run-time
 boltons>=23.0.0
-conda>=22.11.1
+conda>=23.3.0
 importlib-metadata
 libmamba>=1.4.1
 libmambapy>=1.4.1
