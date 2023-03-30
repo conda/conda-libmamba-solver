@@ -192,7 +192,7 @@ class LibMambaIndexHelper(IndexHelper):
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
-        
+
         if "PYTEST_CURRENT_TEST" in os.environ:
             # Workaround some testing issues - TODO: REMOVE
             # Fix conda.testing.helpers._patch_for_local_exports by removing last line
