@@ -159,11 +159,7 @@ def init_api_context(use_mamba_experimental: bool = False):
     elif context.channel_priority is ChannelPriority.DISABLED:
         api_ctx.channel_priority = api.ChannelPriority.kDisabled
 
-    if hasattr(api_ctx, "user_agent"):
-        api_ctx.user_agent = context.user_agent
-    if hasattr(api_ctx, "experimental_sat_error_message"):
-        api_ctx.experimental_sat_error_message = True
-    if hasattr(api_ctx, "use_lockfiles"):
-        api_ctx.use_lockfiles = False
+    api_ctx.user_agent = context.user_agent
+    api_ctx.use_lockfiles = False
 
     return api_ctx
