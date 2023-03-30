@@ -165,10 +165,10 @@ class LibMambaSolver(Solver):
                 subdirs = *subdirs, "noarch"
 
         all_channels = (
-                *self.channels,
-                *in_state.channels_from_specs(),
-                *in_state.channels_from_installed(),
-                *in_state.maybe_free_channel(),
+            *self.channels,
+            *in_state.channels_from_specs(),
+            *in_state.channels_from_installed(),
+            *in_state.maybe_free_channel(),
         )
         with Spinner(
             self._spinner_msg(all_channels),
