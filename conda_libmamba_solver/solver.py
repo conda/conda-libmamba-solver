@@ -764,17 +764,14 @@ class LibMambaSolver(Solver):
             # - Msys2 packages are m2-*, m2w64-*, or msys2-*
             # - Everything else is in main
             name = match_spec.name.lower()
-            if (
-                name in ("r", "rpy2", "rstudio")
-                or name.startswith(("r-", "_r-", "mro-")) 
-            ):
+            if name in ("r", "rpy2", "rstudio") or name.startswith(("r-", "_r-", "mro-")):
                 channel = "pkgs/r"
             elif name.startswith(("m2-", "m2w64-", "msys2-")):
                 channel = "pkgs/msys2"
             else:
                 channel = "pkgs/main"
             match_spec = MatchSpec(match_spec, channel=channel)
-        
+
         return match_spec
 
     def _reset(self):
