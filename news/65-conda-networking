@@ -1,0 +1,19 @@
+### Enhancements
+
+* Use `conda`'s `SubdirData` for all repodata fetching and caching. (#59, #68 via #65, #171)
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
