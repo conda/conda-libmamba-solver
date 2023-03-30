@@ -610,33 +610,7 @@ class LibMambaSolver(Solver):
         return unsatisfiable
 
     def _prepare_problems_message(self):
-        if hasattr(self.solver, "explain_problems"):
-            explained_problems = self.solver.explain_problems()
-            if "====" in explained_problems:
-                # This is for libmamba 1.3.x, where the explanation had a disclaimer
-                try:
-                    key = None
-                    sections = {}
-                    for line in explained_problems.splitlines():
-                        if line.strip().startswith("===="):
-                            title = line.strip("=").strip()
-                            if "(old)" in title:
-                                key = "old"
-                            elif "(new)" in title:
-                                key = "new"
-                            else:
-                                key = "disclaimer"
-                            sections[key] = []
-                            continue
-                        if key is not None:
-                            sections[key].append(line)
-                    return "\n".join(sections["old"] + sections["new"])
-                except Exception as exc:
-                    log.debug("Could not parse experimental 'explain_problems'", exc_info=exc)
-            else:
-                # libmamba 1.4.x enabled this by default, no need to parse disclaimers
-                return "\n".join([self.solver.problems_to_str(), explained_problems])
-        return self.solver.problems_to_str()
+        return f"{self.solver.problems_to_str()}\n{self.solver.explain_problems()}"
 
     def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<
@@ -670,7 +644,11 @@ class LibMambaSolver(Solver):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
 
-        transaction = api.Transaction(self.solver, api.MultiPackageCache(context.pkgs_dirs))
+        transaction = api.Transaction(
+            index._pool,
+            self.solver,
+            api.MultiPackageCache(context.pkgs_dirs),
+        )
         (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
 
         for _, filename in to_unlink:

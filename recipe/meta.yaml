@@ -19,8 +19,8 @@ requirements:
     - flit-core >=3.2,<4
   run:
     - python >=3.7
-    - libmambapy >=1.0
-    - conda >=22.11
+    - conda >=22.11.1
+    - libmambapy >=1.4.1
     - importlib-metadata
     - boltons >=23.0.0
 
