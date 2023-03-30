@@ -207,7 +207,7 @@ class LibMambaSolver(Solver):
             f"Channels:\n"
             f" - {canonical_names_dashed}\n"
             f"Platform: {context.subdir}\n"
-            f"Collect all metadata ({self._repodata_fn})"
+            f"Collecting package metadata ({self._repodata_fn})"
         )
 
     def _solving_loop(
