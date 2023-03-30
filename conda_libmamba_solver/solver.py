@@ -5,6 +5,7 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
 """
+import json
 import logging
 import os
 import re
@@ -12,7 +13,6 @@ import sys
 from collections import defaultdict
 from functools import lru_cache
 from inspect import stack
-from itertools import chain
 from textwrap import dedent
 from typing import Iterable, Mapping, Optional, Sequence, Union
 
@@ -31,7 +31,7 @@ from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
 from conda.common.path import paths_equal
-from conda.common.url import percent_decode, remove_auth, split_anaconda_token
+from conda.common.url import join_url, percent_decode
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
@@ -47,7 +47,7 @@ from conda.models.version import VersionOrder
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper
-from .mamba_utils import init_api_context, mamba_version, to_package_record_from_subjson
+from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -152,7 +152,7 @@ class LibMambaSolver(Solver):
             return none_or_final_state
 
         # From now on we _do_ require a solver and the index
-        api_ctx = init_api_context()
+        init_api_context()
         subdirs = self.subdirs
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
@@ -164,43 +164,51 @@ class LibMambaSolver(Solver):
             if "noarch" not in subdirs:
                 subdirs = *subdirs, "noarch"
 
-        index = LibMambaIndexHelper(
-            installed_records=chain(in_state.installed.values(), in_state.virtual.values()),
-            channels=list(dict.fromkeys(chain(self.channels, in_state.channels_from_specs()))),
-            subdirs=subdirs,
-            repodata_fn=self._repodata_fn,
+        all_channels = (
+            *self.channels,
+            *in_state.channels_from_specs(),
+            *in_state.channels_from_installed(),
+            *in_state.maybe_free_channel(),
         )
-
         with Spinner(
-            f"Collect all metadata ({self._repodata_fn})",
+            self._spinner_msg(all_channels),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            self._setup_solver(index)
+            index = LibMambaIndexHelper(
+                installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
+                channels=all_channels,
+                subdirs=subdirs,
+                repodata_fn=self._repodata_fn,
+            )
 
         with Spinner(
             "Solving environment",
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
+            self._setup_solver(index)
             # This function will copy and mutate `out_state`
             # Make sure we get the latest copy to return the correct solution below
             out_state = self._solving_loop(in_state, out_state, index)
-
-        # Restore intended verbosity to avoid unwanted
-        # "freeing xxxx..." messages when the libmambapy objects are deleted
-        api_ctx.verbosity = context.verbosity
-        api_ctx.set_verbosity(context.verbosity)
-
-        self.neutered_specs = tuple(out_state.neutered.values())
-
-        solution = out_state.current_solution
+            self.neutered_specs = tuple(out_state.neutered.values())
+            solution = out_state.current_solution
 
         # Check whether conda can be updated; this is normally done in .solve_for_diff()
         # but we are doing it now so we can reuse in_state and friends
         self._notify_conda_outdated(None, index, solution)
 
         return solution
+
+    def _spinner_msg(self, channels: Iterable["Channel"]):
+        canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
+        canonical_names_dashed = "\n - ".join(canonical_names)
+        return (
+            f"Channels:\n"
+            f" - {canonical_names_dashed}\n"
+            f"Platform: {context.subdir}\n"
+            f"Collect all metadata ({self._repodata_fn})"
+        )
 
     def _solving_loop(
         self,
@@ -267,7 +275,7 @@ class LibMambaSolver(Solver):
         log.info("Using libmamba solver")
         log.info("Conda version: %s", _conda_version)
         log.info("Mamba version: %s", mamba_version())
-        log.info("Target prefix: %s", self.prefix)
+        log.info("Target prefix: %r", self.prefix)
         log.info("Command: %s", sys.argv)
         log.info("Specs to add: %s", self.specs_to_add)
         log.info("Specs to remove: %s", self.specs_to_remove)
@@ -662,19 +670,8 @@ class LibMambaSolver(Solver):
             else:
                 log.warn("Tried to unlink %s but it is not installed or manageable?", filename)
 
-        for channel, filename, json_str in to_link:
-            if channel.startswith("file://"):
-                # The conda functions (specifically remove_auth) assume the input
-                # is a url; a file uri on windows with a drive letter messes them up.
-                key = channel
-            else:
-                key = split_anaconda_token(remove_auth(channel))[0]
-            if key not in index._channel_lookup:
-                raise KeyError(
-                    f"missing key '{key}' in channel map: {index._channel_lookup.keys()}"
-                )
-            record = to_package_record_from_subjson(index._channel_lookup[key], filename, json_str)
-
+        for channel, filename, json_payload in to_link:
+            record = self._package_record_from_json_payload(index, channel, filename, json_payload)
             # We need this check below to make sure noarch package get reinstalled
             # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
@@ -699,6 +696,30 @@ class LibMambaSolver(Solver):
             for record in out_state.records.values():
                 record.channel.location = percent_decode(record.channel.location)
                 record.channel.name = percent_decode(record.channel.name)
+
+    def _package_record_from_json_payload(
+        self, index: LibMambaIndexHelper, channel: str, pkg_filename: str, json_payload: str
+    ) -> PackageRecord:
+        """
+        The libmamba transactions cannot return full-blown objects from the C/C++ side.
+        Instead, it returns the instructions to build one on the Python side:
+
+        channel_info: dict
+            Channel data, as built in .index.LibmambaIndexHelper._fetch_channel()
+            This is retrieved from the .index._index mapping, keyed by channel URLs
+        pkg_filename: str
+            The filename (.tar.bz2 or .conda) of the selected record.
+        json_payload: str
+            A str-encoded JSON payload with the PackageRecord kwargs.
+        """
+        channel_info = index.get_info(channel)
+        kwargs = json.loads(json_payload)
+        kwargs["fn"] = pkg_filename
+        kwargs["channel"] = channel_info.channel
+        kwargs["url"] = join_url(channel_info.noauth_url, pkg_filename)
+        if not kwargs.get("subdir"):  # missing in old channels
+            kwargs["subdir"] = channel_info.channel.subdir
+        return PackageRecord(**kwargs)
 
     def _check_spec_compat(self, match_spec):
         """

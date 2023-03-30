@@ -1,7 +1,10 @@
 # build-time
 pip
 # run-time
+boltons>=23.0.0
 conda>=22.11.1
 importlib-metadata
+libmamba>=1.4.1
 libmambapy>=1.4.1
-boltons>=23.0.0
+# be explicit about sqlite because sometimes it's removed from the env :shrug:
+sqlite

@@ -27,6 +27,7 @@ from conda.base.context import conda_tests_ctxt_mgmt_def_pol, context
 from conda.common.io import env_var
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
+from conda.core.subdir_data import SubdirData
 from conda.exceptions import UnsatisfiableError
 from conda.gateways.subprocess import subprocess_call_with_clean_env
 from conda.models.match_spec import MatchSpec
@@ -722,6 +723,7 @@ def test_conda_downgrade(tmpdir):
             )
             assert convert_to_dist_str(final_state_1) == order
 
+    SubdirData.clear_cached_local_channel_data()
     specs_to_add = (MatchSpec("itsdangerous"),)  # MatchSpec("conda"),
     saved_sys_prefix = sys.prefix
     try:

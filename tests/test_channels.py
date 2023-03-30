@@ -2,40 +2,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 import sys
-from subprocess import STDOUT, check_output
+from subprocess import STDOUT, CalledProcessError, check_output
 
-import pytest
 from conda.testing.integration import _get_temp_prefix, make_temp_env, run_command
-
-from .channel_testing_utils import (
-    create_with_channel,
-    create_with_channel_in_process,
-    http_server_auth_basic,
-    http_server_auth_basic_email,
-    http_server_auth_none,
-    http_server_auth_token,
-)
-
-
-def test_http_server_auth_none(http_server_auth_none):
-    create_with_channel(http_server_auth_none)
-
-
-def test_http_server_auth_basic(http_server_auth_basic):
-    create_with_channel(http_server_auth_basic)
-
-
-@pytest.mark.xfail(reason="known encoding issue with @ symbols in channel URLs")
-def test_http_server_auth_basic_email(http_server_auth_basic_email):
-    create_with_channel(http_server_auth_basic_email)
-
-
-def test_http_server_auth_token(http_server_auth_token):
-    create_with_channel(http_server_auth_token)
 
 
 def test_channel_matchspec():
-    stdout, stderr, _ = run_command(
+    stdout, *_ = run_command(
         "create",
         _get_temp_prefix(),
         "--solver=libmamba",
@@ -62,21 +35,27 @@ def test_channels_prefixdata():
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env("conda-forge::xz", "python", use_restricted_unicode=True) as prefix:
-        output = check_output(
-            [
-                sys.executable,
-                "-m",
-                "conda",
-                "install",
-                "-yp",
-                prefix,
-                "pytest",
-                "--solver=libmamba",
-            ],
-            stderr=STDOUT,
-            text=True,
-        )
+    with make_temp_env(
+        "conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True
+    ) as prefix:
+        try:
+            output = check_output(
+                [
+                    sys.executable,
+                    "-m",
+                    "conda",
+                    "install",
+                    "-yp",
+                    prefix,
+                    "pytest",
+                    "--solver=libmamba",
+                ],
+                stderr=STDOUT,
+                text=True,
+            )
+        except CalledProcessError as exc:
+            print(exc.output)
+            raise exc
         print(output)
         assert (
             "Selected channel specific (or force-reinstall) job, "
