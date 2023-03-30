@@ -201,10 +201,11 @@ class LibMambaSolver(Solver):
         return solution
 
     def _spinner_msg(self, channels: Iterable["Channel"]):
-        channel_names = "\n - ".join([c.canonical_name for c in channels])
+        canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
+        canonical_names_dashed = "\n - ".join(canonical_names)
         return (
             f"Channels:\n"
-            f" - {channel_names}\n"
+            f" - {canonical_names_dashed}\n"
             f"Platform: {context.subdir}\n"
             f"Collect all metadata ({self._repodata_fn})"
         )
