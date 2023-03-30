@@ -618,7 +618,18 @@ class LibMambaSolver(Solver):
         return unsatisfiable
 
     def _prepare_problems_message(self):
-        return f"{self.solver.problems_to_str()}\n{self.solver.explain_problems()}"
+        legacy_errors = self.solver.problems_to_str()
+        if "unsupported request" in legacy_errors:
+            # This error makes 'explain_problems()' crash. Anticipate.
+            log.warning("Failed to explain problems. Unsupported request")
+            return legacy_errors
+        try:
+            explained_errors = self.solver.explain_problems()
+        except Exception as exc:
+            log.warning("Failed to explain problems", exc_info=exc)
+            return legacy_errors
+        else:
+            return f"{legacy_errors}\n{explained_errors}"
 
     def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<
