@@ -192,13 +192,14 @@ class LibMambaIndexHelper(IndexHelper):
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
-
-        # Workaround some testing issues - TODO: REMOVE
-        # Fix conda.testing.helpers._patch_for_local_exports by removing last line
-        maybe_cached = SubdirData._cache_.get((url, self._repodata_fn))
-        if maybe_cached and maybe_cached._mtime == float("inf"):
-            del SubdirData._cache_[(url, self._repodata_fn)]
-        # /Workaround
+        
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            # Workaround some testing issues - TODO: REMOVE
+            # Fix conda.testing.helpers._patch_for_local_exports by removing last line
+            maybe_cached = SubdirData._cache_.get((url, self._repodata_fn))
+            if maybe_cached and maybe_cached._mtime == float("inf"):
+                del SubdirData._cache_[(url, self._repodata_fn)]
+            # /Workaround
 
         if hasattr(SubdirData, "repo_fetch"):
             # New interface
