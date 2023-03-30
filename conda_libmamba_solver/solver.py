@@ -621,12 +621,12 @@ class LibMambaSolver(Solver):
         legacy_errors = self.solver.problems_to_str()
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
-            log.warning("Failed to explain problems. Unsupported request")
+            log.info("Failed to explain problems. Unsupported request")
             return legacy_errors
         try:
             explained_errors = self.solver.explain_problems()
         except Exception as exc:
-            log.warning("Failed to explain problems", exc_info=exc)
+            log.info("Failed to explain problems", exc_info=exc)
             return legacy_errors
         else:
             return f"{legacy_errors}\n{explained_errors}"
