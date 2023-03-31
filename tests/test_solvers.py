@@ -89,6 +89,41 @@ def test_python_downgrade_reinstalls_noarch_packages():
         check_call([pip, "--version"])
 
 
+def test_defaults_specs_work():
+    """
+    See https://github.com/conda/conda-libmamba-solver/issues/173
+
+    `conda install defaults::<pkg_name>` fails with libmamba due to a
+    mapping issue between conda and libmamba.Repo channel names.
+    defaults is secretly (main, r and msys2), and repos are built using those
+    actual channels. A bug in libmamba fails to map this relationship.
+
+    We are testing our workaround (https://github.com/conda/conda-libmamba-solver/issues/173)
+    works for now, but we should probably help fix this in libmamba.
+    """
+    out, err, rc = run_command(
+        "create",
+        "unused",
+        "--dry-run",
+        "--json",
+        "--solver=libmamba",
+        "--override-channels",
+        "-c",
+        "conda-forge",
+        "python=3.10",
+        "defaults::libarchive",
+        use_exception_handler=True,
+    )
+    data = json.loads(out)
+    assert data["success"] is True
+    for link in data["actions"]["LINK"]:
+        if link["name"] == "libarchive":
+            assert link["channel"] in ("defaults", "pkgs/main")
+            break
+    else:
+        raise AssertionError("libarchive not found in LINK actions")
+
+
 def test_determinism(tmpdir):
     "Based on https://github.com/conda/conda-libmamba-solver/issues/75"
     env = os.environ.copy()

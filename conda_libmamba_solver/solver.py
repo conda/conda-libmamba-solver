@@ -385,7 +385,7 @@ class LibMambaSolver(Solver):
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue
-            self._check_spec_compat(spec)
+            spec = self._check_spec_compat(spec)
             spec_str = self._spec_to_str(spec)
             installed = in_state.installed.get(name)
 
@@ -491,7 +491,7 @@ class LibMambaSolver(Solver):
         # --deps-only
         key = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
         for name, spec in in_state.requested.items():
-            self._check_spec_compat(spec)
+            spec = self._check_spec_compat(spec)
             tasks[key].append(str(spec))
 
         return dict(tasks)
@@ -504,7 +504,7 @@ class LibMambaSolver(Solver):
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue
-            self._check_spec_compat(spec)
+            spec = self._check_spec_compat(spec)
             spec = self._fix_version_field_for_conda_build(spec)
             tasks[key].append(spec.conda_build_form())
 
@@ -527,16 +527,19 @@ class LibMambaSolver(Solver):
 
     @staticmethod
     def _str_to_matchspec(spec: Union[str, Sequence[str]]):
-        if isinstance(spec, str):
-            name, version, build = spec.rsplit("-", 2)
-            return MatchSpec(name=name, version=version, build=build)
-        else:
-            kwargs = {"name": spec[0].rstrip(",")}
-            if len(spec) >= 2:
-                kwargs["version"] = spec[1].rstrip(",")
-            if len(spec) == 3:
-                kwargs["build"] = spec[2].rstrip(",")
-            return MatchSpec(**kwargs)
+        try:
+            if isinstance(spec, str):
+                name, version, build = spec.rsplit("-", 2)
+                return MatchSpec(name=name, version=version, build=build)
+            else:
+                kwargs = {"name": spec[0].rstrip(",")}
+                if len(spec) >= 2:
+                    kwargs["version"] = spec[1].rstrip(",")
+                if len(spec) == 3:
+                    kwargs["build"] = spec[2].rstrip(",")
+                return MatchSpec(**kwargs)
+        except Exception as exc:
+            raise ValueError(f"Could not parse spec: {spec}") from exc
 
     @classmethod
     def _parse_problems(cls, problems: str) -> Mapping[str, MatchSpec]:
@@ -550,7 +553,6 @@ class LibMambaSolver(Solver):
         - à la conda-build, e.g. package 1.2.*
         - just names, e.g. package
         """
-
         conflicts = []
         not_found = []
         for line in problems.splitlines():
@@ -568,7 +570,8 @@ class LibMambaSolver(Solver):
                 marker = next((i for (i, w) in enumerate(words) if w == "needed"), None)
                 if marker:
                     conflicts.append(cls._str_to_matchspec(words[-1]))
-                not_found.append(cls._str_to_matchspec(words[4:marker]))
+                start = 3 if marker == 4 else 4
+                not_found.append(cls._str_to_matchspec(words[start:marker]))
 
         return {
             "conflicts": {s.name: s for s in conflicts},
@@ -618,7 +621,18 @@ class LibMambaSolver(Solver):
         return unsatisfiable
 
     def _prepare_problems_message(self):
-        return f"{self.solver.problems_to_str()}\n{self.solver.explain_problems()}"
+        legacy_errors = self.solver.problems_to_str()
+        if "unsupported request" in legacy_errors:
+            # This error makes 'explain_problems()' crash. Anticipate.
+            log.info("Failed to explain problems. Unsupported request.")
+            return legacy_errors
+        try:
+            explained_errors = self.solver.explain_problems()
+        except Exception as exc:
+            log.warning("Failed to explain problems", exc_info=exc)
+            return legacy_errors
+        else:
+            return f"{legacy_errors}\n{explained_errors}"
 
     def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
         # TODO: Remove this hack for conda-build compatibility >_<
@@ -721,7 +735,7 @@ class LibMambaSolver(Solver):
             kwargs["subdir"] = channel_info.channel.subdir
         return PackageRecord(**kwargs)
 
-    def _check_spec_compat(self, match_spec):
+    def _check_spec_compat(self, match_spec: MatchSpec) -> MatchSpec:
         """
         Make sure we are not silently ingesting MatchSpec fields we are not
         doing anything with!
@@ -741,6 +755,24 @@ class LibMambaSolver(Solver):
                 f"You can only use {supported}, but you tried to use "
                 f"{tuple(unsupported_but_set)}.",
             )
+        if match_spec.get_raw_value("channel") == "defaults":
+            # !!! Temporary !!!
+            # Apply workaround for defaults::pkg-name specs.
+            # We need to replace it with the actual channel name (main, msys2, r)
+            # Instead of searching in the index, we apply a simple heuristic:
+            # - R packages are [_]r-*, mro-*, rpy or rstudio
+            # - Msys2 packages are m2-*, m2w64-*, or msys2-*
+            # - Everything else is in main
+            name = match_spec.name.lower()
+            if name in ("r", "rpy2", "rstudio") or name.startswith(("r-", "_r-", "mro-")):
+                channel = "pkgs/r"
+            elif name.startswith(("m2-", "m2w64-", "msys2-")):
+                channel = "pkgs/msys2"
+            else:
+                channel = "pkgs/main"
+            match_spec = MatchSpec(match_spec, channel=channel)
+
+        return match_spec
 
     def _reset(self):
         self.solver = None
