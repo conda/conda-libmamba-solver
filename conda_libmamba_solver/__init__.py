@@ -5,7 +5,7 @@ try:
     from ._version import version as __version__
 except ImportError:
     try:
-        from importlib_metadata import version
+        from importlib.metadata import version
 
         __version__ = version("conda_libmamba_solver")
         del version

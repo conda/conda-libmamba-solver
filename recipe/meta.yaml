@@ -15,15 +15,14 @@ build:
 
 requirements:
   host:
-    - python >=3.7
+    - python >=3.8
     - pip
     - hatchling
     - hatch-vcs
   run:
-    - python >=3.7
+    - python >=3.8
     - conda >=23.3.1
     - libmambapy >=1.4.1
-    - importlib-metadata
     - boltons >=23.0.0
 
 test:
