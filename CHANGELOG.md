@@ -43,7 +43,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### Contributors
 
-* @AlbertDeFusco
+* @AlbertDeFusco made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/142
 * @costrouc
 * @jaimergp
 * @jezdez
