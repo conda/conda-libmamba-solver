@@ -91,14 +91,15 @@ def test_python_downgrade_reinstalls_noarch_packages():
 
 def test_defaults_specs_work():
     """
-    Reported in https://github.com/conda/conda/issues/11346
+    See https://github.com/conda/conda-libmamba-solver/issues/173
+    
+    `conda install defaults::<pkg_name>` fails with libmamba due to a
+    mapping issue between conda and libmamba.Repo channel names.
+    defaults is secretly (main, r and msys2), and repos are built using those
+    actual channels. A bug in libmamba fails to map this relationship.
 
-    See also test_create::test_noarch_python_package_reinstall_on_pyver_change
-    in conda/conda test suite. Note that we use conda-forge here deliberately;
-    defaults at the time of writing (March 2022) packages pip as a non-noarch
-    build, which means it has a different name across Python versions. conda-forge
-    uses noarch here, so the package is the same across Python versions. Probably
-    why upstream didn't catch this error before.
+    We are testing our workaround (https://github.com/conda/conda-libmamba-solver/issues/173)
+    works for now, but we should probably help fix this in libmamba.
     """
     out, err, rc = run_command(
         "create",
@@ -106,6 +107,9 @@ def test_defaults_specs_work():
         "--dry-run",
         "--json",
         "--solver=libmamba",
+        "--override-channels",
+        "-c",
+        "conda-forge",
         "python=3.10",
         "defaults::libarchive",
         use_exception_handler=True,
