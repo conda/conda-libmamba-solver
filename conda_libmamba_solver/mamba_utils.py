@@ -8,11 +8,7 @@
 
 import logging
 import os
-
-try:
-    from importlib.metadata import version
-except ImportError:
-    from importlib_metadata import version
+from importlib.metadata import version
 
 import libmambapy as api
 from conda.base.constants import ChannelPriority

@@ -32,10 +32,10 @@ When using `mamba` directly in the CLI, its user agent will start with `mamba/<v
 import json
 import os
 import sys
+from importlib.metadata import version
 from subprocess import PIPE, check_output, run
 
 import pytest
-from importlib_metadata import version
 
 from .channel_testing_utils import (
     create_with_channel,
