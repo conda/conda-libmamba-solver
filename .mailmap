@@ -9,6 +9,7 @@
 # This file is up-to-date if the command git log --format="%aN <%aE>" | sort -u
 # gives no duplicates.
 
+Albert DeFusco <albert.defusco+gh@me.com>
 Christopher Ostrouchov <chris.ostrouchov@gmail.com>
 Daniel Holth <dholth@anaconda.com>
 Jaime Rodríguez-Guerra <jaimergp@users.noreply.github.com> jaimergp <jaimergp@users.noreply.github.com>
