@@ -13,6 +13,45 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.3.0 (2023-03-31)
+
+### Enhancements
+
+* Simplify exception parsing and enable new (experimental) conflict reports in `libmamba`. (#102 via #103, #160)
+* Use `conda`'s `SubdirData` for all repodata fetching and caching. (#59, #68 via #65, #171)
+
+### Bug fixes
+
+* Disable lockfiles within libmambapy to conform with conda's behavior of not using them. (#120)
+* Fix JSON serialization errors in some exceptions. (#140 via #142)
+* Fix API breakage upstream: `SubdirData.cache_path_json` property changed from `str` to `PrefixPath`. Depend directly on `boltons.setutils.IndexedSet`. (#151)
+* Updated bundled conda recipe and corresponding CI workflow. (#166)
+* Bumped minimum conda version from 22.11.1 -> 23.3.0 due to change in boltons IndexedSet. (#170)
+* Add workaround for `defaults::<pkg_name>` specs. (#173 via #172)
+
+### Deprecations
+
+* Python 3.7 is no longer supported. The minimum version is now 3.8. (#174)
+
+### Other
+
+* Change the build-system to `hatchling` + `hatch-cvs` for a `setuptools-scm`-like versioning setup. (#128 via #127)
+* Add conda-forge based CI environments. (#133)
+* Fix cache directory in flaky test. (#157)
+* CI: Pin `minio` to `2023-03-13T19-46-17Z` to avoid breaking changes. (#159)
+* Require `libmamba 1.4.1` or greater and remove unused code paths. (#165)
+
+### Contributors
+
+* @AlbertDeFusco
+* @costrouc
+* @jaimergp
+* @jezdez
+* @conda-bot
+* @pre-commit-ci[bot]
+
+
+
 ## [23.1.0] - 2023-01-31
 
 ### Bug fixes
