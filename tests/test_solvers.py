@@ -92,7 +92,7 @@ def test_python_downgrade_reinstalls_noarch_packages():
 def test_defaults_specs_work():
     """
     See https://github.com/conda/conda-libmamba-solver/issues/173
-    
+
     `conda install defaults::<pkg_name>` fails with libmamba due to a
     mapping issue between conda and libmamba.Repo channel names.
     defaults is secretly (main, r and msys2), and repos are built using those
