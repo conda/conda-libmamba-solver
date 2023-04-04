@@ -26,10 +26,10 @@ repos:
     rev: v3.3.1
     hooks:
       - id: pyupgrade
-        args: ["--py37-plus"]
+        args: ["--py38-plus"]
         exclude: ^conda/exports.py
   - repo: https://github.com/psf/black
-    rev: 23.1.0
+    rev: 23.3.0
     hooks:
       - id: black
         exclude: tests/_reposerver\.py
@@ -48,7 +48,7 @@ repos:
     hooks:
       - id: flake8
   - repo: https://github.com/PyCQA/pylint
-    rev: v2.17.1
+    rev: v3.0.0a6
     hooks:
       - id: pylint
         args: [--exit-zero]
@@ -60,7 +60,7 @@ repos:
         # ignore all tests, not just tests data
         exclude: ^tests/
   - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.4.2
+    rev: v1.5.1
     hooks:
       - id: insert-license
         files: \.py$
