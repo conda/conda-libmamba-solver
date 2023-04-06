@@ -46,7 +46,7 @@ Refer to each module docstrings for further details!
 ### Solver-agnostic parts
 
 The idea behind the module separation is to have better logic reusability and separation between the `libmamba` library and the preparation logic `conda` uses.
-The following paragraphs assume you have read the [Deep Dive guides](https://docs.conda.io/projects/conda/en/stable/dev-guide/deep-dive-install.html) in the `conda` documentation, but as a refresher:
+The following paragraphs assume you have read the [Deep Dive guides](https://docs.conda.io/projects/conda/en/stable/dev-guide/deep-dives/solvers.html) in the `conda` documentation, but as a refresher:
 
 * The `Solver` class will take a list of `MatchSpec` objects coming from diverse sources, like:
   * The packages the user requested in the command line or an environment file
