@@ -1,8 +1,6 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (C) 2022 Anaconda, Inc
-# SPDX-License-Identifier: BSD-3-Clause
 import os
 from pathlib import Path
 from subprocess import CalledProcessError, check_call

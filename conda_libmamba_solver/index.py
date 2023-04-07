@@ -1,8 +1,6 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
-# Copyright (C) 2022 Anaconda, Inc
-# SPDX-License-Identifier: BSD-3-Clause
 """
 This module provides a convenient interface between `libmamba.Solver`
 and conda's `PrefixData`. In other words, it allows to expose channels
