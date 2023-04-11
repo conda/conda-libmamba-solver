@@ -165,10 +165,16 @@ class LibMambaSolver(Solver):
             if "noarch" not in subdirs:
                 subdirs = *subdirs, "noarch"
 
+        if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
+            # see https://github.com/conda/conda-libmamba-solver/issues/108
+            channels_from_installed = ()
+        else:
+            channels_from_installed = in_state.channels_from_installed()
+
         all_channels = (
             *self.channels,
             *in_state.channels_from_specs(),
-            *in_state.channels_from_installed(),
+            *channels_from_installed,
             *in_state.maybe_free_channel(),
         )
         with Spinner(
