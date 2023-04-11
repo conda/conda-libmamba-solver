@@ -1,8 +1,8 @@
 # disable autofixing PRs, commenting "pre-commit.ci autofix" on a pull request triggers a autofix
 ci:
-    autofix_prs: false
+  autofix_prs: false
 # generally speaking we ignore all vendored code as well as tests data
-exclude:
+exclude: |
   (?x)^(
     tests/data/ |
     tests/_reposerver\.py |
@@ -65,4 +65,4 @@ repos:
       - id: insert-license
         files: \.py$
         args: [--license-filepath, .github/disclaimer.txt, --no-extra-eol]
-        exclude: ^conda_libmamba_solver/mamba_utils\.py
+        exclude: ^tests/channel_testing_utils\.py  # extend global exclude

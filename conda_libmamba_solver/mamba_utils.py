@@ -1,4 +1,5 @@
-# Copyright (C) 2019, QuantStack
+# Copyright (C) 2019 QuantStack and the Mamba contributors.
+# Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 
 # TODO: Temporarily vendored from mamba.utils v0.19 on 2021.12.02
