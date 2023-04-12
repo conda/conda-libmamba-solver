@@ -471,7 +471,7 @@ class LibMambaSolver(Solver):
                     else:
                         # NOTE: This is ugly and there should be another way
                         spec_str = self._spec_to_str(
-                            MatchSpec(spec, version=f"!={installed.version}")
+                            MatchSpec(spec, version=f">{installed.version}")
                         )
 
             tasks[key].append(spec_str)
