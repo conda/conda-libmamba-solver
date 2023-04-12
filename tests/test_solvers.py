@@ -10,7 +10,7 @@ from subprocess import check_call, run
 from uuid import uuid4
 
 from conda.common.compat import on_win
-from conda.core.prefix_data import get_python_version_for_prefix
+from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
 
@@ -161,3 +161,39 @@ def test_determinism(tmpdir):
         else:
             raise AssertionError("Didn't find bokeh!")
     assert len(set(installed_bokeh_versions)) == 1
+
+
+def test_update_from_latest_not_downgrade(tmpdir):
+    """Based on two issues where an upgrade caused a downgrade in a given package
+
+    Suppose we have two python versions 3.11.2 and 3.11.3. The bug is when:
+    $ conda install python | grep python
+    python 3.11.3
+    $ conda update python | grep python
+    python 3.11.2
+
+    Update should not downgrade the package
+     - https://github.com/conda/conda-libmamba-solver/issues/71
+     - https://github.com/conda/conda-libmamba-solver/issues/156
+    """
+    with make_temp_env(
+        "--override-channels",
+        "-c",
+        "conda-forge",
+        "--solver=libmamba",
+        "python",
+        no_capture=True,
+    ) as prefix:
+        original_python = PrefixData(prefix).get('python')
+        run_command(
+            Commands.UPDATE,
+            prefix,
+            "--solver=libmamba",
+            "--override-channels",
+            "-c",
+            "conda-forge",
+            "python",
+            no_capture=True,
+        )
+        update_python = PrefixData(prefix).get('python')
+        assert original_python.version == update_python.version
