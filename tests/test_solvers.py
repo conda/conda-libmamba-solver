@@ -184,7 +184,7 @@ def test_update_from_latest_not_downgrade(tmpdir):
         "python",
         no_capture=True,
     ) as prefix:
-        original_python = PrefixData(prefix).get('python')
+        original_python = PrefixData(prefix).get("python")
         run_command(
             Commands.UPDATE,
             prefix,
@@ -195,5 +195,5 @@ def test_update_from_latest_not_downgrade(tmpdir):
             "python",
             no_capture=True,
         )
-        update_python = PrefixData(prefix).get('python')
+        update_python = PrefixData(prefix).get("python")
         assert original_python.version == update_python.version
