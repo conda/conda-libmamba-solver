@@ -172,9 +172,6 @@ jobs:
           if errorlevel 1 exit 1
         # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.conda-subdir }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         shell: cmd
