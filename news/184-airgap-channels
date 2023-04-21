@@ -1,0 +1,22 @@
+### Enhancements
+
+* Provide a `CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED` environment variable to prevent
+  channels from being injected from installed packages. This is useful for air-gapped environments
+  where outside channels are not available. (#108 via #184)
+
+### Bug fixes
+
+* Ensure unauthenticated channels are not re-injected in the channel lists from installed packages
+  if an authenticated equivalent is already present. (#108 via #184)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
