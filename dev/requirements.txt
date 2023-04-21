@@ -3,10 +3,7 @@ pip
 # run-time
 boltons>=23.0.0
 conda>=23.3.1
-importlib-metadata
-libmamba==1.4.1
-libmambapy==1.4.1
+libmamba>=1.4.1,!=1.4.2
+libmambapy>=1.4.1,!=1.4.2
 # be explicit about sqlite because sometimes it's removed from the env :shrug:
 sqlite
-# needed for many conda tests
-flask
