@@ -140,7 +140,7 @@ jobs:
             python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
           conda info
-          python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
+          python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
 
       - name: Install conda-libmamba-solver
         shell: bash -el {0}
@@ -211,7 +211,7 @@ jobs:
           if errorlevel 1 exit 1
           call .\dev-init.bat
           if errorlevel 1 exit 1
-          python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
+          python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
           if errorlevel 1 exit 1
           conda info -a
           if errorlevel 1 exit 1

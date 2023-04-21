@@ -161,7 +161,7 @@ jobs:
           :: Install conda-libmamba-solver
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
-          python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
+          python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
           if errorlevel 1 exit 1
           :: override pytest settings
           copy "%GITHUB_WORKSPACE%\conda-libmamba-solver\pyproject.toml" .\pyproject.toml
@@ -448,7 +448,7 @@ jobs:
           # original setup
           ./dev/macos/setup.sh
           # /original setup
-          python -c "from importlib_metadata import version; print('libmambapy', version('libmambapy'))"
+          python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
           python -m pip install ../conda-libmamba-solver -vv --no-deps
           conda info -a
           # override pytest settings
