@@ -1,1 +1,3 @@
 conda-forge::pytest-xprocess
+# needed for many conda tests
+flask
