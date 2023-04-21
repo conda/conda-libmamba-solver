@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* CI failures
+* Do not set `quiet` manually when `context.json` is true. (#187)
 
 ### Deprecations
 
@@ -16,4 +16,4 @@
 
 ### Other
 
-* <news item>
+* Skip tests on libmamba 1.4.2 temporarily to workaround some test failures. Tracked by #186. (#187)
