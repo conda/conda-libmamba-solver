@@ -7,11 +7,8 @@ from pathlib import Path
 
 import pytest
 from conda.common.io import env_vars
-from conda.testing.integration import (
-    _get_temp_prefix,
-    make_temp_env,
-    run_command as conda_inprocess,
-)
+from conda.testing.integration import _get_temp_prefix, make_temp_env
+from conda.testing.integration import run_command as conda_inprocess
 
 from .utils import conda_subprocess, write_env_config
 
@@ -87,7 +84,7 @@ def _setup_channels_custom(prefix):
 
 @pytest.mark.parametrize(
     "config_env",
-    (   
+    (
         _setup_channels_alias,
         _setup_channels_custom,
     ),
@@ -122,7 +119,8 @@ def test_mirrors_do_not_leak_channels(config_env):
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
             assert (
-                pkg["base_url"] == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
+                pkg["base_url"]
+                == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
             ), pkg
 
         # Make a change to that channel
@@ -135,8 +133,8 @@ def test_mirrors_do_not_leak_channels(config_env):
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
             assert (
-                pkg["base_url"] == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
+                pkg["base_url"]
+                == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
             ), pkg
-        
-        # Ensure that other end points were never loaded
 
+        # Ensure that other end points were never loaded
