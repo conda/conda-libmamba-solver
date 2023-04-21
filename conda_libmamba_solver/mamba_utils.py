@@ -1,4 +1,5 @@
 # Copyright (C) 2019 QuantStack and the Mamba contributors.
+# Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 
@@ -77,10 +78,6 @@ def init_api_context(use_mamba_experimental: bool = False):
     api_ctx.dry_run = context.dry_run
     if context.json:
         api.cancel_json_output()
-        context.always_yes = True
-        context.quiet = True
-        if use_mamba_experimental:
-            context.json = False
 
     api_ctx.verbosity = context.verbosity
     api_ctx.set_verbosity(context.verbosity)
