@@ -27,8 +27,10 @@ sudo /opt/conda/bin/cmake --build build/ -j
 sudo make install -C build/
 sudo /opt/conda/bin/pip install -e libmambapy/ --no-deps
 
+# remove libmamba in environment yaml since already installed in develop
+sed '/libmamba/d' /opt/conda-libmamba-solver-src/dev/requirements.txt > /tmp/conda-libmamba-solver-requirements.txt
 sudo /opt/conda/condabin/conda install -y -p /opt/conda \
-    --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
+    --file /tmp/conda-libmamba-solver-requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 
 cd /opt/conda-libmamba-solver-src
