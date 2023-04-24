@@ -48,6 +48,7 @@ $ docker run -it --rm \
 > sudo /opt/conda/bin/cmake --build build/ -j
 > sudo make install -C build/
 > ```
+> Rebuild takes around 1-3 minutes
 
 ## General workflow
 
