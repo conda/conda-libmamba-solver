@@ -10,6 +10,23 @@ restore_e() {
 }
 trap restore_e EXIT
 
+# remove "sel(win)" in environment yaml hack since conda does not understand
+# libmamba specific specs
+sed '/sel/d' /opt/mamba-src/mamba/environment-dev.yml > /tmp/mamba-environment-dev.yml
+sudo /opt/conda/condabin/conda env update -p /opt/conda \
+     --file /tmp/mamba-environment-dev.yml
+
+cd /opt/mamba-src/
+sudo /opt/conda/bin/cmake -B build/ \
+    -DBUILD_LIBMAMBA=ON \
+    -DBUILD_SHARED=ON \
+    -DCMAKE_INSTALL_PREFIX=/opt/conda \
+    -DCMAKE_PREFIX_PATH=/opt/conda \
+    -DBUILD_LIBMAMBAPY=ON
+sudo /opt/conda/bin/cmake --build build/ -j
+sudo make install -C build/
+sudo /opt/conda/bin/pip install -e libmambapy/ --no-deps
+
 sudo /opt/conda/condabin/conda install -y -p /opt/conda \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt

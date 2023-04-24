@@ -4,8 +4,8 @@
 
 The development workflow is streamlined for Linux thanks to the `conda/conda` Docker images used in the upstream CI.
 
-1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
-   (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
+1. Clone `conda/conda`, `mamba/mamba`, `conda/conda-libmamba-solver` to your preferred locations
+   (e.g. `~/devel/conda`, `~/devel/mamba` and `~/devel/conda-libmamba-solver`, respectively).
 2. Run the `conda/conda` Docker images with the repos mounted to the following locations.
    In this case we are using `amd64` with `python=3.10` by default, but feel free to customize if needed. If you are running on Apple Silicon, you can use the `linux/aarch64` platform instead of `linux/amd64` for faster performance. Note that some tests might fail due to the different architecture. You can choose between `defaults` or `conda-forge` based images:
 
@@ -14,6 +14,7 @@ The development workflow is streamlined for Linux thanks to the `conda/conda` Do
 $ docker run -it --rm \
     --platform=linux/amd64 \
     -v ~/devel/conda:/opt/conda-src \
+    -v ~/devel/mamba:/opt/mamba-src \
     -v ~/devel/conda-libmamba-solver:/opt/conda-libmamba-solver-src \
     ghcr.io/conda/conda-ci:main-linux-python3.10 \
     bash
@@ -21,13 +22,14 @@ $ docker run -it --rm \
 $ docker run -it --rm \
     --platform=linux/amd64 \
     -v ~/devel/conda:/opt/conda-src \
+    -v ~/devel/mamba:/opt/mamba-src \
     -v ~/devel/conda-libmamba-solver:/opt/conda-libmamba-solver-src \
     ghcr.io/conda/conda-ci:main-linux-python3.10-conda-forge \
     bash
 ```
 
-3. This will drop you in a `bash` session with the `conda` and `conda-libmamba-solver` repositories
-   mounted to `/opt/conda-src` and `/opt/conda-libmamba-solver-src`, respectively.
+3. This will drop you in a `bash` session with the `conda`, `mamba`, and `conda-libmamba-solver` repositories
+   mounted to `/opt/conda-src`, `/opt/mamba-src`, and `/opt/conda-libmamba-solver-src`, respectively.
    `/opt/conda` contains the bundled Miniconda installation.
 
 4. Set up the development environment with `source /opt/conda-libmamba-solver-src/dev/linux/bashrc.sh`.
@@ -38,6 +40,14 @@ $ docker run -it --rm \
    However, if the debugging exercises result in a permanent modification of the development environment,
    consider exiting Docker (via <kbd>Ctrl</kbd>+<kbd>D</kbd>) and starting step 2 again.
 
+> **Note**
+> Whenever the code changes to `libmamba` it will require a
+> manual recompilation and installation of the shared libraries
+> ```shell
+> cd /opt/mamba-src
+> sudo /opt/conda/bin/cmake --build build/ -j
+> sudo make install -C build/
+> ```
 
 ## General workflow
 
