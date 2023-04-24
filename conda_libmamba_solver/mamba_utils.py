@@ -74,14 +74,14 @@ def set_channel_priorities(index, has_priority=None):
 def init_api_context(use_mamba_experimental: bool = False):
     api_ctx = api.Context()
 
-    api_ctx.json = context.json
+    api_ctx.output_params.json = context.json
     api_ctx.dry_run = context.dry_run
     if context.json:
         api.cancel_json_output()
 
-    api_ctx.verbosity = context.verbosity
+    api_ctx.output_params.verbosity = context.verbosity
     api_ctx.set_verbosity(context.verbosity)
-    api_ctx.quiet = context.quiet
+    api_ctx.output_params.quiet = context.quiet
     api_ctx.offline = True
     api_ctx.local_repodata_ttl = context.local_repodata_ttl
     api_ctx.use_index_cache = True
@@ -140,9 +140,9 @@ def init_api_context(use_mamba_experimental: bool = False):
     api_ctx.pkgs_dirs = context.pkgs_dirs
     api_ctx.envs_dirs = context.envs_dirs
 
-    api_ctx.connect_timeout_secs = int(round(context.remote_connect_timeout_secs))
-    api_ctx.max_retries = context.remote_max_retries
-    api_ctx.retry_backoff = context.remote_backoff_factor
+    api_ctx.remote_fetch_params.connect_timeout_secs = int(round(context.remote_connect_timeout_secs))
+    api_ctx.remote_fetch_params.max_retries = context.remote_max_retries
+    api_ctx.remote_fetch_params.retry_backoff = context.remote_backoff_factor
     api_ctx.add_pip_as_python_dependency = context.add_pip_as_python_dependency
     api_ctx.use_only_tar_bz2 = context.use_only_tar_bz2
 
@@ -153,7 +153,7 @@ def init_api_context(use_mamba_experimental: bool = False):
     elif context.channel_priority is ChannelPriority.DISABLED:
         api_ctx.channel_priority = api.ChannelPriority.kDisabled
 
-    api_ctx.user_agent = context.user_agent
+    api_ctx.remote_fetch_params.user_agent = context.user_agent
     api_ctx.use_lockfiles = False
 
     return api_ctx
