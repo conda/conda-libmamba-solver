@@ -219,8 +219,9 @@ class LibMambaIndexHelper(IndexHelper):
         # 1. Obtain and deduplicate URLs from channels
         urls = []
         seen_noauth = set()
-        for c in self._channels:
-            noauth_urls = Channel(c).urls(with_credentials=False, subdirs=self._subdirs)
+        for _c in self._channels:
+            c = Channel(_c)
+            noauth_urls = c.urls(with_credentials=False, subdirs=self._subdirs)
             if seen_noauth.issuperset(noauth_urls):
                 continue
             if c.auth or c.token:  # authed channel always takes precedence
