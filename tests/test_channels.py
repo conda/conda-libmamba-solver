@@ -114,7 +114,8 @@ def test_mirrors_do_not_leak_channels(config_env):
         # Create an environment using mirrored channels only
         p = conda_subprocess("install", *common, "python", "pip", env=env)
         result = json.loads(p.stdout)
-        assert "conda.anaconda.org" not in p.stderr
+        if p.stderr:
+            assert "conda.anaconda.org" not in p.stderr
 
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
@@ -128,7 +129,8 @@ def test_mirrors_do_not_leak_channels(config_env):
 
         # Ensure that the loaded channels are ONLY the mirrored ones
         result = json.loads(p.stdout)
-        assert "conda.anaconda.org" not in p.stderr
+        if p.stderr:
+            assert "conda.anaconda.org" not in p.stderr
 
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
