@@ -73,8 +73,9 @@ and `libmamba.Repo` objects.
 import logging
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from tempfile import NamedTemporaryFile
-from typing import Iterable, Union
+from typing import Iterable, Union, Tuple
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
@@ -94,6 +95,15 @@ from .utils import escape_channel_url
 log = logging.getLogger(f"conda.{__name__}")
 
 
+@dataclass(frozen=True)
+class _ChannelRepoInfo:
+    channel: Channel
+    repo: api.Repo
+    full_url: str
+    noauth_url: str
+
+
+@lru_cache(maxsize=None)
 class LibMambaIndexHelper(IndexHelper):
     def __init__(
         self,
@@ -132,7 +142,19 @@ class LibMambaIndexHelper(IndexHelper):
                 f"Channel info for {orig_key} ({key}) not found. "
                 f"Available keys: {list(self._index)}"
             ) from exc
-
+    
+    def reload_local_channels(self):
+        """
+        Reload a channel that was previously loaded from a local directory.
+        """
+        for url, info in self._index.items():
+            if url.startswith("file://"):
+                url, json_path = self._fetch_channel(url)
+                new = self._json_path_to_repo_info(url, json_path)
+                self._repos[self._repos.index(info.repo)] = new.repo
+                self._index[url] = new
+        set_channel_priorities(self._index)
+    
     def _repo_from_records(
         self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
     ) -> api.Repo:
@@ -186,7 +208,7 @@ class LibMambaIndexHelper(IndexHelper):
         finally:
             os.unlink(f.name)
 
-    def _fetch_channel(self, url: str) -> api.Repo:
+    def _fetch_channel(self, url: str) -> Tuple[str, str]:
         # We could load from subdir_data.iter_records(), but that means
         # re-exporting everything to a temporary JSON path and well,
         # `subdir_data.load()` already did!
@@ -213,7 +235,18 @@ class LibMambaIndexHelper(IndexHelper):
             subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
             subdir_data.load()
             json_path = subdir_data.cache_path_json
-        return url, json_path
+        return url, str(json_path)
+
+    def _json_path_to_repo_info(self, url: str, json_path: str) -> _ChannelRepoInfo:
+        channel = Channel.from_url(url)
+        noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
+        repo = api.Repo(self._pool, noauth_url, json_path, escape_channel_url(noauth_url))
+        return _ChannelRepoInfo(
+            repo=repo,
+            channel=channel,
+            full_url=url,
+            noauth_url=noauth_url,
+        )
 
     def _load_channels(self):
         # 1. Obtain and deduplicate URLs from channels
@@ -231,15 +264,8 @@ class LibMambaIndexHelper(IndexHelper):
         # 3. Create repos in same order as `urls`
         index = {}
         for url in urls:
-            channel = Channel.from_url(url)
-            noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-            repo = api.Repo(self._pool, noauth_url, jsons[url], escape_channel_url(noauth_url))
-            index[noauth_url] = _ChannelRepoInfo(
-                repo=repo,
-                channel=channel,
-                full_url=url,
-                noauth_url=noauth_url,
-            )
+            info = self._json_path_to_repo_info(url, jsons[url])
+            index[info.noauth_url] = info
 
         # 4. Configure priorities
         set_channel_priorities(index)
@@ -325,11 +351,3 @@ class _DownloadOnlySubdirData(SubdirData):
 
     def _pickle_me(self, *args):
         return
-
-
-@dataclass(frozen=True)
-class _ChannelRepoInfo:
-    channel: Channel
-    repo: api.Repo
-    full_url: str
-    noauth_url: str
