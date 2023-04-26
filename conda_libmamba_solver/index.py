@@ -75,7 +75,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from tempfile import NamedTemporaryFile
-from typing import Iterable, Union, Tuple
+from typing import Iterable, Tuple, Union
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
@@ -142,7 +142,7 @@ class LibMambaIndexHelper(IndexHelper):
                 f"Channel info for {orig_key} ({key}) not found. "
                 f"Available keys: {list(self._index)}"
             ) from exc
-    
+
     def reload_local_channels(self):
         """
         Reload a channel that was previously loaded from a local directory.
@@ -154,7 +154,7 @@ class LibMambaIndexHelper(IndexHelper):
                 self._repos[self._repos.index(info.repo)] = new.repo
                 self._index[url] = new
         set_channel_priorities(self._index)
-    
+
     def _repo_from_records(
         self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
     ) -> api.Repo:

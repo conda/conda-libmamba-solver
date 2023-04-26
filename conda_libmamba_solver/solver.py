@@ -164,13 +164,11 @@ class LibMambaSolver(Solver):
             # errors because we are not using the patched index.
             # Fix: just add noarch to subdirs.
             if "noarch" not in subdirs:
-                subdirs = *subdirs, "noarch"            
+                subdirs = *subdirs, "noarch"
             # We need to recover the local dirs (conda-build's local, output_folder, etc)
             # from the index. This is a bit of a hack, but it works.
             conda_bld_channels = {
-                rec.channel: None 
-                for rec in self._index
-                if rec.channel.scheme == "file"
+                rec.channel: None for rec in self._index if rec.channel.scheme == "file"
             }
         if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
@@ -189,7 +187,7 @@ class LibMambaSolver(Solver):
             self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
-        ):  
+        ):
             index = LibMambaIndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
                 channels=all_channels,
@@ -671,7 +669,8 @@ class LibMambaSolver(Solver):
         else:
             return f"{legacy_errors}\n{explained_errors}"
 
-    def _maybe_raise_for_conda_build(self, 
+    def _maybe_raise_for_conda_build(
+        self,
         conflicting_specs: Mapping[str, MatchSpec],
         message: str = None,
     ):
@@ -684,12 +683,10 @@ class LibMambaSolver(Solver):
             return
 
         from .exceptions import ExplainedDependencyNeedsBuildingError
+
         # the patched index should contain the arch we are building this env for
         # if the index is empty, we default to whatever platform we are running on
-        subdir = next(
-            (subdir for subdir in self.subdirs if subdir != "noarch"),
-            context.subdir
-        )
+        subdir = next((subdir for subdir in self.subdirs if subdir != "noarch"), context.subdir)
         exc = ExplainedDependencyNeedsBuildingError(
             packages=list(conflicting_specs.keys()),
             matchspecs=list(conflicting_specs.values()),
