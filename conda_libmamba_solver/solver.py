@@ -214,14 +214,15 @@ class LibMambaSolver(Solver):
 
         return solution
 
-    def _spinner_msg_metadata(self, channels: Iterable["Channel"], conda_bld_channels=()):
-        canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
-        canonical_names_dashed = "\n - ".join(canonical_names)
+    def _spinner_msg_metadata(self, channels: Iterable[Channel], conda_bld_channels=()):
         if self._called_from_conda_build():
             msg = "Reloading output folder"
             if conda_bld_channels:
-                msg += f" ({', '.join(conda_bld_channels)})"
+                names = [Channel(c).canonical_name for c in conda_bld_channels]
+                msg += f" ({', '.join(names)})"
             return msg
+        canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
+        canonical_names_dashed = "\n - ".join(canonical_names)
         return (
             f"Channels:\n"
             f" - {canonical_names_dashed}\n"
