@@ -41,13 +41,14 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
 )
+from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 from conda.models.version import VersionOrder
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
-from .index import LibMambaIndexHelper
+from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
 
@@ -170,6 +171,9 @@ class LibMambaSolver(Solver):
             conda_bld_channels = {
                 rec.channel: None for rec in self._index if rec.channel.scheme == "file"
             }
+            # Cache indices for conda-build, it gets heavy otherwise
+            LibMambaIndexHelper = _CachedLibMambaIndexHelper
+
         if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             channels_from_installed = ()
@@ -180,7 +184,7 @@ class LibMambaSolver(Solver):
             *conda_bld_channels,
             *self.channels,
             *in_state.channels_from_specs(),
-            *in_state.channels_from_installed(),
+            *channels_from_installed,
             *in_state.maybe_free_channel(),
         )
         with Spinner(

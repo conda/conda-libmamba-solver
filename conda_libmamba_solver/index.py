@@ -103,7 +103,6 @@ class _ChannelRepoInfo:
     noauth_url: str
 
 
-@lru_cache(maxsize=None)
 class LibMambaIndexHelper(IndexHelper):
     def __init__(
         self,
@@ -327,6 +326,10 @@ class LibMambaIndexHelper(IndexHelper):
                 pkg_records.append(record)
             return pkg_records
         return result
+
+
+# for conda-build
+_CachedLibMambaIndexHelper = lru_cache(maxsize=None)(LibMambaIndexHelper)
 
 
 class _DownloadOnlySubdirData(SubdirData):
