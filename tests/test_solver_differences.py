@@ -1,3 +1,6 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 This module collects examples of environments that were hard to solve, required
 workarounds or didn't meet users' expectations... specially if compared to conda classic.
@@ -5,8 +8,8 @@ workarounds or didn't meet users' expectations... specially if compared to conda
 import json
 import os
 
-from conda.common.compat import on_linux
 import pytest
+from conda.common.compat import on_linux
 
 from .utils import conda_subprocess
 
@@ -84,8 +87,8 @@ def test_gpu_cpu_mutexes():
         - https://github.com/conda/conda-libmamba-solver/issues/115#issuecomment-1399040871
         - https://github.com/conda/conda-libmamba-solver/issues/115#issuecomment-1399040867
         - https://github.com/conda/conda-libmamba-solver/issues/131
-    
-    This behaviour difference is known and explained at 
+
+    This behaviour difference is known and explained at
     https://github.com/conda/conda-libmamba-solver/issues/131#issuecomment-1440745813.
 
     If at some point this changes (e.g. libmamba fix), this test will capture it.
@@ -138,7 +141,7 @@ def test_gpu_cpu_mutexes():
     data = json.loads(p.stdout)
     # This should not happen, but it does. See docstring.
     assert next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "cudatoolkit")
-    
+
     p = conda_subprocess(
         *args,
         "--solver=libmamba",
@@ -151,4 +154,3 @@ def test_gpu_cpu_mutexes():
     data = json.loads(p.stdout)
     # This should not happen, but it does. See docstring.
     assert not next((pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "cudatoolkit"), None)
-
