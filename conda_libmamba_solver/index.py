@@ -217,11 +217,25 @@ class LibMambaIndexHelper(IndexHelper):
 
     def _load_channels(self):
         # 1. Obtain and deduplicate URLs from channels
-        urls = [
-            url
-            for c in self._channels
-            for url in Channel(c).urls(with_credentials=True, subdirs=self._subdirs)
-        ]
+        urls = []
+        seen_noauth = set()
+        for _c in self._channels:
+            c = Channel(_c)
+            noauth_urls = c.urls(with_credentials=False, subdirs=self._subdirs)
+            if seen_noauth.issuperset(noauth_urls):
+                continue
+            if c.auth or c.token:  # authed channel always takes precedence
+                urls += Channel(c).urls(with_credentials=True, subdirs=self._subdirs)
+                seen_noauth.update(noauth_urls)
+                continue
+            # at this point, we are handling an unauthed channel; in some edge cases,
+            # an auth'd variant of the same channel might already be present in `urls`.
+            # we only add them if we haven't seen them yet
+            for url in noauth_urls:
+                if url not in seen_noauth:
+                    urls.append(url)
+                    seen_noauth.add(url)
+
         urls = tuple(dict.fromkeys(urls))  # de-duplicate
 
         # 2. Fetch URLs (if needed)
