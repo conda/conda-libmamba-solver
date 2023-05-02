@@ -362,6 +362,9 @@ def test_pinned_1(tmpdir):
 def test_freeze_deps_1(tmpdir):
     specs = (MatchSpec("six=1.7"),)
     with get_solver_2(tmpdir, specs) as solver:
+        ## ADDED
+        solver._command = "install"
+        ## /ADDED
         final_state_1 = solver.solve_final_state()
         pprint(convert_to_dist_str(final_state_1))
         order = add_subdir_to_iter(
@@ -382,6 +385,9 @@ def test_freeze_deps_1(tmpdir):
     with get_solver_2(
         tmpdir, specs_to_add, prefix_records=final_state_1, history_specs=specs
     ) as solver:
+        ## ADDED
+        solver._command = "install"
+        ## /ADDED
         unlink_precs, link_precs = solver.solve_for_diff()
         pprint(convert_to_dist_str(unlink_precs))
         pprint(convert_to_dist_str(link_precs))
@@ -413,6 +419,9 @@ def test_freeze_deps_1(tmpdir):
         prefix_records=final_state_1,
         history_specs=(MatchSpec("six=1.7"), MatchSpec("python=3.4")),
     ) as solver:
+        ## ADDED
+        solver._command = "install"
+        ## /ADDED
         unlink_precs, link_precs = solver.solve_for_diff()
         pprint(convert_to_dist_str(unlink_precs))
         pprint(convert_to_dist_str(link_precs))
@@ -445,6 +454,9 @@ def test_freeze_deps_1(tmpdir):
             prefix_records=final_state_1,
             history_specs=(MatchSpec("six=1.7"), MatchSpec("python=3.4")),
         ) as solver:
+            ## ADDED
+            solver._command = "install"
+            ## /ADDED
             unlink_precs, link_precs = solver.solve_for_diff()
 
     # adding the explicit python spec allows conda to change the python versions.
@@ -509,6 +521,9 @@ def test_freeze_deps_1(tmpdir):
         history_specs=(MatchSpec("six=1.7"), MatchSpec("python=3.4")),
     ) as solver:
         with pytest.raises(UnsatisfiableError):
+            ## ADDED
+            solver._command = "install"
+            ## /ADDED
             solver.solve_final_state(update_modifier=UpdateModifier.FREEZE_INSTALLED)
 
 
