@@ -262,7 +262,10 @@ class LibMambaSolver(Solver):
                 "as conflicts for maximum flexibility",
             )
             # we only check this for "desperate" strategies in _specs_to_tasks
-            self._command = "last_solve_attempt"
+            if self._command in (None, NULL):
+                self._command = "last_solve_attempt"
+            else:
+                self._command += "+last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
                 message = self._prepare_problems_message()
