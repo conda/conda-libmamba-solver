@@ -460,13 +460,13 @@ class LibMambaSolver(Solver):
                     requested,
                     spec == requested,
                     spec.strictness == 1,
-                    self._command in ("update", "last_solve_attempt", None, NULL),
+                    self._command in ("update", "update+last_solve_attempt", None, NULL),
                     in_state.deps_modifier != DepsModifier.ONLY_DEPS,
                     in_state.update_modifier
                     not in (UpdateModifier.UPDATE_DEPS, UpdateModifier.FREEZE_INSTALLED),
                 )
                 if all(conditions):
-                    if self._command == "last_solve_attempt":
+                    if "last_solve_attempt" in str(self._command):
                         key = (
                             "UPDATE | ESSENTIAL | FORCEBEST",
                             api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL | api.SOLVER_FORCEBEST,
