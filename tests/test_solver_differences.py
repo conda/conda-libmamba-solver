@@ -11,8 +11,8 @@ import os
 import pytest
 from conda.common.compat import on_linux
 
-from .utils import conda_subprocess
 from .repodata_time_machine import repodata_time_machine
+from .utils import conda_subprocess
 
 
 @pytest.mark.skipif(not on_linux, reason="Only relevant on Linux")
@@ -173,7 +173,7 @@ def test_old_panel(tmp_path):
             subdirs=("osx-64", "noarch"),
         )
     )
-    with open(f"{old_repodata}/conda-forge/osx-64/repodata.json", "r") as f:
+    with open(f"{old_repodata}/conda-forge/osx-64/repodata.json") as f:
         data = json.load(f)
         # Make sure we have patched the repodata correctly
         # Python 3.11 only appeared in October 2022
@@ -220,4 +220,3 @@ def test_old_panel(tmp_path):
         data = json.loads(p.stdout)
         panel = next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "panel")
         assert panel["version"] == "0.14.0a2"
-

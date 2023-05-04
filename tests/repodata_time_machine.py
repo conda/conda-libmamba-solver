@@ -1,3 +1,5 @@
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 conda repodata time machine
 
@@ -9,19 +11,18 @@ Given a date and a channel, this script will:
 - Apply the patches
 - Generate a ready-to-use local channel
 """
-from argparse import ArgumentParser
-from datetime import datetime
 import bz2
 import json
 import os
 import urllib.request
+from argparse import ArgumentParser
+from datetime import datetime
 
+import requests
 from conda.base.context import context
 from conda.models.channel import Channel
 from conda_index.index import _apply_instructions
 from conda_package_handling.api import extract as cph_extract
-import requests
-
 
 PATCHED_CHANNELS = {"defaults", "main", "conda-forge"}
 
@@ -61,7 +62,7 @@ def download_repodata(channel, subdirs=None):
 def trim_to_timestamp(repodata, timestamp: float):
     trimmed_tar_pkgs = {}
     trimmed_conda_pkgs = {}
-    with open(repodata, "r") as f:
+    with open(repodata) as f:
         data = json.load(f)
         for name, pkg in data["packages"].items():
             if pkg.get("timestamp", 0) <= timestamp:
@@ -104,7 +105,7 @@ def download_patches(channel, timestamp: float):
 
 
 def apply_patch(repodata_file, patch):
-    with open(repodata_file, "r") as f, open(patch, "r") as g:
+    with open(repodata_file) as f, open(patch) as g:
         repodata = json.load(f)
         instructions = json.load(g)
     fn = f"patched.{os.path.basename(repodata_file)}"
