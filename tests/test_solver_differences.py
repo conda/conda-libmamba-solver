@@ -12,6 +12,7 @@ import pytest
 from conda.common.compat import on_linux
 
 from .utils import conda_subprocess
+from .repodata_time_machine import repodata_time_machine
 
 
 @pytest.mark.skipif(not on_linux, reason="Only relevant on Linux")
@@ -154,3 +155,69 @@ def test_gpu_cpu_mutexes():
     data = json.loads(p.stdout)
     # This should not happen, but it does. See docstring.
     assert not next((pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "cudatoolkit"), None)
+
+
+@pytest.mark.skipif(not on_linux, reason="Slow test, only run on Linux")
+def test_old_panel(tmp_path):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/64
+
+    Note we cannot reproduce the original error even with the "time-machine'd" repodata.
+    """
+    os.chdir(tmp_path)
+    print("Patching repodata...")
+    old_repodata = os.path.abspath(
+        repodata_time_machine(
+            channels=["conda-forge", "pyviz/label/dev"],
+            timestamp_str="2022-06-16 12:31:00",
+            subdirs=("osx-64", "noarch"),
+        )
+    )
+    with open(f"{old_repodata}/conda-forge/osx-64/repodata.json", "r") as f:
+        data = json.load(f)
+        # Make sure we have patched the repodata correctly
+        # Python 3.11 only appeared in October 2022
+        assert "python-3.11.0" not in data
+
+    channel_prefix = f"file://{old_repodata}/"
+    env = os.environ.copy()
+    env["CONDA_SUBDIR"] = "osx-64"
+    env["CONDA_REPODATA_THREADS"] = "1"
+    env["CONDA_DEFAULT_THREADS"] = "1"
+    env["CONDA_FETCH_THREADS"] = "1"
+    env["CONDA_REMOTE_CONNECT_TIMEOUT_SECS"] = "1"
+    env["CONDA_REMOTE_MAX_RETRIES"] = "1"
+    env["CONDA_REMOTE_BACKOFF_FACTOR"] = "1"
+    env["CONDA_REMOTE_READ_TIMEOUT_SECS"] = "1"
+    args = (
+        "create",
+        "-n",
+        "unused",
+        "--dry-run",
+        "--json",
+        "--override-channels",
+        "-c",
+        f"{channel_prefix}pyviz/label/dev",
+        "-c",
+        f"{channel_prefix}conda-forge",
+        "--repodata-fn=repodata.json",
+    )
+    pkgs = (
+        "python=3.8",
+        "lumen",
+    )
+
+    # conda-libmamba-solver gets an older version of panel
+    for solver in ("classic", "libmamba"):
+        print("Solving with", solver)
+        p = conda_subprocess(
+            *args,
+            "--solver",
+            solver,
+            *pkgs,
+            env=env,
+        )
+        data = json.loads(p.stdout)
+        panel = next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "panel")
+        assert panel["version"] == "0.14.0a2"
+
