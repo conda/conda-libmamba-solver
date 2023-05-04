@@ -73,9 +73,9 @@ and `libmamba.Repo` objects.
 import logging
 import os
 from dataclasses import dataclass
+from functools import partial
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
-from functools import partial
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
