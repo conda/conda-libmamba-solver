@@ -73,13 +73,14 @@ and `libmamba.Repo` objects.
 import logging
 import os
 from dataclasses import dataclass
+from functools import partial
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context
-from conda.common.io import ThreadLimitedThreadPoolExecutor
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
 from conda.common.url import remove_auth, split_anaconda_token
 from conda.core.subdir_data import SubdirData
@@ -239,7 +240,12 @@ class LibMambaIndexHelper(IndexHelper):
         urls = tuple(dict.fromkeys(urls))  # de-duplicate
 
         # 2. Fetch URLs (if needed)
-        with ThreadLimitedThreadPoolExecutor() as executor:
+        Executor = (
+            DummyExecutor
+            if context.debug or context.repodata_threads == 1
+            else partial(ThreadLimitedThreadPoolExecutor, max_workers=context.repodata_threads)
+        )
+        with Executor() as executor:
             jsons = {url: str(path) for (url, path) in executor.map(self._fetch_channel, urls)}
 
         # 3. Create repos in same order as `urls`
