@@ -311,6 +311,6 @@ jobs:
           package-name: ${{ github.event.repository.name }}
           subdir: ${{ matrix.subdir }}
           anaconda-org-channel: conda-canary
-          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}
           anaconda-org-token: ${{ secrets.CONDA_CANARY_ANACONDA_ORG_TOKEN }}
           conda-build-arguments: '--override-channels -c conda-forge -c defaults'
