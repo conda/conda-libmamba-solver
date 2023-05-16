@@ -20,8 +20,8 @@ as well as some the configuration for some tools (`black`, `pytest`, etc.).
 
 Some peculiarities:
 
-* `flit_core` is the chosen backend for the packaging (as opposed to `setuptools`).
-* The `version` is dynamically taken from `conda_libmamba_solver/__init__.py`.
+* `hatchling` is the chosen backend for the packaging.
+* The `version` is calculated from the `git` info with `hatchling-vcs`.
 * `black` uses a line length of 99 characters.
 * Pytest configurations are extensive but are only necessary when dealing with upstream testing.
   Check "Development workflows" for details.
