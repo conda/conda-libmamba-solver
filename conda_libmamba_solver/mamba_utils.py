@@ -9,8 +9,8 @@
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
 import logging
-import os
 from importlib.metadata import version
+from typing import Dict
 
 import libmambapy as api
 from conda.base.constants import ChannelPriority
@@ -23,9 +23,9 @@ def mamba_version():
     return version("libmambapy")
 
 
-def set_channel_priorities(index, has_priority=None):
+def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: bool = None):
     """
-    This function was part of load_channels originally.
+    This function was part of mamba.utils.load_channels originally.
     We just split it to reuse it a bit better.
     """
     if has_priority is None:
@@ -71,7 +71,7 @@ def set_channel_priorities(index, has_priority=None):
     return index
 
 
-def init_api_context():
+def init_api_context() -> api.Context:
     api_ctx = api.Context()
 
     api_ctx.json = context.json
