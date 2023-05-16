@@ -78,16 +78,21 @@ from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
 import libmambapy as api
-from conda.base.constants import REPODATA_FN
-from conda.base.context import context
-from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
-from conda.common.serialize import json_dump, json_load
-from conda.common.url import remove_auth, split_anaconda_token
-from conda.core.subdir_data import SubdirData
-from conda.models.channel import Channel
-from conda.models.match_spec import MatchSpec
-from conda.models.records import PackageRecord
 
+from .conda_interface import (
+    REPODATA_FN,
+    Channel,
+    DummyExecutor,
+    MatchSpec,
+    PackageRecord,
+    SubdirData,
+    ThreadLimitedThreadPoolExecutor,
+    context,
+    json_dump,
+    json_load,
+    remove_auth,
+    split_anaconda_token,
+)
 from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
 from .utils import escape_channel_url

@@ -19,33 +19,32 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 
 import libmambapy as api
 from boltons.setutils import IndexedSet
-from conda import __version__ as _conda_version
-from conda.base.constants import (
+
+from . import __version__
+from .conda_interface import (
+    __version__ as _conda_version,
+    NULL,
     REPODATA_FN,
     UNKNOWN_CHANNEL,
     ChannelPriority,
     DepsModifier,
-    UpdateModifier,
-    on_win,
-)
-from conda.base.context import context
-from conda.common.constants import NULL
-from conda.common.io import Spinner
-from conda.common.path import paths_equal
-from conda.common.url import join_url, percent_decode
-from conda.core.prefix_data import PrefixData
-from conda.core.solve import Solver
-from conda.exceptions import (
     InvalidMatchSpec,
+    MatchSpec,
+    PackageRecord,
     PackagesNotFoundError,
+    PrefixData,
+    Solver,
     SpecsConfigurationConflictError,
+    Spinner,
     UnsatisfiableError,
+    UpdateModifier,
+    VersionOrder,
+    context, 
+    join_url, 
+    on_win, 
+    paths_equal, 
+    percent_decode,
 )
-from conda.models.match_spec import MatchSpec
-from conda.models.records import PackageRecord
-from conda.models.version import VersionOrder
-
-from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version

@@ -4,8 +4,7 @@
 from logging import getLogger
 from urllib.parse import quote
 
-from conda.common.compat import on_win
-from conda.common.url import urlparse
+from .conda_interface import on_win, urlparse
 
 log = getLogger(f"conda.{__name__}")
 

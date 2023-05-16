@@ -69,23 +69,27 @@ from types import MappingProxyType
 from typing import Iterable, Mapping, Optional, Type, Union
 
 from boltons.setutils import IndexedSet
-from conda import CondaError
-from conda.auxlib import NULL
-from conda.auxlib.ish import dals
-from conda.base.constants import DepsModifier, UpdateModifier
-from conda.base.context import context
-from conda.common.io import dashlist
-from conda.common.path import get_major_minor_version, paths_equal
-from conda.core.index import _supplement_index_with_system
-from conda.core.prefix_data import PrefixData
-from conda.core.solve import get_pinned_specs
-from conda.exceptions import PackagesNotFoundError, SpecsConfigurationConflictError
-from conda.history import History
-from conda.models.channel import Channel
-from conda.models.match_spec import MatchSpec
-from conda.models.prefix_graph import PrefixGraph
-from conda.models.records import PackageRecord
 
+from .conda_interface import (
+    NULL,
+    Channel,
+    DepsModifier,
+    History,
+    MatchSpec,
+    PackageRecord,
+    PackagesNotFoundError,
+    PrefixData,
+    PrefixGraph,
+    SpecsConfigurationConflictError,
+    UpdateModifier,
+    _supplement_index_with_system,
+    context,
+    dals,
+    dashlist,
+    get_major_minor_version,
+    get_pinned_specs,
+    paths_equal,
+)
 from .models import EnumAsBools, TrackedMap
 
 log = logging.getLogger(f"conda.{__name__}")

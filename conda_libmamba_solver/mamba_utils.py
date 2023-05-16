@@ -13,8 +13,8 @@ import os
 from importlib.metadata import version
 
 import libmambapy as api
-from conda.base.constants import ChannelPriority
-from conda.base.context import context
+
+from .conda_interface import ChannelPriority, context
 
 log = logging.getLogger(f"conda.{__name__}")
 
