@@ -197,9 +197,6 @@ class LibMambaIndexHelper(IndexHelper):
             os.unlink(f.name)
 
     def _fetch_channel(self, url: str) -> Tuple[str, os.PathLike]:
-        # We could load from subdir_data.iter_records(), but that means
-        # re-exporting everything to a temporary JSON path and well,
-        # `subdir_data.load()` already did!
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
