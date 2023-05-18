@@ -50,7 +50,6 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: jlap-follow-on
           path: conda
 
       - name: Python ${{ matrix.python-version }}
@@ -100,7 +99,6 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: jlap-follow-on
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -185,7 +183,6 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
-          ref: jlap-follow-on
           path: conda
 
       - name: Set temp dirs correctly
