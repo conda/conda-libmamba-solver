@@ -207,6 +207,7 @@ class LibMambaIndexHelper(IndexHelper):
             # New interface
             log.debug("Fetching %s with SubdirData.repo_fetch", channel)
             subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
+            subdir_data.cache_path_base.mkdir(parents=True, exist_ok=True)
             json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
         else:
             # Legacy interface
