@@ -74,7 +74,6 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import partial
-# from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Iterable, Union
 
@@ -85,7 +84,6 @@ from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
 from conda.common.url import remove_auth, split_anaconda_token
 from conda.core.subdir_data import SubdirData
-# from conda.gateways.disk import mkdir_p_sudo_safe
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -209,7 +207,6 @@ class LibMambaIndexHelper(IndexHelper):
             # New interface
             log.debug("Fetching %s with SubdirData.repo_fetch", channel)
             subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
-            # mkdir_p_sudo_safe(Path(subdir_data.cache_path_base).parent)
             json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
         else:
             # Legacy interface
