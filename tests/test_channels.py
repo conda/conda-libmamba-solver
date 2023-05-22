@@ -82,8 +82,9 @@ def _setup_channels_custom(prefix):
         },
     )
 
+
 @pytest.mark.skipif(
-    datetime.now() < datetime(2023, 6, 15), 
+    datetime.now() < datetime(2023, 6, 15),
     reason="Skip until 2023-06-15; remote server has been flaky lately",
 )
 @pytest.mark.parametrize(
