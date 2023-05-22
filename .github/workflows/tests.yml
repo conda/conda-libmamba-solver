@@ -50,6 +50,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
+          ref: 23.5.x
           path: conda
 
       - name: Python ${{ matrix.python-version }}
@@ -99,6 +100,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
+          ref: 23.5.x
           path: conda
 
       - uses: conda-incubator/setup-miniconda@v2
@@ -183,6 +185,7 @@ jobs:
         with:
           fetch-depth: 0
           repository: conda/conda
+          ref: 23.5.x
           path: conda
 
       - name: Set temp dirs correctly
