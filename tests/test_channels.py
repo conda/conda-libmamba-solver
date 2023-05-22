@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 import os
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -81,7 +82,10 @@ def _setup_channels_custom(prefix):
         },
     )
 
-
+@pytest.mark.skipif(
+    datetime.now() < datetime(2023, 6, 15), 
+    reason="Skip until 2023-06-15; remote server has been flaky lately",
+)
 @pytest.mark.parametrize(
     "config_env",
     (
