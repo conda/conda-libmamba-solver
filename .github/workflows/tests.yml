@@ -4,11 +4,21 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "docs/**"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "conda_libmamba_solver/**"
+      - "dev/**"
+      - "recipe/**"
+      - "tests/**"
+      - "pyproject.toml"
   pull_request:
-    paths-ignore:
-      - "docs/**"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "conda_libmamba_solver/**"
+      - "dev/**"
+      - "recipe/**"
+      - "tests/**"
+      - "pyproject.toml"
   schedule:
     - cron: "15 6 * * 1-5"  # Mon to Fri, 6:15am
 

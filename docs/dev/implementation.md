@@ -20,8 +20,8 @@ as well as some the configuration for some tools (`black`, `pytest`, etc.).
 
 Some peculiarities:
 
-* `flit_core` is the chosen backend for the packaging (as opposed to `setuptools`).
-* The `version` is dynamically taken from `conda_libmamba_solver/__init__.py`.
+* `hatchling` is the chosen backend for the packaging.
+* The `version` is calculated from the `git` info with `hatchling-vcs`.
 * `black` uses a line length of 99 characters.
 * Pytest configurations are extensive but are only necessary when dealing with upstream testing.
   Check "Development workflows" for details.
@@ -35,6 +35,7 @@ The package is a flat namespace:
 * `conda_libmamba_solver.index`: Helper objects to deal with repodata fetching and loading, interfacing with `libmamba` helpers.
 * `conda_libmamba_solver.mamba_utils`: Utility functions to help set up the `libmamba` objects.
 * `conda_libmamba_solver.models`: Application-agnostic objects to assist in the metadata collection phases.
+* `conda_libmamba_solver.plugin`: The `pluggy` registration mechanism in `conda.plugins`.
 * `conda_libmamba_solver.solver`: The `conda.core.solve.Solver` subclass with all the libmamba-specific logic.
 * `conda_libmamba_solver.state`: Solver-agnostic objects to assist in the solver state specification and collection.
 * `conda_libmamba_solver.utils`: Other application-agnostic utility functions.
@@ -84,7 +85,13 @@ which logs its own changes for better debugging and developer experience while a
 
 ## Integrations with `conda`
 
-### First iterations
+### With the plugin system
+
+Once co-installed with `conda`, `conda_libmamba_solver` registers itself via the `conda.plugins.hookimpl`-decorated function in `conda.plugin`, which yields a `CondaSolver` plugin instance.
+
+After that, `conda` clients just need to get the configured solver via `context.plugin_manager.get_cached_solver_backend()`.
+
+### Draft integrations (pre-plugin phase)
 
 ```{note}
 This is just here as a historical trivia item.
@@ -119,11 +126,3 @@ The default value for the `key` was set by the `Context` object, which was popul
 * The environment variable, `CONDA_EXPERIMENTAL_SOLVER`.
 * The command-line flag, `--experimental-solver`.
 * A configuration file (e.g. `~/.condarc`).
-
-### With the plugin system
-
-With the plugin system, the `Context` object still provides the solver type to use.
-The attribute is now called simply `solver` (instead of `experimental_solver`),
-and it is populated by the `pluggy` registry.
-
-TODO: WIP.
