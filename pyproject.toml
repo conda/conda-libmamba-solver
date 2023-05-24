@@ -122,9 +122,9 @@ addopts = [
   "--deselect=tests/core/test_solve.py::test_channel_priority_churn_minimized",
   "--deselect=tests/core/test_solve.py::test_priority_1",
   # TODO: Investigate why this fails on Windows now
-  "--deselect=tests/test_create.py::IntegrationTests::test_install_update_deps_only_deps_flags",
+  "--deselect=tests/test_create.py::test_install_update_deps_only_deps_flags",
   # TODO: https://github.com/conda/conda-libmamba-solver/issues/141
-  "--deselect=tests/test_create.py::IntegrationTests::test_conda_pip_interop_conda_editable_package",
+  "--deselect=tests/test_create.py::test_conda_pip_interop_conda_editable_package",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
