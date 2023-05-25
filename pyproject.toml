@@ -23,7 +23,7 @@ classifiers = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-  "conda >=23.3.1",
+  "conda >=23.5.0",
   "libmambapy >=1.4.1",
   "boltons >=23.0.0",
 ]
