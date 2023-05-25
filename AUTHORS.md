@@ -6,8 +6,8 @@ Authors are sorted alphabetically.
 * Daniel Holth
 * Jaime Rodríguez-Guerra
 * Jannis Leidel
+* John Kirkham
 * Ken Odegard
 * Matthew R. Becker
 * conda-bot
-* jakirkham
 * pre-commit-ci[bot]
