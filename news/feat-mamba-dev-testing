@@ -12,8 +12,9 @@
 
 ### Docs
 
-* Added notes about development workflows with libmamba from source  (#191)
+* Added notes about development workflows with libmamba from source. (#191)
 
 ### Other
 
-* Adding libmamba/libmambapy as development dependencies within docker images (#191)
+* Adding libmamba/libmambapy as development dependencies within docker images. (#191)
+
