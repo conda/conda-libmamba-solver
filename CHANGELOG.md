@@ -48,12 +48,12 @@ Remember to update the hyperlinks at the bottom.
 
 ### Contributors
 
+* @jakirkham made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/189
 * @costrouc
 * @jaimergp
 * @jezdez
 * @kenodegard
 * @conda-bot
-* @jakirkham
 * @pre-commit-ci[bot]
 
 
