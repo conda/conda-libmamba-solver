@@ -1,3 +1,4 @@
 conda-forge::pytest-xprocess
+conda-index
 # needed for many conda tests
 flask
