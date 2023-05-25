@@ -17,4 +17,3 @@
 ### Other
 
 * Adding libmamba/libmambapy as development dependencies within docker images. (#191)
-
