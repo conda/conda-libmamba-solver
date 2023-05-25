@@ -11,16 +11,20 @@ restore_e() {
 trap restore_e EXIT
 
 function recompile-mamba () {
-  pushd /opt/mamba-src/
-  sudo /opt/conda/bin/cmake -B build/ \
-      -DBUILD_LIBMAMBA=ON \
-      -DBUILD_SHARED=ON \
-      -DCMAKE_INSTALL_PREFIX=/opt/conda \
-      -DCMAKE_PREFIX_PATH=/opt/conda \
-      -DBUILD_LIBMAMBAPY=ON
-  sudo /opt/conda/bin/cmake --build build/ -j
-  sudo make install -C build/
-  popd
+  if [ -d "/opt/mamba-src" ]; then
+    pushd /opt/mamba-src/
+    sudo /opt/conda/bin/cmake -B build/ \
+        -DBUILD_LIBMAMBA=ON \
+        -DBUILD_SHARED=ON \
+        -DCMAKE_INSTALL_PREFIX=/opt/conda \
+        -DCMAKE_PREFIX_PATH=/opt/conda \
+        -DBUILD_LIBMAMBAPY=ON
+    sudo /opt/conda/bin/cmake --build build/ -j
+    sudo make install -C build/
+    popd
+  else
+    echo "ERROR: path '/opt/mamba-src' not mounted so no libmamba to recompile"
+  fi
 }
 
 sudo /opt/conda/condabin/conda install -y -p /opt/conda \
