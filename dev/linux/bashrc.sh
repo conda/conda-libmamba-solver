@@ -34,7 +34,7 @@ sudo /opt/conda/condabin/conda install -y -p /opt/conda \
 if [ -d "/opt/mamba-src" ]; then
   # remove "sel(win)" in environment yaml hack since conda does not understand
   # libmamba specific specs
-  sed '/sel/d' /opt/mamba-src/mamba/environment-dev.yml > /tmp/mamba-environment-dev.yml
+  sed '/sel(.*)/d' /opt/mamba-src/mamba/environment-dev.yml > /tmp/mamba-environment-dev.yml
   sudo /opt/conda/condabin/conda env update -p /opt/conda \
        --file /tmp/mamba-environment-dev.yml
 
