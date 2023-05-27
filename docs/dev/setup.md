@@ -77,6 +77,46 @@ $ cd $REPO_LOCATION
 $ python -m pip install --no-deps -e .
 ```
 
+For testing out the `libmamba` solve you can set it several ways:
+ - environment variable `CONDA_SOLVER=libmamba`
+ - pass a flag `--solver=libmamba`
+ - setting the conda config `conda config --set solver=libmamba` which will modify your `condarc`
+
+## Debugging `conda` and `conda-libmamba-solver`
+
+Once you have followed the steps described in the general workflow
+above you may need to investigate the state in a particular
+point. Insert a
+[`breakpoint()`](https://docs.python.org/3/library/pdb.html) within
+the code and run a test or conda directly to hit the breakpoint.
+
+## Debugging Mamba
+
+While debugging the conda workflows only requires modifying python
+code and running conda. Debugging the mamba code requires
+recompilation and is not as easy to jump into a debugger to
+investigate state.
+
+1. Get familiar with the ["Local development" guide for `mamba` itself][mamba_dev].
+
+2. Fork and clone the `mamba` repository to your preferred location:
+
+```bash
+$ git clone "git@github.com:$YOUR_USERNAME/mamba" "$REPO_LOCATION"
+# cd $REPO_LOCATION
+```
+
+3. Use the docker image for development suggested above and re-run
+   `recompile-mamba` whenever you make change to `mamba` in
+   $REPO_LOCATION. This should take less than a minute.
+
+We recommend debugging via either breakpoints and using gdb or print
+statements via `std::cout << ... << std::endl`. The
+[following](https://github.com/costrouc/mamba/commit/99ac04ee9ca26c9579c67816cfba25bf310c30fb)
+shows an example of inserting print statements into the `libmamba`
+source in order to debug the [libsolv](https://github.com/openSUSE/libsolv) state.
+
 <!-- LINKS -->
 
 [conda_dev]: https://docs.conda.io/projects/conda/en/latest/dev-guide/development-environment.html
+[mamba_dev]: https://mamba.readthedocs.io/en/latest/developer_zone/build_locally.html
