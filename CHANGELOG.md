@@ -13,6 +13,51 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.5.0 (2023-05-25)
+
+### Enhancements
+
+* Provide a `CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED` environment variable to prevent
+  channels from being injected from installed packages. This is useful for air-gapped environments
+  where outside channels are not available. (#108 via #184)
+* Simplify `libmambapy.Context` initialization so we only set the bits that we use. (#209)
+* Use the new `RepoInterface` and remove the `SubdirData` subclass workarounds, which requires `conda 23.5.0`.
+  (#210)
+
+### Bug fixes
+
+* Fix an issue where running `conda update <package>` would result in the package being _downgraded_ if no newer versions were available. (#71 via #158)
+* Ensure unauthenticated channels are not re-injected in the channel lists from installed packages
+  if an authenticated equivalent is already present. (#108 via #184)
+* Honor `context.repodata_threads`. (#200)
+* Do not set `quiet` manually when `context.json` is true. (#187)
+
+### Deprecations
+
+* Remove unneeded user-agent tests. (#183)
+
+### Docs
+
+* Document known solver behavior differences. (#115, #131 via #197)
+* Update development docs to reflect changes in build system and other inaccuracies. (#208)
+
+### Other
+
+* Add tests reproducing the known solver differences. (#115, #131 via #197)
+* Skip tests on libmamba 1.4.2 temporarily to workaround some test failures. Tracked by #186. (#187)
+
+### Contributors
+
+* @jakirkham made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/189
+* @costrouc
+* @jaimergp
+* @jezdez
+* @kenodegard
+* @conda-bot
+* @pre-commit-ci[bot]
+
+
+
 ## 23.3.0 (2023-03-31)
 
 ### Enhancements

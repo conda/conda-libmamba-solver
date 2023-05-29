@@ -73,13 +73,14 @@ and `libmamba.Repo` objects.
 import logging
 import os
 from dataclasses import dataclass
+from functools import partial
 from tempfile import NamedTemporaryFile
-from typing import Iterable, Union
+from typing import Dict, Iterable, Tuple, Union
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context
-from conda.common.io import ThreadLimitedThreadPoolExecutor
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
 from conda.common.url import remove_auth, split_anaconda_token
 from conda.core.subdir_data import SubdirData
@@ -92,6 +93,15 @@ from .state import IndexHelper
 from .utils import escape_channel_url
 
 log = logging.getLogger(f"conda.{__name__}")
+
+
+@dataclass(frozen=True)
+class _ChannelRepoInfo:
+    "A dataclass mapping conda Channels, libmamba Repos and URLs"
+    channel: Channel
+    repo: api.Repo
+    full_url: str
+    noauth_url: str
 
 
 class LibMambaIndexHelper(IndexHelper):
@@ -118,7 +128,7 @@ class LibMambaIndexHelper(IndexHelper):
         self._query = api.Query(self._pool)
         self._format = api.QueryFormat.JSON
 
-    def get_info(self, key: str):
+    def get_info(self, key: str) -> _ChannelRepoInfo:
         orig_key = key
         if not key.startswith("file://"):
             # The conda functions (specifically remove_auth) assume the input
@@ -186,10 +196,7 @@ class LibMambaIndexHelper(IndexHelper):
         finally:
             os.unlink(f.name)
 
-    def _fetch_channel(self, url: str) -> api.Repo:
-        # We could load from subdir_data.iter_records(), but that means
-        # re-exporting everything to a temporary JSON path and well,
-        # `subdir_data.load()` already did!
+    def _fetch_channel(self, url: str) -> Tuple[str, os.PathLike]:
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
@@ -202,30 +209,42 @@ class LibMambaIndexHelper(IndexHelper):
                 del SubdirData._cache_[(url, self._repodata_fn)]
             # /Workaround
 
-        if hasattr(SubdirData, "repo_fetch"):
-            # New interface
-            log.debug("Fetching %s with SubdirData.repo_fetch", channel)
-            subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
-            json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
-        else:
-            # Legacy interface
-            log.debug("Fetching %s with _DownloadOnlySubdirData", channel)
-            subdir_data = _DownloadOnlySubdirData(channel, repodata_fn=self._repodata_fn)
-            subdir_data.load()
-            json_path = subdir_data.cache_path_json
+        log.debug("Fetching %s with SubdirData.repo_fetch", channel)
+        subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
+        json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
+
         return url, json_path
 
-    def _load_channels(self):
+    def _load_channels(self) -> Dict[str, _ChannelRepoInfo]:
         # 1. Obtain and deduplicate URLs from channels
-        urls = [
-            url
-            for c in self._channels
-            for url in Channel(c).urls(with_credentials=True, subdirs=self._subdirs)
-        ]
+        urls = []
+        seen_noauth = set()
+        for _c in self._channels:
+            c = Channel(_c)
+            noauth_urls = c.urls(with_credentials=False, subdirs=self._subdirs)
+            if seen_noauth.issuperset(noauth_urls):
+                continue
+            if c.auth or c.token:  # authed channel always takes precedence
+                urls += Channel(c).urls(with_credentials=True, subdirs=self._subdirs)
+                seen_noauth.update(noauth_urls)
+                continue
+            # at this point, we are handling an unauthed channel; in some edge cases,
+            # an auth'd variant of the same channel might already be present in `urls`.
+            # we only add them if we haven't seen them yet
+            for url in noauth_urls:
+                if url not in seen_noauth:
+                    urls.append(url)
+                    seen_noauth.add(url)
+
         urls = tuple(dict.fromkeys(urls))  # de-duplicate
 
         # 2. Fetch URLs (if needed)
-        with ThreadLimitedThreadPoolExecutor() as executor:
+        Executor = (
+            DummyExecutor
+            if context.debug or context.repodata_threads == 1
+            else partial(ThreadLimitedThreadPoolExecutor, max_workers=context.repodata_threads)
+        )
+        with Executor() as executor:
             jsons = {url: str(path) for (url, path) in executor.map(self._fetch_channel, urls)}
 
         # 3. Create repos in same order as `urls`
@@ -244,19 +263,6 @@ class LibMambaIndexHelper(IndexHelper):
         # 4. Configure priorities
         set_channel_priorities(index)
 
-        # 5. Clean up the conda SubdirData cache. We bypassed the post-processing
-        # so now the parent class has a cached instance with no data, which breaks
-        # some tests.
-        if "PYTEST_CURRENT_TEST" in os.environ:
-            log.debug("Cleaning up SubdirData cache")
-            clear_these = []
-            for key, cache in SubdirData._cache_.items():
-                if isinstance(cache, _DownloadOnlySubdirData):
-                    clear_these.append(key)
-
-            for key in clear_these:
-                del SubdirData._cache_[key]
-
         return index
 
     def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
@@ -264,15 +270,15 @@ class LibMambaIndexHelper(IndexHelper):
         repo.set_installed()
         return repo
 
-    def whoneeds(self, query: str, records=True):
+    def whoneeds(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict]:
         result_str = self._query.whoneeds(query, self._format)
         return self._process_query_result(result_str, records=records)
 
-    def depends(self, query: str, records=True):
+    def depends(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict]:
         result_str = self._query.depends(query, self._format)
         return self._process_query_result(result_str, records=records)
 
-    def search(self, query: str, records=True):
+    def search(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict]:
         result_str = self._query.find(query, self._format)
         return self._process_query_result(result_str, records=records)
 
@@ -287,7 +293,11 @@ class LibMambaIndexHelper(IndexHelper):
                 explicit_pool.add(record.name)
         return tuple(explicit_pool)
 
-    def _process_query_result(self, result_str, records=True):
+    def _process_query_result(
+        self,
+        result_str,
+        records=True,
+    ) -> Union[Iterable[PackageRecord], dict]:
         result = json_load(result_str)
         if result.get("result", {}).get("status") != "OK":
             query_type = result.get("query", {}).get("type", "<Unknown>")
@@ -301,35 +311,3 @@ class LibMambaIndexHelper(IndexHelper):
                 pkg_records.append(record)
             return pkg_records
         return result
-
-
-class _DownloadOnlySubdirData(SubdirData):
-    _internal_state_template = {
-        "_package_records": {},
-        "_names_index": {},
-        "_track_features_index": {},
-    }
-
-    def _read_local_repodata(self, *args, **kwargs):
-        return self._internal_state_template
-
-    # Original implementation had a typo in its name which got fixed.
-    # Add alias for backwards compatibility.
-    _read_local_repdata = _read_local_repodata
-
-    def _process_raw_repodata_str(self, *args, **kwargs):
-        return self._internal_state_template
-
-    def _process_raw_repodata(self, *args, **kwargs):
-        return self._internal_state_template
-
-    def _pickle_me(self, *args):
-        return
-
-
-@dataclass(frozen=True)
-class _ChannelRepoInfo:
-    channel: Channel
-    repo: api.Repo
-    full_url: str
-    noauth_url: str

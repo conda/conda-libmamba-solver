@@ -1,0 +1,19 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* Added notes about development workflows with libmamba from source. (#191)
+
+### Other
+
+* Adding libmamba/libmambapy as development dependencies within docker images. (#191)

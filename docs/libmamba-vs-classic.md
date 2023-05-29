@@ -251,6 +251,52 @@ It runs in C, using memory-efficient data structures.
 
 `conda-libmamba-solver` uses the same IO stack as `conda` classic. In the past, we relied on `libmamba`'s IO for repodata fetching, but this is not the case anymore.
 
+## Practical examples of solver differences
+
+### Python 3.11 + very old Pydantic
+
+> Case study inspired by [issue #115](https://github.com/conda/conda-libmamba-solver/issues/115)
+
+The following environment file will give different solutions with `classic` and `conda-libmamba-solver`.
+
+```yaml
+name: gmso
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - sympy
+  - unyt <=2.8
+  - boltons
+  - lxml
+  - pydantic <1.9.0
+  - networkx
+  - ele >=0.2.0
+  - forcefield-utilities
+```
+
+- `classic`: `python 3.10` + `pydantic 1.8.2`
+- `conda-libmamba-solver`: `python 3.11` + `pydantic 0.18.2`
+
+This is an example of an underspecified input. There's no `python` dependency (or version) listed
+in the environment file, so the solver has to figure it out. The solver doesn't necessarily know
+which dependency is more "important". `classic` will prioritize getting a more recent `pydantic` at
+the expense of an older `python`, and `conda-libmamba-solver` will prefer having `python 3.11`,
+even if it means going all the way down to `pydantic 0.18.2` (which was packaged as `noarch`) and
+thus compatible with _any_ Python version.
+
+### cudatoolkit present in a `cpuonly` environment
+
+> Originally reported in [issue #131](https://github.com/conda/conda-libmamba-solver/issues/131)
+
+This is an example of a [known limitation in how `libsolv` processes the `track_features`
+metadata](https://mamba.readthedocs.io/en/latest/advanced_usage/package_resolution.html). `libsolv`
+will only "see" the first level of `track_features`, which down-prioritize packages. If you depend
+on 2nd-order dependencies to track prioritized variants (which conda `classic` successfully
+processes), you will get mixed results. This can be solved at the packaging level, where all the
+variants rely on the package _mutex_ directly, instead of relying on packages that depend on the
+mutex.
+
 ## More information
 
 If you want to read (even more) about this, please check the following resources:

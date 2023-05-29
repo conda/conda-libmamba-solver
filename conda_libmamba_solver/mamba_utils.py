@@ -9,8 +9,8 @@
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
 import logging
-import os
 from importlib.metadata import version
+from typing import Dict
 
 import libmambapy as api
 from conda.base.constants import ChannelPriority
@@ -23,9 +23,17 @@ def mamba_version():
     return version("libmambapy")
 
 
-def set_channel_priorities(index, has_priority=None):
+def _get_base_url(url, name=None):
+    tmp = url.rsplit("/", 1)[0]
+    if name:
+        if tmp.endswith(name):
+            return tmp.rsplit("/", 1)[0]
+    return tmp
+
+
+def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: bool = None):
     """
-    This function was part of load_channels originally.
+    This function was part of mamba.utils.load_channels originally.
     We just split it to reuse it a bit better.
     """
     if has_priority is None:
@@ -58,7 +66,7 @@ def set_channel_priorities(index, has_priority=None):
             subpriority = subprio_index
             subprio_index -= 1
 
-        if context.verbosity != 0 and not context.json:
+        if not context.json:
             log.debug(
                 "Channel: %s, platform: %s, prio: %s : %s",
                 info.channel,
@@ -71,7 +79,7 @@ def set_channel_priorities(index, has_priority=None):
     return index
 
 
-def init_api_context(use_mamba_experimental: bool = False):
+def init_api_context() -> api.Context:
     api_ctx = api.Context()
 
     api_ctx.output_params.json = context.json
@@ -89,60 +97,37 @@ def init_api_context(use_mamba_experimental: bool = False):
     api_ctx.channels = context.channels
     api_ctx.platform = context.subdir
 
-    if "MAMBA_EXTRACT_THREADS" in os.environ:
-        try:
-            max_threads = int(os.environ["MAMBA_EXTRACT_THREADS"])
-            api_ctx.extract_threads = max_threads
-        except ValueError:
-            v = os.environ["MAMBA_EXTRACT_THREADS"]
-            raise ValueError(
-                f"Invalid conversion of env variable 'MAMBA_EXTRACT_THREADS' from value '{v}'"
-            )
+    api_ctx.channel_alias = str(_get_base_url(context.channel_alias.url(with_credentials=True)))
 
-    def get_base_url(url, name=None):
-        tmp = url.rsplit("/", 1)[0]
-        if name:
-            if tmp.endswith(name):
-                return tmp.rsplit("/", 1)[0]
-        return tmp
-
-    api_ctx.channel_alias = str(get_base_url(context.channel_alias.url(with_credentials=True)))
-
+    RESERVED_NAMES = {"local", "defaults"}
     additional_custom_channels = {}
     for el in context.custom_channels:
-        if context.custom_channels[el].canonical_name not in ["local", "defaults"]:
-            additional_custom_channels[el] = get_base_url(
+        if context.custom_channels[el].canonical_name not in RESERVED_NAMES:
+            additional_custom_channels[el] = _get_base_url(
                 context.custom_channels[el].url(with_credentials=True), el
             )
     api_ctx.custom_channels = additional_custom_channels
 
     additional_custom_multichannels = {}
     for el in context.custom_multichannels:
-        if el not in ["defaults", "local"]:
+        if el not in RESERVED_NAMES:
             additional_custom_multichannels[el] = []
             for c in context.custom_multichannels[el]:
                 additional_custom_multichannels[el].append(
-                    get_base_url(c.url(with_credentials=True))
+                    _get_base_url(c.url(with_credentials=True))
                 )
     api_ctx.custom_multichannels = additional_custom_multichannels
 
     api_ctx.default_channels = [
-        get_base_url(x.url(with_credentials=True)) for x in context.default_channels
+        _get_base_url(x.url(with_credentials=True)) for x in context.default_channels
     ]
 
-    if context.ssl_verify is False:
-        api_ctx.ssl_verify = "<false>"
-    elif context.ssl_verify is not True:
-        api_ctx.ssl_verify = context.ssl_verify
     api_ctx.target_prefix = context.target_prefix
     api_ctx.root_prefix = context.root_prefix
     api_ctx.conda_prefix = context.conda_prefix
     api_ctx.pkgs_dirs = context.pkgs_dirs
     api_ctx.envs_dirs = context.envs_dirs
 
-    api_ctx.remote_fetch_params.connect_timeout_secs = int(round(context.remote_connect_timeout_secs))
-    api_ctx.remote_fetch_params.max_retries = context.remote_max_retries
-    api_ctx.remote_fetch_params.retry_backoff = context.remote_backoff_factor
     api_ctx.add_pip_as_python_dependency = context.add_pip_as_python_dependency
     api_ctx.use_only_tar_bz2 = context.use_only_tar_bz2
 
