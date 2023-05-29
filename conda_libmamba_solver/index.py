@@ -231,7 +231,7 @@ class LibMambaIndexHelper(IndexHelper):
     def _json_path_to_repo_info(self, url: str, json_path: str) -> _ChannelRepoInfo:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-        repo = api.Repo(self._pool, noauth_url, json_path, escape_channel_url(noauth_url))
+        repo = api.Repo(self._pool, noauth_url, str(json_path), escape_channel_url(noauth_url))
         return _ChannelRepoInfo(
             repo=repo,
             channel=channel,
