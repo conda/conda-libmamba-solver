@@ -4,11 +4,21 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - "docs/**"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "conda_libmamba_solver/**"
+      - "dev/**"
+      - "recipe/**"
+      - "tests/**"
+      - "pyproject.toml"
   pull_request:
-    paths-ignore:
-      - "docs/**"
+    paths:
+      - ".github/workflows/tests.yml"
+      - "conda_libmamba_solver/**"
+      - "dev/**"
+      - "recipe/**"
+      - "tests/**"
+      - "pyproject.toml"
   schedule:
     - cron: "15 6 * * 1-5"  # Mon to Fri, 6:15am
 
@@ -311,6 +321,6 @@ jobs:
           package-name: ${{ github.event.repository.name }}
           subdir: ${{ matrix.subdir }}
           anaconda-org-channel: conda-canary
-          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || format('{0}-{1}', github.event.repository.name, github.ref_name) }}
           anaconda-org-token: ${{ secrets.CONDA_CANARY_ANACONDA_ORG_TOKEN }}
           conda-build-arguments: '--override-channels -c conda-forge -c defaults'

@@ -180,6 +180,12 @@ class LibMambaSolver(Solver):
         else:
             channels_from_installed = in_state.channels_from_installed()
 
+        if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
+            # see https://github.com/conda/conda-libmamba-solver/issues/108
+            channels_from_installed = ()
+        else:
+            channels_from_installed = in_state.channels_from_installed()
+
         all_channels = (
             *conda_bld_channels,
             *self.channels,
@@ -291,7 +297,10 @@ class LibMambaSolver(Solver):
                 "as conflicts for maximum flexibility",
             )
             # we only check this for "desperate" strategies in _specs_to_tasks
-            self._command = "last_solve_attempt"
+            if self._command in (None, NULL):
+                self._command = "last_solve_attempt"
+            else:
+                self._command += "+last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
                 message = self._prepare_problems_message()
@@ -486,13 +495,13 @@ class LibMambaSolver(Solver):
                     requested,
                     spec == requested,
                     spec.strictness == 1,
-                    self._command in ("update", "last_solve_attempt", None, NULL),
+                    self._command in ("update", "update+last_solve_attempt", None, NULL),
                     in_state.deps_modifier != DepsModifier.ONLY_DEPS,
                     in_state.update_modifier
                     not in (UpdateModifier.UPDATE_DEPS, UpdateModifier.FREEZE_INSTALLED),
                 )
                 if all(conditions):
-                    if self._command == "last_solve_attempt":
+                    if "last_solve_attempt" in str(self._command):
                         key = (
                             "UPDATE | ESSENTIAL | FORCEBEST",
                             api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL | api.SOLVER_FORCEBEST,
@@ -500,7 +509,7 @@ class LibMambaSolver(Solver):
                     else:
                         # NOTE: This is ugly and there should be another way
                         spec_str = self._spec_to_str(
-                            MatchSpec(spec, version=f"!={installed.version}")
+                            MatchSpec(spec, version=f">{installed.version}")
                         )
 
             tasks[key].append(spec_str)
