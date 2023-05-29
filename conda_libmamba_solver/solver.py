@@ -172,7 +172,9 @@ class LibMambaSolver(Solver):
                 rec.channel: None for rec in self._index if rec.channel.scheme == "file"
             }
             # Cache indices for conda-build, it gets heavy otherwise
-            LibMambaIndexHelper = _CachedLibMambaIndexHelper
+            IndexHelper = _CachedLibMambaIndexHelper
+        else:
+            IndexHelper = LibMambaIndexHelper
 
         if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
@@ -198,7 +200,7 @@ class LibMambaSolver(Solver):
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            index = LibMambaIndexHelper(
+            index = IndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
                 channels=all_channels,
                 subdirs=subdirs,
