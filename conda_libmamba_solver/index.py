@@ -75,7 +75,6 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from tempfile import NamedTemporaryFile
-from tempfile import NamedTemporaryFile
 from typing import Dict, Iterable, Tuple, Union
 
 import libmambapy as api
