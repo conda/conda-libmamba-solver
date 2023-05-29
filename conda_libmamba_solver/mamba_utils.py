@@ -92,7 +92,7 @@ def init_api_context() -> api.Context:
     api_ctx.set_verbosity(context.verbosity)
     if output_params.json:
         api.cancel_json_output()
-    
+
     # Prefix params
     prefix_params = getattr(api_ctx, "prefix_params", api_ctx)
     prefix_params.conda_prefix = context.conda_prefix
