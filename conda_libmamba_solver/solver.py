@@ -182,12 +182,6 @@ class LibMambaSolver(Solver):
         else:
             channels_from_installed = in_state.channels_from_installed()
 
-        if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
-            # see https://github.com/conda/conda-libmamba-solver/issues/108
-            channels_from_installed = ()
-        else:
-            channels_from_installed = in_state.channels_from_installed()
-
         all_channels = (
             *conda_bld_channels,
             *self.channels,
