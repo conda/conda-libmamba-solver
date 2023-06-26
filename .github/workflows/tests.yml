@@ -80,7 +80,7 @@ jobs:
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
-      
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v3
@@ -267,7 +267,7 @@ jobs:
           if errorlevel 1 exit 1
           python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow" --timeout=600
           if errorlevel 1 exit 1
-      
+
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v3

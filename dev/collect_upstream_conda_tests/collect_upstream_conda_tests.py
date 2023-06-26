@@ -1,3 +1,6 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 pytest plugin to modify which upstream (conda/conda) tests are run by pytest.
 """
@@ -5,11 +8,10 @@ from importlib.metadata import version
 
 import pytest
 
-
+# Deselect tests from conda/conda we cannot pass due to different reasons
+# These used to be skipped or xfail'd upstream, but we are trying to
+# keep it clean from this project's specifics
 _deselected_upstream_tests = [
-    ### Deselect tests from conda/conda we cannot pass due to different reasons
-    ### These used to be skipped or xfail'd upstream, but we are trying to
-    ### keep it clean from this project's specifics
     # This test checks for plugin errors and assumes none are present, but
     # conda-libmamba-solver counts as one so we need to skip it.
     "tests/plugins/test_manager.py::test_load_entrypoints_importerror",
@@ -74,9 +76,9 @@ _broken_by_libmamba_1_4_2 = [
     "tests/core/test_solve.py::test_force_remove_1",
     "tests/core/test_solve.py::test_aggressive_update_packages",
     "tests/core/test_solve.py::test_update_deps_2",
-    "tests/test_create.py::test_conda_pip_interop_dependency_satisfied_by_pip", # Linux-only
-    "tests/test_create.py::test_conda_pip_interop_pip_clobbers_conda", # Linux-only
-    "tests/test_create.py::test_install_tarball_from_local_channel", # Linux-only
+    "tests/test_create.py::test_conda_pip_interop_dependency_satisfied_by_pip",  # Linux-only
+    "tests/test_create.py::test_conda_pip_interop_pip_clobbers_conda",  # Linux-only
+    "tests/test_create.py::test_install_tarball_from_local_channel",  # Linux-only
     # conda-libmamba-solver/tests
     "tests/test_modified_upstream.py::test_pinned_1",
 ]
@@ -95,8 +97,13 @@ def pytest_collection_modifyitems(session, config, items):
         if item.nodeid in _deselected_upstream_tests:
             deselected.append(item)
             continue
-        if version("libmambapy") >= "1.4.2" and item.nodeid in _broken_by_libmamba_1_4_2:
-            item.add_marker(pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186"))
+        if (
+            version("libmambapy") >= "1.4.2"
+            and item.nodeid in _broken_by_libmamba_1_4_2
+        ):
+            item.add_marker(
+                pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186")
+            )
         selected.append(item)
     items[:] = selected
     config.hook.pytest_deselected(items=deselected)
