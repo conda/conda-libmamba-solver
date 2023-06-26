@@ -159,15 +159,13 @@ jobs:
           call .\dev-init.bat
           if errorlevel 1 exit 1
           :: /original logic
+          :: Install test collection plugin
+          python -m pip install -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver\dev\collect_upstream_conda_tests"
+          if errorlevel 1 exit 1
           :: Install conda-libmamba-solver
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
           python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
-          if errorlevel 1 exit 1
-          :: override pytest settings
-          copy "%GITHUB_WORKSPACE%\conda-libmamba-solver\pyproject.toml" .\pyproject.toml
-          if errorlevel 1 exit 1
-          del .\setup.cfg
           if errorlevel 1 exit 1
           call conda info -a
           if errorlevel 1 exit 1
@@ -239,11 +237,6 @@ jobs:
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
-      - name: Override pytest settings
-        run: |
-          # override pytest settings
-          cp conda-libmamba-solver/pyproject.toml conda/pyproject.toml
-          rm conda/setup.cfg
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
@@ -453,11 +446,9 @@ jobs:
           ./dev/macos/setup.sh
           # /original setup
           python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
+          python -m pip install ../conda-libmamba-solver/dev/collect_upstream_conda_tests -vv
           python -m pip install ../conda-libmamba-solver -vv --no-deps
           conda info -a
-          # override pytest settings
-          cp ../conda-libmamba-solver/pyproject.toml ./pyproject.toml
-          rm ./setup.cfg
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
