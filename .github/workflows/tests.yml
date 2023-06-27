@@ -161,6 +161,7 @@ jobs:
             --file ../conda-libmamba-solver/tests/requirements.txt \
             python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
+          python -m pip install ../conda-libmamba-solver/dev/collect_upstream_conda_tests -vv
           conda info
           python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
 
@@ -242,6 +243,8 @@ jobs:
           if errorlevel 1 exit 1
           :: initialize conda dev
           call .\dev\windows\setup.bat
+          if errorlevel 1 exit 1
+          python -m pip install ..\conda-libmamba-solver\dev\collect_upstream_conda_tests -vv
           if errorlevel 1 exit 1
           call .\dev-init.bat
           if errorlevel 1 exit 1
