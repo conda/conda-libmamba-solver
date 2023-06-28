@@ -115,14 +115,15 @@ def pytest_collection_modifyitems(session, config, items):
     selected = []
     deselected = []
     for item in items:
-        path_key = "/".join(item.path.parts[item.path.parts.index("tests"):])
+        path_key = "/".join(item.path.parts[item.path.parts.index("tests") :])
         item_name_no_brackets = item.name.split("[")[0]
         if item_name_no_brackets in _deselected_upstream_tests.get(path_key, []):
             deselected.append(item)
             continue
-        if (
-            version("libmambapy") >= "1.4.2"
-            and item_name_no_brackets in _broken_by_libmamba_1_4_2.get(path_key, [])
+        if version(
+            "libmambapy"
+        ) >= "1.4.2" and item_name_no_brackets in _broken_by_libmamba_1_4_2.get(
+            path_key, []
         ):
             item.add_marker(
                 pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186")
