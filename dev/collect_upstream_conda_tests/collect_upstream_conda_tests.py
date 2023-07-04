@@ -94,6 +94,7 @@ _broken_by_libmamba_1_4_2 = {
         "test_update_deps_2",
     ],
     "tests/test_create.py": [
+        "test_list_with_pip_wheel",
         "test_conda_pip_interop_dependency_satisfied_by_pip",  # Linux-only
         "test_conda_pip_interop_pip_clobbers_conda",  # Linux-only
         "test_install_tarball_from_local_channel",  # Linux-only
