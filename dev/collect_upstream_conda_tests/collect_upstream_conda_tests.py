@@ -123,12 +123,8 @@ def pytest_collection_modifyitems(session, config, items):
             continue
         if version(
             "libmambapy"
-        ) >= "1.4.2" and item_name_no_brackets in _broken_by_libmamba_1_4_2.get(
-            path_key, []
-        ):
-            item.add_marker(
-                pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186")
-            )
+        ) >= "1.4.2" and item_name_no_brackets in _broken_by_libmamba_1_4_2.get(path_key, []):
+            item.add_marker(pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186"))
         selected.append(item)
     items[:] = selected
     config.hook.pytest_deselected(items=deselected)
