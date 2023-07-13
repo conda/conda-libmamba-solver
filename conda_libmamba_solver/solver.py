@@ -41,13 +41,14 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
 )
+from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
 from conda.models.version import VersionOrder
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
-from .index import LibMambaIndexHelper
+from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
 
@@ -155,6 +156,7 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         init_api_context()
         subdirs = self.subdirs
+        conda_bld_channels = ()
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
             # Problem: Conda build generates a custom index which happens to "forget" about
@@ -164,6 +166,15 @@ class LibMambaSolver(Solver):
             # Fix: just add noarch to subdirs.
             if "noarch" not in subdirs:
                 subdirs = *subdirs, "noarch"
+            # We need to recover the local dirs (conda-build's local, output_folder, etc)
+            # from the index. This is a bit of a hack, but it works.
+            conda_bld_channels = {
+                rec.channel: None for rec in self._index if rec.channel.scheme == "file"
+            }
+            # Cache indices for conda-build, it gets heavy otherwise
+            IndexHelper = _CachedLibMambaIndexHelper
+        else:
+            IndexHelper = LibMambaIndexHelper
 
         if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
@@ -172,25 +183,27 @@ class LibMambaSolver(Solver):
             channels_from_installed = in_state.channels_from_installed()
 
         all_channels = (
+            *conda_bld_channels,
             *self.channels,
             *in_state.channels_from_specs(),
             *channels_from_installed,
             *in_state.maybe_free_channel(),
         )
         with Spinner(
-            self._spinner_msg(all_channels),
+            self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            index = LibMambaIndexHelper(
+            index = IndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
                 channels=all_channels,
                 subdirs=subdirs,
                 repodata_fn=self._repodata_fn,
             )
+            index.reload_local_channels()
 
         with Spinner(
-            "Solving environment",
+            self._spinner_msg_solving(),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
@@ -207,7 +220,13 @@ class LibMambaSolver(Solver):
 
         return solution
 
-    def _spinner_msg(self, channels: Iterable["Channel"]):
+    def _spinner_msg_metadata(self, channels: Iterable[Channel], conda_bld_channels=()):
+        if self._called_from_conda_build():
+            msg = "Reloading output folder"
+            if conda_bld_channels:
+                names = [Channel(c).canonical_name for c in conda_bld_channels]
+                msg += f" ({', '.join(names)})"
+            return msg
         canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
         canonical_names_dashed = "\n - ".join(canonical_names)
         return (
@@ -216,6 +235,18 @@ class LibMambaSolver(Solver):
             f"Platform: {context.subdir}\n"
             f"Collecting package metadata ({self._repodata_fn})"
         )
+
+    def _spinner_msg_solving(self):
+        """This shouldn't be our responsibility, but the CLI / app's..."""
+        prefix_name = os.path.basename(self.prefix)
+        if self._called_from_conda_build():
+            if "_env" in prefix_name:
+                env_name = "_".join(prefix_name.split("_")[:3])
+                return f"Solving environment ({env_name})"
+            else:
+                # https://github.com/conda/conda-build/blob/e0884b626a/conda_build/environ.py#L1035-L1036
+                return "Getting pinned dependencies"
+        return "Solving environment"
 
     def _solving_loop(
         self,
@@ -601,7 +632,11 @@ class LibMambaSolver(Solver):
         if isinstance(problems, str):
             problems = self._parse_problems(problems)
 
-        self._maybe_raise_for_conda_build({**problems["conflicts"], **problems["not_found"]})
+        # We allow conda-build (if present) to process the exception early
+        self._maybe_raise_for_conda_build(
+            {**problems["conflicts"], **problems["not_found"]},
+            message=self._prepare_problems_message(),
+        )
 
         unsatisfiable = problems["conflicts"]
         not_found = problems["not_found"]
@@ -644,7 +679,11 @@ class LibMambaSolver(Solver):
         else:
             return f"{legacy_errors}\n{explained_errors}"
 
-    def _maybe_raise_for_conda_build(self, conflicting_specs: Mapping[str, MatchSpec]):
+    def _maybe_raise_for_conda_build(
+        self,
+        conflicting_specs: Mapping[str, MatchSpec],
+        message: str = None,
+    ):
         # TODO: Remove this hack for conda-build compatibility >_<
         # conda-build expects a slightly different exception format
         # good news is that we don't need to retry much, because all
@@ -653,18 +692,17 @@ class LibMambaSolver(Solver):
         if not self._called_from_conda_build():
             return
 
-        from conda_build.exceptions import DependencyNeedsBuildingError
+        from .exceptions import ExplainedDependencyNeedsBuildingError
 
-        exc = DependencyNeedsBuildingError(packages=list(conflicting_specs.keys()))
-        exc.matchspecs = list(conflicting_specs.values())
         # the patched index should contain the arch we are building this env for
-        for pkg_record in self._index.values():
-            if pkg_record.subdir != "noarch":
-                exc.subdir = pkg_record.subdir
-                break
-        else:
-            # if the index is empty, we default to whatever platform we are running on
-            exc.subdir = context.subdir
+        # if the index is empty, we default to whatever platform we are running on
+        subdir = next((subdir for subdir in self.subdirs if subdir != "noarch"), context.subdir)
+        exc = ExplainedDependencyNeedsBuildingError(
+            packages=list(conflicting_specs.keys()),
+            matchspecs=list(conflicting_specs.values()),
+            subdir=subdir,
+            explanation=message,
+        )
         raise exc
 
     def _export_solved_records(

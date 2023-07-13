@@ -73,7 +73,7 @@ and `libmamba.Repo` objects.
 import logging
 import os
 from dataclasses import dataclass
-from functools import partial
+from functools import lru_cache, partial
 from tempfile import NamedTemporaryFile
 from typing import Dict, Iterable, Tuple, Union
 
@@ -142,6 +142,18 @@ class LibMambaIndexHelper(IndexHelper):
                 f"Channel info for {orig_key} ({key}) not found. "
                 f"Available keys: {list(self._index)}"
             ) from exc
+
+    def reload_local_channels(self):
+        """
+        Reload a channel that was previously loaded from a local directory.
+        """
+        for url, info in self._index.items():
+            if url.startswith("file://"):
+                url, json_path = self._fetch_channel(url)
+                new = self._json_path_to_repo_info(url, json_path)
+                self._repos[self._repos.index(info.repo)] = new.repo
+                self._index[url] = new
+        set_channel_priorities(self._index)
 
     def _repo_from_records(
         self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
@@ -215,6 +227,17 @@ class LibMambaIndexHelper(IndexHelper):
 
         return url, json_path
 
+    def _json_path_to_repo_info(self, url: str, json_path: str) -> _ChannelRepoInfo:
+        channel = Channel.from_url(url)
+        noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
+        repo = api.Repo(self._pool, noauth_url, str(json_path), escape_channel_url(noauth_url))
+        return _ChannelRepoInfo(
+            repo=repo,
+            channel=channel,
+            full_url=url,
+            noauth_url=noauth_url,
+        )
+
     def _load_channels(self) -> Dict[str, _ChannelRepoInfo]:
         # 1. Obtain and deduplicate URLs from channels
         urls = []
@@ -250,15 +273,8 @@ class LibMambaIndexHelper(IndexHelper):
         # 3. Create repos in same order as `urls`
         index = {}
         for url in urls:
-            channel = Channel.from_url(url)
-            noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-            repo = api.Repo(self._pool, noauth_url, jsons[url], escape_channel_url(noauth_url))
-            index[noauth_url] = _ChannelRepoInfo(
-                repo=repo,
-                channel=channel,
-                full_url=url,
-                noauth_url=noauth_url,
-            )
+            info = self._json_path_to_repo_info(url, jsons[url])
+            index[info.noauth_url] = info
 
         # 4. Configure priorities
         set_channel_priorities(index)
@@ -311,3 +327,7 @@ class LibMambaIndexHelper(IndexHelper):
                 pkg_records.append(record)
             return pkg_records
         return result
+
+
+# for conda-build
+_CachedLibMambaIndexHelper = lru_cache(maxsize=None)(LibMambaIndexHelper)
