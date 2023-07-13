@@ -19,6 +19,7 @@ sudo su root -c "/opt/conda/bin/conda install -yq conda-build"
 sudo /opt/conda/bin/conda install --quiet -y --solver=classic \
     --file "${CONDA_SRC}/tests/requirements.txt" \
     --file "${CONDA_LIBMAMBA_SOLVER_SRC}/dev/requirements.txt"
+sudo /opt/conda/bin/python -m pip install "$CONDA_LIBMAMBA_SOLVER_SRC/dev/collect_upstream_conda_tests/"
 sudo /opt/conda/bin/python -m pip install "$CONDA_LIBMAMBA_SOLVER_SRC" --no-deps -vvv
 # /CONDA LIBMAMBA SOLVER CHANGES
 eval "$(sudo /opt/conda/bin/python -m conda init --dev bash)"
