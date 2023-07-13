@@ -77,6 +77,13 @@ $ cd $REPO_LOCATION
 $ python -m pip install --no-deps -e .
 ```
 
+5. Install the test collection plugins (only for upstream tests in `conda/conda`):
+
+```bash
+$ cd $REPO_LOCATION
+$ python -m pip install dev/collect_upstream_conda_tests/
+```
+
 For testing out the `libmamba` solve you can set it several ways:
  - environment variable `CONDA_SOLVER=libmamba`
  - pass a flag `--solver=libmamba`

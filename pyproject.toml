@@ -53,79 +53,12 @@ exclude = '''
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = [
-  ### Original settings from conda/conda
-  "--ignore=setup.py",
-  "--ignore=conda/__main__.py",
-  "--ignore=conda/_vendor",
-  "--ignore=tests/conda_env/specs/test_binstar.py",
-  "--ignore=tests/conda_env/support",
-  "--ignore=tests/conda_env/utils/test_uploader.py",
-  "--ignore=test_data",
   "--tb=native",
   "--strict-markers",
   "--xdoctest-modules",
   "--xdoctest-style=google",
-  ### Deselect tests from conda/conda we cannot pass due to different reasons
-  ### These used to be skipped or xfail'd upstream, but we are trying to
-  ### keep it clean from this project's specifics
-  # This test checks for plugin errors and assumes none are present, but
-  # conda-libmamba-solver counts as one so we need to skip it.
-  "--deselect=tests/plugins/test_manager.py::test_load_entrypoints_importerror",
-  # Conflict report / analysis is done differently with libmamba.
-  "--deselect=tests/cli/test_cli_install.py::test_find_conflicts_called_once",
-  # SolverStateContainer needed
-  "--deselect=tests/core/test_solve.py::test_solve_2",
-  "--deselect=tests/core/test_solve.py::test_virtual_package_solver",
-  "--deselect=tests/core/test_solve.py::test_broken_install",
-  # Features / nomkl involved
-  "--deselect=tests/core/test_solve.py::test_features_solve_1",
-  "--deselect=tests/core/test_solve.py::test_prune_1",
-  "--deselect=tests/test_create.py::test_remove_features",
-  # Inconsistency analysis not implemented yet
-  "--deselect=tests/test_create.py::test_conda_recovery_of_pip_inconsistent_env",
-  # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
-  "--deselect=tests/test_create.py::test_offline_with_empty_index_cache",
-  # The following are known to fail upstream due to too strict expectations
-  # We provide the same tests with adjusted checks in tests/test_modified_upstream.py
-  "--deselect=tests/test_create.py::test_neutering_of_historic_specs",
-  "--deselect=tests/test_create.py::test_pinned_override_with_explicit_spec",
-  "--deselect=tests/core/test_solve.py::test_pinned_1",
-  "--deselect=tests/core/test_solve.py::test_freeze_deps_1",
-  "--deselect=tests/core/test_solve.py::test_cuda_fail_1",
-  "--deselect=tests/core/test_solve.py::test_cuda_fail_2",
-  "--deselect=tests/core/test_solve.py::test_update_all_1",
-  "--deselect=tests/core/test_solve.py::test_conda_downgrade",
-  "--deselect=tests/core/test_solve.py::test_python2_update",
-  "--deselect=tests/core/test_solve.py::test_fast_update_with_update_modifier_not_set",
-  "--deselect=tests/core/test_solve.py::test_downgrade_python_prevented_with_sane_message",
-  # These use libmamba-incompatible MatchSpecs (name[build_number=1] syntax)
-  "--deselect=tests/models/test_prefix_graph.py::test_deep_cyclical_dependency",
-  # See https://github.com/conda/conda-libmamba-solver/pull/133#issuecomment-1448607110
-  # These failed after enabling the whole unit test suite for `conda/conda`.
-  # Errors are not critical but would require some further assessment in case fixes are obvious.
-  "--deselect=tests/cli/test_main_notices.py::test_notices_appear_once_when_running_decorated_commands",
-  "--deselect=tests/cli/test_main_notices.py::test_notices_does_not_interrupt_command_on_failure",
-  "--deselect=tests/conda_env/installers/test_pip.py::PipInstallerTest::test_stops_on_exception",
-  "--deselect=tests/conda_env/installers/test_pip.py::PipInstallerTest::test_straight_install",
-  "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_build_msg",
-  "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_dispatches_to_registered_specs",
-  "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_has_build_msg_function",
-  "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_passes_kwargs_to_all_specs",
-  "--deselect=tests/conda_env/specs/test_base.py::DetectTestCase::test_raises_exception_if_no_detection",
-  # TODO: Fix upstream; they seem to assume no other solvers will be active via env var
-  "--deselect=tests/plugins/test_solvers.py::test_get_solver_backend",
-  "--deselect=tests/plugins/test_solvers.py::test_get_solver_backend_multiple",
-  # TODO: Investigate these, since they are solver related-ish
-  "--deselect=tests/conda_env/specs/test_requirements.py::TestRequiremets::test_environment",
-  "--deselect=tests/models/test_prefix_graph.py::test_windows_sort_orders_1",
-  # TODO: These ones need further investigation
-  "--deselect=tests/core/test_solve.py::test_channel_priority_churn_minimized",
-  "--deselect=tests/core/test_solve.py::test_priority_1",
-  # TODO: Investigate why this fails on Windows now
-  "--deselect=tests/test_create.py::test_install_update_deps_only_deps_flags",
-  # TODO: https://github.com/conda/conda-libmamba-solver/issues/141
-  "--deselect=tests/test_create.py::test_conda_pip_interop_conda_editable_package",
 ]
+
 markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",

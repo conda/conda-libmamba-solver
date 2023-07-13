@@ -23,8 +23,6 @@ Some peculiarities:
 * `hatchling` is the chosen backend for the packaging.
 * The `version` is calculated from the `git` info with `hatchling-vcs`.
 * `black` uses a line length of 99 characters.
-* Pytest configurations are extensive but are only necessary when dealing with upstream testing.
-  Check "Development workflows" for details.
 
 ## `conda_libmamba_solver` package
 
