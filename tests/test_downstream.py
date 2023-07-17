@@ -8,7 +8,6 @@ from subprocess import CalledProcessError, check_call
 import pytest
 from conda.base.context import context
 
-
 DATA = Path(__file__).parent / "data"
 
 
@@ -39,7 +38,7 @@ def test_conda_lock(tmp_path):
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
     check_call(
-        ["conda-lock", "lock", "-p", context.subdir, "-f", DATA / "lock_this_env.yml"], 
-        env=env, 
+        ["conda-lock", "lock", "-p", context.subdir, "-f", DATA / "lock_this_env.yml"],
+        env=env,
         cwd=tmp_path,
     )
