@@ -38,7 +38,16 @@ def test_conda_lock(tmp_path):
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
     check_call(
-        ["conda", "lock", "lock", "-p", context.subdir, "-f", DATA / "lock_this_env.yml"],
+        [
+            "conda-lock",
+            "lock",
+            "--platform",
+            context.subdir,
+            "--file",
+            DATA / "lock_this_env.yml",
+            "--conda",
+            context.conda_exe_vars_dict["CONDA_EXE"],
+        ],
         env=env,
         cwd=tmp_path,
     )
