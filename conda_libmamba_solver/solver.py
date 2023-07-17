@@ -778,7 +778,7 @@ class LibMambaSolver(Solver):
         kwargs = json.loads(json_payload)
         kwargs["fn"] = pkg_filename
         kwargs["channel"] = channel_info.channel
-        kwargs["url"] = join_url(channel_info.noauth_url, pkg_filename)
+        kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
         return PackageRecord(**kwargs)
