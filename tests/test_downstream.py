@@ -47,7 +47,7 @@ def test_conda_lock(tmp_path):
             "--file",
             DATA / "lock_this_env.yml",
             "--conda",
-            context.conda_prefix / conda_exe_path,
+            Path(context.conda_prefix) / conda_exe_path,
         ],
         env=env,
         cwd=tmp_path,
