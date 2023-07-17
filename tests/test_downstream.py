@@ -35,7 +35,11 @@ def test_build_recipes():
             check_call(["conda", "build", recipe], env=env)
 
 
-def test_conda_lock():
+def test_conda_lock(tmp_path):
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
-    check_call(["conda-lock", "lock", "-p", context.subdir, "-f", DATA / "lock_this_env.yml"], env=env)
+    check_call(
+        ["conda-lock", "lock", "-p", context.subdir, "-f", DATA / "lock_this_env.yml"], 
+        env=env, 
+        cwd=tmp_path,
+    )
