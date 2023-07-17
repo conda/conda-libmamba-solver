@@ -106,12 +106,14 @@ class LibMambaSolver(Solver):
         for spec in specs_to_add:
             if isinstance(spec, PackageRecord):
                 spec = MatchSpec(str(spec))
-            else:
+            elif isinstance(spec, MatchSpec):
                 spec_str = str(spec)
                 if "::" in spec_str:
                     for arg in sys.argv:
                         if spec_str in arg:
-                            spec = MatchSpec(arg)
+                            ms_from_arg = MatchSpec(arg)
+                            if ms_from_arg.name == spec.name:
+                                spec = ms_from_arg
             fixed_specs.append(spec)
         # MatchSpec.merge sorts before merging; keep order without dups with IndexedSet
         self.specs_to_add = IndexedSet(MatchSpec.merge(s for s in fixed_specs))

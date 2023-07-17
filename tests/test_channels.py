@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+from conda.common.compat import on_linux
 from conda.common.io import env_vars
 from conda.testing.integration import _get_temp_prefix, make_temp_env
 from conda.testing.integration import run_command as conda_inprocess
@@ -145,3 +146,30 @@ def test_mirrors_do_not_leak_channels(config_env):
             ), pkg
 
         # Ensure that other end points were never loaded
+
+
+@pytest.mark.skipif(not on_linux, reason="Only run on Linux")
+def test_jax_and_jaxlib():
+    "https://github.com/conda/conda-libmamba-solver/issues/221"
+    env = os.environ.copy()
+    env["CONDA_SUBDIR"] = "linux-64"
+    for specs in (("jax", "jaxlib"), ("jaxlib", "jax")):
+        process = conda_subprocess(
+            "create",
+            "--name=unused",
+            "--solver=libmamba",
+            "--json",
+            "--dry-run",
+            "--override-channels",
+            "-c",
+            "defaults",
+            f"conda-forge::{specs[0]}",
+            f"conda-forge::{specs[1]}",
+            explain=True,
+            env=env,
+        )
+        result = json.loads(process.stdout)
+        assert result["success"] is True
+        pkgs = {pkg["name"] for pkg in result["actions"]["LINK"]}
+        assert specs[0] in pkgs
+        assert specs[1] in pkgs
