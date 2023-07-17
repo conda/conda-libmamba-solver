@@ -774,6 +774,10 @@ class LibMambaSolver(Solver):
         json_payload: str
             A str-encoded JSON payload with the PackageRecord kwargs.
         """
+        # conda-lock will inject virtual packages, but these are not in the index
+        if pkg_filename.startswith("__") and "/@/" in channel:
+            return PackageRecord(**json.loads(json_payload))
+
         channel_info = index.get_info(channel)
         kwargs = json.loads(json_payload)
         kwargs["fn"] = pkg_filename
