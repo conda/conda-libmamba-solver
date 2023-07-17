@@ -29,9 +29,9 @@ def test_build_recipes():
         print(f"Running {recipe_name}")
         if recipe_name in expected_fail_recipes:
             with pytest.raises(CalledProcessError):
-                check_call(["conda", "build", recipe], env=env)
+                check_call(["conda-build", recipe], env=env)
         else:
-            check_call(["conda", "build", recipe], env=env)
+            check_call(["conda-build", recipe], env=env)
 
 
 def test_conda_lock(tmp_path):
