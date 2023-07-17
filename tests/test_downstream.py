@@ -37,6 +37,7 @@ def test_build_recipes():
 def test_conda_lock(tmp_path):
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
+    conda_exe_path = "Scripts/conda.exe" if os.name == "nt" else "bin/conda"
     check_call(
         [
             "conda-lock",
@@ -46,7 +47,7 @@ def test_conda_lock(tmp_path):
             "--file",
             DATA / "lock_this_env.yml",
             "--conda",
-            context.conda_exe_vars_dict["CONDA_EXE"],
+            context.conda_prefix / conda_exe_path,
         ],
         env=env,
         cwd=tmp_path,
