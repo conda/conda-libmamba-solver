@@ -6,6 +6,10 @@ from pathlib import Path
 from subprocess import CalledProcessError, check_call
 
 import pytest
+from conda.base.context import context
+
+
+DATA = Path(__file__).parent / "data"
 
 
 def test_build_recipes():
@@ -15,7 +19,7 @@ def test_build_recipes():
 
     See /tests/data/conda_build_recipes/LICENSE for more details
     """
-    recipes_dir = Path(__file__).parent / "data" / "conda_build_recipes"
+    recipes_dir = DATA / "conda_build_recipes"
 
     recipes = [str(x) for x in recipes_dir.iterdir() if x.is_dir()]
     env = os.environ.copy()
@@ -29,3 +33,9 @@ def test_build_recipes():
                 check_call(["conda", "build", recipe], env=env)
         else:
             check_call(["conda", "build", recipe], env=env)
+
+
+def test_conda_lock():
+    env = os.environ.copy()
+    env["CONDA_SOLVER"] = "libmamba"
+    check_call(["conda-lock", "lock", "-p", context.subdir, "-f", DATA / "lock_this_env.yml"], env=env)
