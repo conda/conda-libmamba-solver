@@ -29,7 +29,7 @@ repos:
         args: ["--py38-plus"]
         exclude: ^conda/exports.py
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 23.7.0
     hooks:
       - id: black
         exclude: tests/_reposerver\.py
