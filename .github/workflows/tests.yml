@@ -326,10 +326,10 @@ jobs:
 
       - name: Checkout our source
         uses: actions/checkout@v3
-        if: github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
+        if: always() && github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
 
       - name: Report failures
-        if: github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
+        if: always() && github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
         uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
