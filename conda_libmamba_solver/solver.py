@@ -463,17 +463,18 @@ class LibMambaSolver(Solver):
                 tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
 
             if installed is not None:
-                # ## Regular task ###
-                key = "UPDATE", api.SOLVER_UPDATE
-
-                if spec_str == self._spec_to_str(installed.to_match_spec()):
+                installed_spec_str = self._spec_to_str(installed.to_match_spec())
+                if spec_str == installed_spec_str and name not in out_state.conflicts:
                     # if we just want to force things to STAY as they are, better leave them alone
-                    key = None, None
+                    if name in protected:
+                        key = "LOCK", api.SOLVER_LOCK
+                    else:
+                        key = "ADD_PIN", api.SOLVER_NOOP
+                    spec_str = spec_str.split("::")[1]  # remove channel, otherwise lock/pin fails
 
                 # ## Protect if installed AND history
                 if name in protected:
-                    installed_spec = self._spec_to_str(installed.to_match_spec())
-                    tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
+                    tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
                     # This is "just" an essential job, so it gets higher priority in the solver
                     # conflict resolution. We do this because these are "protected" packages
                     # (history, aggressive updates) that we should try not messing with if
