@@ -436,7 +436,10 @@ class LibMambaSolver(Solver):
             spec_str = self._spec_to_str(spec)
             installed = in_state.installed.get(name)
 
-            key = "INSTALL", api.SOLVER_INSTALL
+            if self._command == "update":
+                key = ("UPDATE", api.SOLVER_UPDATE)
+            else:
+                key = ("INSTALL", api.SOLVER_INSTALL)
 
             # Fast-track Python version changes: mark non-noarch Python-depending packages as
             # conflicting (see `python_version_might_change` definition above for more details)
