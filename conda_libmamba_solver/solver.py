@@ -367,7 +367,7 @@ class LibMambaSolver(Solver):
             if task_name == "ADD_PIN":
                 for spec in specs:
                     self.solver.add_pin(spec)
-            else:
+            elif task_name:
                 self.solver.add_jobs(specs, task_type)
 
         # ## Run solver
@@ -464,8 +464,8 @@ class LibMambaSolver(Solver):
                 key = "UPDATE", api.SOLVER_UPDATE
 
                 if spec_str == self._spec_to_str(installed.to_match_spec()):
-                    # if we just want to force things to STAY as they are, better pin them
-                    key = "ADD_PIN", None
+                    # if we just want to force things to STAY as they are, better leave them alone
+                    key = None, None
 
                 # ## Protect if installed AND history
                 if name in protected:
