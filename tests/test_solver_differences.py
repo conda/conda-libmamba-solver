@@ -233,12 +233,23 @@ def test_too_aggressive_update_to_conda_forge_packages():
     EVERYTHING it can to conda-forge.
     """
     with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
-        cmd = "install", "-p", prefix, "-c", "conda-forge", "libzlib", "--json", "--dry-run", "-y", "-vvv"
+        cmd = (
+            "install",
+            "-p",
+            prefix,
+            "-c",
+            "conda-forge",
+            "libzlib",
+            "--json",
+            "--dry-run",
+            "-y",
+            "-vvv",
+        )
         env = os.environ.copy()
         env.pop("CONDA_SOLVER", None)
         p_classic = conda_subprocess(*cmd, "--solver=classic", explain=True, env=env)
         p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True, env=env)
         data_classic = json.loads(p_classic.stdout)
         data_libmamba = json.loads(p_libmamba.stdout)
-        assert len(data_classic["actions"]["LINK"]) < 10 
+        assert len(data_classic["actions"]["LINK"]) < 10
         assert len(data_libmamba["actions"]["LINK"]) < 10

@@ -466,7 +466,7 @@ class LibMambaSolver(Solver):
                 if spec_str == self._spec_to_str(installed.to_match_spec()):
                     # if we just want to force things to STAY as they are, better pin them
                     key = "ADD_PIN", None
-                
+
                 # ## Protect if installed AND history
                 if name in protected:
                     installed_spec = self._spec_to_str(installed.to_match_spec())
