@@ -10,6 +10,7 @@ import os
 
 import pytest
 from conda.common.compat import on_linux
+from conda.testing.integration import make_temp_env
 
 from .repodata_time_machine import repodata_time_machine
 from .utils import conda_subprocess
@@ -220,3 +221,21 @@ def test_old_panel(tmp_path):
         data = json.loads(p.stdout)
         panel = next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "panel")
         assert panel["version"] == "0.14.0a2"
+
+
+def test_too_aggressive_update_to_conda_forge_packages():
+    """
+    Comes from report in https://github.com/conda/conda-libmamba-solver/issues/240
+
+    We expect a minimum change to the 'base' environment if we only ask for a single package.
+    conda classic would just change a few (<5) packages, but libmamba seemed to upgrade
+    EVERYTHING it can to conda-forge.
+    """
+    with make_temp_env("conda", "python", "--override-channels", "--channel=defaults", "--solver=classic") as prefix:
+        cmd = "install", "-p", prefix, "-c", "conda-forge", "libzlib", "--json", "--dry-run", "-y", "-vvv"
+        p_classic = conda_subprocess(*cmd, "--solver=classic", explain=True)
+        p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True)
+        data_classic = json.loads(p_classic.stdout)
+        data_libmamba = json.loads(p_libmamba.stdout)
+        assert len(data_classic["actions"]["LINK"]) < 10 
+        assert len(data_libmamba["actions"]["LINK"]) < 10
