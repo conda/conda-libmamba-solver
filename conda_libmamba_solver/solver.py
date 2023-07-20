@@ -628,7 +628,8 @@ class LibMambaSolver(Solver):
                 start = 3 if marker == 4 else 4
                 not_found.append(cls._str_to_matchspec(words[start:marker]))
             elif "has constraint" in line and "conflicting with" in line:
-                # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014 conflicting with zlib-1.2.13-h998d150_0
+                # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014
+                # conflicting with zlib-1.2.13-h998d150_0
                 conflicts.append(cls._str_to_matchspec(words[-1]))
             else:
                 log.debug("! Problem line not recognized: %s", line)
