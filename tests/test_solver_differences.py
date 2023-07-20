@@ -223,6 +223,7 @@ def test_old_panel(tmp_path):
         assert panel["version"] == "0.14.0a2"
 
 
+@pytest.mark.skipif(not on_linux, reason="Linux only")
 def test_too_aggressive_update_to_conda_forge_packages():
     """
     Comes from report in https://github.com/conda/conda-libmamba-solver/issues/240
