@@ -458,7 +458,7 @@ class LibMambaSolver(Solver):
                         break
 
             # ## Low-prio task ###
-            if name in out_state.conflicts and name not in protected:
+            if name in out_state.conflicts and name not in (*protected, *in_state.requested):
                 tasks[("DISFAVOR", api.SOLVER_DISFAVOR)].append(spec_str)
                 tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
 
