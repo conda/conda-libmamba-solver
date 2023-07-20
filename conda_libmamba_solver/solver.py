@@ -364,7 +364,11 @@ class LibMambaSolver(Solver):
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            self.solver.add_jobs(specs, task_type)
+            if task_name == "ADD_PIN":
+                for spec in specs:
+                    self.solver.add_pin(spec)
+            else:
+                self.solver.add_jobs(specs, task_type)
 
         # ## Run solver
         solved = self.solver.solve()
@@ -389,7 +393,7 @@ class LibMambaSolver(Solver):
         return self._specs_to_tasks_add(in_state, out_state)
 
     @staticmethod
-    def _spec_to_str(spec):
+    def _spec_to_str(spec: MatchSpec) -> str:
         """
         Workarounds for Matchspec str-roundtrip limitations.
 
@@ -459,6 +463,10 @@ class LibMambaSolver(Solver):
                 # ## Regular task ###
                 key = "UPDATE", api.SOLVER_UPDATE
 
+                if spec_str == self._spec_to_str(installed.to_match_spec()):
+                    # if we just want to force things to STAY as they are, better pin them
+                    key = "ADD_PIN", None
+                
                 # ## Protect if installed AND history
                 if name in protected:
                     installed_spec = self._spec_to_str(installed.to_match_spec())
@@ -467,7 +475,8 @@ class LibMambaSolver(Solver):
                     # conflict resolution. We do this because these are "protected" packages
                     # (history, aggressive updates) that we should try not messing with if
                     # conflicts appear
-                    key = ("UPDATE | ESSENTIAL", api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL)
+                    if key[0] == "UPDATE":
+                        key = ("UPDATE | ESSENTIAL", api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL)
 
                 # ## Here we deal with the "bare spec update" problem
                 # ## I am only adding this for legacy / test compliancy reasons; forced updates
