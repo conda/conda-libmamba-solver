@@ -479,8 +479,7 @@ class LibMambaSolver(Solver):
                     # conflict resolution. We do this because these are "protected" packages
                     # (history, aggressive updates) that we should try not messing with if
                     # conflicts appear
-                    if key[0] == "UPDATE":
-                        key = ("UPDATE | ESSENTIAL", api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL)
+                    key = f"{key[0]} | ESSENTIAL", key[1] | api.SOLVER_ESSENTIAL
 
                 # ## Here we deal with the "bare spec update" problem
                 # ## I am only adding this for legacy / test compliancy reasons; forced updates
