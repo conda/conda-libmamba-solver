@@ -4,6 +4,7 @@
 from conda import plugins
 
 from .solver import LibMambaSolver
+from .mamba_solver import MambaSolver
 
 
 @plugins.hookimpl
@@ -14,4 +15,9 @@ def conda_solvers():
     yield plugins.CondaSolver(
         name="libmamba",
         backend=LibMambaSolver,
+    )
+
+    yield plugins.CondaSolver(
+        name="mamba",
+        backend=MambaSolver,
     )
