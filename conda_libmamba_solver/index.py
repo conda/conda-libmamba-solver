@@ -82,7 +82,7 @@ from conda.base.constants import REPODATA_FN
 from conda.base.context import context
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
 from conda.common.serialize import json_dump, json_load
-from conda.common.url import remove_auth, split_anaconda_token
+from conda.common.url import percent_decode, remove_auth, split_anaconda_token
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
@@ -138,6 +138,11 @@ class LibMambaIndexHelper(IndexHelper):
         try:
             return self._index[key]
         except KeyError as exc:
+            # some libmamba versions return encoded URLs
+            try:
+                return self._index[percent_decode(key)]
+            except KeyError:
+                pass  # raise original error below
             raise KeyError(
                 f"Channel info for {orig_key} ({key}) not found. "
                 f"Available keys: {list(self._index)}"

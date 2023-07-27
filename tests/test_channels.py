@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 import os
+import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -173,3 +175,22 @@ def test_jax_and_jaxlib():
         pkgs = {pkg["name"] for pkg in result["actions"]["LINK"]}
         assert specs[0] in pkgs
         assert specs[1] in pkgs
+
+
+def test_encoding_file_paths(tmp_path: Path):
+    tmp_channel = tmp_path / "channel+some+encodable+bits"
+    repo = Path(__file__).parent / "data/mamba_repo"
+    shutil.copytree(repo, tmp_channel)
+    process = conda_subprocess(
+        "create",
+        "-p",
+        tmp_path / "env",
+        "-c",
+        tmp_channel,
+        "test-package",
+        "--solver=libmamba",
+    )
+    print(process.stdout)
+    print(process.stderr, file=sys.stderr)
+    assert process.returncode == 0
+    assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
