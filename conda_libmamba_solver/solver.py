@@ -474,8 +474,11 @@ class LibMambaSolver(Solver):
                         key = "ADD_PIN", api.SOLVER_NOOP
                     spec_str = spec_str.split("::")[1]  # remove channel, otherwise lock/pin fails
                 # Sometimes the pin is not fully constrained because it comes from conda-meta/pinned
-                # or similar, but it still needs to be locked
-                elif name in in_state.pinned:
+                # or similar, but it still needs to be locked. However, an explicit request from
+                # the user will override the pin.
+                elif name in in_state.pinned and (
+                    name not in in_state.requested or in_state.requested[name].strictness == 1
+                ):
                     if mamba_version() <= "1.4.1":
                         tasks[("LOCK", api.SOLVER_LOCK)].append(spec_str)
                     else:
