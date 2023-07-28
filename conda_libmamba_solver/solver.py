@@ -464,6 +464,8 @@ class LibMambaSolver(Solver):
 
             if installed is not None:
                 installed_spec_str = self._spec_to_str(installed.to_match_spec())
+                # in_state._prepare_for_add will restrict the specs to adjust behaviour
+                # as in requested by FREEZE_INSTALLED and others
                 if spec_str == installed_spec_str and name not in out_state.conflicts:
                     # if we just want to force things to STAY as they are, better leave them alone
                     if name in protected:
@@ -471,6 +473,13 @@ class LibMambaSolver(Solver):
                     else:
                         key = "ADD_PIN", api.SOLVER_NOOP
                     spec_str = spec_str.split("::")[1]  # remove channel, otherwise lock/pin fails
+                # Sometimes the pin is not fully constrained because it comes from conda-meta/pinned
+                # or similar, but it still needs to be locked
+                elif name in in_state.pinned:
+                    if mamba_version() <= "1.4.1":
+                        tasks[("LOCK", api.SOLVER_LOCK)].append(spec_str)
+                    else:
+                        tasks[("ADD_PIN", api.SOLVER_NOOP)].append(spec_str)
 
                 # ## Protect if installed AND history
                 if name in protected:
