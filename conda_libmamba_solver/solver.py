@@ -692,10 +692,10 @@ class LibMambaSolver(Solver):
             log.info("Failed to explain problems. Unsupported request.")
             return legacy_errors
         if (
-            mamba_version() <= "1.4.1" 
+            mamba_version() <= "1.4.1"
             and "conflicting requests" in self.solver.all_problems_to_str()
         ):
-            # This error makes 'explain_problems()' crash in libmamba <=1.4.1. 
+            # This error makes 'explain_problems()' crash in libmamba <=1.4.1.
             # Anticipate and return simpler error earlier.
             log.info("Failed to explain problems. Conflicting requests.")
             return legacy_errors

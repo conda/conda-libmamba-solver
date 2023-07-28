@@ -9,8 +9,8 @@
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
 import logging
-from importlib.metadata import version
 from functools import lru_cache
+from importlib.metadata import version
 from typing import Dict
 
 import libmambapy as api
