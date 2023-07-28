@@ -691,6 +691,11 @@ class LibMambaSolver(Solver):
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
             return legacy_errors
+        if mamba_version() <= "1.4.1" and "has constraint" in legacy_errors:
+            # This error makes 'explain_problems()' crash in mamba <=1.4.1. 
+            # Anticipate and return simpler error earlier.
+            log.info("Failed to explain problems. Has constraint.")
+            return legacy_errors
         try:
             explained_errors = self.solver.explain_problems()
         except Exception as exc:
