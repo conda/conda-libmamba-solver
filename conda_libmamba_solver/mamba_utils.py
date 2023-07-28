@@ -10,6 +10,7 @@
 
 import logging
 from importlib.metadata import version
+from functools import lru_cache
 from typing import Dict
 
 import libmambapy as api
@@ -19,6 +20,7 @@ from conda.base.context import context
 log = logging.getLogger(f"conda.{__name__}")
 
 
+@lru_cache(maxsize=1)
 def mamba_version():
     return version("libmambapy")
 
