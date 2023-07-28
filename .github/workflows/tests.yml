@@ -80,7 +80,7 @@ jobs:
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
                    /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src/dev/collect_upstream_conda_tests/ -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
-                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
+                   /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vvs -m 'not slow'"
 
       - name: Upload test results
         if: always()
@@ -177,7 +177,8 @@ jobs:
         working-directory: conda
         run: |
           eval "$(sudo ${CONDA_PREFIX}/bin/python -m conda init bash --dev)"
-          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
+          # python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vv -m "not slow"
+          python -m pytest ${GITHUB_WORKSPACE}/conda-libmamba-solver -vvs -m "not slow"
 
       - name: Upload test results
         if: always()
@@ -269,7 +270,7 @@ jobs:
         run: |
           CALL dev-init.bat
           if errorlevel 1 exit 1
-          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vv -m "not slow" --timeout=600
+          python -m pytest "%GITHUB_WORKSPACE%\conda-libmamba-solver" -vvs -m "not slow" --timeout=600
           if errorlevel 1 exit 1
 
       - name: Upload test results

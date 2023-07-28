@@ -696,6 +696,8 @@ class LibMambaSolver(Solver):
             # Anticipate and return simpler error earlier.
             log.info("Failed to explain problems. Has constraint.")
             return legacy_errors
+        if not context.json:
+            print(legacy_errors, file=sys.stderr)
         try:
             explained_errors = self.solver.explain_problems()
         except Exception as exc:
