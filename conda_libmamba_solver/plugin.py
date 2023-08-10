@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from conda import plugins
 
+from .repoquery import configure_parser, repoquery
 from .solver import LibMambaSolver
-from .repoquery import repoquery, configure_parser
 
 
 @plugins.hookimpl

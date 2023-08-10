@@ -1,11 +1,12 @@
 # Copyright (C) 2019, QuantStack
+# Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 import argparse
 import sys
 
-from conda.cli import conda_argparse
 from conda.base.context import context
+from conda.cli import conda_argparse
 from conda.common.io import Spinner
 from conda.core.prefix_data import PrefixData
 from libmambapy import QueryFormat

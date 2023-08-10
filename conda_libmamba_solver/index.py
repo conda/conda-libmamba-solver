@@ -111,7 +111,7 @@ class LibMambaIndexHelper(IndexHelper):
         channels: Iterable[Union[Channel, str]] = None,
         subdirs: Iterable[str] = None,
         repodata_fn: str = REPODATA_FN,
-        query_format = api.QueryFormat.JSON,
+        query_format=api.QueryFormat.JSON,
     ):
         self._channels = context.channels if channels is None else channels
         self._subdirs = context.subdirs if subdirs is None else subdirs
