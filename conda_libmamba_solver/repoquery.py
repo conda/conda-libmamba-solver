@@ -3,6 +3,7 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 import argparse
+import json
 import sys
 
 from conda.base.context import context
@@ -137,4 +138,8 @@ def repoquery(args):
             query_format=query_format,
         )
 
-    print(getattr(index, args.subcmd)(args.package_query, records=False))
+    result = getattr(index, args.subcmd)(args.package_query, records=False)
+    if context.json:
+        print(json.dumps(result, indent=2))
+    else:
+        print(result)
