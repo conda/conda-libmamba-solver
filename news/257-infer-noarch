@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Fix authentication in package downloads. (#216 via #226)
+* Workaround for missing `noarch` field in returned `PackageRecord` payload. (#257)
 
 ### Deprecations
 

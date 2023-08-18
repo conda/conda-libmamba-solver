@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Fix unhandled channels coming from injected virtual packages in `conda-lock`. (#230 via #234)
+* Handle commands with no channels passed gracefully. (#256)
 
 ### Deprecations
 

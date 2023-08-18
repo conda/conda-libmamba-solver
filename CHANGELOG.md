@@ -13,6 +13,37 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.7.0 (2023-07-31)
+
+### Enhancements
+
+* Add basic integrations for local channels in conda-build. (#194)
+
+### Bug fixes
+
+* Add backwards-compatible support for the new namespaced settings in `libmamba.Context`. (#192 via #193)
+* Fixes an error where a user-supplied package in the CLI would get dropped if the argument happened to match a larger string in the argument list. (#221 via #222)
+* Fix authentication in package downloads. (#216 via #226)
+* Fix unhandled channels coming from injected virtual packages in `conda-lock`. (#230 via #234)
+* Handle URL-encoded channels correctly with recent `libmamba` versions. (#247 via #248)
+
+### Docs
+
+* Added notes about development workflows with libmamba from source. (#191)
+
+### Other
+
+* Adding libmamba/libmambapy as development dependencies within docker images. (#191)
+
+### Contributors
+
+* @costrouc
+* @jaimergp
+* @conda-bot
+* @pre-commit-ci[bot]
+
+
+
 ## 23.5.0 (2023-05-25)
 
 ### Enhancements

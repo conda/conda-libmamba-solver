@@ -825,6 +825,12 @@ class LibMambaSolver(Solver):
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
+        if kwargs["subdir"] == "noarch":
+            # libmamba doesn't keep 'noarch' type around, so infer for now
+            if any(dep.split()[0] in ("python", "pypy") for dep in kwargs.get("depends", ())):
+                kwargs["noarch"] = "python"
+            else:
+                kwargs["noarch"] = "generic"
         return PackageRecord(**kwargs)
 
     def _check_spec_compat(self, match_spec: MatchSpec) -> MatchSpec:
