@@ -1,6 +1,10 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 import json
 
 from .utils import conda_subprocess
+
 
 def test_repoquery():
     p = conda_subprocess("repoquery", "--help")
