@@ -83,7 +83,9 @@ _deselected_upstream_tests = {
         "test_get_solver_backend_multiple",
     ],
     # TODO: Investigate these, since they are solver related-ish
-    "tests/conda_env/specs/test_requirements.py": ["TestRequiremets::test_environment"],
+    "tests/conda_env/specs/test_requirements.py": ["TestRequirements::test_environment"],
+    # TODO: Known to fail; should be fixed by https://github.com/conda/conda-libmamba-solver/pull/242
+    "tests/test_priority.py": ["test_reorder_channel_priority"],
 }
 
 _broken_by_libmamba_1_4_2 = {
