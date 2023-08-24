@@ -18,7 +18,8 @@ from .index import LibMambaIndexHelper
 def configure_parser(parser: argparse.ArgumentParser):
     package_cmds = argparse.ArgumentParser(add_help=False)
     package_cmds.add_argument("package_query", help="the target package")
-    package_cmds.add_argument(
+    package_grp = package_cmds.add_argument_group("Subcommand options")
+    package_grp.add_argument(
         "-i",
         "--installed",
         action="store_true",
@@ -26,11 +27,20 @@ def configure_parser(parser: argparse.ArgumentParser):
         help=argparse.SUPPRESS,
     )
 
-    package_cmds.add_argument("-p", "--platform", default=context.subdir)
-    package_cmds.add_argument("--no-installed", action="store_true")
-    package_cmds.add_argument("--pretty", action="store_true")
+    package_grp.add_argument(
+        "-p",
+        "--platform",
+        default=context.subdir,
+        help="Platform/subdir to search packages for. Defaults to current platform.",
+    )
+    package_grp.add_argument(
+        "--no-installed", action="store_true", help="Do not search currently installed packages."
+    )
+    package_grp.add_argument(
+        "--pretty", action="store_true", help="Prettier output with more details."
+    )
 
-    package_cmds.add_argument(
+    package_grp.add_argument(
         "-a",
         "--all-channels",
         action="store_true",
@@ -38,8 +48,11 @@ def configure_parser(parser: argparse.ArgumentParser):
     )
 
     view_cmds = argparse.ArgumentParser(add_help=False)
-    view_cmds.add_argument("-t", "--tree", action="store_true")
-    view_cmds.add_argument("--recursive", action="store_true")
+    view_grp = view_cmds.add_argument_group("Dependency options")
+    view_grp.add_argument(
+        "-t", "--tree", action="store_true", help="Show dependencies in a tree-like format"
+    )
+    view_grp.add_argument("--recursive", action="store_true", help="Show dependencies recursively")
 
     subparser = parser.add_subparsers(dest="subcmd")
 
@@ -72,7 +85,12 @@ def repoquery(args):
     if not args.subcmd:
         print("repoquery needs a subcommand (search, depends or whoneeds)", file=sys.stderr)
         print("eg:", file=sys.stderr)
-        print("    $ mamba repoquery search xtensor\n", file=sys.stderr)
+        print("    $ conda repoquery search python\n", file=sys.stderr)
+        sys.exit(1)
+
+    cli_flags = [getattr(args, attr, False) for attr in ("tree", "recursive", "pretty")]
+    if sum([context.json, *cli_flags]) > 1:
+        print("Use only one of --json, --tree, --recursive and --pretty.", file=sys.stderr)
         sys.exit(1)
 
     channels = None
@@ -99,20 +117,14 @@ def repoquery(args):
         only_installed = False
 
     if only_installed and args.no_installed:
-        print("No channels selected.", file=sys.stderr)
-        print("Activate -a to search all channels.", file=sys.stderr)
+        print("No channels selected. Use -a to search all channels.", file=sys.stderr)
         sys.exit(1)
 
+    installed_records = ()
     if use_installed:
-        spinner_msg = f"Loading installed packages ({context.target_prefix})"
         prefix_data = PrefixData(context.target_prefix)
         prefix_data.load()
         installed_records = prefix_data.iter_records()
-    else:
-        installed_records = ()
-        if channels:
-            names = ",".join([getattr(c, "canonical_name", c) for c in channels])
-            spinner_msg = f"Loading {args.platform} channels ({names})"
 
     if context.json:
         query_format = QueryFormat.JSON
@@ -126,7 +138,7 @@ def repoquery(args):
         query_format = QueryFormat.TABLE
 
     with Spinner(
-        spinner_msg,
+        "Collecting package metadata",
         enabled=not context.verbosity and not context.quiet,
         json=context.json,
     ):
