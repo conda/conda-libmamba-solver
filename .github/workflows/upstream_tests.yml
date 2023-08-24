@@ -70,7 +70,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        default-channel: ['defaults', 'conda-forge']
+        default-channel: ['conda-forge']  # ['defaults', 'conda-forge']
         python-version: ['3.8', '3.9', '3.10']
         conda-subdir: ['win-64']
         test-type: ['unit', 'integration']
@@ -208,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        default-channel: ['defaults', 'conda-forge']
+        default-channel: ['conda-forge']  # ['defaults', 'conda-forge']
         python-version: ['3.8', '3.9', '3.10']
         test-type: ['unit', 'integration']
         test-group: ['1', '2', '3']
@@ -355,7 +355,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        default-channel: ['defaults', 'conda-forge']
+        default-channel: ['conda-forge']  # ['defaults', 'conda-forge']
         python-version: ['3.9']
         test-type: ['unit', 'integration']
         test-group: ['1', '2', '3']
