@@ -22,7 +22,7 @@ def conda_solvers():
 def conda_subcommands():
     yield plugins.CondaSubcommand(
         name="repoquery",
-        summary="Advanced search for repodata",
+        summary="Advanced search for repodata.",
         action=repoquery,
         configure_parser=configure_parser,
     )

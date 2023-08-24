@@ -17,7 +17,7 @@ from .index import LibMambaIndexHelper
 
 def configure_parser(parser: argparse.ArgumentParser):
     package_cmds = argparse.ArgumentParser(add_help=False)
-    package_cmds.add_argument("package_query", help="the target package")
+    package_cmds.add_argument("package_query", help="The target package.")
     package_grp = package_cmds.add_argument_group("Subcommand options")
     package_grp.add_argument(
         "-i",
@@ -44,37 +44,37 @@ def configure_parser(parser: argparse.ArgumentParser):
         "-a",
         "--all-channels",
         action="store_true",
-        help="Look at all channels (for depends / whoneeds)",
+        help="Look at all channels (for depends / whoneeds).",
     )
 
     view_cmds = argparse.ArgumentParser(add_help=False)
     view_grp = view_cmds.add_argument_group("Dependency options")
     view_grp.add_argument(
-        "-t", "--tree", action="store_true", help="Show dependencies in a tree-like format"
+        "-t", "--tree", action="store_true", help="Show dependencies in a tree-like format."
     )
-    view_grp.add_argument("--recursive", action="store_true", help="Show dependencies recursively")
+    view_grp.add_argument("--recursive", action="store_true", help="Show dependencies recursively.")
 
     subparser = parser.add_subparsers(dest="subcmd")
 
-    c1 = subparser.add_parser(
+    whoneeds = subparser.add_parser(
         "whoneeds",
-        help="shows packages that depend on this package",
+        help="Show packages that depend on this package.",
         parents=[package_cmds, view_cmds],
     )
 
-    c2 = subparser.add_parser(
+    depends = subparser.add_parser(
         "depends",
-        help="shows dependencies of this package",
+        help="Show dependencies of this package.",
         parents=[package_cmds, view_cmds],
     )
 
-    c3 = subparser.add_parser(
+    search = subparser.add_parser(
         "search",
-        help="shows all available package versions",
+        help="Show all available package versions.",
         parents=[package_cmds],
     )
 
-    for cmd in (c1, c2, c3):
+    for cmd in (whoneeds, search, depends):
         conda_argparse.add_parser_channels(cmd)
         conda_argparse.add_parser_networking(cmd)
         conda_argparse.add_parser_known(cmd)
@@ -83,19 +83,19 @@ def configure_parser(parser: argparse.ArgumentParser):
 
 def repoquery(args):
     if not args.subcmd:
-        print("repoquery needs a subcommand (search, depends or whoneeds)", file=sys.stderr)
-        print("eg:", file=sys.stderr)
-        print("    $ conda repoquery search python\n", file=sys.stderr)
-        sys.exit(1)
+        print("repoquery needs a subcommand (search, depends or whoneeds), e.g.:", file=sys.stderr)
+        print("    conda repoquery search python\n", file=sys.stderr)
+        return 1
 
     cli_flags = [getattr(args, attr, False) for attr in ("tree", "recursive", "pretty")]
     if sum([context.json, *cli_flags]) > 1:
         print("Use only one of --json, --tree, --recursive and --pretty.", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
-    channels = None
     if hasattr(args, "channel"):
         channels = args.channel
+    else:
+        channels = None
     if args.all_channels or (channels is None and args.subcmd == "search"):
         if channels:
             print("WARNING: Using all channels instead of configured channels\n", file=sys.stderr)
@@ -110,21 +110,23 @@ def repoquery(args):
     if args.subcmd in ("depends", "whoneeds") and use_installed and channels:
         use_installed = False
 
-    only_installed = True
     if args.subcmd == "search" and not args.installed:
         only_installed = False
     elif args.all_channels or (channels and len(channels)):
         only_installed = False
+    else:
+        only_installed = True
 
     if only_installed and args.no_installed:
         print("No channels selected. Use -a to search all channels.", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
-    installed_records = ()
     if use_installed:
         prefix_data = PrefixData(context.target_prefix)
         prefix_data.load()
         installed_records = prefix_data.iter_records()
+    else:
+        installed_records = ()
 
     if context.json:
         query_format = QueryFormat.JSON
