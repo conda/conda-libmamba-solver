@@ -483,6 +483,9 @@ class LibMambaSolver(Solver):
                         tasks[("LOCK", api.SOLVER_LOCK)].append(spec_str)
                     else:
                         tasks[("ADD_PIN", api.SOLVER_NOOP)].append(spec_str)
+                else:
+                    # fallback to previous implmentation
+                    key = "UPDATE", api.SOLVER_UPDATE
 
                 # ## Protect if installed AND history
                 if name in protected:
