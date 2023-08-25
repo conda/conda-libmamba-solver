@@ -1,0 +1,21 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* Port logic from [conda/conda#9614](https://github.com/conda/conda/pull/9614), which fixes
+  a bug where the `--prune` flag was not working correctly in `conda env update` commands.
+  (#267)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
