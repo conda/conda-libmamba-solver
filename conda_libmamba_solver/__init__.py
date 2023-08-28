@@ -29,6 +29,3 @@ def get_solver_class(key="libmamba"):
         )
         return LibMambaSolver
     raise ValueError("Key must be 'libmamba'")
-
-
-# TRIGGER CI; REMOVE
