@@ -9,12 +9,14 @@ from pathlib import Path
 from subprocess import check_call, run
 from uuid import uuid4
 
-from conda.common.compat import on_win
+import pytest
+from conda.common.compat import on_win, on_linux
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
-
 from conda_libmamba_solver import LibMambaSolver
+
+from .utils import conda_subprocess
 
 
 class TestLibMambaSolver(SolverTests):
@@ -197,3 +199,34 @@ def test_update_from_latest_not_downgrade(tmpdir):
         )
         update_python = PrefixData(prefix).get("python")
         assert original_python.version == update_python.version
+
+
+@pytest.mark.skipif(not on_linux, reason="Linux only")
+def test_too_aggressive_update_to_conda_forge_packages():
+    """
+    Comes from report in https://github.com/conda/conda-libmamba-solver/issues/240
+    We expect a minimum change to the 'base' environment if we only ask for a single package.
+    conda classic would just change a few (<5) packages, but libmamba seemed to upgrade
+    EVERYTHING it can to conda-forge.
+    """
+    with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
+        cmd = (
+            "install",
+            "-p",
+            prefix,
+            "-c",
+            "conda-forge",
+            "libzlib",
+            "--json",
+            "--dry-run",
+            "-y",
+            "-vvv",
+        )
+        env = os.environ.copy()
+        env.pop("CONDA_SOLVER", None)
+        p_classic = conda_subprocess(*cmd, "--solver=classic", explain=True, env=env)
+        p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True, env=env)
+        data_classic = json.loads(p_classic.stdout)
+        data_libmamba = json.loads(p_libmamba.stdout)
+        assert len(data_classic["actions"]["LINK"]) < 10
+        assert len(data_libmamba["actions"]["LINK"]) < 10

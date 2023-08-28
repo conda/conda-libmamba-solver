@@ -403,16 +403,20 @@ class LibMambaSolver(Solver):
         return str(spec)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
-        # These packages receive special protection, since they will be
-        # exempt from conflict treatment (ALLOWUNINSTALL) and if installed
-        # their updates will be considered ESSENTIAL and USERINSTALLED
-        protected = (
-            ["python", "conda"]
-            + list(in_state.history.keys())
-            + list(in_state.aggressive_updates.keys())
-        )
+        tasks = defaultdict(list)
 
-        # Fast-track python version changes
+        # Protect history and aggressive updates from being uninstalled if possible. From libsolv
+        # docs: "The matching installed packages are considered to be installed by a user, thus not
+        # installed to fulfill some dependency. This is needed input for the calculation of
+        # unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set."
+        tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)] += [
+            *in_state.history,
+            *in_state.aggressive_updates,
+            *in_state.pinned,
+            *in_state.do_not_remove,
+        ]
+        
+        # Fast-track python version changes (Part 1/2)
         # ## When the Python version changes, this implies all packages depending on
         # ## python will be reinstalled too. This can mean that we'll have to try for every
         # ## installed package to result in a conflict before we get to actually solve everything
@@ -423,96 +427,32 @@ class LibMambaSolver(Solver):
         to_be_installed_python = out_state.specs.get("python")
         if installed_python and to_be_installed_python:
             python_version_might_change = not to_be_installed_python.match(installed_python)
-
-        tasks = defaultdict(list)
+        
+        # Add specs to install
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
-                continue
+                continue  # ignore virtual packages
             spec = self._check_spec_compat(spec)
             spec_str = self._spec_to_str(spec)
             installed = in_state.installed.get(name)
-
-            key = "INSTALL", api.SOLVER_INSTALL
-
-            # Fast-track Python version changes: mark non-noarch Python-depending packages as
-            # conflicting (see `python_version_might_change` definition above for more details)
-            if python_version_might_change and installed is not None:
-                if installed.noarch is not None:
-                    continue
-                for dep in installed.depends:
-                    dep_spec = MatchSpec(dep)
-                    if dep_spec.name in ("python", "python_abi"):
-                        reason = "Python version might change and this package depends on Python"
-                        out_state.conflicts.update(
-                            {name: spec},
-                            reason=reason,
-                            overwrite=False,
-                        )
-                        break
-
-            # ## Low-prio task ###
-            if name in out_state.conflicts and name not in protected:
-                tasks[("DISFAVOR", api.SOLVER_DISFAVOR)].append(spec_str)
-                tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
-
-            if installed is not None:
-                # ## Regular task ###
-                key = "UPDATE", api.SOLVER_UPDATE
-
-                # ## Protect if installed AND history
-                if name in protected:
-                    installed_spec = self._spec_to_str(installed.to_match_spec())
-                    tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
-                    # This is "just" an essential job, so it gets higher priority in the solver
-                    # conflict resolution. We do this because these are "protected" packages
-                    # (history, aggressive updates) that we should try not messing with if
-                    # conflicts appear
-                    key = ("UPDATE | ESSENTIAL", api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL)
-
-                # ## Here we deal with the "bare spec update" problem
-                # ## I am only adding this for legacy / test compliancy reasons; forced updates
-                # ## like this should (imo) use constrained specs (e.g. conda install python=3)
-                # ## or the update command as in `conda update python`. however conda thinks
-                # ## differently of update vs install (quite counterintuitive):
-                # ##   https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/installing-with-conda.html#conda-update-versus-conda-install  # noqa
-                # ## this is tested in:
-                # ##   tests/core/test_solve.py::test_pinned_1
-                # ##   tests/test_create.py::IntegrationTests::test_update_with_pinned_packages
-                # ## fixing this changes the outcome in other tests!
-                # let's say we have an environment with python 2.6 and we say `conda install
-                # python` libsolv will say we already have python and there's no reason to do
-                # anything else even if we force an update with essential, other packages in the
-                # environment (built for py26) will keep it in place. we offer two ways to deal
-                # with this libsolv behaviour issue:
-                #   A) introduce an artificial version spec `python !=<currently installed>`
-                #   B) use FORCEBEST -- this would be ideal, but sometimes in gets in the way,
-                #      so we only use it as a last attempt effort.
-                # NOTE: This is a dirty-ish workaround... rethink?
-                requested = in_state.requested.get(name)
-                conditions = (
-                    requested,
-                    spec == requested,
-                    spec.strictness == 1,
-                    self._command in ("update", "update+last_solve_attempt", None, NULL),
-                    in_state.deps_modifier != DepsModifier.ONLY_DEPS,
-                    in_state.update_modifier
-                    not in (UpdateModifier.UPDATE_DEPS, UpdateModifier.FREEZE_INSTALLED),
-                )
-                if all(conditions):
-                    if "last_solve_attempt" in str(self._command):
-                        key = (
-                            "UPDATE | ESSENTIAL | FORCEBEST",
-                            api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL | api.SOLVER_FORCEBEST,
-                        )
-                    else:
-                        # NOTE: This is ugly and there should be another way
-                        spec_str = self._spec_to_str(
-                            MatchSpec(spec, version=f">{installed.version}")
-                        )
-
-            tasks[key].append(spec_str)
-
+            requested = in_state.requested.get(name)
+            history = in_state.history.get(name)
+            pinned = in_state.pinned.get(name)
+            conflicting = out_state.conflicts.get(name)
+ 
+            if requested:
+                if installed:
+                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
+                else:
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec_str)    
+            elif pinned:
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(spec_str)
+            elif not conflicting and installed:
+                tasks[("LOCK", api.SOLVER_LOCK)].append(name)
+    
         return dict(tasks)
+            
+                    
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
@@ -520,6 +460,7 @@ class LibMambaSolver(Solver):
         tasks = defaultdict(list)
 
         # Protect history and aggressive updates from being uninstalled if possible
+
         for name, record in out_state.records.items():
             if name in in_state.history or name in in_state.aggressive_updates:
                 # MatchSpecs constructed from PackageRecords get parsed too
@@ -598,7 +539,13 @@ class LibMambaSolver(Solver):
         """
         conflicts = []
         not_found = []
-        for line in problems.splitlines():
+        if "1.4.5" <= mamba_version() < "1.5.0":
+            # 1.4.5 had a regression where it would return
+            # a single line with all the problems; fixed in 1.5.0
+            problem_lines = [f" - {problem}" for problem in problems.split(" - ")[1:]]
+        else:
+            problem_lines = problems.splitlines()[1:]
+        for line in problem_lines:
             line = line.strip()
             words = line.split()
             if not line.startswith("- "):
@@ -615,6 +562,12 @@ class LibMambaSolver(Solver):
                     conflicts.append(cls._str_to_matchspec(words[-1]))
                 start = 3 if marker == 4 else 4
                 not_found.append(cls._str_to_matchspec(words[start:marker]))
+            elif "has constraint" in line and "conflicting with" in line:
+                # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014
+                # conflicting with zlib-1.2.13-h998d150_0
+                conflicts.append(cls._str_to_matchspec(words[-1]))
+            else:
+                log.debug("! Problem line not recognized: %s", line)
 
         return {
             "conflicts": {s.name: s for s in conflicts},
@@ -672,6 +625,14 @@ class LibMambaSolver(Solver):
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
+            return legacy_errors
+        if (
+            mamba_version() <= "1.4.1"
+            and "conflicting requests" in self.solver.all_problems_to_str()
+        ):
+            # This error makes 'explain_problems()' crash in libmamba <=1.4.1.
+            # Anticipate and return simpler error earlier.
+            log.info("Failed to explain problems. Conflicting requests.")
             return legacy_errors
         try:
             explained_errors = self.solver.explain_problems()
