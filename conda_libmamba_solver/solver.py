@@ -374,8 +374,9 @@ class LibMambaSolver(Solver):
                     else:
                         spec = f"One of {specs}"
                     msg = (
-                        "This is a bug in libmamba 1.5.0. 'defaults' (and 'pkgs/*') cannot be "
-                        "used in channel::pkg_name specs. Please use -c defaults instead."
+                        "This is a bug in libmamba 1.5.0 when using 'defaults::"
+                        "<spec>' or 'pkgs/main::<spec>'. Please use '-c "
+                        "defaults' instead."
                     )
                     raise InvalidMatchSpec(spec, msg)
                 raise
