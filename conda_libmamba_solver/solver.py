@@ -294,7 +294,7 @@ class LibMambaSolver(Solver):
                 self._command += "+last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
-                message = self._prepare_problems_message()
+                message = self._prepare_problems_message(pins=out_state.pins)
                 exc = LibMambaUnsatisfiableError(message)
                 exc.allow_retry = False
                 raise exc
@@ -355,13 +355,17 @@ class LibMambaSolver(Solver):
         log.debug("Computed specs: %s", out_state.specs)
 
         # ## Convert to tasks
+        out_state.pins.clear()
+        n_pins = 0
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
             if task_name == "ADD_PIN":
                 # ## Add pins
                 for spec in specs:
+                    n_pins += 1
                     self.solver.add_pin(spec)
+                    out_state.pins[f"pin-{n_pins}"] = spec
                 continue
 
             try:
@@ -390,7 +394,7 @@ class LibMambaSolver(Solver):
 
         problems = self.solver.problems_to_str()
         old_conflicts = out_state.conflicts.copy()
-        new_conflicts = self._maybe_raise_for_problems(problems, old_conflicts)
+        new_conflicts = self._maybe_raise_for_problems(problems, old_conflicts, out_state.pins)
         log.debug("Attempt failed with %s conflicts", len(new_conflicts))
         out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
         return False
@@ -482,7 +486,7 @@ class LibMambaSolver(Solver):
             elif history and not history.is_name_only_spec and not conflicting:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
             elif installed:  
-                if conflicting:
+                if conflicting and not history:
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed
@@ -609,6 +613,12 @@ class LibMambaSolver(Solver):
                 # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014
                 # conflicting with zlib-1.2.13-h998d150_0
                 conflicts.append(cls._str_to_matchspec(words[-1]))
+            elif "cannot install both pin-" in line and "and pin-" in line:
+                # a pin is in conflict with another pin
+                pin_a = words[3].rsplit("-", 1)[0]
+                pin_b = words[5].rsplit("-", 1)[0]
+                conflicts.append(MatchSpec(pin_a))
+                conflicts.append(MatchSpec(pin_b))
             else:
                 log.debug("! Problem line not recognized: %s", line)
 
@@ -621,6 +631,7 @@ class LibMambaSolver(Solver):
         self,
         problems: Optional[Union[str, Mapping]] = None,
         previous_conflicts: Mapping[str, MatchSpec] = None,
+        pins: Mapping[str, MatchSpec] = None,
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
@@ -656,14 +667,14 @@ class LibMambaSolver(Solver):
 
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
-            message = self._prepare_problems_message()
+            message = self._prepare_problems_message(pins=pins)
             exc = LibMambaUnsatisfiableError(message)
             # do not allow conda.cli.install to try more things
             exc.allow_retry = False
             raise exc
         return unsatisfiable
 
-    def _prepare_problems_message(self):
+    def _prepare_problems_message(self, pins=None):
         legacy_errors = self.solver.problems_to_str()
         if " - " not in legacy_errors:
             # This makes 'explain_problems()' crash. Anticipate.
@@ -684,9 +695,44 @@ class LibMambaSolver(Solver):
             explained_errors = self.solver.explain_problems()
         except Exception as exc:
             log.warning("Failed to explain problems", exc_info=exc)
-            return legacy_errors
+            return self._explain_with_pins(legacy_errors, pins)
         else:
-            return f"{legacy_errors}\n{explained_errors}"
+            msg = f"{legacy_errors}\n{explained_errors}"
+            return self._explain_with_pins(msg, pins)
+
+    def _explain_with_pins(self, message, pins):
+        """
+        Add info about pins to the error message.
+        This might be temporary as libmamba improves their error messages.
+        As of 1.5.0, if a pin introduces a conflict, it results in a cryptic error message like:
+
+        ```
+        Encountered problems while solving:
+          - cannot install both pin-1-1 and pin-1-1
+
+        Could not solve for environment specs
+        The following packages are incompatible
+        └─ pin-1 is installable with the potential options
+            ├─ pin-1 1, which can be installed;
+            └─ pin-1 1 conflicts with any installable versions previously reported.
+        ```
+
+        Since the pin-N name is masked, we add the following snippet underneath:
+
+        ```
+        Pins seem to be involved in the conflict. Currently pinned specs:
+         - python 2.7.* (labeled as 'pin-1')
+
+        If Python is involved, try adding it explicitly to the command-line.
+        ```
+        """
+        if pins and "pin-1" in message:  # add info about pins for easier debugging
+            pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
+            for pin_name, spec in pins.items():
+                pin_message += f" - {spec} (labeled as '{pin_name}')\n"
+            pin_message += "\nIf python is involved, try adding it explicitly to the command-line."
+            return f"{message}\n\n{pin_message}"
+        return message
 
     def _maybe_raise_for_conda_build(
         self,

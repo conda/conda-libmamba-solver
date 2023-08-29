@@ -463,6 +463,8 @@ class SolverOutputState:
         If a solve attempt is not successful, conflicting specs are kept here for further
         relaxation of the version and build constrains. If not provided, their default value is a
         blank mapping.
+    pins
+        Packages that ended up being pinned. Mostly used for reporting and debugging.
 
     Notes
     -----
@@ -496,6 +498,7 @@ class SolverOutputState:
         for_history: Optional[Mapping[str, MatchSpec]] = None,
         neutered: Optional[Mapping[str, MatchSpec]] = None,
         conflicts: Optional[Mapping[str, MatchSpec]] = None,
+        pins: Optional[Mapping[str, MatchSpec]] = None,
     ):
         self.solver_input_state: SolverInputState = solver_input_state
 
@@ -532,6 +535,10 @@ class SolverOutputState:
         # we track conflicts to relax some constrains and help the solver out
         self.conflicts: Mapping[str, MatchSpec] = TrackedMap(
             "conflicts", data=(conflicts or {}), reason="From arguments"
+        )
+
+        self.pins: Mapping[str, MatchSpec] = TrackedMap(
+            "pins", data=(pins or {}), reason="From arguments"
         )
 
     def _initialize_specs_from_input_state(self):
