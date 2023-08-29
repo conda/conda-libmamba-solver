@@ -2,8 +2,8 @@
 pip
 # run-time
 boltons>=23.0.0
-conda>=23.3.1
-libmamba>=1.4.1
-libmambapy>=1.4.1
+conda>=23.7.3
+libmamba>=1.5.0
+libmambapy>=1.5.0
 # be explicit about sqlite because sometimes it's removed from the env :shrug:
 sqlite
