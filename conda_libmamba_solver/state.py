@@ -293,7 +293,7 @@ class SolverInputState:
         - almost all packages if update_all is true
         - etc
         """
-        pkgs = {**self._aggressive_updates}
+        pkgs = {pkg: MatchSpec(pkg) for pkg in self.aggressive_updates if pkg in self.installed}
         if context.auto_update_conda and paths_equal(self.prefix, context.root_prefix):
             pkgs.setdefault("conda", MatchSpec("conda"))
         if self.update_modifier.UPDATE_ALL:

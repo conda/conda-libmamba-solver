@@ -425,10 +425,14 @@ class LibMambaSolver(Solver):
         # installed to fulfill some dependency. This is needed input for the calculation of
         # unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set."
         user_installed = {
-            *in_state.history,
-            *in_state.aggressive_updates,
-            *in_state.pinned,
-            *in_state.do_not_remove,
+            pkg 
+            for pkg in (
+                *in_state.history,
+                *in_state.aggressive_updates,
+                *in_state.pinned,
+                *in_state.do_not_remove
+            ) 
+            if pkg in in_state.installed
         }
 
         # Fast-track python version changes (Part 1/2)
@@ -449,19 +453,22 @@ class LibMambaSolver(Solver):
                 continue  # ignore virtual packages
             spec: MatchSpec = self._check_spec_compat(spec)
             installed: PackageRecord = in_state.installed.get(name)
+            if installed:
+                installed_spec_str = self._spec_to_str(installed.to_match_spec())
+            else:
+                installed_spec_str = None
             requested: MatchSpec = in_state.requested.get(name)
             history: MatchSpec = in_state.history.get(name)
             pinned: MatchSpec = in_state.pinned.get(name)
             conflicting: MatchSpec = out_state.conflicts.get(name)
 
-            if name in user_installed and installed and not in_state.prune:
-                installed_spec_str = self._spec_to_str(installed.to_match_spec())
+            if name in user_installed and not in_state.prune and not conflicting:
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
 
             # These specs are explicit in some sort of way
             if requested:
                 tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(requested))
-            elif installed and name in in_state.aggressive_updates:
+            elif name in in_state.always_update:
                 tasks[("UPDATE", api.SOLVER_UPDATE)].append(name)
             elif pinned:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
