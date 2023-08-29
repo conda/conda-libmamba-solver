@@ -20,14 +20,7 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 import libmambapy as api
 from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
-from conda.base.constants import (
-    REPODATA_FN,
-    UNKNOWN_CHANNEL,
-    ChannelPriority,
-    DepsModifier,
-    UpdateModifier,
-    on_win,
-)
+from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
@@ -437,7 +430,7 @@ class LibMambaSolver(Solver):
             *in_state.pinned,
             *in_state.do_not_remove,
         }
-        
+
         # Fast-track python version changes (Part 1/2)
         # ## When the Python version changes, this implies all packages depending on
         # ## python will be reinstalled too. This can mean that we'll have to try for every
@@ -449,13 +442,12 @@ class LibMambaSolver(Solver):
         to_be_installed_python = out_state.specs.get("python")
         if installed_python and to_be_installed_python:
             python_version_might_change = not to_be_installed_python.match(installed_python)
-        
+
         # Add specs to install
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue  # ignore virtual packages
             spec: MatchSpec = self._check_spec_compat(spec)
-            spec_str = self._spec_to_str(spec)
             installed: PackageRecord = in_state.installed.get(name)
             requested: MatchSpec = in_state.requested.get(name)
             history: MatchSpec = in_state.history.get(name)
@@ -465,7 +457,7 @@ class LibMambaSolver(Solver):
             if name in user_installed and installed and not in_state.prune:
                 installed_spec_str = self._spec_to_str(installed.to_match_spec())
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
-            
+
             # These specs are explicit in some sort of way
             if requested:
                 tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(requested))
@@ -490,7 +482,9 @@ class LibMambaSolver(Solver):
                             lock = False
                             break
                 if lock:
-                    tasks[("LOCK", api.SOLVER_LOCK)].append(self._spec_to_str(installed.to_match_spec()))
+                    tasks[("LOCK", api.SOLVER_LOCK)].append(
+                        self._spec_to_str(installed.to_match_spec())
+                    )
 
         return dict(tasks)
 
@@ -662,8 +656,9 @@ class LibMambaSolver(Solver):
 
     def _prepare_problems_message(self):
         legacy_errors = self.solver.problems_to_str()
-        if not " - " in legacy_errors:
-            return "Failed with empty error message"
+        if " - " not in legacy_errors:
+            # This makes 'explain_problems()' crash. Anticipate.
+            return "Failed with empty error message."
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")

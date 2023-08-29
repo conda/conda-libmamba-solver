@@ -10,10 +10,11 @@ from subprocess import check_call, run
 from uuid import uuid4
 
 import pytest
-from conda.common.compat import on_win, on_linux
+from conda.common.compat import on_linux, on_win
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
+
 from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.mamba_utils import mamba_version
 
