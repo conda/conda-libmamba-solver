@@ -474,17 +474,19 @@ class LibMambaSolver(Solver):
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
             elif history and not history.is_name_only_spec and not conflicting:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
-            elif not conflicting and installed:  # we freeze everything else as installed
-                lock = True
-                if python_version_might_change and installed.noarch is None:
-                    for dep in installed.depends:
-                        if MatchSpec(dep).name in ("python", "python_abi"):
-                            lock = False
-                            break
-                if lock:
-                    tasks[("LOCK", api.SOLVER_LOCK)].append(
-                        self._spec_to_str(installed.to_match_spec())
-                    )
+            elif installed:  
+                if conflicting:
+                    tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                else:
+                    # we freeze everything else as installed
+                    lock = True
+                    if python_version_might_change and installed.noarch is None:
+                        for dep in installed.depends:
+                            if MatchSpec(dep).name in ("python", "python_abi"):
+                                lock = False
+                                break
+                    if lock:
+                        tasks[("LOCK", api.SOLVER_LOCK)].append(installed_spec_str)
 
         return dict(tasks)
 
