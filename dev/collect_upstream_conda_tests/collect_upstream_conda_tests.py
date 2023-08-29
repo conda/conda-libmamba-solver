@@ -50,7 +50,6 @@ _deselected_upstream_tests = {
         "test_conda_recovery_of_pip_inconsistent_env",
         # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
         "test_offline_with_empty_index_cache",
-        "test_neutering_of_historic_specs",
         "test_pinned_override_with_explicit_spec",
         # TODO: Investigate why this fails on Windows now
         "test_install_update_deps_only_deps_flags",

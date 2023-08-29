@@ -63,30 +63,6 @@ class PatchedCondaTestCreate(BaseTestCase):
     def setUp(self):
         PackageCacheData.clear()
 
-    # https://github.com/conda/conda/issues/9124
-    @pytest.mark.skipif(
-        context.subdir != "linux-64", reason="lazy; package constraint here only valid on linux-64"
-    )
-    def test_neutering_of_historic_specs(self):
-        with make_temp_env("psutil=5.6.3=py37h7b6447c_0") as prefix:
-            stdout, stderr, _ = run_command(Commands.INSTALL, prefix, "python=3.6")
-            with open(os.path.join(prefix, "conda-meta", "history")) as f:
-                d = f.read()
-
-            ## MODIFIED
-            #  libmamba relaxes more aggressively sometimes
-            #  instead of relaxing from pkgname=version=build to pkgname=version, it
-            #  goes to just pkgname; this is because libmamba does not take into account
-            #  matchspec target and optionality (iow, MatchSpec.conda_build_form() does not)
-            #  Original check was stricter:
-            ### assert re.search(r"neutered specs:.*'psutil==5.6.3'\]", d)
-            assert re.search(r"neutered specs:.*'psutil'\]", d)
-            ## /MODIFIED
-
-            # this would be unsatisfiable if the neutered specs were not being factored in correctly.
-            #    If this command runs successfully (does not raise), then all is well.
-            stdout, stderr, _ = run_command(Commands.INSTALL, prefix, "imagesize")
-
     def test_pinned_override_with_explicit_spec(self):
         with make_temp_env("python=3.6") as prefix:
             ## MODIFIED
