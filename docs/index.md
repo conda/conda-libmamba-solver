@@ -10,6 +10,7 @@ Start here if you want a faster conda:
 ```{toctree}
 :maxdepth: 1
 getting-started
+subcommands
 libmamba-vs-classic
 performance
 faq
