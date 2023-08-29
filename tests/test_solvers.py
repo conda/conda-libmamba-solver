@@ -9,12 +9,14 @@ from pathlib import Path
 from subprocess import check_call, run
 from uuid import uuid4
 
+import pytest
 from conda.common.compat import on_win
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
+from conda_libmamba_solver.mamba_utils import mamba_version
 
 
 class TestLibMambaSolver(SolverTests):
@@ -87,6 +89,10 @@ def test_python_downgrade_reinstalls_noarch_packages():
         check_call([pip, "--version"])
 
 
+@pytest.mark.xfail(
+    mamba_version() == "1.5.0",
+    reason="Known bug. See https://github.com/mamba-org/mamba/issues/2431",
+)
 def test_defaults_specs_work():
     """
     See https://github.com/conda/conda-libmamba-solver/issues/173
@@ -113,7 +119,7 @@ def test_defaults_specs_work():
         use_exception_handler=True,
     )
     data = json.loads(out)
-    assert data["success"] is True
+    assert data.get("success") is True
     for link in data["actions"]["LINK"]:
         if link["name"] == "libarchive":
             assert link["channel"] in ("defaults", "pkgs/main")
