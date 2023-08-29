@@ -463,31 +463,24 @@ class LibMambaSolver(Solver):
             pinned: MatchSpec = in_state.pinned.get(name)
             conflicting: MatchSpec = out_state.conflicts.get(name)
 
-            if name in user_installed and installed:
+            if name in user_installed and installed and not in_state.prune:
                 installed_spec_str = self._spec_to_str(installed.to_match_spec())
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
             
             # These specs are explicit in some sort of way
             if requested:
-                if self._command in ("install", "create", None, NULL):
-                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(requested))
-                else:
-                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(self._spec_to_str(requested))
+                tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(requested))
             elif installed and name in in_state.aggressive_updates:
                 tasks[("UPDATE", api.SOLVER_UPDATE)].append(name)
             elif pinned:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
-                # if installed:
-                #     # TODO: Pins should worrrrk
-                #     tasks[("UPDATE", api.SOLVER_UPDATE)].append(self._spec_to_str(pinned))
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
+            elif in_state.prune:
+                continue
             elif name == "python" and installed:
                 pyver = ".".join(installed.version.split(".")[:2])
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
-                # We shouldn't need this and will cause unneeded updates, but the pins
-                # are not working for some reason (https://github.com/mamba-org/mamba/issues/2737)
-                # tasks[("UPDATE", api.SOLVER_UPDATE)].append(f"python {pyver}.*")
             elif history:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
                 # if installed:
