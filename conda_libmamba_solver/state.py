@@ -282,9 +282,25 @@ class SolverInputState:
         associated version or build constrain. Note that the packages here returned do not need to
         be installed.
         """
-        if context.auto_update_conda and paths_equal(self.prefix, context.root_prefix):
-            return MappingProxyType({"conda": MatchSpec("conda"), **self._aggressive_updates})
         return MappingProxyType(self._aggressive_updates)
+
+    @property
+    def always_update(self) -> Mapping[str, MatchSpec]:
+        """
+        Merged lists of packages that should always be updated, depending on the flags, including:
+        - aggressive_updates
+        - conda if auto_update_conda is true and we are on the base env
+        - almost all packages if update_all is true
+        - etc
+        """
+        pkgs = {**self._aggressive_updates}
+        if context.auto_update_conda and paths_equal(self.prefix, context.root_prefix):
+            pkgs.setdefault("conda", MatchSpec("conda"))
+        if self.update_modifier.UPDATE_ALL:
+            for pkg in self.installed:
+                if pkg != "python":
+                    pkgs.setdefault(pkg, MatchSpec(pkg))
+        return MappingProxyType(pkgs)
 
     @property
     def do_not_remove(self) -> Mapping[str, MatchSpec]:
