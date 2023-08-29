@@ -25,6 +25,10 @@ _deselected_upstream_tests = {
         # Features / nomkl involved
         "test_features_solve_1",
         "test_prune_1",
+        "test_update_prune_2",
+        "test_update_prune_3",
+        # Message expected, but libmamba does not report constraints
+        "test_update_prune_5",
         # TODO: These ones need further investigation
         "test_channel_priority_churn_minimized",
         "test_priority_1",

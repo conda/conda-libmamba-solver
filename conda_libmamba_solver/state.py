@@ -198,6 +198,8 @@ class SolverInputState:
         self._update_modifier = self._default_to_context_if_null(
             "update_modifier", update_modifier
         )
+        if prune and self._update_modifier == UpdateModifier.FREEZE_INSTALLED:
+            self._update_modifier = UpdateModifier.UPDATE_SPECS  # revert to default
         self._deps_modifier = self._default_to_context_if_null("deps_modifier", deps_modifier)
         self._ignore_pinned = self._default_to_context_if_null("ignore_pinned", ignore_pinned)
         self._force_remove = self._default_to_context_if_null("force_remove", force_remove)
@@ -523,8 +525,10 @@ class SolverOutputState:
         """
         # Initialize specs following conda.core.solve._collect_all_metadata()
 
-        # First initialization depends on whether we have a history to work with or not
-        if self.solver_input_state.history:
+        if self.solver_input_state.prune:
+            pass  # we do not initialize specs with history OR installed pkgs if we are pruning
+        # Otherwise, initialization depends on whether we have a history to work with or not
+        elif self.solver_input_state.history:
             # add in historically-requested specs
             self.specs.update(self.solver_input_state.history, reason="As in history")
             for name, record in self.solver_input_state.installed.items():
@@ -557,7 +561,7 @@ class SolverOutputState:
             # add everything in prefix if we have no history to work with (e.g. with --update-all)
             self.specs.update(
                 {name: MatchSpec(name) for name in self.solver_input_state.installed},
-                reason="Installed and no history available",
+                reason="Installed and no history available (prune=false)",
             )
 
         # Add virtual packages so they are taken into account by the solver
@@ -666,7 +670,7 @@ class SolverOutputState:
                 )
             else:
                 # every other spec that matches something installed will be configured with
-                # only a target This is the case for conflicts, among others
+                # only a target. This is the case for conflicts, among others
                 self.specs.set(
                     name, MatchSpec(name, target=record.dist_str()), reason="Spec matches record"
                 )
