@@ -280,6 +280,8 @@ class SolverInputState:
         associated version or build constrain. Note that the packages here returned do not need to
         be installed.
         """
+        if context.auto_update_conda and paths_equal(self.prefix, context.root_prefix):
+            return MappingProxyType({"conda": MatchSpec("conda"), **self._aggressive_updates})
         return MappingProxyType(self._aggressive_updates)
 
     @property
