@@ -111,6 +111,7 @@ class LibMambaIndexHelper(IndexHelper):
         channels: Iterable[Union[Channel, str]] = None,
         subdirs: Iterable[str] = None,
         repodata_fn: str = REPODATA_FN,
+        query_format=api.QueryFormat.JSON,
     ):
         self._channels = context.channels if channels is None else channels
         self._subdirs = context.subdirs if subdirs is None else subdirs
@@ -126,7 +127,7 @@ class LibMambaIndexHelper(IndexHelper):
         self._repos += [info.repo for info in self._index.values()]
 
         self._query = api.Query(self._pool)
-        self._format = api.QueryFormat.JSON
+        self._format = query_format
 
     def get_info(self, key: str) -> _ChannelRepoInfo:
         orig_key = key
@@ -291,17 +292,23 @@ class LibMambaIndexHelper(IndexHelper):
         repo.set_installed()
         return repo
 
-    def whoneeds(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict]:
+    def whoneeds(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict, str]:
         result_str = self._query.whoneeds(query, self._format)
-        return self._process_query_result(result_str, records=records)
+        if self._format == api.QueryFormat.JSON:
+            return self._process_query_result(result_str, records=records)
+        return result_str
 
-    def depends(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict]:
+    def depends(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict, str]:
         result_str = self._query.depends(query, self._format)
-        return self._process_query_result(result_str, records=records)
+        if self._format == api.QueryFormat.JSON:
+            return self._process_query_result(result_str, records=records)
+        return result_str
 
-    def search(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict]:
+    def search(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict, str]:
         result_str = self._query.find(query, self._format)
-        return self._process_query_result(result_str, records=records)
+        if self._format == api.QueryFormat.JSON:
+            return self._process_query_result(result_str, records=records)
+        return result_str
 
     def explicit_pool(self, specs: Iterable[MatchSpec]) -> Iterable[str]:
         """
