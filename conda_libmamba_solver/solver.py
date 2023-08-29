@@ -326,13 +326,14 @@ class LibMambaSolver(Solver):
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
-            (api.SOLVER_FLAG_ALLOW_UNINSTALL, 1),
             (api.SOLVER_FLAG_INSTALL_ALSO_UPDATES, 1),
-            (api.SOLVER_FLAG_FOCUS_BEST, 1),
-            (api.SOLVER_FLAG_BEST_OBEY_POLICY, 1),
+            # (api.SOLVER_FLAG_FOCUS_BEST, 1),
+            # (api.SOLVER_FLAG_BEST_OBEY_POLICY, 1),
         ]
         if context.channel_priority is ChannelPriority.STRICT:
             solver_options.append((api.SOLVER_FLAG_STRICT_REPO_PRIORITY, 1))
+        if self.specs_to_remove and self._command in ("remove", None, NULL):
+            solver_options.append((api.SOLVER_FLAG_ALLOW_UNINSTALL, 1))
 
         self.solver = api.Solver(index._pool, self._solver_options)
 
