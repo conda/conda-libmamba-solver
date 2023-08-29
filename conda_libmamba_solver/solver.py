@@ -660,6 +660,8 @@ class LibMambaSolver(Solver):
 
     def _prepare_problems_message(self):
         legacy_errors = self.solver.problems_to_str()
+        if not " - " in legacy_errors:
+            return "Failed with empty error message"
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
