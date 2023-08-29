@@ -364,7 +364,22 @@ class LibMambaSolver(Solver):
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            self.solver.add_jobs(specs, task_type)
+            try:
+                self.solver.add_jobs(specs, task_type)
+            except RuntimeError as exc:
+                if mamba_version() == "1.5.0":
+                    for spec in specs:
+                        if spec in str(exc):
+                            break
+                    else:
+                        spec = f"One of {specs}"
+                    msg = (
+                        "This is a bug in libmamba 1.5.0 when using 'defaults::"
+                        "<spec>' or 'pkgs/main::<spec>'. Please use '-c "
+                        "defaults' instead."
+                    )
+                    raise InvalidMatchSpec(spec, msg)
+                raise
 
         # ## Run solver
         solved = self.solver.solve()
