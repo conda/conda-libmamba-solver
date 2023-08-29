@@ -364,7 +364,13 @@ class LibMambaSolver(Solver):
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            self.solver.add_jobs(specs, task_type)
+            print("Adding task %s with specs %s", task_name, specs)
+            if task_name == "ADD_PIN":
+                # ## Add pins
+                for spec in specs:
+                    self.solver.add_pin(spec)
+            else:
+                self.solver.add_jobs(specs, task_type)
 
         # ## Run solver
         solved = self.solver.solve()
@@ -409,12 +415,12 @@ class LibMambaSolver(Solver):
         # docs: "The matching installed packages are considered to be installed by a user, thus not
         # installed to fulfill some dependency. This is needed input for the calculation of
         # unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set."
-        tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)] += [
+        user_installed = {
             *in_state.history,
             *in_state.aggressive_updates,
             *in_state.pinned,
             *in_state.do_not_remove,
-        ]
+        }
         
         # Fast-track python version changes (Part 1/2)
         # ## When the Python version changes, this implies all packages depending on
@@ -432,27 +438,49 @@ class LibMambaSolver(Solver):
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
                 continue  # ignore virtual packages
-            spec = self._check_spec_compat(spec)
+            spec: MatchSpec = self._check_spec_compat(spec)
             spec_str = self._spec_to_str(spec)
-            installed = in_state.installed.get(name)
-            requested = in_state.requested.get(name)
-            history = in_state.history.get(name)
-            pinned = in_state.pinned.get(name)
-            conflicting = out_state.conflicts.get(name)
- 
-            if requested:
-                if installed:
-                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
-                else:
-                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec_str)    
-            elif pinned:
-                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(spec_str)
-            elif not conflicting and installed:
-                tasks[("LOCK", api.SOLVER_LOCK)].append(name)
-    
-        return dict(tasks)
+            installed: PackageRecord = in_state.installed.get(name)
+            requested: MatchSpec = in_state.requested.get(name)
+            history: MatchSpec = in_state.history.get(name)
+            pinned: MatchSpec = in_state.pinned.get(name)
+            conflicting: MatchSpec = out_state.conflicts.get(name)
+
+            if name in user_installed and installed:
+                installed_spec_str = self._spec_to_str(installed.to_match_spec())
+                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
             
-                    
+            # These specs are explicit in some sort of way
+            if requested:
+                if self._command in ("install", "create", None, NULL):
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(requested))
+                else:
+                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(self._spec_to_str(requested))
+            elif installed and name in in_state.aggressive_updates:
+                tasks[("UPDATE", api.SOLVER_UPDATE)].append(name)
+            elif pinned:
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+                # if installed:
+                #     # TODO: Pins should worrrrk
+                #     tasks[("UPDATE", api.SOLVER_UPDATE)].append(self._spec_to_str(pinned))
+            # These specs are "implicit"; the solver logic massages them for better UX
+            # as long as they don't cause trouble
+            elif name == "python" and installed:
+                pyver = ".".join(installed.version.split(".")[:2])
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
+                # We shouldn't need this and will cause unneeded updates, but the pins
+                # are not working for some reason (https://github.com/mamba-org/mamba/issues/2737)
+                # tasks[("UPDATE", api.SOLVER_UPDATE)].append(f"python {pyver}.*")
+            elif history:
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
+                # if installed:
+                #     # TODO: Pins should worrrrk
+                #     tasks[("UPDATE", api.SOLVER_UPDATE)].append(self._spec_to_str(history))
+            elif not conflicting and installed:  # we freeze everything else as installed
+                tasks[("LOCK", api.SOLVER_LOCK)].append(name)
+                # pass
+
+        return dict(tasks)
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
