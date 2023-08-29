@@ -298,7 +298,7 @@ class SolverInputState:
             pkgs.setdefault("conda", MatchSpec("conda"))
         if self.update_modifier.UPDATE_ALL:
             for pkg in self.installed:
-                if pkg != "python":
+                if pkg != "python" and pkg not in self.pinned:
                     pkgs.setdefault(pkg, MatchSpec(pkg))
         return MappingProxyType(pkgs)
 
