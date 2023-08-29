@@ -365,7 +365,6 @@ class LibMambaSolver(Solver):
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            print("Adding task %s with specs %s", task_name, specs)
             if task_name == "ADD_PIN":
                 # ## Add pins
                 for spec in specs:
@@ -483,12 +482,8 @@ class LibMambaSolver(Solver):
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
             elif history:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
-                # if installed:
-                #     # TODO: Pins should worrrrk
-                #     tasks[("UPDATE", api.SOLVER_UPDATE)].append(self._spec_to_str(history))
             elif not conflicting and installed:  # we freeze everything else as installed
                 tasks[("LOCK", api.SOLVER_LOCK)].append(name)
-                # pass
 
         return dict(tasks)
 
