@@ -551,7 +551,7 @@ class SolverOutputState:
         if self.solver_input_state.prune:
             pass  # we do not initialize specs with history OR installed pkgs if we are pruning
         # Otherwise, initialization depends on whether we have a history to work with or not
-        elif self.solver_input_state.history:
+        elif self.solver_input_state.history and not self.solver_input_state.update_modifier.UPDATE_ALL:
             # add in historically-requested specs
             self.specs.update(self.solver_input_state.history, reason="As in history")
             for name, record in self.solver_input_state.installed.items():
@@ -793,6 +793,12 @@ class SolverOutputState:
                             MatchSpec(name),
                             reason="Update all, with history: treat pip installed "
                             "stuff as explicitly installed",
+                        )
+                    elif name not in self.specs:
+                        self.specs.set(
+                            name,
+                            MatchSpec(name),
+                            reason="Update all, with history: adding name-only spec from installed",
                         )
             else:
                 for name in sis.installed:

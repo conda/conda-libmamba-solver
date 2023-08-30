@@ -20,7 +20,7 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 import libmambapy as api
 from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win
+from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win, UpdateModifier, DepsModifier
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
@@ -320,8 +320,6 @@ class LibMambaSolver(Solver):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
             (api.SOLVER_FLAG_INSTALL_ALSO_UPDATES, 1),
-            # (api.SOLVER_FLAG_FOCUS_BEST, 1),
-            # (api.SOLVER_FLAG_BEST_OBEY_POLICY, 1),
         ]
         if context.channel_priority is ChannelPriority.STRICT:
             solver_options.append((api.SOLVER_FLAG_STRICT_REPO_PRIORITY, 1))
@@ -470,17 +468,31 @@ class LibMambaSolver(Solver):
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
 
             # These specs are explicit in some sort of way
+            if pinned: 
+                # these are the EXPLICIT pins; conda also uses implicit pinning to 
+                # constrain updates too but those can be overridden in case of conflicts.
+                if requested and not requested.match(pinned):
+                    # We don't pin; requested and pinned are different, requested wins
+                    # we let that happen in the next block
+                    pass
+                else:
+                    tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+
             if requested:
-                tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(requested))
+                spec_str = self._spec_to_str(requested)
+                if installed:
+                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
+                    tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                else:
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec_str)
             elif name in in_state.always_update:
                 tasks[("UPDATE", api.SOLVER_UPDATE)].append(name)
-            elif pinned:
-                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+                tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
             elif in_state.prune:
                 continue
-            elif name == "python" and installed:
+            elif name == "python" and installed and not pinned:
                 pyver = ".".join(installed.version.split(".")[:2])
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
             elif history and not history.is_name_only_spec and not conflicting:
@@ -490,14 +502,15 @@ class LibMambaSolver(Solver):
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed
-                    lock = True
+                    lock = not in_state.update_modifier.UPDATE_ALL
                     if python_version_might_change and installed.noarch is None:
                         for dep in installed.depends:
                             if MatchSpec(dep).name in ("python", "python_abi"):
                                 lock = False
                                 break
                     if lock:
-                        tasks[("LOCK", api.SOLVER_LOCK)].append(installed_spec_str)
+                        tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(installed_spec_str)
+                        tasks[("VERIFY", api.SOLVER_VERIFY | api.SOLVER_WEAK)].append(name)
 
         return dict(tasks)
 
