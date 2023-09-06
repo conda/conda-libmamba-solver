@@ -52,7 +52,9 @@ def configure_parser(parser: argparse.ArgumentParser):
     view_grp.add_argument(
         "-t", "--tree", action="store_true", help="Show dependencies in a tree-like format."
     )
-    view_grp.add_argument("--recursive", action="store_true", help="Show dependencies recursively.")
+    view_grp.add_argument(
+        "--recursive", action="store_true", help="Show dependencies recursively."
+    )
 
     subparser = parser.add_subparsers(dest="subcmd")
 
