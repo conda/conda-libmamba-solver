@@ -87,6 +87,7 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
 from .models import EnumAsBools, TrackedMap
+from .utils import is_channel_available
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -390,8 +391,8 @@ class SolverInputState:
                     channel = Channel(spec.original_spec_str.split("::")[0])
                 yield channel
 
-    def channels_from_installed(self) -> Iterable[Channel]:
-        seen_urls = set()
+    def channels_from_installed(self, seen=None) -> Iterable[Channel]:
+        seen_urls = set(seen or [])
         # See https://github.com/conda/conda/issues/11790
         for record in self.installed.values():
             if record.channel.auth or record.channel.token:
@@ -402,10 +403,12 @@ class SolverInputState:
                 # These "channels" are not really channels, more like
                 # metadata placeholders
                 continue
-            subdir_url = record.channel.subdir_url
-            if subdir_url not in seen_urls:
-                seen_urls.add(subdir_url)
-                yield record.channel
+            if record.channel.subdir_url in seen_urls:
+                continue
+            if not is_channel_available(record.channel.base_url):
+                continue
+            seen_urls.add(record.channel.subdir_url)
+            yield record.channel
 
     def maybe_free_channel(self) -> Iterable[Channel]:
         if context.restore_free_channel:

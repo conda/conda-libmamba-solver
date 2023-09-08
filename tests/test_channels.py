@@ -11,6 +11,8 @@ from pathlib import Path
 import pytest
 from conda.common.compat import on_linux
 from conda.common.io import env_vars
+from conda.core.prefix_data import PrefixData
+from conda.models.channel import Channel
 from conda.testing.integration import _get_temp_prefix, make_temp_env
 from conda.testing.integration import run_command as conda_inprocess
 
@@ -60,6 +62,25 @@ def test_channels_prefixdata():
             "but package is not available from channel. "
             "Solve job will fail." not in (p.stdout + p.stderr)
         )
+
+def test_channels_installed_unavailable():
+    "Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"
+    with make_temp_env("xz", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+        pd = PrefixData(prefix)
+        pd.load()
+        record = pd.get("xz")
+        assert record
+        record.channel = Channel.from_url("file:///nonexistent")
+
+        _, _, retcode = conda_inprocess(
+            "install",
+            prefix,
+            "zlib",
+            "--solver=libmamba",
+            "--dry-run",
+            use_exception_handler=True,
+        )
+        assert retcode == 0
 
 
 def _setup_channels_alias(prefix):

@@ -178,19 +178,23 @@ class LibMambaSolver(Solver):
         else:
             IndexHelper = LibMambaIndexHelper
 
+        all_channels = [
+            *conda_bld_channels,
+            *self.channels,
+            *in_state.channels_from_specs(),
+        ]
         if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             channels_from_installed = ()
         else:
-            channels_from_installed = in_state.channels_from_installed()
-
-        all_channels = (
-            *conda_bld_channels,
-            *self.channels,
-            *in_state.channels_from_specs(),
+            all_urls = [url for c in all_channels for url in Channel(c).urls(False)]
+            channels_from_installed = in_state.channels_from_installed(seen=all_urls)
+        
+        all_channels += [
             *channels_from_installed,
             *in_state.maybe_free_channel(),
-        )
+        ]
+        all_channels = tuple(all_channels)
         with Spinner(
             self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
@@ -795,8 +799,19 @@ class LibMambaSolver(Solver):
         if pkg_filename.startswith("__") and "/@/" in channel:
             return PackageRecord(**json.loads(json_payload))
 
-        channel_info = index.get_info(channel)
         kwargs = json.loads(json_payload)
+        try:
+            channel_info = index.get_info(channel)
+        except KeyError:
+            # this channel was never used to build the index, which
+            # means we obtained an already installed PackageRecord
+            # whose metadata contains a channel that doesn't exist
+            pd = PrefixData(self.prefix)
+            record = pd.get(kwargs["name"])
+            if record and record.fn == pkg_filename:
+                return record
+        
+        # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
         kwargs["channel"] = channel_info.channel
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
