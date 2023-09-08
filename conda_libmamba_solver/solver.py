@@ -189,7 +189,7 @@ class LibMambaSolver(Solver):
         else:
             all_urls = [url for c in all_channels for url in Channel(c).urls(False)]
             channels_from_installed = in_state.channels_from_installed(seen=all_urls)
-        
+
         all_channels += [
             *channels_from_installed,
             *in_state.maybe_free_channel(),
@@ -810,7 +810,7 @@ class LibMambaSolver(Solver):
             record = pd.get(kwargs["name"])
             if record and record.fn == pkg_filename:
                 return record
-        
+
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
         kwargs["channel"] = channel_info.channel

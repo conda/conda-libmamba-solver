@@ -63,6 +63,7 @@ def test_channels_prefixdata():
             "Solve job will fail." not in (p.stdout + p.stderr)
         )
 
+
 def test_channels_installed_unavailable():
     "Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"
     with make_temp_env("xz", "--solver=libmamba", use_restricted_unicode=True) as prefix:
