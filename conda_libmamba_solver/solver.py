@@ -20,7 +20,7 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 import libmambapy as api
 from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win, UpdateModifier, DepsModifier
+from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
@@ -427,13 +427,13 @@ class LibMambaSolver(Solver):
         # installed to fulfill some dependency. This is needed input for the calculation of
         # unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set."
         user_installed = {
-            pkg 
+            pkg
             for pkg in (
                 *in_state.history,
                 *in_state.aggressive_updates,
                 *in_state.pinned,
-                *in_state.do_not_remove
-            ) 
+                *in_state.do_not_remove,
+            )
             if pkg in in_state.installed
         }
 
@@ -468,8 +468,8 @@ class LibMambaSolver(Solver):
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
 
             # These specs are explicit in some sort of way
-            if pinned: 
-                # these are the EXPLICIT pins; conda also uses implicit pinning to 
+            if pinned:
+                # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
                 if requested and not requested.match(pinned):
                     # We don't pin; requested and pinned are different, requested wins
@@ -497,7 +497,7 @@ class LibMambaSolver(Solver):
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
             elif history and not history.is_name_only_spec and not conflicting:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
-            elif installed:  
+            elif installed:
                 if conflicting and not history:
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
@@ -509,7 +509,9 @@ class LibMambaSolver(Solver):
                                 lock = False
                                 break
                     if lock:
-                        tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(installed_spec_str)
+                        tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(
+                            installed_spec_str
+                        )
                         tasks[("VERIFY", api.SOLVER_VERIFY | api.SOLVER_WEAK)].append(name)
 
         return dict(tasks)
