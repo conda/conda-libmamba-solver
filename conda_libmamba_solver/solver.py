@@ -369,16 +369,16 @@ class LibMambaSolver(Solver):
             try:
                 self.solver.add_jobs(specs, task_type)
             except RuntimeError as exc:
-                if mamba_version() == "1.5.0":
+                if mamba_version() in ("1.5.0", "1.5.1"):
                     for spec in specs:
                         if spec in str(exc):
                             break
                     else:
                         spec = f"One of {specs}"
                     msg = (
-                        "This is a bug in libmamba 1.5.0 when using 'defaults::"
-                        "<spec>' or 'pkgs/main::<spec>'. Please use '-c "
-                        "defaults' instead."
+                        f"This is a bug in libmamba {mamba_version()} when using "
+                        "'defaults::<spec>' or 'pkgs/main::<spec>'. "
+                        "Consider using '-c defaults' instead."
                     )
                     raise InvalidMatchSpec(spec, msg)
                 raise
