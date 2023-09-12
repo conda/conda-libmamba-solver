@@ -498,7 +498,7 @@ class LibMambaSolver(Solver):
             elif history and not history.is_name_only_spec and not conflicting:
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
             elif installed:
-                if conflicting and not history:
+                if conflicting:
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed

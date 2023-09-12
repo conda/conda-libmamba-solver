@@ -1040,7 +1040,9 @@ class SolverOutputState:
             history_spec = sis.history.get(name)
             if history_spec and spec.strictness < history_spec.strictness:
                 self.neutered.set(
-                    name, spec, reason="Spec needs less strict constrains than history"
+                    name,
+                    MatchSpec(name, version=history_spec.get("version")), 
+                    reason="Spec needs less strict constrains than history",
                 )
 
         # ## Add inconsistent packages back ###
