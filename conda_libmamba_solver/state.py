@@ -1041,7 +1041,7 @@ class SolverOutputState:
             if history_spec and spec.strictness < history_spec.strictness:
                 self.neutered.set(
                     name,
-                    MatchSpec(name, version=history_spec.get("version")), 
+                    MatchSpec(name, version=history_spec.get("version")),
                     reason="Spec needs less strict constrains than history",
                 )
 
