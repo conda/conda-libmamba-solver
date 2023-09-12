@@ -30,7 +30,6 @@ _deselected_upstream_tests = {
         # Message expected, but libmamba does not report constraints
         "test_update_prune_5",
         # TODO: These ones need further investigation
-        "test_channel_priority_churn_minimized",
         "test_priority_1",
         # The following are known to fail upstream due to too strict expectations
         # We provide the same tests with adjusted checks in tests/test_modified_upstream.py
@@ -46,13 +45,9 @@ _deselected_upstream_tests = {
     ],
     "tests/test_create.py": [
         "test_remove_features",
-        # Inconsistency analysis not implemented yet
-        "test_conda_recovery_of_pip_inconsistent_env",
         # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
         "test_offline_with_empty_index_cache",
         "test_pinned_override_with_explicit_spec",
-        # TODO: Investigate why this fails on Windows now
-        "test_install_update_deps_only_deps_flags",
         # TODO: https://github.com/conda/conda-libmamba-solver/issues/141
         "test_conda_pip_interop_conda_editable_package",
     ],
@@ -95,18 +90,6 @@ _deselected_upstream_tests = {
 }
 
 _broken_by_libmamba_1_4_2 = {
-    # conda/tests
-    "tests/core/test_solve.py": [
-        "test_force_remove_1",
-        "test_aggressive_update_packages",
-        "test_update_deps_2",
-    ],
-    "tests/test_create.py": [
-        "test_list_with_pip_wheel",
-        "test_conda_pip_interop_dependency_satisfied_by_pip",  # Linux-only
-        "test_conda_pip_interop_pip_clobbers_conda",  # Linux-only
-        "test_install_tarball_from_local_channel",  # Linux-only
-    ],
     # conda-libmamba-solver/tests
     "tests/test_modified_upstream.py": [
         "test_pinned_1",
