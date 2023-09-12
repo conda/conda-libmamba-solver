@@ -403,9 +403,11 @@ class SolverInputState:
                 # These "channels" are not really channels, more like
                 # metadata placeholders
                 continue
+            if record.channel.base_url is None:
+                continue
             if record.channel.subdir_url in seen_urls:
                 continue
-            if record.channel.base_url and not is_channel_available(record.channel.base_url):
+            if is_channel_available(record.channel.base_url):
                 continue
             seen_urls.add(record.channel.subdir_url)
             yield record.channel
