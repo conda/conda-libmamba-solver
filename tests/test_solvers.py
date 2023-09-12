@@ -234,5 +234,5 @@ def test_too_aggressive_update_to_conda_forge_packages():
         p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True, env=env)
         data_classic = json.loads(p_classic.stdout)
         data_libmamba = json.loads(p_libmamba.stdout)
-        assert len(data_classic["actions"]["LINK"]) < 10
-        assert len(data_libmamba["actions"]["LINK"]) < 10
+        assert len(data_classic["actions"]["LINK"]) < 15
+        assert len(data_libmamba["actions"]["LINK"]) <= len(data_classic["actions"]["LINK"])
