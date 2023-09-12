@@ -1,12 +1,13 @@
 ### Enhancements
 
-* <news item>
+* Rewrite how we create tasks for `libsolv`, making use of `libmamba`'s `add_pin` features. (#270)
 
 ### Bug fixes
 
 * Port logic from [conda/conda#9614](https://github.com/conda/conda/pull/9614), which fixes
   a bug where the `--prune` flag was not working correctly in `conda env update` commands.
-  (#267)
+  (#270)
+* Ensure environments are not aggressively updated to higher priority channels under some conditions. (#240 via #270)
 
 ### Deprecations
 
