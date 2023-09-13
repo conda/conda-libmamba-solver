@@ -471,7 +471,10 @@ class LibMambaSolver(Solver):
             if pinned:
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
-                if requested and not requested.match(pinned):
+                if pinned.is_name_only_spec:
+                    # pins need to constrain in some way, otherwide is undefined behaviour
+                    pass
+                elif requested and not requested.match(pinned):
                     # We don't pin; requested and pinned are different and incompatible,
                     # requested wins and we let that happen in the next block
                     pass
@@ -502,7 +505,11 @@ class LibMambaSolver(Solver):
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed
-                    lock = not in_state.update_modifier.UPDATE_ALL
+                    if pinned and pinned.is_name_only_spec:
+                        # name-only pins are treated as locks when installed
+                        lock = True
+                    elif in_state.update_modifier.UPDATE_ALL:
+                        lock = False
                     if python_version_might_change and installed.noarch is None:
                         for dep in installed.depends:
                             if MatchSpec(dep).name in ("python", "python_abi"):
