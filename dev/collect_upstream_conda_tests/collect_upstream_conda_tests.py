@@ -84,8 +84,7 @@ _deselected_upstream_tests = {
     "tests/conda_env/specs/test_requirements.py": [
         "TestRequirements::test_environment",
     ],
-    # TODO: Known to fail; should be fixed by
-    # https://github.com/conda/conda-libmamba-solver/pull/242
+    # Added to test_modified_upstream.py
     "tests/test_priority.py": ["test_reorder_channel_priority"],
 }
 
