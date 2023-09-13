@@ -97,6 +97,14 @@ _broken_by_libmamba_1_4_2 = {
 }
 
 
+_broken_by_libmamba_1_5_x = {
+    # conda/tests
+    "tests/test_export.py": [
+        "test_explicit",
+    ],
+}
+
+
 def pytest_collection_modifyitems(session, config, items):
     """
     We use this hook to modify which upstream tests (from the conda/conda repo)
@@ -116,6 +124,8 @@ def pytest_collection_modifyitems(session, config, items):
             "libmambapy"
         ) >= "1.4.2" and item_name_no_brackets in _broken_by_libmamba_1_4_2.get(path_key, []):
             item.add_marker(pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186"))
+        if version("libmambapy") in ("1.5.0", "1.5.1") and item_name_no_brackets in _broken_by_libmamba_1_5_x.get(path_key, []):
+            item.add_marker(pytest.mark.xfail(reason="Broken in libmamba 1.5.x; see https://github.com/mamba-org/mamba/issues/2431"))
         selected.append(item)
     items[:] = selected
     config.hook.pytest_deselected(items=deselected)
