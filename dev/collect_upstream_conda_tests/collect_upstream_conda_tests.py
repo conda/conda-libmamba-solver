@@ -29,7 +29,8 @@ _deselected_upstream_tests = {
         "test_update_prune_3",
         # Message expected, but libmamba does not report constraints
         "test_update_prune_5",
-        # TODO: These ones need further investigation
+        # classic expects implicit update to channel with higher priority, including downgrades
+        # libmamba does not do this, it just stays in the same channel; should it change?
         "test_priority_1",
         # The following are known to fail upstream due to too strict expectations
         # We provide the same tests with adjusted checks in tests/test_modified_upstream.py
@@ -44,9 +45,11 @@ _deselected_upstream_tests = {
         "test_downgrade_python_prevented_with_sane_message",
     ],
     "tests/test_create.py": [
+        # libmamba does not support features
         "test_remove_features",
         # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
         "test_offline_with_empty_index_cache",
+        # Adjusted in tests/test_modified_upstream.py
         "test_pinned_override_with_explicit_spec",
         # TODO: https://github.com/conda/conda-libmamba-solver/issues/141
         "test_conda_pip_interop_conda_editable_package",
