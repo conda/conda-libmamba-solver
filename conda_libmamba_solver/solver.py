@@ -666,7 +666,7 @@ class LibMambaSolver(Solver):
         not_found = problems["not_found"]
         if not unsatisfiable and not_found:
             # This is not a conflict, but a missing package in the channel
-            exc = PackagesNotFoundError(not_found.values(), self.channels)
+            exc = PackagesNotFoundError(tuple(not_found.values()), tuple(self.channels))
             exc.allow_retry = False
             raise exc
 
