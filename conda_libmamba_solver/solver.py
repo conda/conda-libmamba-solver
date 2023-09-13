@@ -508,6 +508,7 @@ class LibMambaSolver(Solver):
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed
+                    lock = True
                     if pinned and pinned.is_name_only_spec:
                         # name-only pins are treated as locks when installed
                         lock = True
