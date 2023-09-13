@@ -50,6 +50,7 @@ _deselected_upstream_tests = {
         # Known bug in mamba; see https://github.com/mamba-org/mamba/issues/1197
         "test_offline_with_empty_index_cache",
         # Adjusted in tests/test_modified_upstream.py
+        "test_install_features",
         "test_pinned_override_with_explicit_spec",
         # TODO: https://github.com/conda/conda-libmamba-solver/issues/141
         "test_conda_pip_interop_conda_editable_package",

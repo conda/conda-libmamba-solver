@@ -107,6 +107,32 @@ class PatchedCondaTestCreate(BaseTestCase):
             assert package_is_installed(prefix, "jinja2>3.0.1")
 
 
+@pytest.mark.xfail(on_win, reason="nomkl not present on windows", strict=True)
+def test_install_features():
+    # MODIFIED: Added fixture manually
+    PackageCacheData.clear()
+    # /MODIFIED
+    with make_temp_env("python=2", "numpy=1.13", "nomkl", no_capture=True) as prefix:
+        assert package_is_installed(prefix, "numpy")
+        assert package_is_installed(prefix, "nomkl")
+        assert not package_is_installed(prefix, "mkl")
+
+    with make_temp_env("python=2", "numpy=1.13") as prefix:
+        assert package_is_installed(prefix, "numpy")
+        assert not package_is_installed(prefix, "nomkl")
+        assert package_is_installed(prefix, "mkl")
+
+        # run_command(Commands.INSTALL, prefix, "nomkl", no_capture=True)
+        run_command(Commands.INSTALL, prefix, "python=2", "nomkl", no_capture=True)
+        # MODIFIED ^: python=2 needed explicitly to trigger update
+        assert package_is_installed(prefix, "numpy")
+        assert package_is_installed(prefix, "nomkl")
+        assert package_is_installed(prefix, "blas=1.0=openblas")
+        assert not package_is_installed(prefix, "mkl_fft")
+        assert not package_is_installed(prefix, "mkl_random")
+        # assert not package_is_installed(prefix, "mkl")  # pruned as an indirect dep
+
+
 # The following tests come from `conda/conda::tests/core/test_solve.py`
 
 
