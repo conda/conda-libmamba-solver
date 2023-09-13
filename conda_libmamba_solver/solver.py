@@ -369,7 +369,7 @@ class LibMambaSolver(Solver):
             try:
                 self.solver.add_jobs(specs, task_type)
             except RuntimeError as exc:
-                if mamba_version() in ("1.5.0", "1.5.1"):
+                if mamba_version().startswith("1.5."):
                     for spec in specs:
                         if spec in str(exc):
                             break
