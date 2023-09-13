@@ -97,6 +97,7 @@ _broken_by_libmamba_1_5_x = {
     # conda/tests
     "tests/test_export.py": [
         "test_explicit",
+        "test_export",
     ],
 }
 
@@ -121,7 +122,8 @@ def pytest_collection_modifyitems(session, config, items):
         ) and item_name_no_brackets in _broken_by_libmamba_1_5_x.get(path_key, []):
             item.add_marker(
                 pytest.mark.xfail(
-                    reason="Broken in libmamba 1.5.x; see https://github.com/mamba-org/mamba/issues/2431q"
+                    reason="Broken in libmamba 1.5.x; "
+                    "see https://github.com/mamba-org/mamba/issues/2431."
                 )
             )
         selected.append(item)
