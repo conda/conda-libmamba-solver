@@ -301,7 +301,10 @@ def test_pinned_1(tmpdir):
             assert convert_to_dist_str(final_state_5) == order
 
     # now update without pinning
-    specs_to_add = (MatchSpec("python"),)
+    # MODIFIED: libmamba decides to stay in python=2.6 unless explicit
+    # specs_to_add = (MatchSpec("python"),)
+    specs_to_add = (MatchSpec("python=3"),)
+    # /MODIFIED
     history_specs = (
         MatchSpec("python"),
         MatchSpec("system=5.8=0"),

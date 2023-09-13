@@ -472,8 +472,8 @@ class LibMambaSolver(Solver):
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
                 if requested and not requested.match(pinned):
-                    # We don't pin; requested and pinned are different, requested wins
-                    # we let that happen in the next block
+                    # We don't pin; requested and pinned are different and incompatible,
+                    # requested wins and we let that happen in the next block
                     pass
                 else:
                     tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))

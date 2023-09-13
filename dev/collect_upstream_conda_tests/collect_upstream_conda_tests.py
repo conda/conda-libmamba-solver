@@ -89,13 +89,6 @@ _deselected_upstream_tests = {
     "tests/test_priority.py": ["test_reorder_channel_priority"],
 }
 
-_broken_by_libmamba_1_4_2 = {
-    # conda-libmamba-solver/tests
-    "tests/test_modified_upstream.py": [
-        "test_pinned_1",
-    ],
-}
-
 
 _broken_by_libmamba_1_5_x = {
     # conda/tests
@@ -120,12 +113,14 @@ def pytest_collection_modifyitems(session, config, items):
         if item_name_no_brackets in _deselected_upstream_tests.get(path_key, []):
             deselected.append(item)
             continue
-        if version(
-            "libmambapy"
-        ) >= "1.4.2" and item_name_no_brackets in _broken_by_libmamba_1_4_2.get(path_key, []):
-            item.add_marker(pytest.mark.xfail(reason="Broken by libmamba 1.4.2; see #186"))
-        if version("libmambapy") in ("1.5.0", "1.5.1") and item_name_no_brackets in _broken_by_libmamba_1_5_x.get(path_key, []):
-            item.add_marker(pytest.mark.xfail(reason="Broken in libmamba 1.5.x; see https://github.com/mamba-org/mamba/issues/2431"))
+        if version("libmambapy").startswith(
+            "1.5."
+        ) and item_name_no_brackets in _broken_by_libmamba_1_5_x.get(path_key, []):
+            item.add_marker(
+                pytest.mark.xfail(
+                    reason="Broken in libmamba 1.5.x; see https://github.com/mamba-org/mamba/issues/2431q"
+                )
+            )
         selected.append(item)
     items[:] = selected
     config.hook.pytest_deselected(items=deselected)
