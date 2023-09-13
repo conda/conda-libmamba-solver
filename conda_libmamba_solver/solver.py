@@ -171,10 +171,9 @@ class LibMambaSolver(Solver):
         else:
             IndexHelper = LibMambaIndexHelper
 
-        if (
-            os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED")
-            or (getattr(context, "_argparse_args", None) or {}).get("override_channels")
-        ):
+        if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED") or (
+            getattr(context, "_argparse_args", None) or {}
+        ).get("override_channels"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             channels_from_installed = ()
         else:

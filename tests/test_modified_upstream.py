@@ -33,7 +33,13 @@ from conda.exceptions import UnsatisfiableError
 from conda.gateways.subprocess import subprocess_call_with_clean_env
 from conda.models.match_spec import MatchSpec
 from conda.models.version import VersionOrder
-from conda.testing import conda_cli, path_factory, tmp_env
+from conda.testing import (
+    CondaCLIFixture,
+    TmpEnvFixture,
+    conda_cli,
+    path_factory,
+    tmp_env,
+)
 from conda.testing.cases import BaseTestCase
 from conda.testing.helpers import (
     add_subdir,
@@ -53,10 +59,7 @@ from conda.testing.integration import (
     package_is_installed,
     run_command,
 )
-
 from pytest import MonkeyPatch
-
-from conda.testing import CondaCLIFixture, TmpEnvFixture
 
 
 @pytest.mark.integration
@@ -1290,6 +1293,7 @@ def test_downgrade_python_prevented_with_sane_message(tmpdir):
 
 # The following tests come from tests/test_priority.py
 
+
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "pinned_package",
@@ -1313,9 +1317,7 @@ def test_reorder_channel_priority(
         monkeypatch.setenv("CONDA_PINNED_PACKAGES", package1)
 
     # create environment with package1 and package2
-    with tmp_env(
-        "--override-channels", "--channel=defaults", package1, package2
-    ) as prefix:
+    with tmp_env("--override-channels", "--channel=defaults", package1, package2) as prefix:
         # check both packages are installed from defaults
         PrefixData._cache_.clear()
         assert PrefixData(prefix).get(package1).channel.name == "pkgs/main"
