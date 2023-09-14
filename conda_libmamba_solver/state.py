@@ -407,7 +407,7 @@ class SolverInputState:
                 continue
             if record.channel.subdir_url in seen_urls:
                 continue
-            if is_channel_available(record.channel.base_url):
+            if not is_channel_available(record.channel.base_url):
                 continue
             seen_urls.add(record.channel.subdir_url)
             yield record.channel

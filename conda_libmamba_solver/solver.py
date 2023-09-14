@@ -186,8 +186,8 @@ class LibMambaSolver(Solver):
         if not os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             all_urls = [url for c in all_channels for url in Channel(c).urls(False)]
-            all_channels += list(in_state.channels_from_installed(seen=all_urls))
-        all_channels += list(in_state.maybe_free_channel())
+            all_channels.extend(in_state.channels_from_installed(seen=all_urls))
+        all_channels.extend(in_state.maybe_free_channel())
 
         all_channels = tuple(all_channels)
         with Spinner(
