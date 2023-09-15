@@ -53,4 +53,8 @@ source /opt/conda-src/dev/linux/bashrc.sh
 
 cd /opt/conda-libmamba-solver-src
 
-set +e
+set -x
+conda list -p /opt/conda
+conda info
+conda config --show-sources
+set +ex
