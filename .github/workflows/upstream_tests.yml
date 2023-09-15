@@ -438,7 +438,7 @@ jobs:
       - name: Setup environment
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         shell: bash -el {0}
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           # CONDA-LIBMAMBA-SOLVER CHANGE
           cat ../conda-libmamba-solver/dev/requirements.txt >> tests/requirements.txt

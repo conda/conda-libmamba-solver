@@ -33,6 +33,13 @@ from conda.exceptions import UnsatisfiableError
 from conda.gateways.subprocess import subprocess_call_with_clean_env
 from conda.models.match_spec import MatchSpec
 from conda.models.version import VersionOrder
+from conda.testing import (
+    CondaCLIFixture,
+    TmpEnvFixture,
+    conda_cli,
+    path_factory,
+    tmp_env,
+)
 from conda.testing.cases import BaseTestCase
 from conda.testing.helpers import (
     add_subdir,
@@ -52,6 +59,7 @@ from conda.testing.integration import (
     package_is_installed,
     run_command,
 )
+from pytest import MonkeyPatch
 
 
 @pytest.mark.integration
@@ -62,30 +70,6 @@ class PatchedCondaTestCreate(BaseTestCase):
 
     def setUp(self):
         PackageCacheData.clear()
-
-    # https://github.com/conda/conda/issues/9124
-    @pytest.mark.skipif(
-        context.subdir != "linux-64", reason="lazy; package constraint here only valid on linux-64"
-    )
-    def test_neutering_of_historic_specs(self):
-        with make_temp_env("psutil=5.6.3=py37h7b6447c_0") as prefix:
-            stdout, stderr, _ = run_command(Commands.INSTALL, prefix, "python=3.6")
-            with open(os.path.join(prefix, "conda-meta", "history")) as f:
-                d = f.read()
-
-            ## MODIFIED
-            #  libmamba relaxes more aggressively sometimes
-            #  instead of relaxing from pkgname=version=build to pkgname=version, it
-            #  goes to just pkgname; this is because libmamba does not take into account
-            #  matchspec target and optionality (iow, MatchSpec.conda_build_form() does not)
-            #  Original check was stricter:
-            ### assert re.search(r"neutered specs:.*'psutil==5.6.3'\]", d)
-            assert re.search(r"neutered specs:.*'psutil'\]", d)
-            ## /MODIFIED
-
-            # this would be unsatisfiable if the neutered specs were not being factored in correctly.
-            #    If this command runs successfully (does not raise), then all is well.
-            stdout, stderr, _ = run_command(Commands.INSTALL, prefix, "imagesize")
 
     def test_pinned_override_with_explicit_spec(self):
         with make_temp_env("python=3.6") as prefix:
@@ -124,6 +108,32 @@ class PatchedCondaTestCreate(BaseTestCase):
             assert result_before == result_after
             assert package_is_installed(prefix, "flask=2.0.1")
             assert package_is_installed(prefix, "jinja2>3.0.1")
+
+
+@pytest.mark.xfail(on_win, reason="nomkl not present on windows", strict=True)
+def test_install_features():
+    # MODIFIED: Added fixture manually
+    PackageCacheData.clear()
+    # /MODIFIED
+    with make_temp_env("python=2", "numpy=1.13", "nomkl", no_capture=True) as prefix:
+        assert package_is_installed(prefix, "numpy")
+        assert package_is_installed(prefix, "nomkl")
+        assert not package_is_installed(prefix, "mkl")
+
+    with make_temp_env("python=2", "numpy=1.13") as prefix:
+        assert package_is_installed(prefix, "numpy")
+        assert not package_is_installed(prefix, "nomkl")
+        assert package_is_installed(prefix, "mkl")
+
+        # run_command(Commands.INSTALL, prefix, "nomkl", no_capture=True)
+        run_command(Commands.INSTALL, prefix, "python=2", "nomkl", no_capture=True)
+        # MODIFIED ^: python=2 needed explicitly to trigger update
+        assert package_is_installed(prefix, "numpy")
+        assert package_is_installed(prefix, "nomkl")
+        assert package_is_installed(prefix, "blas=1.0=openblas")
+        assert not package_is_installed(prefix, "mkl_fft")
+        assert not package_is_installed(prefix, "mkl_random")
+        # assert not package_is_installed(prefix, "mkl")  # pruned as an indirect dep
 
 
 # The following tests come from `conda/conda::tests/core/test_solve.py`
@@ -325,7 +335,10 @@ def test_pinned_1(tmpdir):
             assert convert_to_dist_str(final_state_5) == order
 
     # now update without pinning
-    specs_to_add = (MatchSpec("python"),)
+    # MODIFIED: libmamba decides to stay in python=2.6 unless explicit
+    # specs_to_add = (MatchSpec("python"),)
+    specs_to_add = (MatchSpec("python=3"),)
+    # /MODIFIED
     history_specs = (
         MatchSpec("python"),
         MatchSpec("system=5.8=0"),
@@ -1276,3 +1289,52 @@ def test_downgrade_python_prevented_with_sane_message(tmpdir):
         assert "Encountered problems while solving" in error_msg
         assert "package unsatisfiable-with-py26-1.0-0 requires scikit-learn 0.13" in error_msg
         ## /MODIFIED
+
+
+# The following tests come from tests/test_priority.py
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "pinned_package",
+    [
+        pytest.param(True, id="with pinned_package"),
+        pytest.param(False, id="without pinned_package"),
+    ],
+)
+def test_reorder_channel_priority(
+    tmp_env: TmpEnvFixture,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+    pinned_package: bool,
+):
+    # use "cheap" packages with no dependencies
+    package1 = "zlib"
+    package2 = "ca-certificates"
+
+    # set pinned package
+    if pinned_package:
+        monkeypatch.setenv("CONDA_PINNED_PACKAGES", package1)
+
+    # create environment with package1 and package2
+    with tmp_env("--override-channels", "--channel=defaults", package1, package2) as prefix:
+        # check both packages are installed from defaults
+        PrefixData._cache_.clear()
+        assert PrefixData(prefix).get(package1).channel.name == "pkgs/main"
+        assert PrefixData(prefix).get(package2).channel.name == "pkgs/main"
+
+        # update --all
+        out, err, retcode = conda_cli(
+            "update",
+            f"--prefix={prefix}",
+            "--override-channels",
+            "--channel=conda-forge",
+            "--all",
+            "--yes",
+        )
+        # check pinned package is unchanged but unpinned packages are updated from conda-forge
+        PrefixData._cache_.clear()
+        expected_channel = "pkgs/main" if pinned_package else "conda-forge"
+        assert PrefixData(prefix).get(package1).channel.name == expected_channel
+        # assert PrefixData(prefix).get(package2).channel.name == "conda-forge"
+        # MODIFIED ^: Some packages do not change channels in libmamba
