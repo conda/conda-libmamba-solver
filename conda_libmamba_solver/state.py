@@ -198,6 +198,8 @@ class SolverInputState:
         self._update_modifier = self._default_to_context_if_null(
             "update_modifier", update_modifier
         )
+        if prune and self._update_modifier == UpdateModifier.FREEZE_INSTALLED:
+            self._update_modifier = UpdateModifier.UPDATE_SPECS  # revert to default
         self._deps_modifier = self._default_to_context_if_null("deps_modifier", deps_modifier)
         self._ignore_pinned = self._default_to_context_if_null("ignore_pinned", ignore_pinned)
         self._force_remove = self._default_to_context_if_null("force_remove", force_remove)
@@ -281,6 +283,24 @@ class SolverInputState:
         be installed.
         """
         return MappingProxyType(self._aggressive_updates)
+
+    @property
+    def always_update(self) -> Mapping[str, MatchSpec]:
+        """
+        Merged lists of packages that should always be updated, depending on the flags, including:
+        - aggressive_updates
+        - conda if auto_update_conda is true and we are on the base env
+        - almost all packages if update_all is true
+        - etc
+        """
+        pkgs = {pkg: MatchSpec(pkg) for pkg in self.aggressive_updates if pkg in self.installed}
+        if context.auto_update_conda and paths_equal(self.prefix, context.root_prefix):
+            pkgs.setdefault("conda", MatchSpec("conda"))
+        if self.update_modifier.UPDATE_ALL:
+            for pkg in self.installed:
+                if pkg != "python" and pkg not in self.pinned:
+                    pkgs.setdefault(pkg, MatchSpec(pkg))
+        return MappingProxyType(pkgs)
 
     @property
     def do_not_remove(self) -> Mapping[str, MatchSpec]:
@@ -443,6 +463,8 @@ class SolverOutputState:
         If a solve attempt is not successful, conflicting specs are kept here for further
         relaxation of the version and build constrains. If not provided, their default value is a
         blank mapping.
+    pins
+        Packages that ended up being pinned. Mostly used for reporting and debugging.
 
     Notes
     -----
@@ -476,6 +498,7 @@ class SolverOutputState:
         for_history: Optional[Mapping[str, MatchSpec]] = None,
         neutered: Optional[Mapping[str, MatchSpec]] = None,
         conflicts: Optional[Mapping[str, MatchSpec]] = None,
+        pins: Optional[Mapping[str, MatchSpec]] = None,
     ):
         self.solver_input_state: SolverInputState = solver_input_state
 
@@ -514,6 +537,10 @@ class SolverOutputState:
             "conflicts", data=(conflicts or {}), reason="From arguments"
         )
 
+        self.pins: Mapping[str, MatchSpec] = TrackedMap(
+            "pins", data=(pins or {}), reason="From arguments"
+        )
+
     def _initialize_specs_from_input_state(self):
         """
         Provide the initial value for the ``.specs`` mapping. This depends on whether
@@ -521,8 +548,13 @@ class SolverOutputState:
         """
         # Initialize specs following conda.core.solve._collect_all_metadata()
 
-        # First initialization depends on whether we have a history to work with or not
-        if self.solver_input_state.history:
+        if self.solver_input_state.prune:
+            pass  # we do not initialize specs with history OR installed pkgs if we are pruning
+        # Otherwise, initialization depends on whether we have a history to work with or not
+        elif (
+            self.solver_input_state.history
+            and not self.solver_input_state.update_modifier.UPDATE_ALL
+        ):
             # add in historically-requested specs
             self.specs.update(self.solver_input_state.history, reason="As in history")
             for name, record in self.solver_input_state.installed.items():
@@ -555,7 +587,7 @@ class SolverOutputState:
             # add everything in prefix if we have no history to work with (e.g. with --update-all)
             self.specs.update(
                 {name: MatchSpec(name) for name in self.solver_input_state.installed},
-                reason="Installed and no history available",
+                reason="Installed and no history available (prune=false)",
             )
 
         # Add virtual packages so they are taken into account by the solver
@@ -664,7 +696,7 @@ class SolverOutputState:
                 )
             else:
                 # every other spec that matches something installed will be configured with
-                # only a target This is the case for conflicts, among others
+                # only a target. This is the case for conflicts, among others
                 self.specs.set(
                     name, MatchSpec(name, target=record.dist_str()), reason="Spec matches record"
                 )
@@ -764,6 +796,13 @@ class SolverOutputState:
                             MatchSpec(name),
                             reason="Update all, with history: treat pip installed "
                             "stuff as explicitly installed",
+                        )
+                    elif name not in self.specs:
+                        self.specs.set(
+                            name,
+                            MatchSpec(name),
+                            reason="Update all, with history: "
+                            "adding name-only spec from installed",
                         )
             else:
                 for name in sis.installed:
@@ -1001,7 +1040,9 @@ class SolverOutputState:
             history_spec = sis.history.get(name)
             if history_spec and spec.strictness < history_spec.strictness:
                 self.neutered.set(
-                    name, spec, reason="Spec needs less strict constrains than history"
+                    name,
+                    MatchSpec(name, version=history_spec.get("version")),
+                    reason="Spec needs less strict constrains than history",
                 )
 
         # ## Add inconsistent packages back ###

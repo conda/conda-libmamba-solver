@@ -18,7 +18,7 @@ def conda_subprocess(*args, explain=False, capture_output=True, **kwargs) -> Com
         text=kwargs.pop("text", capture_output),
         **kwargs,
     )
-    if capture_output and p.returncode:
+    if capture_output and (explain or p.returncode):
         print(p.stdout)
         print(p.stderr, file=sys.stderr)
     p.check_returncode()

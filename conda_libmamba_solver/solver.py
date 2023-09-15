@@ -20,14 +20,7 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 import libmambapy as api
 from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
-from conda.base.constants import (
-    REPODATA_FN,
-    UNKNOWN_CHANNEL,
-    ChannelPriority,
-    DepsModifier,
-    UpdateModifier,
-    on_win,
-)
+from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner
@@ -178,7 +171,9 @@ class LibMambaSolver(Solver):
         else:
             IndexHelper = LibMambaIndexHelper
 
-        if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED"):
+        if os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED") or (
+            getattr(context, "_argparse_args", None) or {}
+        ).get("override_channels"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             channels_from_installed = ()
         else:
@@ -301,7 +296,7 @@ class LibMambaSolver(Solver):
                 self._command += "+last_solve_attempt"
             solved = self._solve_attempt(in_state, out_state, index)
             if not solved:
-                message = self._prepare_problems_message()
+                message = self._prepare_problems_message(pins=out_state.pins)
                 exc = LibMambaUnsatisfiableError(message)
                 exc.allow_retry = False
                 raise exc
@@ -326,13 +321,12 @@ class LibMambaSolver(Solver):
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
-            (api.SOLVER_FLAG_ALLOW_UNINSTALL, 1),
             (api.SOLVER_FLAG_INSTALL_ALSO_UPDATES, 1),
-            (api.SOLVER_FLAG_FOCUS_BEST, 1),
-            (api.SOLVER_FLAG_BEST_OBEY_POLICY, 1),
         ]
         if context.channel_priority is ChannelPriority.STRICT:
             solver_options.append((api.SOLVER_FLAG_STRICT_REPO_PRIORITY, 1))
+        if self.specs_to_remove and self._command in ("remove", None, NULL):
+            solver_options.append((api.SOLVER_FLAG_ALLOW_UNINSTALL, 1))
 
         self.solver = api.Solver(index._pool, self._solver_options)
 
@@ -361,22 +355,32 @@ class LibMambaSolver(Solver):
         log.debug("Computed specs: %s", out_state.specs)
 
         # ## Convert to tasks
+        out_state.pins.clear()
+        n_pins = 0
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
+            if task_name == "ADD_PIN":
+                # ## Add pins
+                for spec in specs:
+                    n_pins += 1
+                    self.solver.add_pin(spec)
+                    out_state.pins[f"pin-{n_pins}"] = spec
+                continue
+
             try:
                 self.solver.add_jobs(specs, task_type)
             except RuntimeError as exc:
-                if mamba_version() == "1.5.0":
+                if mamba_version().startswith("1.5."):
                     for spec in specs:
                         if spec in str(exc):
                             break
                     else:
                         spec = f"One of {specs}"
                     msg = (
-                        "This is a bug in libmamba 1.5.0 when using 'defaults::"
-                        "<spec>' or 'pkgs/main::<spec>'. Please use '-c "
-                        "defaults' instead."
+                        f"This is a bug in libmamba {mamba_version()} when using "
+                        "'defaults::<spec>' or 'pkgs/main::<spec>'. "
+                        "Consider using '-c defaults' instead."
                     )
                     raise InvalidMatchSpec(spec, msg)
                 raise
@@ -390,7 +394,7 @@ class LibMambaSolver(Solver):
 
         problems = self.solver.problems_to_str()
         old_conflicts = out_state.conflicts.copy()
-        new_conflicts = self._maybe_raise_for_problems(problems, old_conflicts)
+        new_conflicts = self._maybe_raise_for_problems(problems, old_conflicts, out_state.pins)
         log.debug("Attempt failed with %s conflicts", len(new_conflicts))
         out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
         return False
@@ -418,16 +422,24 @@ class LibMambaSolver(Solver):
         return str(spec)
 
     def _specs_to_tasks_add(self, in_state: SolverInputState, out_state: SolverOutputState):
-        # These packages receive special protection, since they will be
-        # exempt from conflict treatment (ALLOWUNINSTALL) and if installed
-        # their updates will be considered ESSENTIAL and USERINSTALLED
-        protected = (
-            ["python", "conda"]
-            + list(in_state.history.keys())
-            + list(in_state.aggressive_updates.keys())
-        )
+        tasks = defaultdict(list)
 
-        # Fast-track python version changes
+        # Protect history and aggressive updates from being uninstalled if possible. From libsolv
+        # docs: "The matching installed packages are considered to be installed by a user, thus not
+        # installed to fulfill some dependency. This is needed input for the calculation of
+        # unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set."
+        user_installed = {
+            pkg
+            for pkg in (
+                *in_state.history,
+                *in_state.aggressive_updates,
+                *in_state.pinned,
+                *in_state.do_not_remove,
+            )
+            if pkg in in_state.installed
+        }
+
+        # Fast-track python version changes (Part 1/2)
         # ## When the Python version changes, this implies all packages depending on
         # ## python will be reinstalled too. This can mean that we'll have to try for every
         # ## installed package to result in a conflict before we get to actually solve everything
@@ -439,93 +451,78 @@ class LibMambaSolver(Solver):
         if installed_python and to_be_installed_python:
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
-        tasks = defaultdict(list)
+        # Add specs to install
         for name, spec in out_state.specs.items():
             if name.startswith("__"):
+                continue  # ignore virtual packages
+            spec: MatchSpec = self._check_spec_compat(spec)
+            installed: PackageRecord = in_state.installed.get(name)
+            if installed:
+                installed_spec_str = self._spec_to_str(installed.to_match_spec())
+            else:
+                installed_spec_str = None
+            requested: MatchSpec = in_state.requested.get(name)
+            history: MatchSpec = in_state.history.get(name)
+            pinned: MatchSpec = in_state.pinned.get(name)
+            conflicting: MatchSpec = out_state.conflicts.get(name)
+
+            if name in user_installed and not in_state.prune and not conflicting:
+                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
+
+            # These specs are explicit in some sort of way
+            if pinned:
+                # these are the EXPLICIT pins; conda also uses implicit pinning to
+                # constrain updates too but those can be overridden in case of conflicts.
+                if pinned.is_name_only_spec:
+                    # pins need to constrain in some way, otherwide is undefined behaviour
+                    pass
+                elif requested and not requested.match(pinned):
+                    # We don't pin; requested and pinned are different and incompatible,
+                    # requested wins and we let that happen in the next block
+                    pass
+                else:
+                    tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+
+            if requested:
+                spec_str = self._spec_to_str(requested)
+                if installed:
+                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
+                    tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                else:
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec_str)
+            elif name in in_state.always_update:
+                tasks[("UPDATE", api.SOLVER_UPDATE)].append(name)
+                tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+            # These specs are "implicit"; the solver logic massages them for better UX
+            # as long as they don't cause trouble
+            elif in_state.prune:
                 continue
-            spec = self._check_spec_compat(spec)
-            spec_str = self._spec_to_str(spec)
-            installed = in_state.installed.get(name)
-
-            key = "INSTALL", api.SOLVER_INSTALL
-
-            # Fast-track Python version changes: mark non-noarch Python-depending packages as
-            # conflicting (see `python_version_might_change` definition above for more details)
-            if python_version_might_change and installed is not None:
-                if installed.noarch is not None:
-                    continue
-                for dep in installed.depends:
-                    dep_spec = MatchSpec(dep)
-                    if dep_spec.name in ("python", "python_abi"):
-                        reason = "Python version might change and this package depends on Python"
-                        out_state.conflicts.update(
-                            {name: spec},
-                            reason=reason,
-                            overwrite=False,
+            elif name == "python" and installed and not pinned:
+                pyver = ".".join(installed.version.split(".")[:2])
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
+            elif history and not history.is_name_only_spec and not conflicting:
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
+            elif installed:
+                if conflicting:
+                    tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                else:
+                    # we freeze everything else as installed
+                    lock = True
+                    if pinned and pinned.is_name_only_spec:
+                        # name-only pins are treated as locks when installed
+                        lock = True
+                    elif in_state.update_modifier.UPDATE_ALL:
+                        lock = False
+                    if python_version_might_change and installed.noarch is None:
+                        for dep in installed.depends:
+                            if MatchSpec(dep).name in ("python", "python_abi"):
+                                lock = False
+                                break
+                    if lock:
+                        tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(
+                            installed_spec_str
                         )
-                        break
-
-            # ## Low-prio task ###
-            if name in out_state.conflicts and name not in protected:
-                tasks[("DISFAVOR", api.SOLVER_DISFAVOR)].append(spec_str)
-                tasks[("ALLOWUNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(spec_str)
-
-            if installed is not None:
-                # ## Regular task ###
-                key = "UPDATE", api.SOLVER_UPDATE
-
-                # ## Protect if installed AND history
-                if name in protected:
-                    installed_spec = self._spec_to_str(installed.to_match_spec())
-                    tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec)
-                    # This is "just" an essential job, so it gets higher priority in the solver
-                    # conflict resolution. We do this because these are "protected" packages
-                    # (history, aggressive updates) that we should try not messing with if
-                    # conflicts appear
-                    key = ("UPDATE | ESSENTIAL", api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL)
-
-                # ## Here we deal with the "bare spec update" problem
-                # ## I am only adding this for legacy / test compliancy reasons; forced updates
-                # ## like this should (imo) use constrained specs (e.g. conda install python=3)
-                # ## or the update command as in `conda update python`. however conda thinks
-                # ## differently of update vs install (quite counterintuitive):
-                # ##   https://docs.conda.io/projects/conda/en/latest/user-guide/concepts/installing-with-conda.html#conda-update-versus-conda-install  # noqa
-                # ## this is tested in:
-                # ##   tests/core/test_solve.py::test_pinned_1
-                # ##   tests/test_create.py::IntegrationTests::test_update_with_pinned_packages
-                # ## fixing this changes the outcome in other tests!
-                # let's say we have an environment with python 2.6 and we say `conda install
-                # python` libsolv will say we already have python and there's no reason to do
-                # anything else even if we force an update with essential, other packages in the
-                # environment (built for py26) will keep it in place. we offer two ways to deal
-                # with this libsolv behaviour issue:
-                #   A) introduce an artificial version spec `python !=<currently installed>`
-                #   B) use FORCEBEST -- this would be ideal, but sometimes in gets in the way,
-                #      so we only use it as a last attempt effort.
-                # NOTE: This is a dirty-ish workaround... rethink?
-                requested = in_state.requested.get(name)
-                conditions = (
-                    requested,
-                    spec == requested,
-                    spec.strictness == 1,
-                    self._command in ("update", "update+last_solve_attempt", None, NULL),
-                    in_state.deps_modifier != DepsModifier.ONLY_DEPS,
-                    in_state.update_modifier
-                    not in (UpdateModifier.UPDATE_DEPS, UpdateModifier.FREEZE_INSTALLED),
-                )
-                if all(conditions):
-                    if "last_solve_attempt" in str(self._command):
-                        key = (
-                            "UPDATE | ESSENTIAL | FORCEBEST",
-                            api.SOLVER_UPDATE | api.SOLVER_ESSENTIAL | api.SOLVER_FORCEBEST,
-                        )
-                    else:
-                        # NOTE: This is ugly and there should be another way
-                        spec_str = self._spec_to_str(
-                            MatchSpec(spec, version=f">{installed.version}")
-                        )
-
-            tasks[key].append(spec_str)
+                        tasks[("VERIFY", api.SOLVER_VERIFY | api.SOLVER_WEAK)].append(name)
 
         return dict(tasks)
 
@@ -535,6 +532,7 @@ class LibMambaSolver(Solver):
         tasks = defaultdict(list)
 
         # Protect history and aggressive updates from being uninstalled if possible
+
         for name, record in out_state.records.items():
             if name in in_state.history or name in in_state.aggressive_updates:
                 # MatchSpecs constructed from PackageRecords get parsed too
@@ -613,7 +611,13 @@ class LibMambaSolver(Solver):
         """
         conflicts = []
         not_found = []
-        for line in problems.splitlines():
+        if "1.4.5" <= mamba_version() < "1.5.0":
+            # 1.4.5 had a regression where it would return
+            # a single line with all the problems; fixed in 1.5.0
+            problem_lines = [f" - {problem}" for problem in problems.split(" - ")[1:]]
+        else:
+            problem_lines = problems.splitlines()[1:]
+        for line in problem_lines:
             line = line.strip()
             words = line.split()
             if not line.startswith("- "):
@@ -630,6 +634,18 @@ class LibMambaSolver(Solver):
                     conflicts.append(cls._str_to_matchspec(words[-1]))
                 start = 3 if marker == 4 else 4
                 not_found.append(cls._str_to_matchspec(words[start:marker]))
+            elif "has constraint" in line and "conflicting with" in line:
+                # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014
+                # conflicting with zlib-1.2.13-h998d150_0
+                conflicts.append(cls._str_to_matchspec(words[-1]))
+            elif "cannot install both pin-" in line and "and pin-" in line:
+                # a pin is in conflict with another pin
+                pin_a = words[3].rsplit("-", 1)[0]
+                pin_b = words[5].rsplit("-", 1)[0]
+                conflicts.append(MatchSpec(pin_a))
+                conflicts.append(MatchSpec(pin_b))
+            else:
+                log.debug("! Problem line not recognized: %s", line)
 
         return {
             "conflicts": {s.name: s for s in conflicts},
@@ -640,6 +656,7 @@ class LibMambaSolver(Solver):
         self,
         problems: Optional[Union[str, Mapping]] = None,
         previous_conflicts: Mapping[str, MatchSpec] = None,
+        pins: Mapping[str, MatchSpec] = None,
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
@@ -659,7 +676,7 @@ class LibMambaSolver(Solver):
         not_found = problems["not_found"]
         if not unsatisfiable and not_found:
             # This is not a conflict, but a missing package in the channel
-            exc = PackagesNotFoundError(not_found.values(), self.channels)
+            exc = PackagesNotFoundError(tuple(not_found.values()), tuple(self.channels))
             exc.allow_retry = False
             raise exc
 
@@ -675,26 +692,72 @@ class LibMambaSolver(Solver):
 
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
-            message = self._prepare_problems_message()
+            message = self._prepare_problems_message(pins=pins)
             exc = LibMambaUnsatisfiableError(message)
             # do not allow conda.cli.install to try more things
             exc.allow_retry = False
             raise exc
         return unsatisfiable
 
-    def _prepare_problems_message(self):
+    def _prepare_problems_message(self, pins=None):
         legacy_errors = self.solver.problems_to_str()
+        if " - " not in legacy_errors:
+            # This makes 'explain_problems()' crash. Anticipate.
+            return "Failed with empty error message."
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
+            return legacy_errors
+        if (
+            mamba_version() <= "1.4.1"
+            and "conflicting requests" in self.solver.all_problems_to_str()
+        ):
+            # This error makes 'explain_problems()' crash in libmamba <=1.4.1.
+            # Anticipate and return simpler error earlier.
+            log.info("Failed to explain problems. Conflicting requests.")
             return legacy_errors
         try:
             explained_errors = self.solver.explain_problems()
         except Exception as exc:
             log.warning("Failed to explain problems", exc_info=exc)
-            return legacy_errors
+            return self._explain_with_pins(legacy_errors, pins)
         else:
-            return f"{legacy_errors}\n{explained_errors}"
+            msg = f"{legacy_errors}\n{explained_errors}"
+            return self._explain_with_pins(msg, pins)
+
+    def _explain_with_pins(self, message, pins):
+        """
+        Add info about pins to the error message.
+        This might be temporary as libmamba improves their error messages.
+        As of 1.5.0, if a pin introduces a conflict, it results in a cryptic error message like:
+
+        ```
+        Encountered problems while solving:
+          - cannot install both pin-1-1 and pin-1-1
+
+        Could not solve for environment specs
+        The following packages are incompatible
+        └─ pin-1 is installable with the potential options
+            ├─ pin-1 1, which can be installed;
+            └─ pin-1 1 conflicts with any installable versions previously reported.
+        ```
+
+        Since the pin-N name is masked, we add the following snippet underneath:
+
+        ```
+        Pins seem to be involved in the conflict. Currently pinned specs:
+         - python 2.7.* (labeled as 'pin-1')
+
+        If Python is involved, try adding it explicitly to the command-line.
+        ```
+        """
+        if pins and "pin-1" in message:  # add info about pins for easier debugging
+            pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
+            for pin_name, spec in pins.items():
+                pin_message += f" - {spec} (labeled as '{pin_name}')\n"
+            pin_message += "\nIf python is involved, try adding it explicitly to the command-line."
+            return f"{message}\n\n{pin_message}"
+        return message
 
     def _maybe_raise_for_conda_build(
         self,

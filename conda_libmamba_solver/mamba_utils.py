@@ -9,6 +9,7 @@
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
 import logging
+from functools import lru_cache
 from importlib.metadata import version
 from typing import Dict
 
@@ -19,6 +20,7 @@ from conda.base.context import context
 log = logging.getLogger(f"conda.{__name__}")
 
 
+@lru_cache(maxsize=1)
 def mamba_version():
     return version("libmambapy")
 
