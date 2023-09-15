@@ -176,10 +176,9 @@ class LibMambaSolver(Solver):
             *self.channels,
             *in_state.channels_from_specs(),
         ]
-        if (
-          not os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED")
-          and not (getattr(context, "_argparse_args", None) or {}).get("override_channels")
-        ):
+        if not os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED") and not (
+            getattr(context, "_argparse_args", None) or {}
+        ).get("override_channels"):
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             all_urls = [url for c in all_channels for url in Channel(c).urls(False)]
             all_channels.extend(in_state.channels_from_installed(seen=all_urls))
