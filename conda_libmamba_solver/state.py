@@ -74,7 +74,7 @@ from conda.auxlib import NULL
 from conda.auxlib.ish import dals
 from conda.base.constants import DepsModifier, UpdateModifier
 from conda.base.context import context
-from conda.common.io import dashlist, timeout
+from conda.common.io import dashlist
 from conda.common.path import get_major_minor_version, paths_equal
 from conda.core.index import _supplement_index_with_system
 from conda.core.prefix_data import PrefixData
@@ -87,7 +87,6 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
 from .models import EnumAsBools, TrackedMap
-from .utils import is_channel_available
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -426,8 +425,6 @@ class SolverInputState:
             if record.channel.base_url is None:
                 continue
             if record.channel.subdir_url in seen_urls:
-                continue
-            if not timeout(1, is_channel_available, record.channel.base_url, default_return=False):
                 continue
             seen_urls.add(record.channel.subdir_url)
             yield record.channel

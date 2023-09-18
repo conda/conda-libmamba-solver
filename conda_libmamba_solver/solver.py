@@ -23,7 +23,7 @@ from conda import __version__ as _conda_version
 from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win
 from conda.base.context import context
 from conda.common.constants import NULL
-from conda.common.io import Spinner
+from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
 from conda.common.url import join_url, percent_decode
 from conda.core.prefix_data import PrefixData
@@ -44,6 +44,7 @@ from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
+from .utils import is_channel_available
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -176,12 +177,15 @@ class LibMambaSolver(Solver):
             *self.channels,
             *in_state.channels_from_specs(),
         ]
-        if not os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED") and not (
-            getattr(context, "_argparse_args", None) or {}
-        ).get("override_channels"):
+        override = (getattr(context, "_argparse_args", None) or {}).get("override_channels")
+        if not os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED") and not override:
             # see https://github.com/conda/conda-libmamba-solver/issues/108
             all_urls = [url for c in all_channels for url in Channel(c).urls(False)]
-            all_channels.extend(in_state.channels_from_installed(seen=all_urls))
+            installed_channels = in_state.channels_from_installed(seen=all_urls)
+            for channel in installed_channels:
+                # Only add to list if resource is available; check has timeout=1s
+                if timeout(1, is_channel_available, channel.base_url, default_return=False):
+                    all_channels.append(channel)
         all_channels.extend(in_state.maybe_free_channel())
 
         all_channels = tuple(all_channels)
