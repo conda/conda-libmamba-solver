@@ -11,6 +11,7 @@ from conda.base.context import context
 from conda.common.compat import on_win
 from conda.common.path import url_to_path
 from conda.common.url import urlparse
+from conda.gateways.connection.session import get_session
 
 log = getLogger(f"conda.{__name__}")
 
@@ -44,6 +45,11 @@ def is_channel_available(channel_url) -> bool:
         # We don't know where the channel might be (even file:// might be a network share)
         # so we play it safe and assume it's not available
         return False
-    if channel_url.startswith("file://"):
-        return Path(url_to_path(channel_url)).is_dir()
-    return requests.head(f"{channel_url}/noarch/repodata.json").ok
+    try:
+        if channel_url.startswith("file://"):
+            return Path(url_to_path(channel_url)).is_dir()
+        session = get_session(channel_url)
+        return session.head(f"{channel_url}/noarch/repodata.json").ok
+    except Exception as exc:
+        log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
+        return False
