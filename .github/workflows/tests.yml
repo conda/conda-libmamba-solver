@@ -77,8 +77,8 @@ jobs:
                         --repodata-fn=repodata.json --update-specs \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
                         --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
-                   /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
-                   /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src/dev/collect_upstream_conda_tests/ -vvv &&
+                   sudo /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
+                   sudo /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src/dev/collect_upstream_conda_tests/ -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
 
