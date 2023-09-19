@@ -394,7 +394,9 @@ class LibMambaSolver(Solver):
 
         problems = self.solver.problems_to_str()
         old_conflicts = out_state.conflicts.copy()
-        new_conflicts = self._maybe_raise_for_problems(problems, old_conflicts, out_state.pins)
+        new_conflicts = self._maybe_raise_for_problems(
+            problems, old_conflicts, out_state.pins, index._channels
+        )
         log.debug("Attempt failed with %s conflicts", len(new_conflicts))
         out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
         return False
@@ -657,6 +659,7 @@ class LibMambaSolver(Solver):
         problems: Optional[Union[str, Mapping]] = None,
         previous_conflicts: Mapping[str, MatchSpec] = None,
         pins: Mapping[str, MatchSpec] = None,
+        channels: Iterable[Channel] = (),
     ):
         if self.solver is None:
             raise RuntimeError("Solver is not initialized. Call `._setup_solver()` first.")
@@ -664,19 +667,26 @@ class LibMambaSolver(Solver):
         if problems is None:
             problems = self.solver.problems_to_str()
         if isinstance(problems, str):
-            problems = self._parse_problems(problems)
+            parsed_problems = self._parse_problems(problems)
 
         # We allow conda-build (if present) to process the exception early
         self._maybe_raise_for_conda_build(
-            {**problems["conflicts"], **problems["not_found"]},
+            {**parsed_problems["conflicts"], **parsed_problems["not_found"]},
             message=self._prepare_problems_message(),
         )
 
-        unsatisfiable = problems["conflicts"]
-        not_found = problems["not_found"]
+        unsatisfiable = parsed_problems["conflicts"]
+        not_found = parsed_problems["not_found"]
         if not unsatisfiable and not_found:
+            log.debug(
+                "Inferred PackagesNotFoundError %s from conflicts:\n%s",
+                tuple(not_found.keys()),
+                problems,
+            )
             # This is not a conflict, but a missing package in the channel
-            exc = PackagesNotFoundError(tuple(not_found.values()), tuple(self.channels))
+            exc = PackagesNotFoundError(
+                tuple(not_found.values()), tuple(channels or self.channels)
+            )
             exc.allow_retry = False
             raise exc
 
