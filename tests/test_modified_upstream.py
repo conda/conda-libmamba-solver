@@ -17,8 +17,8 @@ source found in commit 98fb262c610e17a7731b9183bf37cca98dcc1a71.
 """
 
 import os
-import re
 import sys
+import warnings
 from pprint import pprint
 
 import pytest
@@ -31,6 +31,7 @@ from conda.core.prefix_data import PrefixData
 from conda.core.subdir_data import SubdirData
 from conda.exceptions import UnsatisfiableError
 from conda.gateways.subprocess import subprocess_call_with_clean_env
+from conda.misc import explicit
 from conda.models.match_spec import MatchSpec
 from conda.models.version import VersionOrder
 from conda.testing import (
@@ -60,6 +61,7 @@ from conda.testing.integration import (
     run_command,
 )
 from pytest import MonkeyPatch
+from pytest_mock import MockerFixture
 
 
 @pytest.mark.integration
@@ -1338,3 +1340,37 @@ def test_reorder_channel_priority(
         assert PrefixData(prefix).get(package1).channel.name == expected_channel
         # assert PrefixData(prefix).get(package2).channel.name == "conda-forge"
         # MODIFIED ^: Some packages do not change channels in libmamba
+
+
+def test_explicit_missing_cache_entries(
+    mocker: MockerFixture,
+    conda_cli: CondaCLIFixture,
+    tmp_env: TmpEnvFixture,
+):
+    """Test that explicit() raises and notifies if some of the specs were not found in the cache."""
+    from conda.core.package_cache_data import PackageCacheData
+
+    with tmp_env() as prefix:  # ensure writable env
+        if len(PackageCacheData.get_all_extracted_entries()) == 0:
+            # Package cache e.g. ./devenv/Darwin/x86_64/envs/devenv-3.9-c/pkgs/ can
+            # be empty in certain cases (Noted in OSX with Python 3.9, when
+            # Miniconda installs Python 3.10). Install a small package.
+            warnings.warn("test_explicit_missing_cache_entries: No packages in cache.")
+            out, err, retcode = conda_cli("install", "--prefix", prefix, "heapdict", "--yes")
+            assert retcode == 0, (out, err)  # MODIFIED
+
+        # Patching ProgressiveFetchExtract prevents trying to download a package from the url.
+        # Note that we cannot monkeypatch context.dry_run, because explicit() would exit early with that.
+        mocker.patch("conda.misc.ProgressiveFetchExtract")
+        print(PackageCacheData.get_all_extracted_entries()[0])  # MODIFIED
+        with pytest.raises(
+            AssertionError,
+            match="Missing package cache records for: pkgs/linux-64::foo==1.0.0=py_0",
+        ):
+            explicit(
+                [
+                    "http://test/pkgs/linux-64/foo-1.0.0-py_0.tar.bz2",  # does not exist
+                    PackageCacheData.get_all_extracted_entries()[0].url,  # exists
+                ],
+                prefix,
+            )
