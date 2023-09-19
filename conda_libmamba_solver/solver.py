@@ -461,10 +461,10 @@ class LibMambaSolver(Solver):
                 installed_spec_str = self._spec_to_str(installed.to_match_spec())
             else:
                 installed_spec_str = None
-            requested: MatchSpec = in_state.requested.get(name)
-            history: MatchSpec = in_state.history.get(name)
-            pinned: MatchSpec = in_state.pinned.get(name)
-            conflicting: MatchSpec = out_state.conflicts.get(name)
+            requested: MatchSpec = self._check_spec_compat(in_state.requested.get(name))
+            history: MatchSpec = self._check_spec_compat(in_state.history.get(name))
+            pinned: MatchSpec = self._check_spec_compat(in_state.pinned.get(name))
+            conflicting: MatchSpec = self._check_spec_compat(out_state.conflicts.get(name))
 
             if name in user_installed and not in_state.prune and not conflicting:
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
@@ -873,13 +873,15 @@ class LibMambaSolver(Solver):
                 kwargs["noarch"] = "generic"
         return PackageRecord(**kwargs)
 
-    def _check_spec_compat(self, match_spec: MatchSpec) -> MatchSpec:
+    def _check_spec_compat(self, match_spec: Union[MatchSpec, None]) -> Union[MatchSpec, None]:
         """
         Make sure we are not silently ingesting MatchSpec fields we are not
         doing anything with!
 
         TODO: We currently allow `subdir` but we are not handling it right now.
         """
+        if match_spec is None:
+            return None
         supported = "name", "version", "build", "channel", "subdir"
         unsupported_but_set = []
         for field in match_spec.FIELD_NAMES:
