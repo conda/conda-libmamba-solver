@@ -27,7 +27,7 @@ function recompile-mamba () {
   fi
 }
 
-sudo /opt/conda/condabin/conda install -y -p /opt/conda \
+sudo /opt/conda/condabin/conda install -y -p /opt/conda --repodata-fn repodata.json \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 
@@ -44,7 +44,7 @@ if [ -d "/opt/mamba-src" ]; then
 fi
 
 cd /opt/conda-libmamba-solver-src
-sudo /opt/conda/bin/python -m pip install ./dev/collect_upstream_conda_tests/
+sudo /opt/conda/bin/python -m pip install ./dev/collect_upstream_conda_tests/ --no-deps
 sudo /opt/conda/bin/python -m pip install -e . --no-deps
 
 cd /opt/conda-src

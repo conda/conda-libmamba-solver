@@ -16,7 +16,7 @@ TEST_GROUP="${TEST_GROUP:-1}"
 sudo su root -c "/opt/conda/bin/conda install -yq conda-build"
 # make sure all test requirements are installed
 # CONDA LIBMAMBA SOLVER CHANGES
-sudo /opt/conda/bin/conda install --quiet -y --solver=classic \
+sudo /opt/conda/bin/conda install --quiet -y --solver=classic --repodata-fn repodata.json \
     --file "${CONDA_SRC}/tests/requirements.txt" \
     --file "${CONDA_LIBMAMBA_SOLVER_SRC}/dev/requirements.txt"
 sudo /opt/conda/bin/python -m pip install "$CONDA_LIBMAMBA_SOLVER_SRC/dev/collect_upstream_conda_tests/"
