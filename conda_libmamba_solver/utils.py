@@ -1,11 +1,16 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from functools import lru_cache
 from logging import getLogger
+from pathlib import Path
 from urllib.parse import quote
 
+from conda.base.context import context
 from conda.common.compat import on_win
+from conda.common.path import url_to_path
 from conda.common.url import urlparse
+from conda.gateways.connection import session as gateway_session
 
 log = getLogger(f"conda.{__name__}")
 
@@ -31,3 +36,22 @@ def escape_channel_url(channel):
         parts = parts.replace(path=path)
         return str(parts)
     return channel
+
+
+@lru_cache(maxsize=None)
+def is_channel_available(channel_url) -> bool:
+    if context.offline:
+        # We don't know where the channel might be (even file:// might be a network share)
+        # so we play it safe and assume it's not available
+        return False
+    try:
+        if channel_url.startswith("file://"):
+            return Path(url_to_path(channel_url)).is_dir()
+        if hasattr(gateway_session, "get_session"):
+            session = gateway_session.get_session(channel_url)
+        else:
+            session = gateway_session.CondaSession()
+        return session.head(f"{channel_url}/noarch/repodata.json").ok
+    except Exception as exc:
+        log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
+        return False
