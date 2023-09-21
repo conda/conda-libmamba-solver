@@ -63,7 +63,6 @@ as well as richer logging for each action.
 # TODO: This module could be part of conda-core once if we refactor the classic logic
 
 import logging
-from itertools import chain
 from os import PathLike
 from types import MappingProxyType
 from typing import Iterable, Mapping, Optional, Type, Union
@@ -961,11 +960,6 @@ class SolverOutputState:
             if name in self.solver_input_state.pinned
         }
         if conflicting_and_pinned:
-            requested = [
-                str(spec)
-                for name, spec in self.solver_input_state.requested.items()
-                if name in conflicting_and_pinned
-            ]
             exc = SpecsConfigurationConflictError(
                 requested_specs=sorted(
                     self.solver_input_state.requested.values(), key=lambda x: x.name
