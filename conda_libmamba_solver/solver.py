@@ -520,8 +520,7 @@ class LibMambaSolver(Solver):
                     if python_version_might_change and installed.noarch is None:
                         for dep in installed.depends:
                             if MatchSpec(dep).name in ("python", "python_abi"):
-                                lock = False
-                                verify = False
+                                lock = verify = False
                                 break
                     if lock:
                         tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(
