@@ -87,6 +87,7 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
 from .models import EnumAsBools, TrackedMap
+from .utils import compatible_matchspecs
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -954,22 +955,24 @@ class SolverOutputState:
         # here we would call conda.core.solve.classic.Solver._find_inconsistent_packages()
 
         # ## Check conflicts are only present in .specs
-        conflicting_and_pinned = [
-            str(spec)
-            for name, spec in self.conflicts.items()
+        conflicting_and_pinned = {
+            name: str(self.solver_input_state.pinned[name])
+            for name in self.conflicts
             if name in self.solver_input_state.pinned
-        ]
+        }
         if conflicting_and_pinned:
             requested = [
                 str(spec)
-                for spec in chain(self.specs, self.solver_input_state.requested)
-                if spec not in conflicting_and_pinned
+                for name, spec in self.solver_input_state.requested.items()
+                if name in conflicting_and_pinned
             ]
-            raise SpecsConfigurationConflictError(
-                requested_specs=requested,
-                pinned_specs=conflicting_and_pinned,
+            exc = SpecsConfigurationConflictError(
+                requested_specs=sorted(self.solver_input_state.requested.values(), key=lambda x: x.name),
+                pinned_specs=sorted(self.solver_input_state.pinned.values(), key=lambda x: x.name),
                 prefix=self.solver_input_state.prefix,
             )
+            exc.allow_retry = False
+            raise exc
 
         # ## Conflict minimization ###
         # here conda.core.solve.classic.Solver._run_sat() enters a `while conflicting_specs` loop
