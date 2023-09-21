@@ -532,9 +532,7 @@ class LibMambaSolver(Solver):
                         # see conda/tests/core/test_solve.py::test_force_remove_1
                         tasks[("VERIFY", api.SOLVER_VERIFY | api.SOLVER_WEAK)].append(name)
 
-        d = dict(tasks)
-        print(json.dumps({k[0]: v for k, v in d.items()}, indent=2))
-        return d
+        return dict(tasks)
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
