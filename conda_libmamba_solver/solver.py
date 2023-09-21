@@ -44,7 +44,7 @@ from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
-from .utils import compatible_matchspecs, is_channel_available
+from .utils import is_channel_available
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -261,6 +261,7 @@ class LibMambaSolver(Solver):
         )
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
+            out_state.attempt_count = attempt
             try:
                 solved = self._solve_attempt(in_state, out_state, index)
                 if solved:
@@ -479,12 +480,16 @@ class LibMambaSolver(Solver):
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
                 if pinned.is_name_only_spec:
-                    # pins need to constrain in some way, otherwide is undefined behaviour
+                    # name-only pins are treated as locks when installed, see below
                     pass
-                elif requested and not compatible_matchspecs(requested, pinned):
-                    # In uncompatible, we don't pin to 'pinned'; instead, requested wins and
-                    # we let that happen in the next 'if requested' block
-                    pass
+                elif requested:
+                    if out_state.attempt_count == 1:
+                        log.warning(
+                            "pinned spec %s is also user-requested. "
+                            "Overriding pinned spec with %s",
+                            pinned,
+                            requested,
+                        )
                 else:
                     tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
 

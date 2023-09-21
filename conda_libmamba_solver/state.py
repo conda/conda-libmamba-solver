@@ -86,7 +86,6 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
 from .models import EnumAsBools, TrackedMap
-from .utils import compatible_matchspecs
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -543,6 +542,8 @@ class SolverOutputState:
             "pins", data=(pins or {}), reason="From arguments"
         )
 
+        self.attempt_count = 0  # 0 if we didn't even start yet
+    
     def _initialize_specs_from_input_state(self):
         """
         Provide the initial value for the ``.specs`` mapping. This depends on whether
@@ -629,7 +630,7 @@ class SolverOutputState:
             self._prepare_for_remove()
         else:
             self._prepare_for_add(index)
-        self._prepare_for_solve()
+        # self._prepare_for_solve()
         return self.specs
 
     def _prepare_for_add(self, index: IndexHelper):
@@ -719,7 +720,12 @@ class SolverOutputState:
             if name in sis.installed and not requested:
                 self.specs.set(name, pin, reason="Pinned, installed and not requested")
             elif requested:
-                if compatible_matchspecs(requested, pin):
+                # We assume the user knows what they want and just add the request without
+                # looking at the pins. Whatever happens is up to the solver. Note that
+                # in the solver.py module we are adding BOTH the pin and the install spec
+                # so this is mostly an explanation of what should have happend in the classic
+                # solver.
+                if False:  # compatible_matchspecs(requested, pin):  # assume user knows
                     reason = (
                         "Pinned, installed and requested; constraining request "
                         "as pin because they are compatible"
@@ -949,6 +955,10 @@ class SolverOutputState:
         solver try, fail with conflicts, and annotate those as such so they are unconstrained.
 
         Now, this method only ensures that the pins do not cause conflicts.
+
+        NOTE: libmamba does not try to anticipate anything and we just let the solver print
+        the appropriate error message if there are conflicts. This function call is commented out
+        in .prepare_specs()
         """
         # ## Inconsistency analysis ###
         # here we would call conda.core.solve.classic.Solver._find_inconsistent_packages()
