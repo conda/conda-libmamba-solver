@@ -1,6 +1,6 @@
 ### Enhancements
 
-* Rewrite how we create tasks for `libsolv`, making use of `libmamba`'s `add_pin` features. (#270)
+* Rewrite how we create tasks for `libsolv`, making use of `libmamba`'s `add_pin` features. (#270, #288)
 
 ### Bug fixes
 

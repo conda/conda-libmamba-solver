@@ -512,21 +512,23 @@ class LibMambaSolver(Solver):
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed
-                    lock = True
+                    lock = in_state.update_modifier.FREEZE_INSTALLED
+                    verify = True
                     if pinned and pinned.is_name_only_spec:
                         # name-only pins are treated as locks when installed
                         lock = True
-                    elif in_state.update_modifier.UPDATE_ALL:
-                        lock = False
                     if python_version_might_change and installed.noarch is None:
                         for dep in installed.depends:
                             if MatchSpec(dep).name in ("python", "python_abi"):
-                                lock = False
+                                lock = verify = False
                                 break
                     if lock:
                         tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(
                             installed_spec_str
                         )
+                    if verify:
+                        # without verify, solves after a force-remove do not restore missing pkg
+                        # see conda/tests/core/test_solve.py::test_force_remove_1
                         tasks[("VERIFY", api.SOLVER_VERIFY | api.SOLVER_WEAK)].append(name)
 
         return dict(tasks)
