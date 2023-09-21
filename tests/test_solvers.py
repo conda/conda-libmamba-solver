@@ -8,8 +8,10 @@ from itertools import chain, permutations, repeat
 from pathlib import Path
 from subprocess import check_call, run
 from uuid import uuid4
+from textwrap import dedent
 
 import pytest
+from conda.base.context import context
 from conda.common.compat import on_linux, on_win
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
@@ -236,3 +238,30 @@ def test_too_aggressive_update_to_conda_forge_packages():
         data_libmamba = json.loads(p_libmamba.stdout)
         assert len(data_classic["actions"]["LINK"]) < 15
         assert len(data_libmamba["actions"]["LINK"]) <= len(data_classic["actions"]["LINK"])
+
+
+@pytest.mark.skipif(context.subdir != "linux-64", reason="Linux-64 only")
+def test_pinned_with_cli_build_string():
+    """ """
+    cmd = (
+        "scipy=1.7.3=py37hf2a6cf1_0",
+        "python=3.7.3",
+        "pandas=1.2.5=py37h295c915_0",
+        "--channel=conda-forge",
+    )
+    with make_temp_env(*cmd) as prefix:
+        Path(prefix, "conda-meta").mkdir(exist_ok=True)
+        Path(prefix, "conda-meta", "pinned").write_text(
+            dedent(
+                """
+                python ==3.7.3
+                pandas ==1.2.5
+                scipy ==1.7.3
+                """
+            ).lstrip()
+        )
+
+        p = conda_subprocess("install", "-p", prefix, *cmd, "--dry-run", "--json", explain=True)
+        data = json.loads(p.stdout)
+        assert data.get("success")
+        assert data.get("message") == "All requested packages already installed."
