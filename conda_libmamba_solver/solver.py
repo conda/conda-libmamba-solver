@@ -481,7 +481,7 @@ class LibMambaSolver(Solver):
                 if pinned.is_name_only_spec:
                     # pins need to constrain in some way, otherwide is undefined behaviour
                     pass
-                elif requested and compatible_matchspecs(requested, pinned):
+                elif requested and not compatible_matchspecs(requested, pinned):
                     # In uncompatible, we don't pin to 'pinned'; instead, requested wins and
                     # we let that happen in the next 'if requested' block
                     pass
