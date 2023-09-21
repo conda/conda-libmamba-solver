@@ -967,7 +967,9 @@ class SolverOutputState:
                 if name in conflicting_and_pinned
             ]
             exc = SpecsConfigurationConflictError(
-                requested_specs=sorted(self.solver_input_state.requested.values(), key=lambda x: x.name),
+                requested_specs=sorted(
+                    self.solver_input_state.requested.values(), key=lambda x: x.name
+                ),
                 pinned_specs=sorted(self.solver_input_state.pinned.values(), key=lambda x: x.name),
                 prefix=self.solver_input_state.prefix,
             )

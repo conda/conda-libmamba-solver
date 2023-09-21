@@ -44,7 +44,7 @@ from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
-from .utils import is_channel_available, compatible_matchspecs
+from .utils import compatible_matchspecs, is_channel_available
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -482,7 +482,7 @@ class LibMambaSolver(Solver):
                     # pins need to constrain in some way, otherwide is undefined behaviour
                     pass
                 elif requested and compatible_matchspecs(requested, pinned):
-                    # In uncompatible, we don't pin to 'pinned'; instead, requested wins and 
+                    # In uncompatible, we don't pin to 'pinned'; instead, requested wins and
                     # we let that happen in the next 'if requested' block
                     pass
                 else:

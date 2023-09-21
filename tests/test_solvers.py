@@ -7,8 +7,8 @@ import sys
 from itertools import chain, permutations, repeat
 from pathlib import Path
 from subprocess import check_call, run
-from uuid import uuid4
 from textwrap import dedent
+from uuid import uuid4
 
 import pytest
 from conda.base.context import context
