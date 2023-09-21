@@ -533,7 +533,7 @@ class LibMambaSolver(Solver):
                         tasks[("VERIFY", api.SOLVER_VERIFY | api.SOLVER_WEAK)].append(name)
 
         d = dict(tasks)
-        print(json.dumps({k[0]: v for k,v in d.items()}, indent=2))
+        print(json.dumps({k[0]: v for k, v in d.items()}, indent=2))
         return d
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
