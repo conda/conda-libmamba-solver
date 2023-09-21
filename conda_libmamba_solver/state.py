@@ -715,11 +715,11 @@ class SolverOutputState:
             explicit_pool = set(index.explicit_pool(sis.requested.values()))
         for name, spec in sis.pinned.items():
             pin = MatchSpec(spec, optional=False)
-            requested = name in sis.requested
+            requested = sis.requested.get(name)
             if name in sis.installed and not requested:
                 self.specs.set(name, pin, reason="Pinned, installed and not requested")
             elif requested:
-                if sis.requested[name].match(spec):
+                if compatible_matchspecs(requested, pin):
                     reason = (
                         "Pinned, installed and requested; constraining request "
                         "as pin because they are compatible"
@@ -731,7 +731,7 @@ class SolverOutputState:
                         "Pinned, installed and requested; pin and request "
                         "are conflicting, so adding user request due to higher precedence"
                     )
-                    self.specs.set(name, sis.requested[name], reason=reason)
+                    self.specs.set(name, requested, reason=reason)
             elif name in explicit_pool:
                 # TODO: This might be introducing additional specs into the list if the pin
                 # matches a dependency of a request, but that dependency only appears in _some_
@@ -750,7 +750,7 @@ class SolverOutputState:
                 )
             else:
                 log.warn(
-                    "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
+                    "pinned pin %s conflicts with explicit specs. Overriding pinned pin.", pin
                 )
 
         # ## Update modifiers ###

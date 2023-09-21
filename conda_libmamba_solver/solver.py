@@ -44,7 +44,7 @@ from .exceptions import LibMambaUnsatisfiableError
 from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
-from .utils import is_channel_available
+from .utils import is_channel_available, compatible_matchspecs
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -481,9 +481,9 @@ class LibMambaSolver(Solver):
                 if pinned.is_name_only_spec:
                     # pins need to constrain in some way, otherwide is undefined behaviour
                     pass
-                elif requested and not requested.match(pinned):
-                    # We don't pin; requested and pinned are different and incompatible,
-                    # requested wins and we let that happen in the next block
+                elif requested and compatible_matchspecs(requested, pinned):
+                    # In uncompatible, we don't pin to 'pinned'; instead, requested wins and 
+                    # we let that happen in the next 'if requested' block
                     pass
                 else:
                     tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))

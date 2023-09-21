@@ -11,6 +11,7 @@ from conda.common.compat import on_win
 from conda.common.path import url_to_path
 from conda.common.url import urlparse
 from conda.gateways.connection import session as gateway_session
+from conda.models.match_spec import MatchSpec
 
 log = getLogger(f"conda.{__name__}")
 
@@ -55,3 +56,20 @@ def is_channel_available(channel_url) -> bool:
     except Exception as exc:
         log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
         return False
+
+
+def compatible_matchspecs(*match_specs) -> bool:
+    """
+    Returns True if all match_specs are compatible with each other, False otherwise.
+    """
+    if len(match_specs) < 2:
+        raise ValueError("Must provide at least two match_specs")
+    if len({ms.name for ms in match_specs if ms.name not in (None, "", "*")}) > 1:
+        return False
+    try:
+        merged = MatchSpec.merge(match_specs)
+        if len(merged) > 1:
+            return False
+    except ValueError:
+        return False
+    return True
