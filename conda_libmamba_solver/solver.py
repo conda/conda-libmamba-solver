@@ -512,12 +512,10 @@ class LibMambaSolver(Solver):
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
                 else:
                     # we freeze everything else as installed
-                    lock = True
+                    lock = in_state.update_modifier.FREEZE_INSTALLED
                     if pinned and pinned.is_name_only_spec:
                         # name-only pins are treated as locks when installed
                         lock = True
-                    elif in_state.update_modifier.UPDATE_ALL:
-                        lock = False
                     if python_version_might_change and installed.noarch is None:
                         for dep in installed.depends:
                             if MatchSpec(dep).name in ("python", "python_abi"):
