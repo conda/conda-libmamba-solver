@@ -954,11 +954,7 @@ class SolverOutputState:
         # here we would call conda.core.solve.classic.Solver._find_inconsistent_packages()
 
         # ## Check conflicts are only present in .specs
-        conflicting_and_pinned = {
-            name: str(self.solver_input_state.pinned[name])
-            for name in self.conflicts
-            if name in self.solver_input_state.pinned
-        }
+        conflicting_and_pinned = set(self.conflicts).intersection(self.solver_input_state.pinned)
         if conflicting_and_pinned:
             exc = SpecsConfigurationConflictError(
                 requested_specs=sorted(

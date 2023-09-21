@@ -68,8 +68,6 @@ def compatible_matchspecs(*match_specs) -> bool:
         return False
     try:
         merged = MatchSpec.merge(match_specs)
-        if len(merged) > 1:
-            return False
+        return len(merged) == 1
     except ValueError:
         return False
-    return True
