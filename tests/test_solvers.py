@@ -270,7 +270,7 @@ def test_pinned_with_cli_build_string():
 
 def test_constraining_pin_and_requested():
     env = os.environ.copy()
-    env["CONDA_PINNED_PACKAGES"] = "python=3.9.10"
+    env["CONDA_PINNED_PACKAGES"] = "python=3.9"
 
     # This should fail because it contradicts the pinned packages
     p = conda_subprocess(
@@ -280,6 +280,9 @@ def test_constraining_pin_and_requested():
         "--dry-run",
         "--json",
         "python=3.10",
+        "--override-channels",
+        "-c",
+        "conda-forge",
         env=env,
         explain=True,
         check=False,
