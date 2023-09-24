@@ -86,8 +86,8 @@ from conda.models.match_spec import MatchSpec
 from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
-from .models import EnumAsBools, TrackedMap
 from .exceptions import RequestedAndPinnedError
+from .models import EnumAsBools, TrackedMap
 
 log = logging.getLogger(f"conda.{__name__}")
 
