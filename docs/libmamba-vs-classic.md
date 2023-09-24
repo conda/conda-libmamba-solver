@@ -1,6 +1,13 @@
-# Should I use `conda-libmamba-solver`?
+# `libmamba` vs `classic`
 
-You should definitely try `conda-libmamba-solver` if:
+The `libmamba` solver tries hard to be a drop-in replacement for the `classic` solver.
+However, there are some differences. Some of them are a result of the fundamental differences
+in the underlying solver algorithms, some of them are a result of the implementation details.
+Others are a conscious decision to improve the overall user experience.
+
+## Should I use `conda-libmamba-solver`?
+
+You should definitely stick to `conda-libmamba-solver` if:
 
 * You want a faster solver with low-memory footprint.
 * Some of your environments do not solve quick enough, or at all, with `classic`.
@@ -14,18 +21,27 @@ If the given solution is not fully satisfying, try to restrict your request a bi
 For example, if you run `conda install scipy` and do not get the latest version, try using a more explicit command: `conda install scipy=X.Y`.
 ```
 
-You should probably still use `classic` in the following scenarios:
-
-* Backwards compatibility is very important in your use case, and you need your environments solved in the same way they have been solved in the past years.
-  This is a bit more important in long-lived environments than new ones.
+You might still need `classic` here and there, specially if backwards compatibility is very important in your use case, and you need your environments solved in the same way they have been solved in the past years. 
+This is a bit more important in long-lived environments than new ones.
 
 ```{important}
 You can always use `--solver=classic` to re-enable the `classic` solver temporarily for specific operations, even after setting `libmamba` as default.
 ```
 
-## Differences between `libmamba` and `classic`
+## Intentional deviations from `classic`
 
-Ok, so we know `conda-libmamba-solver` brings a faster solver to `conda`.
+With the release of `conda-libmamba-solver`, we took the opportunity to improve some aspects of the solver experience that were not possible to change in `classic` due to backwards compatibility restraints. The main ones are:
+
+* `conda-libmamba-solver` does not use `current_repodata.json` by default. Instead, it always uses the full `repodata.json` files.
+* `conda-libmamba-solver` does not retry with `--freeze-installed` by default. Instead, it has a tighter retry logic that progressively relaxes the constraints on the conflicting packages.
+* `conda-libmamba-solver` does not allow the user to override the configured pinned specs by specifying other constraints in the CLI. Instead, it will error early. To override pinned specs,
+it needs to be done explicitly in the relevant configuration file(s).
+* `conda-libmamba-solver` provides a way to hard-lock a given package to its currently installed version. To do so, specify _only_ the name of the package as a pinned spec. Once installed, the solver will prevent _any_ modifications to the package. Use with care, since this can be a source of conflicts. Adequately constrained pins are a more flexible alternative.
+
+
+## Technical differences between `libmamba` and `classic`
+
+We know `conda-libmamba-solver` brings a faster solver to `conda`.
 But, why is that? Or, in other words, why couldn't `classic` become faster
 on its own?
 
