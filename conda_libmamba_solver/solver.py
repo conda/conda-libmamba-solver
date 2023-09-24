@@ -487,7 +487,13 @@ class LibMambaSolver(Solver):
             # does not 'request' a package). In classic, pins were actually targeted installs
             # so they were exclusive
             if requested:
-                spec_str = self._spec_to_str(requested)
+                if requested.is_name_only_spec and pinned and not pinned.is_name_only_spec:
+                    # for name-only specs, this is a no-op; we already added the pin above
+                    # but we will constrain it again in the install task to have better
+                    # error messages if not solvable
+                    spec_str = self._spec_to_str(pinned)
+                else:
+                    spec_str = self._spec_to_str(requested)
                 if installed:
                     tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
