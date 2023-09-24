@@ -1031,7 +1031,9 @@ class SolverOutputState:
         # Check if requested and pins overlap
         # NOTE: This is a difference with respect to classic logic. classic
         # allows pin overrides in the CLI, but we don't.
-        constraining_requests = {spec.name for spec in sis.requested.values() if not spec.is_name_only_spec}
+        constraining_requests = {
+            spec.name for spec in sis.requested.values() if not spec.is_name_only_spec
+        }
         constraining_pins = {spec.name for spec in sis.pinned.values()}
         requested_and_pinned = constraining_requests.intersection(constraining_pins)
         if requested_and_pinned:

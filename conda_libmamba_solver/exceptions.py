@@ -6,7 +6,11 @@ import sys
 from textwrap import dedent
 
 from conda.common.io import dashlist
-from conda.exceptions import CondaError, SpecsConfigurationConflictError, UnsatisfiableError
+from conda.exceptions import (
+    CondaError,
+    SpecsConfigurationConflictError,
+    UnsatisfiableError,
+)
 
 
 class LibMambaUnsatisfiableError(UnsatisfiableError):
@@ -24,8 +28,9 @@ class RequestedAndPinnedError(SpecsConfigurationConflictError):
     """
 
     def __init__(self, requested_specs, pinned_specs, prefix):
-        message = dedent(
-            """
+        message = (
+            dedent(
+                """
             Requested specs overlap with pinned specs.
               requested specs: {requested_specs_formatted}
               pinned specs: {pinned_specs_formatted}
@@ -35,10 +40,13 @@ class RequestedAndPinnedError(SpecsConfigurationConflictError):
             Pinned specs may also be defined in the file
             {pinned_specs_path}.
             """
-        ).lstrip().format(
-            requested_specs_formatted=dashlist(requested_specs, 4),
-            pinned_specs_formatted=dashlist(pinned_specs, 4),
-            pinned_specs_path=os.path.join(prefix, "conda-meta", "pinned"),
+            )
+            .lstrip()
+            .format(
+                requested_specs_formatted=dashlist(requested_specs, 4),
+                pinned_specs_formatted=dashlist(pinned_specs, 4),
+                pinned_specs_path=os.path.join(prefix, "conda-meta", "pinned"),
+            )
         )
         # skip SpecsConfigurationConflictError.__init__ but subclass from it
         # to benefit from the try/except logic in the CLI layer
