@@ -219,12 +219,41 @@ class SolverInputState:
         """
         Run some consistency checks to ensure configuration is solid.
         """
-        # Ensure configured pins match installed builds
-        for name, pin_spec in self.pinned.items():
-            installed = self.installed.get(name)
-            if installed and not pin_spec.match(installed):
-                raise SpecsConfigurationConflictError([installed], [pin_spec], self.prefix)
+        # Check we are not trying to remove things that are not installed
+        if self.is_removing:
+            not_installed = [
+                spec for name, spec in self.requested.items() if name not in self.installed
+            ]
+            if not_installed:
+                exc = PackagesNotFoundError(not_installed)
+                exc.allow_retry = False
+                raise exc
 
+        # Check if requested and pins overlap
+        # NOTE: This is a difference with respect to classic logic. classic
+        # allows pin overrides in the CLI, but we don't.
+        constraining_requests = {
+            spec.name for spec in self.requested.values() if not spec.is_name_only_spec
+        }
+        constraining_pins = {spec.name for spec in self.pinned.values()}
+        requested_and_pinned = constraining_requests.intersection(constraining_pins)
+        if requested_and_pinned:
+            # libmamba has two types of pins:
+            # - Pins with constraints: limit which versions of a package can be installed
+            # - Name-only pins: lock the package as installed; has no effect if not installed
+            #   Below we render name-only pins as their installed version when appropriate.
+            pinned_specs = [
+                (self.installed.get(name, pin) if pin.is_name_only_spec else pin)
+                for name, pin in sorted(self.pinned.items())
+            ]
+            exc = RequestedAndPinnedError(
+                requested_specs=sorted(self.requested.values(), key=lambda x: x.name),
+                pinned_specs=pinned_specs,
+                prefix=self.prefix,
+            )
+            exc.allow_retry = False
+            raise exc
+    
     def _default_to_context_if_null(self, name, value, context=context):
         "Obtain default value from the context if value is set to NULL; otherwise leave as is"
         return getattr(context, name) if value is NULL else self._ENUM_STR_MAP.get(value, value)
@@ -1005,8 +1034,8 @@ class SolverOutputState:
 
     def early_exit(self):
         """
-        Operations that do not need a solver at all and might result in returning early
-        are collected here.
+        Operations that do not need a solver but do need the index or the output state
+        and might result in returning early are collected here.
         """
         sis = self.solver_input_state
 
@@ -1027,39 +1056,6 @@ class SolverOutputState:
                 # Return early, with the current solution (at this point, .records is set
                 # to the map of installed packages)
                 return self.current_solution
-
-        # Check we are not trying to remove things that are not installed
-        if sis.is_removing:
-            not_installed = [
-                spec for name, spec in sis.requested.items() if name not in sis.installed
-            ]
-            if not_installed:
-                raise PackagesNotFoundError(not_installed)
-
-        # Check if requested and pins overlap
-        # NOTE: This is a difference with respect to classic logic. classic
-        # allows pin overrides in the CLI, but we don't.
-        constraining_requests = {
-            spec.name for spec in sis.requested.values() if not spec.is_name_only_spec
-        }
-        constraining_pins = {spec.name for spec in sis.pinned.values()}
-        requested_and_pinned = constraining_requests.intersection(constraining_pins)
-        if requested_and_pinned:
-            # libmamba has two types of pins:
-            # - Pins with constraints: limit which versions of a package can be installed
-            # - Name-only pins: lock the package as installed; has no effect if not installed
-            #   Below we render name-only pins as their installed version when appropriate.
-            pinned_specs = [
-                (sis.installed.get(name, pin) if pin.is_name_only_spec else pin)
-                for name, pin in sorted(sis.pinned.items())
-            ]
-            exc = RequestedAndPinnedError(
-                requested_specs=sorted(sis.requested.values(), key=lambda x: x.name),
-                pinned_specs=pinned_specs,
-                prefix=sis.prefix,
-            )
-            exc.allow_retry = False
-            raise exc
 
     def post_solve(self, solver: Type["Solver"]):
         """
