@@ -713,51 +713,57 @@ class SolverOutputState:
         # - requested by the user (if request and pin conflict, request takes precedence)
         # - a dependency of something requested by the user
         pin_overrides = set()
-        if sis.pinned:
-            explicit_pool = set(index.explicit_pool(sis.requested.values()))
+        # The block using this object below has been deactivated.
+        # so we don't build this (potentially expensive) set anymore
+        # if sis.pinned:
+        # explicit_pool = set(index.explicit_pool(sis.requested.values()))
         for name, spec in sis.pinned.items():
             pin = MatchSpec(spec, optional=False)
-            requested = sis.requested.get(name)
+            requested = name in sis.requested
             if name in sis.installed and not requested:
                 self.specs.set(name, pin, reason="Pinned, installed and not requested")
             elif requested:
-                # We assume the user knows what they want and just add the request without
-                # looking at the pins. Whatever happens is up to the solver. Note that
-                # in the solver.py module we are adding BOTH the pin and the install spec
-                # so this is mostly an explanation of what should have happend in the classic
-                # solver.
-                if False:  # compatible_matchspecs(requested, pin):  # assume user knows
-                    reason = (
-                        "Pinned, installed and requested; constraining request "
-                        "as pin because they are compatible"
-                    )
-                    self.specs.set(name, pin, reason=reason)
-                    pin_overrides.add(name)
-                else:
-                    reason = (
-                        "Pinned, installed and requested; pin and request "
-                        "are conflicting, so adding user request due to higher precedence"
-                    )
-                    self.specs.set(name, requested, reason=reason)
-            elif name in explicit_pool:
-                # TODO: This might be introducing additional specs into the list if the pin
-                # matches a dependency of a request, but that dependency only appears in _some_
-                # of the request variants. For example, package A=2 depends on B, but package
-                # A=3 no longer depends on B. B will be part of A's explicit pool because it
-                # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
-                # one chosen by the solver, then B would be included in the solution when it
-                # shouldn't. It's a corner case but it can happen so we might need to further
-                # restrict the explicit_pool to see. The original logic in the classic solver
-                # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
-                # set()):`
-                self.specs.set(
-                    name,
-                    pin,
-                    reason="Pin matches one of the potential dependencies of user requests",
-                )
+                pass
+            #     # THIS BLOCK WOULD NEVER RUN
+            #     # classic solver would check compatibility between pinned and requested
+            #     # and let the user override pins in the CLI. libmamba doesn't allow
+            #     # the user to override pins. We will have raised an exception earlier
+            #     # We will keep this code here for reference
+            #     if sis.requested[name].match(spec):  # <-- this line is buggy!
+            #         reason = (
+            #             "Pinned, installed and requested; constraining request "
+            #             "as pin because they are compatible"
+            #         )
+            #         self.specs.set(name, pin, reason=reason)
+            #         pin_overrides.add(name)
+            #     else:
+            #         reason = (
+            #             "Pinned, installed and requested; pin and request "
+            #             "are conflicting, so adding user request due to higher precedence"
+            #         )
+            #         self.specs.set(name, sis.requested[name], reason=reason)
+            # elif name in explicit_pool:
+            #     # THIS BLOCK HAS BEEN DEACTIVATED
+            #     # the explicit pool is potentially expensive and we are not using it.
+            #     # leaving this here for reference
+            #     # TODO: This might be introducing additional specs into the list if the pin
+            #     # matches a dependency of a request, but that dependency only appears in _some_
+            #     # of the request variants. For example, package A=2 depends on B, but package
+            #     # A=3 no longer depends on B. B will be part of A's explicit pool because it
+            #     # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
+            #     # one chosen by the solver, then B would be included in the solution when it
+            #     # shouldn't. It's a corner case but it can happen so we might need to further
+            #     # restrict the explicit_pool to see. The original logic in the classic solver
+            #     # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
+            #     # set()):`
+            #     self.specs.set(
+            #         name,
+            #         pin,
+            #         reason="Pin matches one of the potential dependencies of user requests",
+            #     )
             else:
                 log.warn(
-                    "pinned pin %s conflicts with explicit specs. Overriding pinned pin.", pin
+                    "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
                 )
 
         # ## Update modifiers ###

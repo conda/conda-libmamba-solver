@@ -458,10 +458,13 @@ class LibMambaSolver(Solver):
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
         # Add specs to install
-        for name, spec in out_state.specs.items():
+        # SolverOutputState.specs has been populated at initialization with what the classic
+        # logic considers should be the target version for each package in the environment
+        # and requested changes. We are _not_ following those targets here, but we do iterate
+        # over the list to decide what to do with each package.
+        for name, _classic_logic_spec in out_state.specs.items():
             if name.startswith("__"):
                 continue  # ignore virtual packages
-            spec: MatchSpec = self._check_spec_compat(spec)
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
                 installed_spec_str = self._spec_to_str(installed.to_match_spec())
@@ -476,24 +479,14 @@ class LibMambaSolver(Solver):
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
 
             # These specs are explicit in some sort of way
-            if pinned:
+            if pinned and not pinned.is_name_only_spec:
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
-                if pinned.is_name_only_spec:
-                    # name-only pins are treated as locks when installed, see below
-                    pass
-                elif requested:
-                    if out_state.attempt_count == 1:
-                        log.warning(
-                            "pinned spec %s is also user-requested. "
-                            "Overriding pinned spec with %s",
-                            pinned,
-                            requested,
-                        )
-                else:
-                    tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
-
-            if requested:
+                # name-only pins are treated as locks when installed, see below
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+            elif requested:
+                # pinned pkgs cannot be requested too; we should have raised earlier
+                # but the elif here makes sure we don't miss anything
                 spec_str = self._spec_to_str(requested)
                 if installed:
                     tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
