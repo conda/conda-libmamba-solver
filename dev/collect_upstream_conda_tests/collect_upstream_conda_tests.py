@@ -51,6 +51,8 @@ _deselected_upstream_tests = {
         "test_offline_with_empty_index_cache",
         # Adjusted in tests/test_modified_upstream.py
         "test_install_features",
+        # libmamba departs from this behavior in the classic logic
+        # see https://github.com/conda/conda-libmamba-solver/pull/289
         "test_pinned_override_with_explicit_spec",
         # TODO: https://github.com/conda/conda-libmamba-solver/issues/141
         "test_conda_pip_interop_conda_editable_package",
