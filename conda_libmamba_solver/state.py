@@ -253,7 +253,7 @@ class SolverInputState:
             )
             exc.allow_retry = False
             raise exc
-    
+
     def _default_to_context_if_null(self, name, value, context=context):
         "Obtain default value from the context if value is set to NULL; otherwise leave as is"
         return getattr(context, name) if value is NULL else self._ENUM_STR_MAP.get(value, value)
@@ -772,22 +772,22 @@ class SolverOutputState:
                     self.specs.set(name, sis.requested[name], reason=reason)
             # always assume the pin will be needed
             # elif name in explicit_pool:
-                # THIS BLOCK HAS BEEN DEACTIVATED
-                # the explicit pool is potentially expensive and we are not using it.
-                # leaving this here for reference. It's supposed to check whether the pin
-                # was going to be part of the environment because it shows up in the dependency
-                # tree of the explicitly requested specs.
-                # ---
-                # TODO: This might be introducing additional specs into the list if the pin
-                # matches a dependency of a request, but that dependency only appears in _some_
-                # of the request variants. For example, package A=2 depends on B, but package
-                # A=3 no longer depends on B. B will be part of A's explicit pool because it
-                # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
-                # one chosen by the solver, then B would be included in the solution when it
-                # shouldn't. It's a corner case but it can happen so we might need to further
-                # restrict the explicit_pool to see. The original logic in the classic solver
-                # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
-                # set()):`
+            # THIS BLOCK HAS BEEN DEACTIVATED
+            # the explicit pool is potentially expensive and we are not using it.
+            # leaving this here for reference. It's supposed to check whether the pin
+            # was going to be part of the environment because it shows up in the dependency
+            # tree of the explicitly requested specs.
+            # ---
+            # TODO: This might be introducing additional specs into the list if the pin
+            # matches a dependency of a request, but that dependency only appears in _some_
+            # of the request variants. For example, package A=2 depends on B, but package
+            # A=3 no longer depends on B. B will be part of A's explicit pool because it
+            # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
+            # one chosen by the solver, then B would be included in the solution when it
+            # shouldn't. It's a corner case but it can happen so we might need to further
+            # restrict the explicit_pool to see. The original logic in the classic solver
+            # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
+            # set()):`
             else:  # always add the pin for libmamba to consider it
                 self.specs.set(
                     name,

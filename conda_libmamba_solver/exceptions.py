@@ -34,7 +34,7 @@ class RequestedAndPinnedError(SpecsConfigurationConflictError):
                 Requested specs overlap with pinned specs.
                   requested specs: {requested_specs_formatted}
                   pinned specs: {pinned_specs_formatted}
-                
+
                 Consider adjusting your requested specs to respect the pin(s),
                 or explicitly remove the offending pin(s) from the configuration.
                 Use 'conda config --show-sources' to look for 'pinned_specs'.

@@ -21,7 +21,7 @@ If the given solution is not fully satisfying, try to restrict your request a bi
 For example, if you run `conda install scipy` and do not get the latest version, try using a more explicit command: `conda install scipy=X.Y`.
 ```
 
-You might still need `classic` here and there, specially if backwards compatibility is very important in your use case, and you need your environments solved in the same way they have been solved in the past years. 
+You might still need `classic` here and there, specially if backwards compatibility is very important in your use case, and you need your environments solved in the same way they have been solved in the past years.
 This is a bit more important in long-lived environments than new ones.
 
 ```{important}
