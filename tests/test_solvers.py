@@ -269,7 +269,7 @@ def test_pinned_with_cli_build_string():
         assert not data.get("success")
         assert data["exception_name"] == "RequestedAndPinnedError"
 
-        # Adding name only specs is the same as requesting 
+        # Adding name only specs is the same as requesting
         # the pins explicitly, which should be a no-op
         p = conda_subprocess(
             "install",
