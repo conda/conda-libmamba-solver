@@ -13,6 +13,7 @@ from uuid import uuid4
 import pytest
 from conda.base.context import context
 from conda.common.compat import on_linux, on_win
+from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
@@ -265,3 +266,41 @@ def test_pinned_with_cli_build_string():
         data = json.loads(p.stdout)
         assert data.get("success")
         assert data.get("message") == "All requested packages already installed."
+
+
+def test_constraining_pin_and_requested():
+    env = os.environ.copy()
+    env["CONDA_PINNED_PACKAGES"] = "python=3.9.10"
+    
+    # This should fail because it contradicts the pinned packages
+    p = conda_subprocess("create", "-n", "unused", "--dry-run", "--json", "python=3.10", env=env, explain=True, check=False)
+    data = json.loads(p.stdout)
+    assert not data.get("success")
+    assert data["exception_name"] == "RequestedAndPinnedError"
+    
+    # This is ok because it's a no-op
+    p = conda_subprocess("create", "-n", "unused", "--dry-run", "--json", "python", env=env, explain=True, check=False)
+    data = json.loads(p.stdout)
+    assert data.get("success")
+    assert data.get("dry_run")
+
+
+def test_locking_pins():
+    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib") as prefix:
+        # Should install just fine
+        zlib = PrefixData(prefix).get("zlib")
+        assert zlib
+        
+        # This should fail because it contradicts the lock packages
+        out, err, retcode = run_command("install", prefix, "zlib=1.2.11", "--dry-run", "--json", use_exception_handler=True)
+        data = json.loads(out)
+        assert retcode
+        assert data["exception_name"] == "RequestedAndPinnedError"
+        assert str(zlib) in data["error"]
+
+        # This is a no-op and ok. It won't involve changes.
+        out, err, retcode = run_command("install", prefix, "zlib", "--dry-run", "--json", use_exception_handler=True)
+        data = json.loads(out)
+        assert not retcode
+        assert data.get("success")
+        assert data["message"] == "All requested packages already installed."

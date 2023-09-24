@@ -1031,7 +1031,7 @@ class SolverOutputState:
         # Check if requested and pins overlap
         # NOTE: This is a difference with respect to classic logic. classic
         # allows pin overrides in the CLI, but we don't.
-        constraining_requests = {spec.name for spec in sis.requested.values()}
+        constraining_requests = {spec.name for spec in sis.requested.values() if not spec.is_name_only_spec}
         constraining_pins = {spec.name for spec in sis.pinned.values()}
         requested_and_pinned = constraining_requests.intersection(constraining_pins)
         if requested_and_pinned:
@@ -1040,7 +1040,7 @@ class SolverOutputState:
             # - Name-only pins: lock the package as installed; has no effect if not installed
             #   Below we render name-only pins as their installed version when appropriate.
             pinned_specs = [
-                (sis.installed.get(name, pin) if pin.is_name_only_specx else pin)
+                (sis.installed.get(name, pin) if pin.is_name_only_spec else pin)
                 for name, pin in sorted(sis.pinned.items())
             ]
             exc = RequestedAndPinnedError(

@@ -10,18 +10,21 @@ from ruamel.yaml import YAML
 
 def conda_subprocess(*args, explain=False, capture_output=True, **kwargs) -> CompletedProcess:
     cmd = [sys.executable, "-m", "conda", *[str(a) for a in args]]
+    check = kwargs.pop("check", True)
     if explain:
         print("+", " ".join(cmd))
     p = run(
         cmd,
         capture_output=capture_output,
         text=kwargs.pop("text", capture_output),
+        check=False,
         **kwargs,
     )
     if capture_output and (explain or p.returncode):
         print(p.stdout)
         print(p.stderr, file=sys.stderr)
-    p.check_returncode()
+    if check:
+        p.check_returncode()
     return p
 
 
