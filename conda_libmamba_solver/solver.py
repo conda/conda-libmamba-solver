@@ -261,7 +261,6 @@ class LibMambaSolver(Solver):
         )
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
-            out_state.attempt_count = attempt
             try:
                 solved = self._solve_attempt(in_state, out_state, index)
                 if solved:

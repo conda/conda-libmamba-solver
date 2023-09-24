@@ -11,7 +11,6 @@ from conda.common.compat import on_win
 from conda.common.path import url_to_path
 from conda.common.url import urlparse
 from conda.gateways.connection import session as gateway_session
-from conda.models.match_spec import MatchSpec
 
 log = getLogger(f"conda.{__name__}")
 
@@ -56,4 +55,3 @@ def is_channel_available(channel_url) -> bool:
     except Exception as exc:
         log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
         return False
-

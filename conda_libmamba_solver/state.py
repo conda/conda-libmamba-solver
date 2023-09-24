@@ -63,6 +63,7 @@ as well as richer logging for each action.
 # TODO: This module could be part of conda-core once if we refactor the classic logic
 
 import logging
+import warnings
 from os import PathLike
 from types import MappingProxyType
 from typing import Iterable, Mapping, Optional, Type, Union
@@ -86,6 +87,7 @@ from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
 from .models import EnumAsBools, TrackedMap
+from .exceptions import RequestedAndPinnedError
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -542,8 +544,6 @@ class SolverOutputState:
             "pins", data=(pins or {}), reason="From arguments"
         )
 
-        self.attempt_count = 0  # 0 if we didn't even start yet
-    
     def _initialize_specs_from_input_state(self):
         """
         Provide the initial value for the ``.specs`` mapping. This depends on whether
