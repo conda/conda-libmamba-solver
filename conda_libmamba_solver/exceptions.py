@@ -31,17 +31,18 @@ class RequestedAndPinnedError(SpecsConfigurationConflictError):
         message = (
             dedent(
                 """
-            Requested specs overlap with pinned specs.
-              requested specs: {requested_specs_formatted}
-              pinned specs: {pinned_specs_formatted}
-            Consider adjusting your requested specs to respect the pin(s),
-            or explicitly remove the offending pin(s) from the configuration.
-            Use 'conda config --show-sources' to look for 'pinned_specs'.
-            Pinned specs may also be defined in the file
-            {pinned_specs_path}.
-            """
+                Requested specs overlap with pinned specs.
+                  requested specs: {requested_specs_formatted}
+                  pinned specs: {pinned_specs_formatted}
+                
+                Consider adjusting your requested specs to respect the pin(s),
+                or explicitly remove the offending pin(s) from the configuration.
+                Use 'conda config --show-sources' to look for 'pinned_specs'.
+                Pinned specs may also be defined in the file
+                {pinned_specs_path}.
+                """
             )
-            .lstrip()
+            .strip()
             .format(
                 requested_specs_formatted=dashlist(requested_specs, 4),
                 pinned_specs_formatted=dashlist(pinned_specs, 4),
