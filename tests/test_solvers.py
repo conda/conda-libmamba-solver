@@ -256,13 +256,32 @@ def test_pinned_with_cli_build_string():
             dedent(
                 """
                 python ==3.7.3
-                pandas ==1.2.5
-                scipy ==1.7.3
+                pandas ==1.2.5 py37h295c915_0
+                scipy ==1.7.3 py37hf2a6cf1_0
                 """
             ).lstrip()
         )
+        # Note we raise even if the specs are the same as the pins
+        p = conda_subprocess(
+            "install", "-p", prefix, *cmd, "--dry-run", "--json", explain=True, check=False
+        )
+        data = json.loads(p.stdout)
+        assert not data.get("success")
+        assert data["exception_name"] == "RequestedAndPinnedError"
 
-        p = conda_subprocess("install", "-p", prefix, *cmd, "--dry-run", "--json", explain=True)
+        # Adding name only specs is the same as requesting 
+        # the pins explicitly, which should be a no-op
+        p = conda_subprocess(
+            "install",
+            "-p",
+            prefix,
+            "python",
+            "pandas",
+            "scipy",
+            "--dry-run",
+            "--json",
+            explain=True,
+        )
         data = json.loads(p.stdout)
         assert data.get("success")
         assert data.get("message") == "All requested packages already installed."
