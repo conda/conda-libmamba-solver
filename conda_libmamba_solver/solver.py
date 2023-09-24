@@ -483,9 +483,10 @@ class LibMambaSolver(Solver):
                 # constrain updates too but those can be overridden in case of conflicts.
                 # name-only pins are treated as locks when installed, see below
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
-            elif requested:
-                # pinned pkgs cannot be requested too; we should have raised earlier
-                # but the elif here makes sure we don't miss anything
+            # in libmamba, pins and installs are compatible tasks (pin only constrains,
+            # does not 'request' a package). In classic, pins were actually targeted installs
+            # so they were exclusive
+            if requested:
                 spec_str = self._spec_to_str(requested)
                 if installed:
                     tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)

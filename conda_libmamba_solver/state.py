@@ -745,63 +745,60 @@ class SolverOutputState:
         # The block using this object below has been deactivated.
         # so we don't build this (potentially expensive) set anymore
         # if sis.pinned:
-        # explicit_pool = set(index.explicit_pool(sis.requested.values()))
+        #     explicit_pool = set(index.explicit_pool(sis.requested.values()))
         for name, spec in sis.pinned.items():
             pin = MatchSpec(spec, optional=False)
             requested = name in sis.requested
             if name in sis.installed and not requested:
                 self.specs.set(name, pin, reason="Pinned, installed and not requested")
             elif requested:
-                pass
-            #     # THIS BLOCK WOULD NEVER RUN
-            #     # classic solver would check compatibility between pinned and requested
-            #     # and let the user override pins in the CLI. libmamba doesn't allow
-            #     # the user to override pins. We will have raised an exception earlier
-            #     # We will keep this code here for reference
-            #     if sis.requested[name].match(spec):  # <-- this line is buggy!
-            #         reason = (
-            #             "Pinned, installed and requested; constraining request "
-            #             "as pin because they are compatible"
-            #         )
-            #         self.specs.set(name, pin, reason=reason)
-            #         pin_overrides.add(name)
-            #     else:
-            #         reason = (
-            #             "Pinned, installed and requested; pin and request "
-            #             "are conflicting, so adding user request due to higher precedence"
-            #         )
-            #         self.specs.set(name, sis.requested[name], reason=reason)
+                # THIS BLOCK WOULD NEVER RUN
+                # classic solver would check compatibility between pinned and requested
+                # and let the user override pins in the CLI. libmamba doesn't allow
+                # the user to override pins. We will have raised an exception earlier
+                # We will keep this code here for reference
+                if sis.requested[name].match(spec):  # <-- this line is buggy!
+                    reason = (
+                        "Pinned, installed and requested; constraining request "
+                        "as pin because they are compatible"
+                    )
+                    self.specs.set(name, pin, reason=reason)
+                    pin_overrides.add(name)
+                else:
+                    reason = (
+                        "Pinned, installed and requested; pin and request "
+                        "are conflicting, so adding user request due to higher precedence"
+                    )
+                    self.specs.set(name, sis.requested[name], reason=reason)
+            # always assume the pin will be needed
             # elif name in explicit_pool:
-            #     # THIS BLOCK HAS BEEN DEACTIVATED
-            #     # the explicit pool is potentially expensive and we are not using it.
-            #     # leaving this here for reference. It's supposed to check whether the pin
-            #     # was going to be part of the environment because it shows up in the dependency
-            #     # tree of the explicitly requested specs.
-            #     # ---
-            #     # TODO: This might be introducing additional specs into the list if the pin
-            #     # matches a dependency of a request, but that dependency only appears in _some_
-            #     # of the request variants. For example, package A=2 depends on B, but package
-            #     # A=3 no longer depends on B. B will be part of A's explicit pool because it
-            #     # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
-            #     # one chosen by the solver, then B would be included in the solution when it
-            #     # shouldn't. It's a corner case but it can happen so we might need to further
-            #     # restrict the explicit_pool to see. The original logic in the classic solver
-            #     # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
-            #     # set()):`
-            #     self.specs.set(
-            #         name,
-            #         pin,
-            #         reason="Pin matches one of the potential dependencies of user requests",
-            #     )
+                # THIS BLOCK HAS BEEN DEACTIVATED
+                # the explicit pool is potentially expensive and we are not using it.
+                # leaving this here for reference. It's supposed to check whether the pin
+                # was going to be part of the environment because it shows up in the dependency
+                # tree of the explicitly requested specs.
+                # ---
+                # TODO: This might be introducing additional specs into the list if the pin
+                # matches a dependency of a request, but that dependency only appears in _some_
+                # of the request variants. For example, package A=2 depends on B, but package
+                # A=3 no longer depends on B. B will be part of A's explicit pool because it
+                # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
+                # one chosen by the solver, then B would be included in the solution when it
+                # shouldn't. It's a corner case but it can happen so we might need to further
+                # restrict the explicit_pool to see. The original logic in the classic solver
+                # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
+                # set()):`
+            else:  # always add the pin for libmamba to consider it
+                self.specs.set(
+                    name,
+                    pin,
+                    reason="Pin matches one of the potential dependencies of user requests",
+                )
+            # In classic, this would notify the pin was being overridden by a request
             # else:
             #     log.warn(
             #         "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
             #     )
-            else:
-                # Add to specs so we can add the constraint in libmamba
-                # Note that in classic this would have meant always adding the pin to the installed
-                # stuff. libmamba pins only constraint, not add, so we can get away with this.
-                self.specs.set(name, pin, reason="Pinned but not installed")
 
         # ## Update modifiers ###
 
