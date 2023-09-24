@@ -248,6 +248,7 @@ def test_pinned_with_cli_build_string():
         "scipy=1.7.3=py37hf2a6cf1_0",
         "python=3.7.3",
         "pandas=1.2.5=py37h295c915_0",
+        "--override-channels",
         "--channel=conda-forge",
     )
     with make_temp_env(*cmd) as prefix:
@@ -263,7 +264,14 @@ def test_pinned_with_cli_build_string():
         )
         # Note we raise even if the specs are the same as the pins
         p = conda_subprocess(
-            "install", "-p", prefix, *cmd, "--dry-run", "--json", explain=True, check=False
+            "install",
+            "-p",
+            prefix,
+            *cmd,
+            "--dry-run",
+            "--json",
+            explain=True,
+            check=False,
         )
         data = json.loads(p.stdout)
         assert not data.get("success")
