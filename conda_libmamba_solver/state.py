@@ -745,7 +745,10 @@ class SolverOutputState:
             # elif name in explicit_pool:
             #     # THIS BLOCK HAS BEEN DEACTIVATED
             #     # the explicit pool is potentially expensive and we are not using it.
-            #     # leaving this here for reference
+            #     # leaving this here for reference. It's supposed to check whether the pin
+            #     # was going to be part of the environment because it shows up in the dependency
+            #     # tree of the explicitly requested specs.
+            #     # ---
             #     # TODO: This might be introducing additional specs into the list if the pin
             #     # matches a dependency of a request, but that dependency only appears in _some_
             #     # of the request variants. For example, package A=2 depends on B, but package
@@ -761,10 +764,15 @@ class SolverOutputState:
             #         pin,
             #         reason="Pin matches one of the potential dependencies of user requests",
             #     )
+            # else:
+            #     log.warn(
+            #         "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
+            #     )
             else:
-                log.warn(
-                    "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
-                )
+                # Add to specs so we can add the constraint in libmamba
+                # Note that in classic this would have meant always adding the pin to the installed
+                # stuff. libmamba pins only constraint, not add, so we can get away with this.
+                self.specs.set(name, pin, reason="Pinned but not installed")
 
         # ## Update modifiers ###
 
