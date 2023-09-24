@@ -773,7 +773,6 @@ class LibMambaSolver(Solver):
             pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
             for pin_name, spec in pins.items():
                 pin_message += f" - {spec} (labeled as '{pin_name}')\n"
-            pin_message += "\nIf python is involved, try adding it explicitly to the command-line."
             return f"{message}\n\n{pin_message}"
         return message
 

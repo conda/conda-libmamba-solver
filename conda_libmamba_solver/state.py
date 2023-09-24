@@ -630,6 +630,7 @@ class SolverOutputState:
             self._prepare_for_remove()
         else:
             self._prepare_for_add(index)
+        # Classic logic would have called this method, but libmamba doesn't use it
         # self._prepare_for_solve()
         return self.specs
 
@@ -955,26 +956,30 @@ class SolverOutputState:
         solver try, fail with conflicts, and annotate those as such so they are unconstrained.
 
         Now, this method only ensures that the pins do not cause conflicts.
-
-        NOTE: libmamba does not try to anticipate anything and we just let the solver print
-        the appropriate error message if there are conflicts. This function call is commented out
-        in .prepare_specs()
         """
+        warnings.warn("This method is not used anymore in libmamba", DeprecationWarning)
+        return
+
         # ## Inconsistency analysis ###
         # here we would call conda.core.solve.classic.Solver._find_inconsistent_packages()
 
         # ## Check conflicts are only present in .specs
-        conflicting_and_pinned = set(self.conflicts).intersection(self.solver_input_state.pinned)
+        conflicting_and_pinned = [
+            str(spec)
+            for name, spec in self.conflicts.items()
+            if name in self.solver_input_state.pinned
+        ]
         if conflicting_and_pinned:
-            exc = SpecsConfigurationConflictError(
-                requested_specs=sorted(
-                    self.solver_input_state.requested.values(), key=lambda x: x.name
-                ),
-                pinned_specs=sorted(self.solver_input_state.pinned.values(), key=lambda x: x.name),
+            requested = [
+                str(spec)
+                for spec in (*self.specs, *self.solver_input_state.requested)
+                if spec not in conflicting_and_pinned
+            ]
+            raise SpecsConfigurationConflictError(
+                requested_specs=requested,
+                pinned_specs=conflicting_and_pinned,
                 prefix=self.solver_input_state.prefix,
             )
-            exc.allow_retry = False
-            raise exc
 
         # ## Conflict minimization ###
         # here conda.core.solve.classic.Solver._run_sat() enters a `while conflicting_specs` loop
@@ -1016,6 +1021,29 @@ class SolverOutputState:
             ]
             if not_installed:
                 raise PackagesNotFoundError(not_installed)
+
+        # Check if requested and pins overlap
+        # NOTE: This is a difference with respect to classic logic. classic
+        # allows pin overrides in the CLI, but we don't.
+        constraining_requests = {spec.name for spec in sis.requested.values()}
+        constraining_pins = {spec.name for spec in sis.pinned.values()}
+        requested_and_pinned = constraining_requests.intersection(constraining_pins)
+        if requested_and_pinned:
+            # libmamba has two types of pins:
+            # - Pins with constraints: limit which versions of a package can be installed
+            # - Name-only pins: lock the package as installed; has no effect if not installed
+            #   Below we render name-only pins as their installed version when appropriate.
+            pinned_specs = [
+                (sis.installed.get(name, pin) if pin.is_name_only_specx else pin)
+                for name, pin in sorted(sis.pinned.items())
+            ]
+            exc = RequestedAndPinnedError(
+                requested_specs=sorted(sis.requested.values(), key=lambda x: x.name),
+                pinned_specs=pinned_specs,
+                prefix=sis.prefix,
+            )
+            exc.allow_retry = False
+            raise exc
 
     def post_solve(self, solver: Type["Solver"]):
         """
