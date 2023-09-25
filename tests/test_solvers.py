@@ -250,6 +250,7 @@ def test_pinned_with_cli_build_string():
         "pandas=1.2.5=py37h295c915_0",
         "--override-channels",
         "--channel=conda-forge",
+        "--channel=defaults",
     )
     with make_temp_env(*cmd) as prefix:
         Path(prefix, "conda-meta").mkdir(exist_ok=True)
