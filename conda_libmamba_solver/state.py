@@ -963,12 +963,13 @@ class SolverOutputState:
         for name in requested_and_pinned:
             requested = sis.requested[name]
             pin = sis.pinned[name]
-            if pin.is_name_only_spec:
-                installed = sis.installed.get(name)
-                if installed:
-                    pin = installed.to_match_spec()
-            if not compatible_specs(index, (requested, pin)):
-                # No records in common -> raise
+            installed = sis.installed.get(name)
+            if (
+                # name-only pins lock to installed; requested spec must match it
+                (pin.is_name_only_spec and installed and not requested.match(installed))
+                # otherwise, the pin needs to be compatible with the requested spec
+                or not compatible_specs(index, (requested, pin))
+            ):
                 pinned_specs = [
                     (sis.installed.get(name, pin) if pin.is_name_only_spec else pin)
                     for name, pin in sorted(sis.pinned.items())
