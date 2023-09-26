@@ -20,7 +20,13 @@ from typing import Iterable, Mapping, Optional, Sequence, Union
 import libmambapy as api
 from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
-from conda.base.constants import REPODATA_FN, UNKNOWN_CHANNEL, ChannelPriority, on_win
+from conda.base.constants import (
+    DEFAULT_CHANNELS,
+    REPODATA_FN,
+    UNKNOWN_CHANNEL,
+    ChannelPriority,
+    on_win,
+)
 from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
@@ -921,7 +927,10 @@ class LibMambaSolver(Solver):
                 f"You can only use {supported}, but you tried to use "
                 f"{tuple(unsupported_but_set)}.",
             )
-        if match_spec.get_raw_value("channel") == "defaults":
+        if (
+            match_spec.get_raw_value("channel") == "defaults"
+            and context.default_channels == DEFAULT_CHANNELS
+        ):
             # !!! Temporary !!!
             # Apply workaround for defaults::pkg-name specs.
             # We need to replace it with the actual channel name (main, msys2, r)
