@@ -40,8 +40,10 @@ With the release of `conda-libmamba-solver`, we took the opportunity to improve 
 
 * `conda-libmamba-solver` does not use `current_repodata.json` by default. Instead, it always uses the full `repodata.json` files.
 * `conda-libmamba-solver` does not retry with `--freeze-installed` by default. Instead, it has a tighter retry logic that progressively relaxes the constraints on the conflicting packages.
-* `conda-libmamba-solver` does not allow the user to override the configured [pinned specs](https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-pkgs.html#preventing-packages-from-updating-pinning) by specifying other constraints in the CLI. Instead, it will error early. To override pinned specs,
+* `conda-libmamba-solver` does not allow the user to override the configured [pinned specs](https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-pkgs.html#preventing-packages-from-updating-pinning) by specifying incompatible constraints in the CLI. Instead, it will error early. To override pinned specs,
 it needs to be done explicitly in the relevant configuration file(s) (e.g. temporarily commenting out the pin spec, or modifying the pin for a more recent version).
+Note that compatible CLI specs are still allowed, and will be used to select the best solution.
+For example, having a pinned spec for `python=3.8` will not prevent you from requesting `python=3.8.10`, but `python=3.9` will be rejected.
 * `conda-libmamba-solver` provides a way to hard-lock a given package to its currently installed version. To do so, specify _only_ the name of the package as a [pinned spec](https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-pkgs.html#preventing-packages-from-updating-pinning). Once installed, the solver will prevent _any_ modifications to the package. Use with care, since this can be a source of conflicts. Adequately constrained pins are a more flexible alternative.
 
 
