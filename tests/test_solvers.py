@@ -244,15 +244,17 @@ def test_too_aggressive_update_to_conda_forge_packages():
 @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux-64 only")
 def test_pinned_with_cli_build_string():
     """ """
-    cmd = (
+    specs = (
         "scipy=1.7.3=py37hf2a6cf1_0",
         "python=3.7.3",
         "pandas=1.2.5=py37h295c915_0",
+    )
+    channels = (
         "--override-channels",
         "--channel=conda-forge",
         "--channel=defaults",
     )
-    with make_temp_env(*cmd) as prefix:
+    with make_temp_env(*specs, *channels) as prefix:
         Path(prefix, "conda-meta").mkdir(exist_ok=True)
         Path(prefix, "conda-meta", "pinned").write_text(
             dedent(
@@ -263,12 +265,31 @@ def test_pinned_with_cli_build_string():
                 """
             ).lstrip()
         )
-        # Note we raise even if the specs are the same as the pins
+        # We ask for the same packages or name-only, it should be compatible
+        for valid_specs in (specs, ("python", "pandas", "scipy")):
+            p = conda_subprocess(
+                "install",
+                "-p",
+                prefix,
+                *valid_specs,
+                *channels,
+                "--dry-run",
+                "--json",
+                explain=True,
+                check=False,
+            )
+            data = json.loads(p.stdout)
+            assert data.get("success")
+            assert data["message"] == "All requested packages already installed."
+
+        # However if we ask for a different version, it should fail
+        invalid_specs = ("python=3.8", "pandas=1.2.4", "scipy=1.7.2")
         p = conda_subprocess(
             "install",
             "-p",
             prefix,
-            *cmd,
+            *invalid_specs,
+            *channels,
             "--dry-run",
             "--json",
             explain=True,
@@ -276,27 +297,23 @@ def test_pinned_with_cli_build_string():
         )
         data = json.loads(p.stdout)
         assert not data.get("success")
-        assert data["exception_name"] == "RequestedAndPinnedError"
+        assert data["exception_name"] == "SpecsConfigurationConflictError"
 
-        # Adding name only specs is the same as requesting
-        # the pins explicitly, which should be a no-op
+        non_existing_specs = ("python=0", "pandas=1000", "scipy=24")
         p = conda_subprocess(
             "install",
             "-p",
             prefix,
-            "python",
-            "pandas",
-            "scipy",
-            "--override-channels",
-            "--channel=conda-forge",
-            "--channel=defaults",
+            *non_existing_specs,
+            *channels,
             "--dry-run",
             "--json",
             explain=True,
+            check=False,
         )
         data = json.loads(p.stdout)
-        assert data.get("success")
-        assert data.get("message") == "All requested packages already installed."
+        assert not data.get("success")
+        assert data["exception_name"] == "PackagesNotFoundError"
 
 
 def test_constraining_pin_and_requested():
@@ -320,7 +337,7 @@ def test_constraining_pin_and_requested():
     )
     data = json.loads(p.stdout)
     assert not data.get("success")
-    assert data["exception_name"] == "RequestedAndPinnedError"
+    assert data["exception_name"] == "SpecsConfigurationConflictError"
 
     # This is ok because it's a no-op
     p = conda_subprocess(
@@ -347,11 +364,16 @@ def test_locking_pins():
 
         # This should fail because it contradicts the lock packages
         out, err, retcode = run_command(
-            "install", prefix, "zlib=1.2.11", "--dry-run", "--json", use_exception_handler=True
+            "install",
+            prefix,
+            "zlib=1.2.11",
+            "--dry-run",
+            "--json",
+            use_exception_handler=True,
         )
         data = json.loads(out)
         assert retcode
-        assert data["exception_name"] == "RequestedAndPinnedError"
+        assert data["exception_name"] == "SpecsConfigurationConflictError"
         assert str(zlib) in data["error"]
 
         # This is a no-op and ok. It won't involve changes.
