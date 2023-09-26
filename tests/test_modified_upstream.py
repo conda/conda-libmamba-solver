@@ -73,6 +73,27 @@ class PatchedCondaTestCreate(BaseTestCase):
     def setUp(self):
         PackageCacheData.clear()
 
+    @pytest.mark.xfail( ## MODIFIED
+        reason="This is not allowed in libmamba: "
+        "https://github.com/conda/conda-libmamba-solver/pull/289"
+    )
+    def test_pinned_override_with_explicit_spec(self):
+        with make_temp_env("python=3.8") as prefix:
+            ## MODIFIED
+            # Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
+            # Instead we only pin whatever the solver decided to install
+            # Original lines were:
+            ### run_command(Commands.CONFIG, prefix,
+            ###             "--add", "pinned_packages", "python=3.6.5")
+            python = next(PrefixData(prefix).query("python"))
+            run_command(
+                Commands.CONFIG, prefix, "--add", "pinned_packages", f"python={python.version}"
+            )
+            ## /MODIFIED
+
+            run_command(Commands.INSTALL, prefix, "python=3.7", no_capture=True)
+            assert package_is_installed(prefix, "python=3.7")
+
     @pytest.mark.xfail(on_win, reason="TODO: Investigate why this fails on Windows only")
     def test_install_update_deps_only_deps_flags(self):
         with make_temp_env("flask=2.0.1", "jinja2=3.0.1") as prefix:
