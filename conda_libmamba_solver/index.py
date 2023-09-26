@@ -74,6 +74,7 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import lru_cache, partial
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Dict, Iterable, Tuple, Union
 
@@ -236,6 +237,15 @@ class LibMambaIndexHelper(IndexHelper):
     def _json_path_to_repo_info(self, url: str, json_path: str) -> _ChannelRepoInfo:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
+        json_path = Path(json_path)
+        solv_path = json_path.parent / f"{json_path.stem}.solv"
+        try:
+            # use solv file if it's newer than the json file
+            if json_path.stat().st_mtime <= solv_path.stat().st_mtime:
+                json_path = solv_path
+                log.debug("Using %s instead of %s", solv_path, json_path)
+        except OSError as exc:
+            log.debug("Failed to stat %s or %s", solv_path, json_path, exc_info=exc)
         repo = api.Repo(self._pool, noauth_url, str(json_path), escape_channel_url(noauth_url))
         return _ChannelRepoInfo(
             repo=repo,
