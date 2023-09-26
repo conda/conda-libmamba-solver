@@ -357,7 +357,8 @@ def test_constraining_pin_and_requested():
 
 
 def test_locking_pins():
-    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib") as prefix:
+    channels = ("--override-channels", "-c", "conda-forge")
+    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib", *channels) as prefix:
         # Should install just fine
         zlib = PrefixData(prefix).get("zlib")
         assert zlib
@@ -367,6 +368,7 @@ def test_locking_pins():
             "install",
             prefix,
             "zlib=1.2.11",
+            *channels,
             "--dry-run",
             "--json",
             use_exception_handler=True,
