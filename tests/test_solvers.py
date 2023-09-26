@@ -357,7 +357,7 @@ def test_constraining_pin_and_requested():
 
 
 def test_locking_pins():
-    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib", ) as prefix:
+    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib") as prefix:
         # Should install just fine
         zlib = PrefixData(prefix).get("zlib")
         assert zlib
