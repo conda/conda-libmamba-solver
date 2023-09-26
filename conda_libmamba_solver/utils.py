@@ -10,6 +10,7 @@ from conda.base.context import context
 from conda.common.compat import on_win
 from conda.common.path import url_to_path
 from conda.common.url import urlparse
+from conda.exceptions import PackagesNotFoundError
 from conda.gateways.connection import session as gateway_session
 
 log = getLogger(f"conda.{__name__}")
@@ -56,20 +57,36 @@ def is_channel_available(channel_url) -> bool:
         log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
         return False
 
-def compatible_specs(index, *specs):
+def compatible_specs(index, specs, raise_not_found=True):
     """
     Assess whether the given specs are compatible with each other.
     This is done by querying the index for each spec and taking the
     intersection of the results. If the intersection is empty, the
     specs are incompatible.
+
+    If raise_not_found is True, a PackagesNotFoundError will be raised
+    when one of the specs is not found. Otherwise, False will be returned
+    because the intersection will be empty.
     """
     if not len(specs) >= 2:
         raise ValueError("Must specify at least two specs")
     
-    matched = set(index.search(str(specs[0])))
-    for spec in specs[1:]:
-        matched &= set(index.search(str(spec)))
+    matched = None
+    for spec in specs:
+        results = set(index.search(str(spec)))
+        if not results:
+            if raise_not_found:
+                exc = PackagesNotFoundError([spec], index._channels)
+                exc.allow_retry = False
+                raise exc
+            return False
+        if matched is None:
+            # First spec, just set matched to the results
+            matched = results
+            continue
+        # Take the intersection of the results
+        matched &= results
         if not matched:
-            break
+            return False
     
     return bool(matched)

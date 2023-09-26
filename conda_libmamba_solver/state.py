@@ -713,7 +713,8 @@ class SolverOutputState:
                 # and let the user override pins in the CLI. libmamba doesn't allow
                 # the user to override pins. We will have raised an exception earlier
                 # We will keep this code here for reference
-                if sis.requested[name].match(spec):  # <-- this line is buggy!
+                if True: # compatible_specs(index, sis.requested[name], spec):
+                    # assume compatible, we will raise later otherwise
                     reason = (
                         "Pinned, installed and requested; constraining request "
                         "as pin because they are compatible"
@@ -957,29 +958,28 @@ class SolverOutputState:
         # here we would call conda.core.solve.classic.Solver._find_inconsistent_packages()
 
         # ## Check pin and requested are compatible
-        # Check if requested and pins overlap
-        # NOTE: This is a difference with respect to classic logic. classic
-        # allows pin overrides in the CLI, but we don't.
         sis = self.solver_input_state
-        constraining_requests = {
-            spec.name for spec in sis.requested.values() if not spec.is_name_only_spec
-        }
-        constraining_pins = {spec.name for spec in sis.pinned.values()}
-        requested_and_pinned = constraining_requests.intersection(constraining_pins)
-        if requested_and_pinned:
-            for name in requested_and_pinned:
-                if not compatible_specs(index, sis.requested[name], sis.pinned[name]):
-                    pinned_specs = [
-                        (sis.installed.get(name, pin) if pin.is_name_only_spec else pin)
-                        for name, pin in sorted(sis.pinned.items())
-                    ]
-                    exc = SpecsConfigurationConflictError(
-                        requested_specs=sorted(sis.requested.values(), key=lambda x: x.name),
-                        pinned_specs=pinned_specs,
-                        prefix=sis.prefix,
-                    )
-                    exc.allow_retry = False
-                    raise exc
+        requested_and_pinned = set(sis.requested).intersection(sis.pinned)
+        for name in requested_and_pinned:
+            requested = sis.requested[name]
+            pin = sis.pinned[name]
+            if pin.is_name_only_spec:
+                installed = sis.installed.get(name)
+                if installed:
+                    pin = installed.to_match_spec()
+            if not compatible_specs(index, (requested, pin)):
+                # No records in common -> raise
+                pinned_specs = [
+                    (sis.installed.get(name, pin) if pin.is_name_only_spec else pin)
+                    for name, pin in sorted(sis.pinned.items())
+                ]
+                exc = SpecsConfigurationConflictError(
+                    requested_specs=sorted(sis.requested.values(), key=lambda x: x.name),
+                    pinned_specs=pinned_specs,
+                    prefix=sis.prefix,
+                )
+                exc.allow_retry = False
+                raise exc
 
         # ## Conflict minimization ###
         # here conda.core.solve.classic.Solver._run_sat() enters a `while conflicting_specs` loop
