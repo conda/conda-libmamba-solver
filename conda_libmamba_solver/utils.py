@@ -55,3 +55,21 @@ def is_channel_available(channel_url) -> bool:
     except Exception as exc:
         log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
         return False
+
+def compatible_specs(index, *specs):
+    """
+    Assess whether the given specs are compatible with each other.
+    This is done by querying the index for each spec and taking the
+    intersection of the results. If the intersection is empty, the
+    specs are incompatible.
+    """
+    if not len(specs) >= 2:
+        raise ValueError("Must specify at least two specs")
+    
+    matched = set(index.search(str(specs[0])))
+    for spec in specs[1:]:
+        matched &= set(index.search(str(spec)))
+        if not matched:
+            break
+    
+    return bool(matched)

@@ -276,7 +276,7 @@ def test_pinned_with_cli_build_string():
         )
         data = json.loads(p.stdout)
         assert not data.get("success")
-        assert data["exception_name"] == "RequestedAndPinnedError"
+        assert data["exception_name"] == "SpecsConfigurationConflictError"
 
         # Adding name only specs is the same as requesting
         # the pins explicitly, which should be a no-op
@@ -320,7 +320,7 @@ def test_constraining_pin_and_requested():
     )
     data = json.loads(p.stdout)
     assert not data.get("success")
-    assert data["exception_name"] == "RequestedAndPinnedError"
+    assert data["exception_name"] == "SpecsConfigurationConflictError"
 
     # This is ok because it's a no-op
     p = conda_subprocess(
@@ -351,7 +351,7 @@ def test_locking_pins():
         )
         data = json.loads(out)
         assert retcode
-        assert data["exception_name"] == "RequestedAndPinnedError"
+        assert data["exception_name"] == "SpecsConfigurationConflictError"
         assert str(zlib) in data["error"]
 
         # This is a no-op and ok. It won't involve changes.
