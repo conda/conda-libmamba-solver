@@ -73,7 +73,7 @@ class PatchedCondaTestCreate(BaseTestCase):
     def setUp(self):
         PackageCacheData.clear()
 
-    @pytest.mark.xfail( ## MODIFIED
+    @pytest.mark.xfail(  ## MODIFIED
         reason="This is not allowed in libmamba: "
         "https://github.com/conda/conda-libmamba-solver/pull/289"
     )
