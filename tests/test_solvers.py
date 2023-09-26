@@ -285,32 +285,32 @@ def test_pinned_with_cli_build_string():
         # However if we ask for a different version, it should fail
         invalid_specs = ("python=3.8", "pandas=1.2.4", "scipy=1.7.2")
         p = conda_subprocess(
-                "install",
-                "-p",
-                prefix,
-                *invalid_specs,
-                *channels,
-                "--dry-run",
-                "--json",
-                explain=True,
-                check=False,
-            )
+            "install",
+            "-p",
+            prefix,
+            *invalid_specs,
+            *channels,
+            "--dry-run",
+            "--json",
+            explain=True,
+            check=False,
+        )
         data = json.loads(p.stdout)
         assert not data.get("success")
         assert data["exception_name"] == "SpecsConfigurationConflictError"
-        
+
         non_existing_specs = ("python=0", "pandas=1000", "scipy=24")
         p = conda_subprocess(
-                "install",
-                "-p",
-                prefix,
-                *non_existing_specs,
-                *channels,
-                "--dry-run",
-                "--json",
-                explain=True,
-                check=False,
-            )
+            "install",
+            "-p",
+            prefix,
+            *non_existing_specs,
+            *channels,
+            "--dry-run",
+            "--json",
+            explain=True,
+            check=False,
+        )
         data = json.loads(p.stdout)
         assert not data.get("success")
         assert data["exception_name"] == "PackagesNotFoundError"

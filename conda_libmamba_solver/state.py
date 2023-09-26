@@ -713,7 +713,7 @@ class SolverOutputState:
                 # and let the user override pins in the CLI. libmamba doesn't allow
                 # the user to override pins. We will have raised an exception earlier
                 # We will keep this code here for reference
-                if True: # compatible_specs(index, sis.requested[name], spec):
+                if True:  # compatible_specs(index, sis.requested[name], spec):
                     # assume compatible, we will raise later otherwise
                     reason = (
                         "Pinned, installed and requested; constraining request "
@@ -991,7 +991,7 @@ class SolverOutputState:
 
     def early_exit(self):
         """
-        Operations that do not need a solver and might result in returning 
+        Operations that do not need a solver and might result in returning
         early are collected here.
         """
         sis = self.solver_input_state
@@ -1003,7 +1003,7 @@ class SolverOutputState:
                 exc = PackagesNotFoundError(not_installed)
                 exc.allow_retry = False
                 raise exc
-        
+
             if sis.force_remove:
                 for name, spec in sis.requested.items():
                     for record in sis.installed.values():
