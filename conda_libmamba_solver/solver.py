@@ -463,10 +463,13 @@ class LibMambaSolver(Solver):
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
         # Add specs to install
-        for name, spec in out_state.specs.items():
+        # SolverOutputState.specs has been populated at initialization with what the classic
+        # logic considers should be the target version for each package in the environment
+        # and requested changes. We are _not_ following those targets here, but we do iterate
+        # over the list to decide what to do with each package.
+        for name, _classic_logic_spec in out_state.specs.items():
             if name.startswith("__"):
                 continue  # ignore virtual packages
-            spec: MatchSpec = self._check_spec_compat(spec)
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
                 installed_spec_str = self._spec_to_str(installed.to_match_spec())
@@ -481,21 +484,22 @@ class LibMambaSolver(Solver):
                 tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
 
             # These specs are explicit in some sort of way
-            if pinned:
+            if pinned and not pinned.is_name_only_spec:
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
-                if pinned.is_name_only_spec:
-                    # pins need to constrain in some way, otherwide is undefined behaviour
-                    pass
-                elif requested and not requested.match(pinned):
-                    # We don't pin; requested and pinned are different and incompatible,
-                    # requested wins and we let that happen in the next block
-                    pass
-                else:
-                    tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
-
+                # name-only pins are treated as locks when installed, see below
+                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+            # in libmamba, pins and installs are compatible tasks (pin only constrains,
+            # does not 'request' a package). In classic, pins were actually targeted installs
+            # so they were exclusive
             if requested:
-                spec_str = self._spec_to_str(requested)
+                if requested.is_name_only_spec and pinned and not pinned.is_name_only_spec:
+                    # for name-only specs, this is a no-op; we already added the pin above
+                    # but we will constrain it again in the install task to have better
+                    # error messages if not solvable
+                    spec_str = self._spec_to_str(pinned)
+                else:
+                    spec_str = self._spec_to_str(requested)
                 if installed:
                     tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
@@ -776,7 +780,6 @@ class LibMambaSolver(Solver):
             pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
             for pin_name, spec in pins.items():
                 pin_message += f" - {spec} (labeled as '{pin_name}')\n"
-            pin_message += "\nIf python is involved, try adding it explicitly to the command-line."
             return f"{message}\n\n{pin_message}"
         return message
 

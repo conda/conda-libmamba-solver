@@ -7,10 +7,13 @@ import sys
 from itertools import chain, permutations, repeat
 from pathlib import Path
 from subprocess import check_call, run
+from textwrap import dedent
 from uuid import uuid4
 
 import pytest
+from conda.base.context import context
 from conda.common.compat import on_linux, on_win
+from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
@@ -236,3 +239,148 @@ def test_too_aggressive_update_to_conda_forge_packages():
         data_libmamba = json.loads(p_libmamba.stdout)
         assert len(data_classic["actions"]["LINK"]) < 15
         assert len(data_libmamba["actions"]["LINK"]) <= len(data_classic["actions"]["LINK"])
+
+
+@pytest.mark.skipif(context.subdir != "linux-64", reason="Linux-64 only")
+def test_pinned_with_cli_build_string():
+    """ """
+    specs = (
+        "scipy=1.7.3=py37hf2a6cf1_0",
+        "python=3.7.3",
+        "pandas=1.2.5=py37h295c915_0",
+    )
+    channels = (
+        "--override-channels",
+        "--channel=conda-forge",
+        "--channel=defaults",
+    )
+    with make_temp_env(*specs, *channels) as prefix:
+        Path(prefix, "conda-meta").mkdir(exist_ok=True)
+        Path(prefix, "conda-meta", "pinned").write_text(
+            dedent(
+                """
+                python ==3.7.3
+                pandas ==1.2.5 py37h295c915_0
+                scipy ==1.7.3 py37hf2a6cf1_0
+                """
+            ).lstrip()
+        )
+        # We ask for the same packages or name-only, it should be compatible
+        for valid_specs in (specs, ("python", "pandas", "scipy")):
+            p = conda_subprocess(
+                "install",
+                "-p",
+                prefix,
+                *valid_specs,
+                *channels,
+                "--dry-run",
+                "--json",
+                explain=True,
+                check=False,
+            )
+            data = json.loads(p.stdout)
+            assert data.get("success")
+            assert data["message"] == "All requested packages already installed."
+
+        # However if we ask for a different version, it should fail
+        invalid_specs = ("python=3.8", "pandas=1.2.4", "scipy=1.7.2")
+        p = conda_subprocess(
+            "install",
+            "-p",
+            prefix,
+            *invalid_specs,
+            *channels,
+            "--dry-run",
+            "--json",
+            explain=True,
+            check=False,
+        )
+        data = json.loads(p.stdout)
+        assert not data.get("success")
+        assert data["exception_name"] == "SpecsConfigurationConflictError"
+
+        non_existing_specs = ("python=0", "pandas=1000", "scipy=24")
+        p = conda_subprocess(
+            "install",
+            "-p",
+            prefix,
+            *non_existing_specs,
+            *channels,
+            "--dry-run",
+            "--json",
+            explain=True,
+            check=False,
+        )
+        data = json.loads(p.stdout)
+        assert not data.get("success")
+        assert data["exception_name"] == "PackagesNotFoundError"
+
+
+def test_constraining_pin_and_requested():
+    env = os.environ.copy()
+    env["CONDA_PINNED_PACKAGES"] = "python=3.9"
+
+    # This should fail because it contradicts the pinned packages
+    p = conda_subprocess(
+        "create",
+        "-n",
+        "unused",
+        "--dry-run",
+        "--json",
+        "python=3.10",
+        "--override-channels",
+        "-c",
+        "conda-forge",
+        env=env,
+        explain=True,
+        check=False,
+    )
+    data = json.loads(p.stdout)
+    assert not data.get("success")
+    assert data["exception_name"] == "SpecsConfigurationConflictError"
+
+    # This is ok because it's a no-op
+    p = conda_subprocess(
+        "create",
+        "-n",
+        "unused",
+        "--dry-run",
+        "--json",
+        "python",
+        env=env,
+        explain=True,
+        check=False,
+    )
+    data = json.loads(p.stdout)
+    assert data.get("success")
+    assert data.get("dry_run")
+
+
+def test_locking_pins():
+    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib") as prefix:
+        # Should install just fine
+        zlib = PrefixData(prefix).get("zlib")
+        assert zlib
+
+        # This should fail because it contradicts the lock packages
+        out, err, retcode = run_command(
+            "install",
+            prefix,
+            "zlib=1.2.11",
+            "--dry-run",
+            "--json",
+            use_exception_handler=True,
+        )
+        data = json.loads(out)
+        assert retcode
+        assert data["exception_name"] == "SpecsConfigurationConflictError"
+        assert str(zlib) in data["error"]
+
+        # This is a no-op and ok. It won't involve changes.
+        out, err, retcode = run_command(
+            "install", prefix, "zlib", "--dry-run", "--json", use_exception_handler=True
+        )
+        data = json.loads(out)
+        assert not retcode
+        assert data.get("success")
+        assert data["message"] == "All requested packages already installed."

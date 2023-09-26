@@ -73,8 +73,12 @@ class PatchedCondaTestCreate(BaseTestCase):
     def setUp(self):
         PackageCacheData.clear()
 
+    @pytest.mark.xfail(  ## MODIFIED
+        reason="This is not allowed in libmamba: "
+        "https://github.com/conda/conda-libmamba-solver/pull/289"
+    )
     def test_pinned_override_with_explicit_spec(self):
-        with make_temp_env("python=3.6") as prefix:
+        with make_temp_env("python=3.8") as prefix:
             ## MODIFIED
             # Original test assumed the `python=3.6` spec above resolves to `python=3.6.5`
             # Instead we only pin whatever the solver decided to install
