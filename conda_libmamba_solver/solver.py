@@ -1008,21 +1008,11 @@ class LibMambaSolver(Solver):
         # once prefix data is lazy this might be a different situation
         current_conda_prefix_rec = None
         for filename in os.scandir(os.path.join(context.conda_prefix, 'conda-meta')):
-            if re.fullmatch('conda-.*\.json', filename.name):
-                # at this point package names could be: conda- and conda-build, etc
-                # so we have to actually check the json content
+            if filename.name.endswith('.json') and filename.name.rsplit('-', 2)[0] == 'conda':
                 with open(filename.path) as f:
-                    data = json.load(f)
-                    if data['name'] == 'conda':
-                        current_conda_prefix_rec = PrefixRecord(**data)
-                        break
+                    current_conda_prefix_rec = PrefixRecord(**json.load(f))
+                    break
         else:
-            # We are checking whether conda can be found in the environment conda is
-            # running from. Unless something is really wrong, this should never happen.
-            return
-
-        current_conda_prefix_rec = PrefixData(context.conda_prefix).get("conda", None)
-        if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
             # running from. Unless something is really wrong, this should never happen.
             return
