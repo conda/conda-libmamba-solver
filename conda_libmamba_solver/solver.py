@@ -1007,8 +1007,8 @@ class LibMambaSolver(Solver):
         # manually check base prefix since `PrefixData(...).get("conda", None) is expensive
         # once prefix data is lazy this might be a different situation
         current_conda_prefix_rec = None
-        for filename in os.scandir(os.path.join(context.conda_prefix, 'conda-meta')):
-            if filename.name.endswith('.json') and filename.name.rsplit('-', 2)[0] == 'conda':
+        for filename in os.scandir(os.path.join(context.conda_prefix, "conda-meta")):
+            if filename.name.endswith(".json") and filename.name.rsplit("-", 2)[0] == "conda":
                 with open(filename.path) as f:
                     current_conda_prefix_rec = PrefixRecord(**json.load(f))
                     break
