@@ -42,7 +42,7 @@ from conda.exceptions import (
 )
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
-from conda.models.records import PackageRecord
+from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
 
 from . import __version__
@@ -1002,6 +1002,23 @@ class LibMambaSolver(Solver):
             return
         if not context.notify_outdated_conda or context.quiet:
             # This check can be silenced with a specific option in the context or in quiet mode
+            return
+
+        # manually check base prefix since `PrefixData(...).get("conda", None) is expensive
+        # once prefix data is lazy this might be a different situation
+        current_conda_prefix_rec = None
+        for filename in os.scandir(os.path.join(context.conda_prefix, 'conda-meta')):
+            if re.fullmatch('conda-.*\.json', filename.name):
+                # at this point package names could be: conda- and conda-build, etc
+                # so we have to actually check the json content
+                with open(filename.path) as f:
+                    data = json.load(f)
+                    if data['name'] == 'conda':
+                        current_conda_prefix_rec = PrefixRecord(**data)
+                        break
+        else:
+            # We are checking whether conda can be found in the environment conda is
+            # running from. Unless something is really wrong, this should never happen.
             return
 
         current_conda_prefix_rec = PrefixData(context.conda_prefix).get("conda", None)
