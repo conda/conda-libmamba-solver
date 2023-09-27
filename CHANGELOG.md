@@ -13,6 +13,42 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.9.0 (2023-09-28)
+
+### Enhancements
+
+* Expose libmamba's `repoquery` search features as a conda subcommand plugin. (#258)
+* Rewrite how we create tasks for `libsolv`, making use of `libmamba`'s `add_pin` features. (#270, #288)
+* Name-only pins will lock the corresponding package if installed. ([conda#13031](https://github.com/conda/conda/pull/13031) via #289)
+* Use the `.solv` cache for repodata if available and recent. (#295)
+
+### Bug fixes
+
+* Handle commands with no channels passed gracefully. (#256)
+* Workaround for missing `noarch` field in returned `PackageRecord` payload. (#257)
+* Port logic from [conda/conda#9614](https://github.com/conda/conda/pull/9614), which fixes
+  a bug where the `--prune` flag was not working correctly in `conda env update` commands.
+  (#270)
+* Ensure environments are not aggressively updated to higher priority channels under some conditions. (#240 via #270, #285)
+* Do not inject those channels from installed packages that do not exist or are unavailable. (#262 via #274)
+* Correctly print all configured channels in `PackagesNotFoundError` exceptions. (#284)
+* Do not crash if a `MatchSpec` with a build string is specified in the CLI and there's a pinned spec for the same package name. (#286 via #289)
+* Only apply `defaults::pkg` workarounds for the default value `default_channels`. (#292)
+
+### Deprecations
+
+* Users won't be able to override pinned specs with incompatible CLI specs anymore. Instead they must modify their pinned specs explicitly. ([conda#9016](https://github.com/conda/conda/issues/9016) via #289, #294)
+
+### Docs
+
+* Document intentional deviations from conda's `classic` solver behavior. (#289)
+
+### Other
+
+* Explain why `defaults::pkg_name` is broken libmamba 1.5.0 ([details](https://github.com/mamba-org/mamba/issues/2431)). (#266)
+
+
+
 ## 23.7.0 (2023-07-31)
 
 ### Enhancements
