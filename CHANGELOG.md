@@ -18,7 +18,7 @@ Remember to update the hyperlinks at the bottom.
 ### Enhancements
 
 * Expose libmamba's `repoquery` search features as a conda subcommand plugin. (#258)
-* Rewrite how we create tasks for `libsolv`, making use of `libmamba`'s `add_pin` features. (#270, #288)
+* Rewrite how we create tasks for `libsolv`, making use of `libmamba`'s `add_pin` features. Requires `libmambapy >=1.5.1`. (#270, #288)
 * Name-only pins will lock the corresponding package if installed. ([conda#13031](https://github.com/conda/conda/pull/13031) via #289)
 * Use the `.solv` cache for repodata if available and recent. (#295)
 
@@ -45,7 +45,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### Other
 
-* Explain why `defaults::pkg_name` is broken libmamba 1.5.0 ([details](https://github.com/mamba-org/mamba/issues/2431)). (#266)
+* Explain why `defaults::pkg_name` is broken libmamba 1.5.x ([details](https://github.com/mamba-org/mamba/issues/2431)). (#266)
 
 
 
