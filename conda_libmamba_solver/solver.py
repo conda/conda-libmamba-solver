@@ -1014,7 +1014,7 @@ class LibMambaSolver(Solver):
                     with open(filename.path) as f:
                         current_conda_prefix_rec = PrefixRecord(**json.load(f))
                         break
-        else:
+        if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
             # running from. Unless something is really wrong, this should never happen.
             return
