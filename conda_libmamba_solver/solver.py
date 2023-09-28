@@ -1011,13 +1011,13 @@ class LibMambaSolver(Solver):
         conda_meta_prefix_directory = os.path.join(context.conda_prefix, "conda-meta")
         with suppress(OSError):
             if os.path.lexists(conda_meta_prefix_directory):
-                for filename in os.scandir(conda_meta_prefix_directory):
+                for entry in os.scandir(conda_meta_prefix_directory):
                     if (
-                        filename.name.endswith(".json")
-                        and filename.name.rsplit("-", 2)[0] == "conda"
+                        entry.is_file()
+                        and entry.name.endswith(".json")
+                        and entry.name.rsplit("-", 2)[0] == "conda"
                     ):
-                        with open(filename.path) as f:
-                            current_conda_prefix_rec = PrefixRecord(**json.load(f))
+                        current_conda_prefix_rec = PrefixRecord(**json.loads(entry_file.read()))
                             break
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
