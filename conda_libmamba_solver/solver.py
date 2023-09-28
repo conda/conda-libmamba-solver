@@ -1016,8 +1016,9 @@ class LibMambaSolver(Solver):
                         entry.is_file()
                         and entry.name.endswith(".json")
                         and entry.name.rsplit("-", 2)[0] == "conda"
-                    ):
-                        current_conda_prefix_rec = PrefixRecord(**json.loads(entry_file.read()))
+                    ):  
+                        with open(entry.path) as f:
+                            current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
                         break
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
