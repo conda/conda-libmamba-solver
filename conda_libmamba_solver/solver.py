@@ -1016,7 +1016,7 @@ class LibMambaSolver(Solver):
                         entry.is_file()
                         and entry.name.endswith(".json")
                         and entry.name.rsplit("-", 2)[0] == "conda"
-                    ):  
+                    ):
                         with open(entry.path) as f:
                             current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
                         break
