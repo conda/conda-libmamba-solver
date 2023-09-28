@@ -11,8 +11,8 @@ import logging
 import os
 import re
 import sys
-from contextlib import suppress
 from collections import defaultdict
+from contextlib import suppress
 from functools import lru_cache
 from inspect import stack
 from textwrap import dedent
@@ -1012,7 +1012,10 @@ class LibMambaSolver(Solver):
         with suppress(OSError):
             if os.path.lexists(conda_meta_prefix_directory):
                 for filename in os.scandir(conda_meta_prefix_directory):
-                    if filename.name.endswith(".json") and filename.name.rsplit("-", 2)[0] == "conda":
+                    if (
+                        filename.name.endswith(".json")
+                        and filename.name.rsplit("-", 2)[0] == "conda"
+                    ):
                         with open(filename.path) as f:
                             current_conda_prefix_rec = PrefixRecord(**json.load(f))
                             break
