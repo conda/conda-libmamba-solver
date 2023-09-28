@@ -1009,7 +1009,7 @@ class LibMambaSolver(Solver):
         # once prefix data is lazy this might be a different situation
         current_conda_prefix_rec = None
         conda_meta_prefix_directory = os.path.join(context.conda_prefix, "conda-meta")
-        with suppress(OSError):
+        with suppress(OSError, ValueError):
             if os.path.lexists(conda_meta_prefix_directory):
                 for entry in os.scandir(conda_meta_prefix_directory):
                     if (
