@@ -12,6 +12,7 @@ import os
 import re
 import sys
 from collections import defaultdict
+from contextlib import suppress
 from functools import lru_cache
 from inspect import stack
 from textwrap import dedent
@@ -42,7 +43,7 @@ from conda.exceptions import (
 )
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
-from conda.models.records import PackageRecord
+from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
 
 from . import __version__
@@ -999,7 +1000,21 @@ class LibMambaSolver(Solver):
             # This check can be silenced with a specific option in the context or in quiet mode
             return
 
-        current_conda_prefix_rec = PrefixData(context.conda_prefix).get("conda", None)
+        # manually check base prefix since `PrefixData(...).get("conda", None) is expensive
+        # once prefix data is lazy this might be a different situation
+        current_conda_prefix_rec = None
+        conda_meta_prefix_directory = os.path.join(context.conda_prefix, "conda-meta")
+        with suppress(OSError, ValueError):
+            if os.path.lexists(conda_meta_prefix_directory):
+                for entry in os.scandir(conda_meta_prefix_directory):
+                    if (
+                        entry.is_file()
+                        and entry.name.endswith(".json")
+                        and entry.name.rsplit("-", 2)[0] == "conda"
+                    ):
+                        with open(entry.path) as f:
+                            current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
+                        break
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
             # running from. Unless something is really wrong, this should never happen.
