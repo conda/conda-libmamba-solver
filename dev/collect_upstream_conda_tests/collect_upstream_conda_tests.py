@@ -32,8 +32,8 @@ _deselected_upstream_tests = {
         # classic expects implicit update to channel with higher priority, including downgrades
         # libmamba does not do this, it just stays in the same channel; should it change?
         "test_priority_1",
-        # FIXME: Known issue: We can use a VERIFY task, but that causes a "dance" across solves, where
-        # the verification task changes a few specs. Next time it runs it undoes it.
+        # FIXME: Known issue: We can use a VERIFY task, but that causes a "dance" across solves,
+        # where the verification task changes a few specs. Next time it runs it undoes it.
         "test_force_remove_1",
         # The following are known to fail upstream due to too strict expectations
         # We provide the same tests with adjusted checks in tests/test_modified_upstream.py
