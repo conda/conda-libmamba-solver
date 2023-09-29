@@ -70,11 +70,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        default-channel: ['conda-forge'] # ['defaults', 'conda-forge']
-        python-version: ['3.8'] # ['3.8', '3.9', '3.10']
+        default-channel: ['defaults', 'conda-forge']
+        python-version: ['3.8', '3.9', '3.10']
         conda-subdir: ['win-64']
-        test-type: ['itegration'] # ['unit', 'integration']
-        test-group: ['3'] # ['1', '2', '3']
+        test-type: ['unit', 'integration']
+        test-group: ['1', '2', '3']
         exclude:
           # exclude all but one Python version for conda-forge
           - default-channel: 'conda-forge'
