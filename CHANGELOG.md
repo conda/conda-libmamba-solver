@@ -13,6 +13,23 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.9.1 (2023-09-29)
+
+### Enhancements
+
+* Increase performance of `notify_conda_outdated` logic. (#298)
+
+### Bug fixes
+
+* Prevent solver from bouncing between two compatible solutions when the same command is run twice in a row. (#302)
+
+### Contributors
+
+* @costrouc
+* @jaimergp
+
+
+
 ## 23.9.0 (2023-09-28)
 
 ### Enhancements
