@@ -2,9 +2,6 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 
-# TODO fake change to trigger ci
-# tigger ci again
-
 from conda import plugins
 
 from .repoquery import configure_parser, repoquery
