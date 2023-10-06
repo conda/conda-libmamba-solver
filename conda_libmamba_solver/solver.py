@@ -1031,7 +1031,7 @@ class LibMambaSolver(Solver):
             return
 
         # we only want to check if a newer conda is available in the channel we installed it from
-        conda_newer_str = f"{channel_name}::conda>{current_conda_prefix_rec.version}"
+        conda_newer_str = f"{channel_name}::conda>{_conda_version}"
         conda_newer_spec = MatchSpec(conda_newer_str)
 
         # if target prefix is the same conda is running from
