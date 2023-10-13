@@ -76,7 +76,7 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, Iterable, Tuple, Union, Optional
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
@@ -249,7 +249,7 @@ class LibMambaIndexHelper(IndexHelper):
         except OSError as exc:
             log.debug("Failed to stat %s", solv_path, exc_info=exc)
             solv_stat = None
-        
+
         if solv_stat is None and json_stat is None:
             log.warn("No repodata found for channel %s. Solve will fail.", channel.canonical_name)
             return
@@ -262,7 +262,7 @@ class LibMambaIndexHelper(IndexHelper):
             path_to_use = solv_path
         else:
             path_to_use = json_path
-        
+
         repo = api.Repo(self._pool, noauth_url, str(path_to_use), escape_channel_url(noauth_url))
         return _ChannelRepoInfo(
             repo=repo,
