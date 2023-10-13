@@ -37,6 +37,7 @@ from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
     InvalidMatchSpec,
+    OperationNotAllowed,
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
@@ -76,6 +77,10 @@ class LibMambaSolver(Solver):
         if specs_to_add and specs_to_remove:
             raise ValueError(
                 "Only one of `specs_to_add` and `specs_to_remove` can be set at a time"
+            )
+        if context.pip_interop_enabled:
+            raise OperationNotAllowed(
+                "conda-libmamba-solver is not compatible with 'pip_interop_enabled'"
             )
         if specs_to_remove and command is NULL:
             command = "remove"
