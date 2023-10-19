@@ -84,6 +84,11 @@ _deselected_upstream_tests = {
         "DetectTestCase::test_passes_kwargs_to_all_specs",
         "DetectTestCase::test_raises_exception_if_no_detection",
     ],
+    # TODO: Known issue: https://github.com/conda/conda-libmamba-solver/issues/320
+    "tests/conda_env/test_cli.py": [
+        "test_update_env_no_action_json_output",
+        "test_update_env_only_pip_json_output",
+    ],
     # TODO: Fix upstream; they seem to assume no other solvers will be active via env var
     "tests/plugins/test_solvers.py": [
         "test_get_solver_backend",
@@ -97,6 +102,8 @@ _deselected_upstream_tests = {
     "tests/test_priority.py": ["test_reorder_channel_priority"],
     # Added to test_modified_upstream.py; this passes just by moving it to another test file
     "tests/test_misc.py": ["test_explicit_missing_cache_entries"],
+    # Unrelated to libmamba, but we need to skip it because it fails in CI
+    "tests/test_activate.py": ["test_bash_basic_integration"],
 }
 
 

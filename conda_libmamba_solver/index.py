@@ -76,7 +76,7 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, Iterable, Tuple, Union
+from typing import Dict, Iterable, Optional, Tuple, Union
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
@@ -234,19 +234,36 @@ class LibMambaIndexHelper(IndexHelper):
 
         return url, json_path
 
-    def _json_path_to_repo_info(self, url: str, json_path: str) -> _ChannelRepoInfo:
+    def _json_path_to_repo_info(self, url: str, json_path: str) -> Optional[_ChannelRepoInfo]:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
         json_path = Path(json_path)
         solv_path = json_path.parent / f"{json_path.stem}.solv"
         try:
-            # use solv file if it's newer than the json file
-            if json_path.stat().st_mtime <= solv_path.stat().st_mtime:
-                json_path = solv_path
-                log.debug("Using %s instead of %s", solv_path, json_path)
+            json_stat = json_path.stat()
         except OSError as exc:
-            log.debug("Failed to stat %s or %s", solv_path, json_path, exc_info=exc)
-        repo = api.Repo(self._pool, noauth_url, str(json_path), escape_channel_url(noauth_url))
+            log.debug("Failed to stat %s", json_path, exc_info=exc)
+            json_stat = None
+        try:
+            solv_stat = solv_path.stat()
+        except OSError as exc:
+            log.debug("Failed to stat %s", solv_path, exc_info=exc)
+            solv_stat = None
+
+        if solv_stat is None and json_stat is None:
+            log.warn("No repodata found for channel %s. Solve will fail.", channel.canonical_name)
+            return
+        if solv_stat is None:
+            path_to_use = json_path
+        elif json_stat is None:
+            path_to_use = solv_path  # better than nothing
+        elif json_stat.st_mtime <= solv_stat.st_mtime:
+            # use solv file if it's newer than the json file
+            path_to_use = solv_path
+        else:
+            path_to_use = json_path
+
+        repo = api.Repo(self._pool, noauth_url, str(path_to_use), escape_channel_url(noauth_url))
         return _ChannelRepoInfo(
             repo=repo,
             channel=channel,
@@ -290,7 +307,8 @@ class LibMambaIndexHelper(IndexHelper):
         index = {}
         for url in urls:
             info = self._json_path_to_repo_info(url, jsons[url])
-            index[info.noauth_url] = info
+            if info is not None:
+                index[info.noauth_url] = info
 
         # 4. Configure priorities
         set_channel_priorities(index)
