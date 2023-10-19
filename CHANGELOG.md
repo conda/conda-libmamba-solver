@@ -13,6 +13,20 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.9.2 (2023-10-19)
+
+### Bug fixes
+
+* Use the conda version reported at runtime (instead of the one reported by `conda list`) to figure out whether there are conda updates available. (#316)
+* Allow the index to be empty in `--offline` runs with no local cache available for the configured channels. (#323)
+
+### Contributors
+
+* @costrouc
+* @jaimergp
+
+
+
 ## 23.9.1 (2023-09-29)
 
 ### Enhancements
