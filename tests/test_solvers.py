@@ -95,8 +95,9 @@ def test_python_downgrade_reinstalls_noarch_packages():
 
 
 @pytest.mark.xfail(
-    mamba_version() in ("1.5.0", "1.5.1"),
+    mamba_version().startswith("1.5."),
     reason="Known bug. See https://github.com/mamba-org/mamba/issues/2431",
+    strict=True,
 )
 def test_defaults_specs_work():
     """
