@@ -88,7 +88,7 @@ _deselected_upstream_tests = {
     "tests/conda_env/test_cli.py": [
         "test_update_env_no_action_json_output",
         "test_update_env_only_pip_json_output",
-    ]
+    ],
     # TODO: Fix upstream; they seem to assume no other solvers will be active via env var
     "tests/plugins/test_solvers.py": [
         "test_get_solver_backend",
