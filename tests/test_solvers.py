@@ -418,7 +418,7 @@ def test_ca_certificates_pins():
 
             for pkg in data["actions"]["LINK"]:
                 if pkg["name"] == "ca-certificates":
-                    assert pkg["version"].startswith("2023.")
+                    assert pkg["version"].startswith("2023."), cli_spec
                     break
             else:
                 raise AssertionError("ca-certificates not found in LINK actions")
