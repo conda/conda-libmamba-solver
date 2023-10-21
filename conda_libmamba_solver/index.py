@@ -320,20 +320,20 @@ class LibMambaIndexHelper(IndexHelper):
         repo.set_installed()
         return repo
 
-    def whoneeds(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict, str]:
-        result_str = self._query.whoneeds(query, self._format)
+    def whoneeds(self, query: Union[str, MatchSpec], records=True) -> Union[Iterable[PackageRecord], dict, str]:
+        result_str = self._query.whoneeds(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
 
-    def depends(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict, str]:
-        result_str = self._query.depends(query, self._format)
+    def depends(self, query: Union[str, MatchSpec], records=True) -> Union[Iterable[PackageRecord], dict, str]:
+        result_str = self._query.depends(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
 
-    def search(self, query: str, records=True) -> Union[Iterable[PackageRecord], dict, str]:
-        result_str = self._query.find(query, self._format)
+    def search(self, query: Union[str, MatchSpec], records=True) -> Union[Iterable[PackageRecord], dict, str]:
+        result_str = self._query.find(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
@@ -348,6 +348,29 @@ class LibMambaIndexHelper(IndexHelper):
             for record in pkg_records:
                 explicit_pool.add(record.name)
         return tuple(explicit_pool)
+
+    def _prepare_query(self, query: Union[str, MatchSpec]) -> str:
+        if isinstance(query, str):
+            if "[" not in query:
+                return query
+            query = MatchSpec(query)
+        # libmambapy.Query only supports some matchspec syntax
+        # https://github.com/conda/conda-libmamba-solver/issues/327
+        # NOTE: Channel specs are currently ignored by libmambapy.Query searches
+        # if query.get_raw_value("channel"):
+        #     result = f"{query.get_raw_value('channel')}::{query.name}"
+        #     if query.version and query.get_raw_value("version").startswith((">", "<", "!", "=")):
+        #         result += query.get_raw_value("version")
+        #     elif query.version:
+        #         result += f"={query.get_raw_value('version')}"
+        #     else:
+        #         result += "=*"
+        #     if query.get_raw_value("build"):
+        #         result += f"={query.get_raw_value('build')}"
+        #     return result
+        if not query.get_raw_value("version"):
+            query = MatchSpec(query, version="*")
+        return query.conda_build_form()
 
     def _process_query_result(
         self,
