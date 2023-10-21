@@ -3,8 +3,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 
-from .utils import conda_subprocess
 from conda_libmamba_solver.index import LibMambaIndexHelper
+
+from .utils import conda_subprocess
 
 
 def test_repoquery():

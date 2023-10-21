@@ -320,19 +320,25 @@ class LibMambaIndexHelper(IndexHelper):
         repo.set_installed()
         return repo
 
-    def whoneeds(self, query: Union[str, MatchSpec], records=True) -> Union[Iterable[PackageRecord], dict, str]:
+    def whoneeds(
+        self, query: Union[str, MatchSpec], records=True
+    ) -> Union[Iterable[PackageRecord], dict, str]:
         result_str = self._query.whoneeds(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
 
-    def depends(self, query: Union[str, MatchSpec], records=True) -> Union[Iterable[PackageRecord], dict, str]:
+    def depends(
+        self, query: Union[str, MatchSpec], records=True
+    ) -> Union[Iterable[PackageRecord], dict, str]:
         result_str = self._query.depends(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
 
-    def search(self, query: Union[str, MatchSpec], records=True) -> Union[Iterable[PackageRecord], dict, str]:
+    def search(
+        self, query: Union[str, MatchSpec], records=True
+    ) -> Union[Iterable[PackageRecord], dict, str]:
         result_str = self._query.find(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
