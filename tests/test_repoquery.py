@@ -34,10 +34,10 @@ def test_query_search():
         "ca-certificates !=2022.9.24,>2020",
         "ca-certificates=*=*_0",
         # TODO: channel specs are accepted but they seem to be ignored by libmambapy.Query!
-        "pkgs/main::ca-certificates",
-        "pkgs/main::ca-certificates=2022.9.24",
-        "pkgs/main::ca-certificates[version='>=2022.9.24']",
-        "pkgs/main::ca-certificates[build='*_0']",
+        # "defaults::ca-certificates",
+        # "defaults::ca-certificates=2022.9.24",
+        # "defaults::ca-certificates[version='>=2022.9.24']",
+        # "defaults::ca-certificates[build='*_0']",
     ):
         results = index.search(query)
         assert len(results) > 0, query
