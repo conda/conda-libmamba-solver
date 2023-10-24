@@ -75,6 +75,8 @@ jobs:
           bash -c "sudo env CONDA_SOLVER=classic \
                         /opt/conda/condabin/conda install -p /opt/conda \
                         --repodata-fn=repodata.json --update-specs \
+                        --file /opt/conda-src/tests/requirements.txt \
+                        --file /opt/conda-src/tests/requirements-s3.txt \
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
                         --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
                    sudo /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
@@ -158,6 +160,7 @@ jobs:
           # install all test requirements
           conda install --yes \
             --file tests/requirements.txt \
+            --file tests/requirements-s3.txt \
             --file ../conda-libmamba-solver/dev/requirements.txt \
             --file ../conda-libmamba-solver/tests/requirements.txt \
             python=${{ matrix.python-version }}

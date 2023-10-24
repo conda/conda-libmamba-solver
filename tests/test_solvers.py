@@ -385,3 +385,40 @@ def test_locking_pins():
         assert not retcode
         assert data.get("success")
         assert data["message"] == "All requested packages already installed."
+
+
+def test_ca_certificates_pins():
+    ca_certificates_pin = "ca-certificates=2023"
+    with make_temp_env() as prefix:
+        Path(prefix, "conda-meta").mkdir(exist_ok=True)
+        Path(prefix, "conda-meta", "pinned").write_text(f"{ca_certificates_pin}\n")
+
+        for cli_spec in (
+            "ca-certificates",
+            "ca-certificates=2023",
+            "ca-certificates>0",
+            "ca-certificates<2024",
+            "ca-certificates!=2022",
+        ):
+            out, err, retcode = run_command(
+                "install",
+                prefix,
+                cli_spec,
+                "--dry-run",
+                "--json",
+                "--override-channels",
+                "-c",
+                "conda-forge",
+                use_exception_handler=True,
+            )
+            data = json.loads(out)
+            assert not retcode
+            assert data.get("success")
+            assert data.get("dry_run")
+
+            for pkg in data["actions"]["LINK"]:
+                if pkg["name"] == "ca-certificates":
+                    assert pkg["version"].startswith("2023."), cli_spec
+                    break
+            else:
+                raise AssertionError("ca-certificates not found in LINK actions")

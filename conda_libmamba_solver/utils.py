@@ -74,7 +74,7 @@ def compatible_specs(index, specs, raise_not_found=True):
 
     matched = None
     for spec in specs:
-        results = set(index.search(str(spec)))
+        results = set(index.search(spec))
         if not results:
             if raise_not_found:
                 exc = PackagesNotFoundError([spec], index._channels)
