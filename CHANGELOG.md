@@ -22,7 +22,6 @@ Remember to update the hyperlinks at the bottom.
 ### Contributors
 
 * @jaimergp
-* @pre-commit-ci[bot]
 
 
 
