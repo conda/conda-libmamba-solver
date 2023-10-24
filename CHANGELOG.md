@@ -13,6 +13,19 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.9.3 (2023-10-24)
+
+### Bug fixes
+
+* Massage bracket-containing specs (e.g. `ca-certificates[version='>=2023']`) so they are understood by `libmambapy.Query`, fixing a bug where `conda` would erroneously complain about no package records matching the configured pinned specs. (#327 via #328)
+
+### Contributors
+
+* @jaimergp
+* @pre-commit-ci[bot]
+
+
+
 ## 23.9.2 (2023-10-19)
 
 ### Bug fixes
