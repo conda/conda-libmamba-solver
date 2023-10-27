@@ -9,6 +9,7 @@
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
 import logging
+import threading
 from functools import lru_cache
 from importlib.metadata import version
 from typing import Dict
@@ -85,6 +86,17 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
 
 
 def init_api_context() -> api.Context:
+    # 1st initialization of libmamba's context must happen outside
+    # the main thread to avoid Ctrl-C signal handling from being hijacked
+    # See https://github.com/mamba-org/mamba/issues/1594
+    # TODO: fix upstream because this is a bit too hacky
+    t = threading.Thread(target=api.Context)
+    t.daemon = True
+    t.start()
+    while t.is_alive():
+        t.join(0.1)
+    
+    # Now we can safely initialize the context
     api_ctx = api.Context()
 
     # Output params
