@@ -107,10 +107,10 @@ def init_api_context() -> api.Context:
         # PyErr_SetInterruptEx.
         if not _once:
             _once = True
-            if not on_win:
-                signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
-            else:
+            if on_win:
                 signal.signal(signal.SIGINT, signal.SIG_DFL)
+            else:
+                signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
 
     # Output params
     # We use this getattr() trick to guarantee backwards compatibility
