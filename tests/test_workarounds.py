@@ -2,8 +2,12 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 import json
+import signal
 import sys
-from subprocess import PIPE, check_call, run
+import time
+from subprocess import PIPE, Popen, check_call, run
+
+import pytest
 
 
 def test_matchspec_star_version():
@@ -56,3 +60,35 @@ def test_build_string_filters():
             assert pkg["version"].startswith("3.8")
         if pkg["name"] == "numpy":
             assert "py38" in pkg["build_string"]
+
+
+@pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
+def test_ctrl_c(stage):
+    p = Popen(
+        [
+            sys.executable,
+            "-m",
+            "conda",
+            "create",
+            "-p",
+            "UNUSED",
+            "--dry-run",
+            "--solver=libmamba",
+            "--override-channels",
+            "--channel=conda-forge",
+            "vaex",
+        ],
+        text=True,
+        stdout=PIPE,
+        stderr=PIPE,
+    )
+    t0 = time.time()
+    while stage not in p.stdout.readline():
+        time.sleep(0.1)
+        if time.time() - t0 > 30:
+            raise RuntimeError("Timeout")
+
+    p.send_signal(signal.SIGINT if sys.platform != "win32" else signal.CTRL_C_EVENT)
+    p.wait()
+    assert p.returncode != 0
+    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
