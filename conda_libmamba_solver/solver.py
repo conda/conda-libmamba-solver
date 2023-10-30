@@ -516,8 +516,16 @@ class LibMambaSolver(Solver):
             elif name == "python" and installed and not pinned:
                 pyver = ".".join(installed.version.split(".")[:2])
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
-            elif history and not history.is_name_only_spec and not conflicting:
-                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
+            elif history and not history.is_name_only_spec:
+                if conflicting:
+                    # deliberately ignore conflicts that appear in history
+                    # because we want to _keep_ this conflicting package!
+                    # by `pass`ing here we won't run the code below that would otherwise
+                    # result in an ALLOW_UNINSTALL, which would tell the solver is ok to remove
+                    # this package, which was explicitly requested by the user in past operations
+                    pass  
+                else:
+                    tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
             elif installed:
                 if conflicting:
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
