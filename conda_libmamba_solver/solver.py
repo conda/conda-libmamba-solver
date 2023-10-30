@@ -523,7 +523,7 @@ class LibMambaSolver(Solver):
                     # by `pass`ing here we won't run the code below that would otherwise
                     # result in an ALLOW_UNINSTALL, which would tell the solver is ok to remove
                     # this package, which was explicitly requested by the user in past operations
-                    pass  
+                    pass
                 else:
                     tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
             elif installed:
