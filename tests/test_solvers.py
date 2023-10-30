@@ -15,7 +15,8 @@ from conda.base.context import context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.testing.integration import Commands, make_temp_env, run_command
+from conda.exceptions import DryRunExit
+from conda.testing.integration import Commands, make_temp_env, package_is_installed, run_command
 from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
@@ -432,6 +433,8 @@ def test_python_update_should_not_uninstall_history():
     channels = "--override-channels", "-c", "defaults"
     solver = "--solver", "libmamba"
     with make_temp_env("python=3.10", "numpy=*=py310*", *channels, *solver) as prefix:
+        assert package_is_installed(prefix, "python=3.10")
+        assert package_is_installed(prefix, "numpy=*=py310*")
         with pytest.raises(
             LibMambaUnsatisfiableError,
             match=r"numpy \* py310\*,.|\n+python 3\.11",
@@ -442,5 +445,29 @@ def test_python_update_should_not_uninstall_history():
                 "python=3.11",
                 *channels,
                 *solver,
+                "--dry-run",
                 no_capture=True,
             )
+        
+        # Explicitly passing 'numpy' in the CLI overrides the history pin
+        out, err, retcode = run_command(
+            Commands.INSTALL,
+            prefix,
+            "python=3.11",
+            "numpy",
+            *channels,
+            *solver,
+            "--dry-run",
+            "--json",
+            use_exception_handler=True,
+        )
+        assert not retcode
+        data = json.loads(out)
+        assert data.get("success")
+        assert data.get("dry_run")
+        for pkg in data["actions"]["LINK"]:
+            if pkg["name"] == "numpy":
+                assert "py311" in pkg["build_string"], pkg
+            elif pkg["name"] == "python":
+                assert pkg["version"].startswith("3.11")
+
