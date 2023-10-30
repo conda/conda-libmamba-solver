@@ -5,7 +5,7 @@ import json
 import signal
 import sys
 import time
-from subprocess import PIPE, Popen, check_call, run
+from subprocess import PIPE, Popen, check_call, run, CREATE_NEW_PROCESS_GROUP
 
 import pytest
 
@@ -64,6 +64,7 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
+    kwargs = {"creationflags": CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {}
     p = Popen(
         [
             sys.executable,
@@ -81,6 +82,7 @@ def test_ctrl_c(stage):
         text=True,
         stdout=PIPE,
         stderr=PIPE,
+        **kwargs,
     )
     t0 = time.time()
     while stage not in p.stdout.readline():
@@ -88,7 +90,7 @@ def test_ctrl_c(stage):
         if time.time() - t0 > 30:
             raise RuntimeError("Timeout")
 
-    p.send_signal(signal.SIGINT if sys.platform != "win32" else signal.CTRL_C_EVENT)
+    p.send_signal(signal.SIGINT if sys.platform != "win32" else signal.CTRL_BREAK_EVENT)
     p.wait()
     assert p.returncode != 0
     assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
