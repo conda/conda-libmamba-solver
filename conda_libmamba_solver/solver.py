@@ -792,7 +792,7 @@ class LibMambaSolver(Solver):
         if not self._called_from_conda_build():
             return
 
-        from .exceptions import ExplainedDependencyNeedsBuildingError
+        from .conda_build_exceptions import ExplainedDependencyNeedsBuildingError
 
         # the patched index should contain the arch we are building this env for
         # if the index is empty, we default to whatever platform we are running on
