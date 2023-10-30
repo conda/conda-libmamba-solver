@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Ensure that historic specs are kept in the environment, even if that means raising a conflict. (#341 via #345) 
+* Ensure that historic specs are kept in the environment, even if that means raising a conflict. (#341 via #345)
 
 ### Deprecations
 

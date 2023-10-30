@@ -434,7 +434,7 @@ def test_python_update_should_not_uninstall_history():
     with make_temp_env("python=3.10", "numpy=*=py310*", *channels, *solver) as prefix:
         with pytest.raises(
             LibMambaUnsatisfiableError,
-            match=r"package numpy-\S+-py310\S+ requires python >=3\.10,<3\.11\.0a0",
+            match=r"numpy \* py310\*,.|\n+python 3\.11",
         ):
             run_command(
                 Commands.INSTALL,
