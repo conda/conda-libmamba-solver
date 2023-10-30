@@ -1,3 +1,6 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 """
@@ -25,5 +28,3 @@ class ExplainedDependencyNeedsBuildingError(DependencyNeedsBuildingError):
             # print simple message in log.warn() calls
             return msg
         return "\n".join([msg, self.explanation])
-
-
