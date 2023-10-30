@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 import signal
+import subprocess as sp
 import sys
 import time
-from subprocess import PIPE, Popen, check_call, run, CREATE_NEW_PROCESS_GROUP
 
 import pytest
 
@@ -16,7 +16,7 @@ def test_matchspec_star_version():
     We work around that with `.utils.safe_conda_build_form()`.
     Reported in https://github.com/conda/conda/issues/11347
     """
-    check_call(
+    sp.check_call(
         [
             sys.executable,
             "-m",
@@ -35,7 +35,7 @@ def test_matchspec_star_version():
 
 
 def test_build_string_filters():
-    process = run(
+    process = sp.run(
         [
             sys.executable,
             "-m",
@@ -48,7 +48,7 @@ def test_build_string_filters():
             "numpy=*=*py38*",
             "--json",
         ],
-        stdout=PIPE,
+        stdout=sp.PIPE,
         text=True,
     )
     print(process.stdout)
@@ -64,8 +64,8 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
-    kwargs = {"creationflags": CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {}
-    p = Popen(
+    kwargs = {"creationflags": sp.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {}
+    p = sp.Popen(
         [
             sys.executable,
             "-m",
@@ -80,8 +80,8 @@ def test_ctrl_c(stage):
             "vaex",
         ],
         text=True,
-        stdout=PIPE,
-        stderr=PIPE,
+        stdout=sp.PIPE,
+        stderr=sp.PIPE,
         **kwargs,
     )
     t0 = time.time()
