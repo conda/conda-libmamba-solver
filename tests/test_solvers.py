@@ -19,6 +19,7 @@ from conda.testing.integration import Commands, make_temp_env, run_command
 from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
+from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.mamba_utils import mamba_version
 
 from .utils import conda_subprocess
@@ -422,3 +423,24 @@ def test_ca_certificates_pins():
                     break
             else:
                 raise AssertionError("ca-certificates not found in LINK actions")
+
+
+def test_python_update_should_not_uninstall_history():
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/341
+    """
+    channels = "--override-channels", "-c", "defaults"
+    solver = "--solver", "libmamba"
+    with make_temp_env("python=3.10", "numpy=*=py310*", *channels, *solver) as prefix:
+        with pytest.raises(
+            LibMambaUnsatisfiableError,
+            match=r"package numpy-\S+-py310\S+ requires python >=3\.10,<3\.11\.0a0",
+        ):
+            run_command(
+                Commands.INSTALL,
+                prefix,
+                "python=3.11",
+                *channels,
+                *solver,
+                no_capture=True,
+            )
