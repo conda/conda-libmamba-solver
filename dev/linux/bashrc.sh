@@ -19,7 +19,7 @@ function recompile-mamba () {
         -DCMAKE_INSTALL_PREFIX=/opt/conda \
         -DCMAKE_PREFIX_PATH=/opt/conda \
         -DBUILD_LIBMAMBAPY=ON
-    sudo /opt/conda/bin/cmake --build build/ -j4
+    sudo /opt/conda/bin/cmake --build build/ -j
     sudo make install -C build/
     popd
   else
@@ -31,6 +31,18 @@ sudo /opt/conda/condabin/conda install -y -p /opt/conda --repodata-fn repodata.j
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 
+if [ -d "/opt/mamba-src" ]; then
+  # remove "sel(win)" in environment yaml hack since conda does not understand
+  # libmamba specific specs
+  sed '/sel(.*)/d' /opt/mamba-src/mamba/environment-dev.yml > /tmp/mamba-environment-dev.yml
+  sudo /opt/conda/condabin/conda env update -p /opt/conda \
+       --file /tmp/mamba-environment-dev.yml
+
+  sudo /opt/conda/condabin/conda remove -p /opt/conda -y --force libmambapy libmamba
+  recompile-mamba
+  sudo /opt/conda/bin/pip install -e /opt/mamba-src/libmambapy/ --no-deps
+fi
+
 cd /opt/conda-libmamba-solver-src
 sudo /opt/conda/bin/python -m pip install ./dev/collect_upstream_conda_tests/ --no-deps
 sudo /opt/conda/bin/python -m pip install -e . --no-deps
@@ -38,18 +50,6 @@ sudo /opt/conda/bin/python -m pip install -e . --no-deps
 cd /opt/conda-src
 export RUNNING_ON_DEVCONTAINER=${RUNNING_ON_DEVCONTAINER:-}
 source /opt/conda-src/dev/linux/bashrc.sh
-
-# if [ -d "/opt/mamba-src" ]; then
-#   # remove "sel(win)" in environment yaml hack since conda does not understand
-#   # libmamba specific specs
-#   sed '/sel(.*)/d' /opt/mamba-src/mamba/environment-dev.yml > /tmp/mamba-environment-dev.yml
-#   sudo /opt/conda/condabin/conda env update -p /opt/conda \
-#        --file /tmp/mamba-environment-dev.yml --solver=libmamba
-
-#   sudo /opt/conda/condabin/conda remove -p /opt/conda -y --force libmambapy libmamba
-#   recompile-mamba
-#   sudo /opt/conda/bin/pip install -e /opt/mamba-src/libmambapy/ --no-deps
-# fi
 
 cd /opt/conda-libmamba-solver-src
 
