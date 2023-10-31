@@ -517,11 +517,8 @@ class LibMambaSolver(Solver):
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
             elif history:
                 if conflicting and history.strictness == 3:
-                    # deliberately ignore conflicts that appear in history
-                    # because we want to _keep_ this conflicting package!
-                    # by `pass`ing here we won't run the code below that would otherwise
-                    # result in an ALLOW_UNINSTALL, which would tell the solver is ok to remove
-                    # this package, which was explicitly requested by the user in past operations
+                    # relax name-version-build (strictness=3) history specs that cause conflicts
+                    # this is called neutering and makes test_neutering_of_historic_specs pass
                     spec = f"{name} {history.version}.*" if history.version else name
                     tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec)
                 else:
