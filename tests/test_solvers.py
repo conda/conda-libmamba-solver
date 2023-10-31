@@ -16,7 +16,12 @@ from conda.common.compat import on_linux, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.exceptions import DryRunExit
-from conda.testing.integration import Commands, make_temp_env, package_is_installed, run_command
+from conda.testing.integration import (
+    Commands,
+    make_temp_env,
+    package_is_installed,
+    run_command,
+)
 from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
