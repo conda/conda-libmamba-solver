@@ -90,7 +90,7 @@ def test_ctrl_c(stage):
         if time.time() - t0 > 30:
             raise RuntimeError("Timeout")
 
-    p.send_signal(signal.SIGINT if sys.platform != "win32" else signal.CTRL_BREAK_EVENT)
+    p.send_signal(signal.CTRL_C_EVENT if sys.platform == "win32" else signal.SIGINT)
     p.wait(timeout=30)
     assert p.returncode != 0
     assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
