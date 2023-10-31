@@ -434,20 +434,30 @@ def test_ca_certificates_pins():
 def test_python_update_should_not_uninstall_history():
     """
     https://github.com/conda/conda-libmamba-solver/issues/341
+
+    Original report complained about an upgrade to Python 3.12 removing numpy from the
+    (originally) py311 environment because at that point in time numpy for py312 was not yet
+    available in defaults. Since at some point it will be, we will test for similar behavior
+    here, but in a way that we know will never be reverted: typing_extensions being available for
+    Python 2.7.
+
+    Given a Python 3.8 + typing-extensions environment, the solver should not allow us to
+    change to Python 2.7 because typing-extensions is in history, and the only solution to get
+    Python 2.7 is to remove it. Hence, we expect a conflict that mentions both.
     """
-    channels = "--override-channels", "-c", "defaults"
+    channels = "--override-channels", "-c", "conda-forge"
     solver = "--solver", "libmamba"
-    with make_temp_env("python=3.11", "numpy", *channels, *solver) as prefix:
-        assert package_is_installed(prefix, "python=3.11")
-        assert package_is_installed(prefix, "numpy=*=py311*")
+    with make_temp_env("python=3.8", "typing_extensions>=4.8", *channels, *solver) as prefix:
+        assert package_is_installed(prefix, "python=3.8")
+        assert package_is_installed(prefix, "typing_extensions>=4.8")
         with pytest.raises(
             LibMambaUnsatisfiableError,
-            match=r"numpy.|\n+python 3\.12.*is not installable",
+            match=r"python 2\.7.|\n*typing_extensions",
         ):
             run_command(
                 Commands.INSTALL,
                 prefix,
-                "python=3.12",
+                "python=2.7",
                 *channels,
                 *solver,
                 "--dry-run",
