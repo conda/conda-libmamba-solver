@@ -4,9 +4,6 @@
 """
 pytest plugin to modify which upstream (conda/conda) tests are run by pytest.
 """
-from importlib.metadata import version
-
-import pytest
 
 # Deselect tests from conda/conda we cannot pass due to different reasons
 # These used to be skipped or xfail'd upstream, but we are trying to
@@ -105,6 +102,7 @@ _deselected_upstream_tests = {
     # Unrelated to libmamba, but we need to skip it because it fails in CI
     "tests/test_activate.py": ["test_bash_basic_integration"],
 }
+
 
 def pytest_collection_modifyitems(session, config, items):
     """
