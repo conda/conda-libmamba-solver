@@ -1049,13 +1049,13 @@ class SolverOutputState:
 
         # ## Neutered ###
         # annotate overridden history specs so they are written to disk
-        for name, spec in self.specs.items():
-            history_spec = sis.history.get(name)
-            if history_spec and spec.strictness < history_spec.strictness:
+        for name, spec in sis.history.items():
+            record = self.records.get(name)
+            if record and not spec.match(record):
                 self.neutered.set(
                     name,
-                    MatchSpec(name, version=history_spec.get("version")),
-                    reason="Spec needs less strict constrains than history",
+                    MatchSpec(name, version=record.version),
+                    reason="Solution required a history override",
                 )
 
         # ## Add inconsistent packages back ###
