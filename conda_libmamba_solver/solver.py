@@ -331,7 +331,6 @@ class LibMambaSolver(Solver):
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
-            (api.SOLVER_FLAG_INSTALL_ALSO_UPDATES, 1),
         ]
         if context.channel_priority is ChannelPriority.STRICT:
             solver_options.append((api.SOLVER_FLAG_STRICT_REPO_PRIORITY, 1))
@@ -516,16 +515,17 @@ class LibMambaSolver(Solver):
             elif name == "python" and installed and not pinned:
                 pyver = ".".join(installed.version.split(".")[:2])
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
-            elif history and not history.is_name_only_spec:
-                if conflicting:
+            elif history:
+                if conflicting and history.strictness == 3:
                     # deliberately ignore conflicts that appear in history
                     # because we want to _keep_ this conflicting package!
                     # by `pass`ing here we won't run the code below that would otherwise
                     # result in an ALLOW_UNINSTALL, which would tell the solver is ok to remove
                     # this package, which was explicitly requested by the user in past operations
-                    pass
+                    spec = f"{name} {history.version}.*" if history.version else name
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec)
                 else:
-                    tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(history))
             elif installed:
                 if conflicting:
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
