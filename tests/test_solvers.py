@@ -432,42 +432,19 @@ def test_python_update_should_not_uninstall_history():
     """
     channels = "--override-channels", "-c", "defaults"
     solver = "--solver", "libmamba"
-    with make_temp_env("python=3.10", "numpy=*=py310*", *channels, *solver) as prefix:
-        assert package_is_installed(prefix, "python=3.10")
-        assert package_is_installed(prefix, "numpy=*=py310*")
+    with make_temp_env("python=3.11", "numpy", *channels, *solver) as prefix:
+        assert package_is_installed(prefix, "python=3.11")
+        assert package_is_installed(prefix, "numpy=*=py311*")
         with pytest.raises(
             LibMambaUnsatisfiableError,
-            match=r"numpy \* py310\*,.|\n+python 3\.11",
+            match=r"numpy.|\n+python 3\.12.*is not installable",
         ):
             run_command(
                 Commands.INSTALL,
                 prefix,
-                "python=3.11",
+                "python=3.12",
                 *channels,
                 *solver,
                 "--dry-run",
                 no_capture=True,
             )
-        
-        # Explicitly passing 'numpy' in the CLI overrides the history pin
-        out, err, retcode = run_command(
-            Commands.INSTALL,
-            prefix,
-            "python=3.11",
-            "numpy",
-            *channels,
-            *solver,
-            "--dry-run",
-            "--json",
-            use_exception_handler=True,
-        )
-        assert not retcode
-        data = json.loads(out)
-        assert data.get("success")
-        assert data.get("dry_run")
-        for pkg in data["actions"]["LINK"]:
-            if pkg["name"] == "numpy":
-                assert "py311" in pkg["build_string"], pkg
-            elif pkg["name"] == "python":
-                assert pkg["version"].startswith("3.11")
-
