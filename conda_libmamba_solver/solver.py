@@ -375,7 +375,6 @@ class LibMambaSolver(Solver):
                     n_pins += 1
                     self.solver.add_pin(spec)
                     out_state.pins[f"pin-{n_pins}"] = spec
-                continue
             else:
                 self.solver.add_jobs(specs, task_type)
 
