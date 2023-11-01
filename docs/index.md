@@ -11,6 +11,7 @@ Start here if you want a faster conda:
 :maxdepth: 1
 getting-started
 subcommands
+configuration
 libmamba-vs-classic
 performance
 faq
