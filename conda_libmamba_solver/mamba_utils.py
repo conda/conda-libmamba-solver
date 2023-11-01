@@ -92,7 +92,7 @@ _once = False
 def init_api_context() -> api.Context:
     global _once
     if hasattr(api.Context, "use_default_signal_handler"):
-        api.Context.use_default_signal_handler(True)
+        api.Context.use_default_signal_handler(False)
         api_ctx = api.Context()
     else:
         api_ctx = api.Context()
