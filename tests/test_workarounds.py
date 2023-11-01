@@ -1,6 +1,7 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+import ctypes
 import json
 import signal
 import subprocess as sp
@@ -64,7 +65,6 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
-    kwargs = {"creationflags": sp.CREATE_NEW_PROCESS_GROUP} if sys.platform == "win32" else {}
     p = sp.Popen(
         [
             sys.executable,
@@ -82,7 +82,6 @@ def test_ctrl_c(stage):
         text=True,
         stdout=sp.PIPE,
         stderr=sp.PIPE,
-        **kwargs,
     )
     t0 = time.time()
     while stage not in p.stdout.readline():
@@ -90,7 +89,21 @@ def test_ctrl_c(stage):
         if time.time() - t0 > 30:
             raise RuntimeError("Timeout")
 
-    p.send_signal(signal.CTRL_C_EVENT if sys.platform == "win32" else signal.SIGINT)
-    p.wait(timeout=30)
-    assert p.returncode != 0
-    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+    # works around Window's awkward CTRL-C signal handling
+    # https://stackoverflow.com/a/64357453
+    if sys.platform == "win32":
+        kernel = ctypes.windll.kernel32
+        kernel.FreeConsole()
+        kernel.AttachConsole(p.pid)
+        kernel.SetConsoleCtrlHandler(None, 1)
+        kernel.GenerateConsoleCtrlEvent(0, 0)
+        p.wait(timeout=30)
+        assert p.returncode != 0
+        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+        kernel.SetConsoleCtrlHandler(None, 0)
+
+    else:
+        p.send_signal(signal.SIGINT)
+        p.wait(timeout=30)
+        assert p.returncode != 0
+        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
