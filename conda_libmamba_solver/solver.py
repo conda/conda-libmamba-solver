@@ -371,29 +371,12 @@ class LibMambaSolver(Solver):
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
             if task_name == "ADD_PIN":
-                # ## Add pins
                 for spec in specs:
                     n_pins += 1
                     self.solver.add_pin(spec)
                     out_state.pins[f"pin-{n_pins}"] = spec
-                continue
-
-            try:
+            else:
                 self.solver.add_jobs(specs, task_type)
-            except RuntimeError as exc:
-                if mamba_version().startswith("1.5."):
-                    for spec in specs:
-                        if spec in str(exc):
-                            break
-                    else:
-                        spec = f"One of {specs}"
-                    msg = (
-                        f"This is a bug in libmamba {mamba_version()} when using "
-                        "'defaults::<spec>' or 'pkgs/main::<spec>'. "
-                        "Consider using '-c defaults' instead."
-                    )
-                    raise InvalidMatchSpec(spec, msg)
-                raise
 
         # ## Run solver
         solved = self.solver.solve()
@@ -624,12 +607,7 @@ class LibMambaSolver(Solver):
         """
         conflicts = []
         not_found = []
-        if "1.4.5" <= mamba_version() < "1.5.0":
-            # 1.4.5 had a regression where it would return
-            # a single line with all the problems; fixed in 1.5.0
-            problem_lines = [f" - {problem}" for problem in problems.split(" - ")[1:]]
-        else:
-            problem_lines = problems.splitlines()[1:]
+        problem_lines = problems.splitlines()[1:]
         for line in problem_lines:
             line = line.strip()
             words = line.split()
@@ -728,14 +706,6 @@ class LibMambaSolver(Solver):
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
-            return legacy_errors
-        if (
-            mamba_version() <= "1.4.1"
-            and "conflicting requests" in self.solver.all_problems_to_str()
-        ):
-            # This error makes 'explain_problems()' crash in libmamba <=1.4.1.
-            # Anticipate and return simpler error earlier.
-            log.info("Failed to explain problems. Conflicting requests.")
             return legacy_errors
         try:
             explained_errors = self.solver.explain_problems()
