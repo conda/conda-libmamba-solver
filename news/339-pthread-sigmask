@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Call `pthread_sigmask()` to override Mamba's signal handling, allowing `CTRL-C` to raise `KeyboardInterrupt` in Python. (#339)
+* Do not use `libmamba`'s default signal handler so users can `Ctrl-C` from `conda`. (#337 via #340)
 
 ### Deprecations
 
