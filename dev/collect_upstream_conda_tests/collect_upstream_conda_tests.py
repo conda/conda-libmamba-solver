@@ -4,9 +4,6 @@
 """
 pytest plugin to modify which upstream (conda/conda) tests are run by pytest.
 """
-from importlib.metadata import version
-
-import pytest
 
 # Deselect tests from conda/conda we cannot pass due to different reasons
 # These used to be skipped or xfail'd upstream, but we are trying to
@@ -107,15 +104,6 @@ _deselected_upstream_tests = {
 }
 
 
-_broken_by_libmamba_1_5_x = {
-    # conda/tests
-    "tests/test_export.py": [
-        "test_explicit",
-        "test_export",
-    ],
-}
-
-
 def pytest_collection_modifyitems(session, config, items):
     """
     We use this hook to modify which upstream tests (from the conda/conda repo)
@@ -131,15 +119,6 @@ def pytest_collection_modifyitems(session, config, items):
         if item_name_no_brackets in _deselected_upstream_tests.get(path_key, []):
             deselected.append(item)
             continue
-        if version("libmambapy").startswith(
-            "1.5."
-        ) and item_name_no_brackets in _broken_by_libmamba_1_5_x.get(path_key, []):
-            item.add_marker(
-                pytest.mark.xfail(
-                    reason="Broken in libmamba 1.5.x; "
-                    "see https://github.com/mamba-org/mamba/issues/2431."
-                )
-            )
         selected.append(item)
     items[:] = selected
     config.hook.pytest_deselected(items=deselected)

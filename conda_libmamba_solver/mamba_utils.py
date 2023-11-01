@@ -113,25 +113,20 @@ def init_api_context() -> api.Context:
                 signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
 
     # Output params
-    # We use this getattr() trick to guarantee backwards compatibility
-    # with libmambapy <=1.4.2; 1.4.3+ grouped some settings together
-    output_params = getattr(api_ctx, "output_params", api_ctx)
-    output_params.json = context.json
-    output_params.quiet = context.quiet
-    output_params.verbosity = context.verbosity
+    api_ctx.output_params.json = context.json
+    api_ctx.output_params.quiet = context.quiet
+    api_ctx.output_params.verbosity = context.verbosity
     api_ctx.set_verbosity(context.verbosity)
-    if output_params.json:
+    if api_ctx.output_params.json:
         api.cancel_json_output()
 
     # Prefix params
-    prefix_params = getattr(api_ctx, "prefix_params", api_ctx)
-    prefix_params.conda_prefix = context.conda_prefix
-    prefix_params.root_prefix = context.root_prefix
-    prefix_params.target_prefix = context.target_prefix
+    api_ctx.prefix_params.conda_prefix = context.conda_prefix
+    api_ctx.prefix_params.root_prefix = context.root_prefix
+    api_ctx.prefix_params.target_prefix = context.target_prefix
 
     # Networking params -- we always operate offline from libmamba's perspective
-    remote_fetch_params = getattr(api_ctx, "remote_fetch_params", api_ctx)
-    remote_fetch_params.user_agent = context.user_agent
+    api_ctx.remote_fetch_params.user_agent = context.user_agent
     api_ctx.local_repodata_ttl = context.local_repodata_ttl
     api_ctx.offline = True
     api_ctx.use_index_cache = True
