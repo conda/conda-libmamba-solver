@@ -15,10 +15,17 @@ from conda.base.context import context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.testing.integration import Commands, make_temp_env, run_command
+from conda.exceptions import DryRunExit
+from conda.testing.integration import (
+    Commands,
+    make_temp_env,
+    package_is_installed,
+    run_command,
+)
 from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
+from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.mamba_utils import mamba_version
 
 from .utils import conda_subprocess
@@ -417,3 +424,37 @@ def test_ca_certificates_pins():
                     break
             else:
                 raise AssertionError("ca-certificates not found in LINK actions")
+
+
+def test_python_update_should_not_uninstall_history():
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/341
+
+    Original report complained about an upgrade to Python 3.12 removing numpy from the
+    (originally) py311 environment because at that point in time numpy for py312 was not yet
+    available in defaults. Since at some point it will be, we will test for similar behavior
+    here, but in a way that we know will never be reverted: typing_extensions being available for
+    Python 2.7.
+
+    Given a Python 3.8 + typing-extensions environment, the solver should not allow us to
+    change to Python 2.7 because typing-extensions is in history, and the only solution to get
+    Python 2.7 is to remove it. Hence, we expect a conflict that mentions both.
+    """
+    channels = "--override-channels", "-c", "conda-forge"
+    solver = "--solver", "libmamba"
+    with make_temp_env("python=3.8", "typing_extensions>=4.8", *channels, *solver) as prefix:
+        assert package_is_installed(prefix, "python=3.8")
+        assert package_is_installed(prefix, "typing_extensions>=4.8")
+        with pytest.raises(
+            LibMambaUnsatisfiableError,
+            match=r"python 2\.7.|\n*typing_extensions",
+        ):
+            run_command(
+                Commands.INSTALL,
+                prefix,
+                "python=2.7",
+                *channels,
+                *solver,
+                "--dry-run",
+                no_capture=True,
+            )
