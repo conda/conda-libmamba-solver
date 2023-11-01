@@ -86,31 +86,10 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
     return index
 
 
-_once = False
-
-
 def init_api_context() -> api.Context:
-    global _once
-    if hasattr(api.Context, "use_default_signal_handler"):
-        api.Context.use_default_signal_handler(False)
-        api_ctx = api.Context()
-    else:
-        api_ctx = api.Context()
-        # Override mamba's signal handling which would otherwise disable CTRL-C etc.
-        # in Python. The signal handling doesn't appear to be used in solver, but is
-        # definitely used to make other parts of libmamba interruptible. Those parts
-        # of libmamba might also set and reset the signal handler. An alternative
-        # and possible better solution would be to override libmamba's signal
-        # handler to also call
-        # https://docs.python.org/3/c-api/exceptions.html#c.PyErr_SetInterruptEx or
-        # to have an overridable callback for that system, that would then call
-        # PyErr_SetInterruptEx.
-        if not _once:
-            _once = True
-            if on_win:
-                signal.signal(signal.SIGINT, signal.SIG_DFL)
-            else:
-                signal.pthread_sigmask(signal.SIG_UNBLOCK, signal.valid_signals())
+    # This function has to be called BEFORE 1st initialization of the context
+    api.Context.use_default_signal_handler(False)
+    api_ctx = api.Context()
 
     # Output params
     api_ctx.output_params.json = context.json
