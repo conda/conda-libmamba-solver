@@ -89,7 +89,7 @@ def test_ctrl_c(stage):
         if time.time() - t0 > 30:
             raise RuntimeError("Timeout")
 
-    # works around Window's awkward CTRL-C signal handling
+    # works around Windows' awkward CTRL-C signal handling
     # https://stackoverflow.com/a/64357453
     if sys.platform == "win32":
         kernel = ctypes.windll.kernel32
