@@ -1,6 +1,7 @@
+conda-build
 conda-forge::pytest-xprocess
 conda-index
-conda-build
 conda-lock
 # needed for many conda tests
 flask
+pytest-rerunfailures
