@@ -2,7 +2,7 @@
   email: jaimergp@users.noreply.github.com
   aliases:
   - jaimergp
-  num_commits: 105
+  num_commits: 112
   first_commit: 2022-01-31 17:24:37
   github: jaimergp
 - name: Jannis Leidel
@@ -12,7 +12,7 @@
   github: jezdez
 - name: pre-commit-ci[bot]
   email: 66853113+pre-commit-ci[bot]@users.noreply.github.com
-  num_commits: 30
+  num_commits: 31
   first_commit: 2022-11-22 08:39:31
   github: pre-commit-ci[bot]
 - name: Christopher Ostrouchov
@@ -22,7 +22,7 @@
   github: costrouc
 - name: Daniel Holth
   email: dholth@anaconda.com
-  num_commits: 1
+  num_commits: 2
   first_commit: 2022-10-19 21:11:39
   github: dholth
 - name: Matthew R. Becker
