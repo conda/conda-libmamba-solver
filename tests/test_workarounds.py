@@ -1,9 +1,15 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+import ctypes
 import json
+import signal
+import subprocess as sp
 import sys
-from subprocess import PIPE, check_call, run
+import time
+
+import pytest
+from conda.common.compat import on_win
 
 
 def test_matchspec_star_version():
@@ -12,7 +18,7 @@ def test_matchspec_star_version():
     We work around that with `.utils.safe_conda_build_form()`.
     Reported in https://github.com/conda/conda/issues/11347
     """
-    check_call(
+    sp.check_call(
         [
             sys.executable,
             "-m",
@@ -31,7 +37,7 @@ def test_matchspec_star_version():
 
 
 def test_build_string_filters():
-    process = run(
+    process = sp.run(
         [
             sys.executable,
             "-m",
@@ -44,7 +50,7 @@ def test_build_string_filters():
             "numpy=*=*py38*",
             "--json",
         ],
-        stdout=PIPE,
+        stdout=sp.PIPE,
         text=True,
     )
     print(process.stdout)
@@ -56,3 +62,50 @@ def test_build_string_filters():
             assert pkg["version"].startswith("3.8")
         if pkg["name"] == "numpy":
             assert "py38" in pkg["build_string"]
+
+
+@pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
+def test_ctrl_c(stage):
+    p = sp.Popen(
+        [
+            sys.executable,
+            "-m",
+            "conda",
+            "create",
+            "-p",
+            "UNUSED",
+            "--dry-run",
+            "--solver=libmamba",
+            "--override-channels",
+            "--channel=conda-forge",
+            "vaex",
+        ],
+        text=True,
+        stdout=sp.PIPE,
+        stderr=sp.PIPE,
+    )
+    t0 = time.time()
+    while stage not in p.stdout.readline():
+        time.sleep(0.1)
+        if time.time() - t0 > 30:
+            raise RuntimeError("Timeout")
+
+    # works around Windows' awkward CTRL-C signal handling
+    # https://stackoverflow.com/a/64357453
+    if on_win:
+        try:
+            kernel = ctypes.windll.kernel32
+            kernel.FreeConsole()
+            kernel.AttachConsole(p.pid)
+            kernel.SetConsoleCtrlHandler(None, 1)
+            kernel.GenerateConsoleCtrlEvent(0, 0)
+            p.wait(timeout=30)
+            assert p.returncode != 0
+            assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+        finally:
+            kernel.SetConsoleCtrlHandler(None, 0)
+    else:
+        p.send_signal(signal.SIGINT)
+        p.wait(timeout=30)
+        assert p.returncode != 0
+        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()

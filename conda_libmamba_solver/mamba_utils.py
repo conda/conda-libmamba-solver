@@ -85,6 +85,8 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
 
 
 def init_api_context() -> api.Context:
+    # This function has to be called BEFORE 1st initialization of the context
+    api.Context.use_default_signal_handler(False)
     api_ctx = api.Context()
 
     # Output params
