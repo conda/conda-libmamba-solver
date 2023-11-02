@@ -64,7 +64,7 @@ def test_build_string_filters():
 
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
-def test_ctrl_c(stage):
+def test_ctrl_c(stage, request):
     p = sp.Popen(
         [
             sys.executable,
@@ -97,13 +97,10 @@ def test_ctrl_c(stage):
         kernel.AttachConsole(p.pid)
         kernel.SetConsoleCtrlHandler(None, 1)
         kernel.GenerateConsoleCtrlEvent(0, 0)
-        p.wait(timeout=30)
-        assert p.returncode != 0
-        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
-        kernel.SetConsoleCtrlHandler(None, 0)
-
+        request.addfinalizer(lambda: kernel.SetConsoleCtrlHandler(None, 0))
     else:
         p.send_signal(signal.SIGINT)
-        p.wait(timeout=30)
-        assert p.returncode != 0
-        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+
+    p.wait(timeout=30)
+    assert p.returncode != 0
+    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
