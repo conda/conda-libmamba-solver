@@ -57,7 +57,7 @@ addopts = [
   "--strict-markers",
   "--xdoctest-modules",
   "--xdoctest-style=google",
-  "--reruns 3",
+  "--reruns=3",
 ]
 
 markers = [

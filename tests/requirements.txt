@@ -4,4 +4,3 @@ conda-index
 conda-lock
 # needed for many conda tests
 flask
-pytest-rerunfailures
