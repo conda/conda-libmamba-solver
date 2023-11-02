@@ -8,8 +8,8 @@ import subprocess as sp
 import sys
 import time
 
-from conda.common.compat import on_win
 import pytest
+from conda.common.compat import on_win
 
 
 def test_matchspec_star_version():
