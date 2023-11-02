@@ -175,7 +175,7 @@ jobs:
         env:
           CONDA_SOLVER: libmamba  # CONDA-LIBMAMBA-SOLVER CHANGE
           CONDA_REMOTE_MAX_RETRIES: 6
-          run: |
+        run: |
           call .\dev\windows\${{ matrix.test-type }}.bat
 
       - uses: codecov/codecov-action@v3
