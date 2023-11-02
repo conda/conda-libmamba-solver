@@ -13,6 +13,25 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.11.0 (2023-11-02)
+
+### Bug fixes
+
+* Do not use `libmamba`'s default signal handler so users can `Ctrl-C` from `conda`. (#337 via #340)
+* Defer conda-build-specific exception definition and import until it is needed by the solver. (#342)
+* Interpret "excluded by strict priority" solver errors as proper satisfiability conflicts and avoid printing related yet uninformative warnings. (#343)
+* Ensure that historic specs are kept in the environment, even if that means raising a conflict. (#341 via #345)
+
+### Docs
+
+* Document environment variables used for advanced configuration. (#349)
+
+### Other
+
+* Require `libmambapy >=1.5.3` for improved signal handling and `MatchSpec` syntax compliance. (#347)
+
+
+
 ## 23.9.3 (2023-10-24)
 
 ### Bug fixes
