@@ -9,7 +9,6 @@
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
 import logging
-import signal
 from functools import lru_cache
 from importlib.metadata import version
 from typing import Dict
@@ -17,7 +16,6 @@ from typing import Dict
 import libmambapy as api
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
-from conda.common.compat import on_win
 
 log = logging.getLogger(f"conda.{__name__}")
 

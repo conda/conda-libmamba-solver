@@ -8,6 +8,7 @@ import subprocess as sp
 import sys
 import time
 
+from conda.common.compat import on_win
 import pytest
 
 
@@ -64,7 +65,7 @@ def test_build_string_filters():
 
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
-def test_ctrl_c(stage, request):
+def test_ctrl_c(stage):
     p = sp.Popen(
         [
             sys.executable,
@@ -91,16 +92,20 @@ def test_ctrl_c(stage, request):
 
     # works around Windows' awkward CTRL-C signal handling
     # https://stackoverflow.com/a/64357453
-    if sys.platform == "win32":
-        kernel = ctypes.windll.kernel32
-        kernel.FreeConsole()
-        kernel.AttachConsole(p.pid)
-        kernel.SetConsoleCtrlHandler(None, 1)
-        kernel.GenerateConsoleCtrlEvent(0, 0)
-        request.addfinalizer(lambda: kernel.SetConsoleCtrlHandler(None, 0))
+    if on_win:
+        try:
+            kernel = ctypes.windll.kernel32
+            kernel.FreeConsole()
+            kernel.AttachConsole(p.pid)
+            kernel.SetConsoleCtrlHandler(None, 1)
+            kernel.GenerateConsoleCtrlEvent(0, 0)
+            p.wait(timeout=30)
+            assert p.returncode != 0
+            assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+        finally:
+            kernel.SetConsoleCtrlHandler(None, 0)
     else:
         p.send_signal(signal.SIGINT)
-
-    p.wait(timeout=30)
-    assert p.returncode != 0
-    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+        p.wait(timeout=30)
+        assert p.returncode != 0
+        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
