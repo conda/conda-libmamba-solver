@@ -640,6 +640,9 @@ class LibMambaSolver(Solver):
                 pin_b = words[5].rsplit("-", 1)[0]
                 conflicts.append(MatchSpec(pin_a))
                 conflicts.append(MatchSpec(pin_b))
+            elif "is excluded by strict repo priority" in line:
+                # package python-3.7.6-h0371630_2 is excluded by strict repo priority
+                conflicts.append(cls._str_to_matchspec(words[2]))
             else:
                 log.debug("! Problem line not recognized: %s", line)
 
@@ -711,6 +714,10 @@ class LibMambaSolver(Solver):
         if "unsupported request" in legacy_errors:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
+            return legacy_errors
+        if "is excluded by strict repo priority" in legacy_errors:
+            # This will cause a lot of warnings until implemented in detail explanations
+            log.info("Skipping error explanation. Excluded by strict repo priority.")
             return legacy_errors
         try:
             explained_errors = self.solver.explain_problems()
