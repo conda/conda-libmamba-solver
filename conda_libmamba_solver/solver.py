@@ -331,7 +331,6 @@ class LibMambaSolver(Solver):
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
-            (api.SOLVER_FLAG_INSTALL_ALSO_UPDATES, 1),
         ]
         if context.channel_priority is ChannelPriority.STRICT:
             solver_options.append((api.SOLVER_FLAG_STRICT_REPO_PRIORITY, 1))
@@ -371,29 +370,12 @@ class LibMambaSolver(Solver):
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
             if task_name == "ADD_PIN":
-                # ## Add pins
                 for spec in specs:
                     n_pins += 1
                     self.solver.add_pin(spec)
                     out_state.pins[f"pin-{n_pins}"] = spec
-                continue
-
-            try:
+            else:
                 self.solver.add_jobs(specs, task_type)
-            except RuntimeError as exc:
-                if mamba_version().startswith("1.5."):
-                    for spec in specs:
-                        if spec in str(exc):
-                            break
-                    else:
-                        spec = f"One of {specs}"
-                    msg = (
-                        f"This is a bug in libmamba {mamba_version()} when using "
-                        "'defaults::<spec>' or 'pkgs/main::<spec>'. "
-                        "Consider using '-c defaults' instead."
-                    )
-                    raise InvalidMatchSpec(spec, msg)
-                raise
 
         # ## Run solver
         solved = self.solver.solve()
@@ -516,8 +498,14 @@ class LibMambaSolver(Solver):
             elif name == "python" and installed and not pinned:
                 pyver = ".".join(installed.version.split(".")[:2])
                 tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
-            elif history and not history.is_name_only_spec and not conflicting:
-                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(history))
+            elif history:
+                if conflicting and history.strictness == 3:
+                    # relax name-version-build (strictness=3) history specs that cause conflicts
+                    # this is called neutering and makes test_neutering_of_historic_specs pass
+                    spec = f"{name} {history.version}.*" if history.version else name
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec)
+                else:
+                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(history))
             elif installed:
                 if conflicting:
                     tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
@@ -624,12 +612,7 @@ class LibMambaSolver(Solver):
         """
         conflicts = []
         not_found = []
-        if "1.4.5" <= mamba_version() < "1.5.0":
-            # 1.4.5 had a regression where it would return
-            # a single line with all the problems; fixed in 1.5.0
-            problem_lines = [f" - {problem}" for problem in problems.split(" - ")[1:]]
-        else:
-            problem_lines = problems.splitlines()[1:]
+        problem_lines = problems.splitlines()[1:]
         for line in problem_lines:
             line = line.strip()
             words = line.split()
@@ -732,14 +715,6 @@ class LibMambaSolver(Solver):
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
             return legacy_errors
-        if (
-            mamba_version() <= "1.4.1"
-            and "conflicting requests" in self.solver.all_problems_to_str()
-        ):
-            # This error makes 'explain_problems()' crash in libmamba <=1.4.1.
-            # Anticipate and return simpler error earlier.
-            log.info("Failed to explain problems. Conflicting requests.")
-            return legacy_errors
         if "is excluded by strict repo priority" in legacy_errors:
             # This will cause a lot of warnings until implemented in detail explanations
             log.info("Skipping error explanation. Excluded by strict repo priority.")
@@ -799,7 +774,7 @@ class LibMambaSolver(Solver):
         if not self._called_from_conda_build():
             return
 
-        from .exceptions import ExplainedDependencyNeedsBuildingError
+        from .conda_build_exceptions import ExplainedDependencyNeedsBuildingError
 
         # the patched index should contain the arch we are building this env for
         # if the index is empty, we default to whatever platform we are running on
