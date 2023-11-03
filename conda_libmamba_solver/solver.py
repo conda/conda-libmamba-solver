@@ -37,6 +37,7 @@ from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
     InvalidMatchSpec,
+    InvalidSpec,
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
@@ -375,7 +376,10 @@ class LibMambaSolver(Solver):
                     self.solver.add_pin(spec)
                     out_state.pins[f"pin-{n_pins}"] = spec
             else:
-                self.solver.add_jobs(specs, task_type)
+                try:
+                    self.solver.add_jobs(specs, task_type)
+                except RuntimeError as exc:
+                    raise InvalidSpec(str(exc))
 
         # ## Run solver
         solved = self.solver.solve()
