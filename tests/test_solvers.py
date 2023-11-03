@@ -458,3 +458,40 @@ def test_python_update_should_not_uninstall_history():
                 "--dry-run",
                 no_capture=True,
             )
+
+def test_python_downgrade_with_pins_removes_truststore():
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/354
+    """
+    channels = "--override-channels", "-c", "conda-forge"
+    solver = "--solver", "libmamba"
+    with make_temp_env("python=3.10", "conda", *channels, *solver) as prefix:
+        zstd_version = PrefixData(prefix).get("zstd").version
+        for pin in (None, "zstd", f"zstd={zstd_version}"):
+            env = os.environ.copy()
+            if pin:
+                env["CONDA_PINNED_PACKAGES"] = pin
+            p = conda_subprocess(
+                Commands.INSTALL,
+                "-p",
+                prefix,
+                *channels,
+                *solver,
+                "--dry-run",
+                "--json",
+                "python=3.9",
+                env=env
+            )
+            assert p.returncode == 0
+            data = json.loads(p.stdout)
+            assert data.get("success")
+            assert data.get("dry_run")
+            assertions = 0
+            link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}
+            unlink_dict = {pkg["name"]: pkg for pkg in data["actions"]["UNLINK"]}
+            assert link_dict["python"]["version"].startswith("3.9.")
+            assert "truststore" in unlink_dict
+            if pin:
+                # shouldn't have changed!
+                assert "zstd" not in link_dict
+                assert "zstd" not in unlink_dict
