@@ -459,6 +459,7 @@ def test_python_update_should_not_uninstall_history():
                 no_capture=True,
             )
 
+
 def test_python_downgrade_with_pins_removes_truststore():
     """
     https://github.com/conda/conda-libmamba-solver/issues/354
@@ -480,7 +481,7 @@ def test_python_downgrade_with_pins_removes_truststore():
                 "--dry-run",
                 "--json",
                 "python=3.9",
-                env=env
+                env=env,
             )
             assert p.returncode == 0
             data = json.loads(p.stdout)
