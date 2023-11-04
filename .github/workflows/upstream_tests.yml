@@ -84,7 +84,7 @@ jobs:
       CONDA_SUBDIR: ${{ matrix.conda-subdir }}
       TEST_SPLITS: 3
       TEST_GROUP: ${{ matrix.test-group }}
-      CONDA_REMOTE_MAX_RETRIES: 6
+      CONDA_REMOTE_BACKOFF_FACTOR: 2
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
         uses: actions/checkout@v3
@@ -174,7 +174,7 @@ jobs:
         shell: cmd
         env:
           CONDA_SOLVER: libmamba  # CONDA-LIBMAMBA-SOLVER CHANGE
-          CONDA_REMOTE_MAX_RETRIES: 6
+          CONDA_REMOTE_BACKOFF_FACTOR: 2
         run: |
           call .\dev\windows\${{ matrix.test-type }}.bat
 
@@ -246,7 +246,7 @@ jobs:
           # we also added '-e CONDA_SOLVER' to the docker options below
           # changes the paths to the volume(s) (plural, we also need conda-libmamba-solver)
           # and changed the script being run to our vendored copy (last line)
-          CONDA_REMOTE_MAX_RETRIES: 6
+          CONDA_REMOTE_BACKOFF_FACTOR: 2
         run: >
           docker run --rm
           -v ${GITHUB_WORKSPACE}/conda:/opt/conda-src
@@ -254,7 +254,7 @@ jobs:
           -e TEST_SPLITS
           -e TEST_GROUP
           -e CONDA_SOLVER
-          -e CONDA_REMOTE_MAX_RETRIES
+          -e CONDA_REMOTE_BACKOFF_FACTOR
           ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
           /opt/conda-libmamba-solver-src/dev/linux/upstream_${{ matrix.test-type }}.sh
 
@@ -459,7 +459,7 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         env:
           CONDA_SOLVER: libmamba  # CONDA-LIBMAMBA-SOLVER CHANGE
-          CONDA_REMOTE_MAX_RETRIES: 6
+          CONDA_REMOTE_BACKOFF_FACTOR: 2
         run: |
           ./dev/macos/${{ matrix.test-type }}.sh
 
