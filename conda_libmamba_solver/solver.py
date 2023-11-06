@@ -270,7 +270,7 @@ class LibMambaSolver(Solver):
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
             try:
-                solved = self._solve_attempt(in_state, out_state, index)
+                solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
                 if solved:
                     break
             except (UnsatisfiableError, PackagesNotFoundError):
@@ -345,10 +345,11 @@ class LibMambaSolver(Solver):
         in_state: SolverInputState,
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
+        attempt: int = 1,
     ):
         self._setup_solver(index)
 
-        log.debug("New solver attempt")
+        log.debug("New solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
 
         # ## First, we need to obtain the list of specs ###
@@ -365,12 +366,13 @@ class LibMambaSolver(Solver):
         log.debug("Computed specs: %s", out_state.specs)
 
         # ## Convert to tasks
-        out_state.pins.clear()
         n_pins = 0
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            if task_name == "ADD_PIN":
+            if task_name == "ADD_PIN" and attempt == 1:
+                # pins only need to be added once; since they persist in the pool
+                # adding them more times results in issues like #354
                 for spec in specs:
                     n_pins += 1
                     self.solver.add_pin(spec)
@@ -393,7 +395,7 @@ class LibMambaSolver(Solver):
         new_conflicts = self._maybe_raise_for_problems(
             problems, old_conflicts, out_state.pins, index._channels
         )
-        log.debug("Attempt failed with %s conflicts", len(new_conflicts))
+        log.debug("Attempt %d failed with %s conflicts", attempt, len(new_conflicts))
         out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
         return False
 
