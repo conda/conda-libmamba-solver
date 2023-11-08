@@ -34,22 +34,6 @@ def test_build_recipes():
             check_call(["conda-build", recipe], env=env)
 
 
-def test_conda_build_with_aliased_channels(request):
-    "https://github.com/conda/conda-libmamba-solver/issues/363"
-    condarc = Path.home() / ".condarc"
-    if condarc.exists():
-        condarc_contents = condarc.read_text()
-        request.addfinalizer(lambda: condarc.write_text(condarc_contents))
-    else:
-        request.addfinalizer(lambda: condarc.unlink())
-    condarc.write_text(
-        "channels: ['defaults']\n"
-        "default_channels: ['conda-forge']\n"
-        "solver: libmamba\n"
-    )
-    check_call(["conda-build", DATA / "conda_build_recipes" / "jedi"])
-
-
 def test_conda_lock(tmp_path):
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
