@@ -237,7 +237,12 @@ def test_conda_build_with_aliased_channels():
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
         _setup_conda_forge_as_defaults(Path.home(), force=True)
-        conda_subprocess("build", DATA / "conda_build_recipes" / "jedi", "--channel=defaults", capture_output=False)
+        conda_subprocess(
+            "build",
+            DATA / "conda_build_recipes" / "jedi",
+            "--channel=defaults",
+            capture_output=False,
+        )
     finally:
         if condarc_contents:
             condarc.write_text(condarc_contents)
