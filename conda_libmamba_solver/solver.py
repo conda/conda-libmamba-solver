@@ -160,7 +160,6 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         init_api_context()
         subdirs = self.subdirs
-        conda_bld_channels = ()
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
             # Problem: Conda build generates a custom index which happens to "forget" about
@@ -179,6 +178,7 @@ class LibMambaSolver(Solver):
             IndexHelper = _CachedLibMambaIndexHelper
         else:
             IndexHelper = LibMambaIndexHelper
+            conda_bld_channels = ()
 
         all_channels = [
             *conda_bld_channels,
@@ -880,7 +880,7 @@ class LibMambaSolver(Solver):
 
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
-        kwargs["channel"] = channel_info.channel
+        kwargs["channel"] = channel_info.channel.canonical_name or channel_info.channel
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
