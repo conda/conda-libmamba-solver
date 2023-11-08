@@ -42,7 +42,7 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
 )
-from conda.models.channel import Channel
+from conda.models.channel import Channel, MultiChannel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
@@ -880,7 +880,14 @@ class LibMambaSolver(Solver):
 
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
-        kwargs["channel"] = channel_info.channel.canonical_name or channel_info.channel
+        cname = channel_info.channel.canonical_name
+        multi_urls = context.custom_multichannels.get(cname)
+        if self._called_from_conda_build() and multi_urls:
+            # conda-build expects multichannel instances the Dist->PackageRecord mapping
+            # see https://github.com/conda/conda-libmamba-solver/issues/363
+            kwargs["channel"] = MultiChannel(cname, multi_urls, channel_info.channel.platform)
+        else:
+            kwargs["channel"] = channel
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
