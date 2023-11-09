@@ -5,6 +5,7 @@
 ### Bug fixes
 
 * Allow authenticated URLs in `default_channels` and other multichannels. (#364 via #366)
+* Preserve authentication while reloading local channels. (#366)
 
 ### Deprecations
 
