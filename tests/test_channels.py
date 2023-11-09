@@ -16,13 +16,11 @@ from conda.models.channel import Channel
 from conda.testing.integration import _get_temp_prefix, make_temp_env
 from conda.testing.integration import run_command as conda_inprocess
 
-from .channel_testing.helpers import (
-    create_with_channel,
-    http_server_auth_basic,  # noqa: F401
-    http_server_auth_basic_email,  # noqa: F401
-    http_server_auth_none,  # noqa: F401
-    http_server_auth_token,  # noqa: F401
-)
+from .channel_testing.helpers import http_server_auth_basic  # noqa: F401
+from .channel_testing.helpers import http_server_auth_basic_email  # noqa: F401
+from .channel_testing.helpers import http_server_auth_none  # noqa: F401
+from .channel_testing.helpers import http_server_auth_token  # noqa: F401
+from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
 
 

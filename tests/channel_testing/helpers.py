@@ -1,6 +1,6 @@
-# Copyright (C) 2022 Anaconda, Inc
-# SPDX-License-Identifier: BSD-3-Clause
 # Copyright (C) 2019 QuantStack and the Mamba contributors.
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 import os
 import pathlib
@@ -23,7 +23,6 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
     print("Starting dummy_http_server")
 
     class Starter(ProcessStarter):
-
         pattern = f"Server started at localhost:{port}"
         terminate_on_interrupt = True
         timeout = 10

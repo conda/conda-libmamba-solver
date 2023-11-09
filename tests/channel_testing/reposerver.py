@@ -1,5 +1,6 @@
 # Copyright (C) 2019 QuantStack and the Mamba contributors.
 # Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 """
 Helper module/script to launch a conda channel/server
@@ -38,7 +39,11 @@ else:
 parser = argparse.ArgumentParser(description="Start a simple conda package server.")
 parser.add_argument("-p", "--port", type=int, default=8000, help="Port to use.")
 parser.add_argument(
-    "-d", "--directory", type=str, default=os.getcwd(), help="Root directory for serving.",
+    "-d",
+    "--directory",
+    type=str,
+    default=os.getcwd(),
+    help="Root directory for serving.",
 )
 parser.add_argument(
     "-a",
@@ -48,16 +53,27 @@ parser.add_argument(
     help="auth method (none, none-debug-repodata, none-debug-packages, basic, or token)",
 )
 parser.add_argument(
-    "--sign", action="store_true", help="Sign repodata (note: run generate_gpg_keys.sh before)",
+    "--sign",
+    action="store_true",
+    help="Sign repodata (note: run generate_gpg_keys.sh before)",
 )
 parser.add_argument(
-    "--token", type=str, default=None, help="Use token as API Key",
+    "--token",
+    type=str,
+    default=None,
+    help="Use token as API Key",
 )
 parser.add_argument(
-    "--user", type=str, default=default_user, help="Use token as API Key",
+    "--user",
+    type=str,
+    default=default_user,
+    help="Use token as API Key",
 )
 parser.add_argument(
-    "--password", type=str, default=default_password, help="Use token as API Key",
+    "--password",
+    type=str,
+    default=default_password,
+    help="Use token as API Key",
 )
 args = parser.parse_args()
 
@@ -70,7 +86,6 @@ def get_fingerprint(gpg_output):
 
 
 class RepoSigner:
-
     keys = {
         "root": [],
         "key_mgr": [
@@ -143,7 +158,6 @@ class RepoSigner:
         print("[reposigner] Root metadata signed & verified!")
 
     def create_key_mgr(self, keys):
-
         private_key_key_mgr = cct_common.PrivateKey.from_hex(keys["key_mgr"][0]["private"])
         pkg_mgr_pub_keys = [k["public"] for k in keys["pkg_mgr"]]
         key_mgr = cct_metadata_construction.build_delegating_metadata(
@@ -199,7 +213,6 @@ class RepoSigner:
         print(f"[reposigner] Signed {final_fn}")
 
     def __init__(self, in_folder=args.directory):
-
         self.keys["root"] = [
             get_fingerprint(os.environ["KEY1"]),
             get_fingerprint(os.environ["KEY2"]),
