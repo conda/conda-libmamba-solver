@@ -243,6 +243,12 @@ def test_conda_build_with_aliased_channels():
             DATA / "conda_build_recipes" / "jedi",
             "--channel=defaults",
             capture_output=False,
+        )
+    finally:
+        if condarc_contents:
+            condarc.write_text(condarc_contents)
+        else:
+            condarc.unlink()
 
 
 def test_http_server_auth_none(http_server_auth_none):
