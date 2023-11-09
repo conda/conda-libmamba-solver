@@ -28,6 +28,7 @@ from conda.base.constants import (
     ChannelPriority,
 )
 from conda.base.context import context
+from conda.common.compat import on_win
 from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
@@ -841,7 +842,7 @@ class LibMambaSolver(Solver):
             )
 
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
-        if self._called_from_conda_build():
+        if on_win and self._called_from_conda_build():
             for record in out_state.records.values():
                 if "%" not in str(record):
                     continue
@@ -882,13 +883,15 @@ class LibMambaSolver(Solver):
 
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
-        cname = channel_info.channel.canonical_name
-        if self._called_from_conda_build() and cname in context.custom_multichannels:
+        kwargs["channel"] = channel_info.channel
+        if self._called_from_conda_build():
             # conda-build expects multichannel instances in the Dist->PackageRecord mapping
             # see https://github.com/conda/conda-libmamba-solver/issues/363
-            kwargs["channel"] = cname
-        else:
-            kwargs["channel"] = channel_info.channel
+            for multichannel_name, channels in context.custom_multichannels.items():
+                urls = [url for c in channels for url in c.urls(with_credentials=False)]
+                if channel_info.noauth_url in urls:
+                    kwargs["channel"] = multichannel_name
+                    break
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
