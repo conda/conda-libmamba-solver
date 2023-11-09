@@ -12,12 +12,12 @@ DATA = Path(__file__).parent / "data"
 
 
 @pytest.mark.parametrize(
-    "recipe", 
+    "recipe",
     [
         pytest.param(x, id=x.name)
         for x in sorted((DATA / "conda_build_recipes").iterdir())
         if (x / "meta.yaml").is_file()
-    ]
+    ],
 )
 def test_build_recipe(recipe):
     """
