@@ -26,7 +26,6 @@ from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,
     ChannelPriority,
-    on_win,
 )
 from conda.base.context import context
 from conda.common.constants import NULL
