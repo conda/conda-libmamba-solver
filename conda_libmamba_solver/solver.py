@@ -42,7 +42,7 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
 )
-from conda.models.channel import Channel, MultiChannel
+from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
@@ -842,8 +842,10 @@ class LibMambaSolver(Solver):
             )
 
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
-        if on_win and self._called_from_conda_build():
+        if self._called_from_conda_build():
             for record in out_state.records.values():
+                if "%" not in str(record):
+                    continue
                 if record.channel.location:  # multichannels like 'defaults' have no location
                     record.channel.location = percent_decode(record.channel.location)
                 record.channel.name = percent_decode(record.channel.name)
@@ -887,7 +889,7 @@ class LibMambaSolver(Solver):
             # see https://github.com/conda/conda-libmamba-solver/issues/363
             kwargs["channel"] = cname
         else:
-            kwargs["channel"] = channel
+            kwargs["channel"] = channel_info.channel
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
