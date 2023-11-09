@@ -154,12 +154,12 @@ class LibMambaIndexHelper(IndexHelper):
         """
         Reload a channel that was previously loaded from a local directory.
         """
-        for url, info in self._index.items():
-            if url.startswith("file://"):
-                url, json_path = self._fetch_channel(url)
+        for noauth_url, info in self._index.items():
+            if noauth_url.startswith("file://"):
+                url, json_path = self._fetch_channel(info.full_url)
                 new = self._json_path_to_repo_info(url, json_path)
                 self._repos[self._repos.index(info.repo)] = new.repo
-                self._index[url] = new
+                self._index[noauth_url] = new
         set_channel_priorities(self._index)
 
     def _repo_from_records(
@@ -280,8 +280,9 @@ class LibMambaIndexHelper(IndexHelper):
             noauth_urls = c.urls(with_credentials=False, subdirs=self._subdirs)
             if seen_noauth.issuperset(noauth_urls):
                 continue
-            if c.auth or c.token:  # authed channel always takes precedence
-                urls += Channel(c).urls(with_credentials=True, subdirs=self._subdirs)
+            auth_urls = c.urls(with_credentials=True, subdirs=self._subdirs)
+            if noauth_urls != auth_urls:  # authed channel always takes precedence
+                urls += auth_urls
                 seen_noauth.update(noauth_urls)
                 continue
             # at this point, we are handling an unauthed channel; in some edge cases,
