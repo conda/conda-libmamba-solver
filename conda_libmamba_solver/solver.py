@@ -844,7 +844,8 @@ class LibMambaSolver(Solver):
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
         if on_win and self._called_from_conda_build():
             for record in out_state.records.values():
-                record.channel.location = percent_decode(record.channel.location)
+                if record.channel.location:  # multichannels like 'defaults' have no location
+                    record.channel.location = percent_decode(record.channel.location)
                 record.channel.name = percent_decode(record.channel.name)
 
     def _package_record_from_json_payload(
@@ -881,11 +882,10 @@ class LibMambaSolver(Solver):
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
         cname = channel_info.channel.canonical_name
-        multi_urls = context.custom_multichannels.get(cname)
-        if self._called_from_conda_build() and multi_urls:
-            # conda-build expects multichannel instances the Dist->PackageRecord mapping
+        if self._called_from_conda_build() and cname in context.custom_multichannels:
+            # conda-build expects multichannel instances in the Dist->PackageRecord mapping
             # see https://github.com/conda/conda-libmamba-solver/issues/363
-            kwargs["channel"] = MultiChannel(cname, multi_urls, channel_info.channel.platform)
+            kwargs["channel"] = cname
         else:
             kwargs["channel"] = channel
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
