@@ -12,8 +12,8 @@
 
 ### Docs
 
-* Use new conda-sphinx-theme for documentation site
-* Reorganize the layout of the documentation site
+* Use new conda-sphinx-theme for documentation site. (#367 via #370)
+* Reorganize the layout of the documentation site. (#370)
 
 ### Other
 
