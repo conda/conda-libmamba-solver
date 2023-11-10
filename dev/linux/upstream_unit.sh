@@ -20,7 +20,6 @@ sudo /opt/conda/bin/conda install --quiet -y --solver=classic --repodata-fn repo
     --file "${CONDA_SRC}/tests/requirements.txt" \
     --file "${CONDA_SRC}/tests/requirements-s3.txt" \
     --file "${CONDA_LIBMAMBA_SOLVER_SRC}/dev/requirements.txt"
-sudo /opt/conda/bin/python -m pip install "$CONDA_LIBMAMBA_SOLVER_SRC/dev/collect_upstream_conda_tests/"
 sudo /opt/conda/bin/python -m pip install "$CONDA_LIBMAMBA_SOLVER_SRC" --no-deps -vvv
 # /CONDA LIBMAMBA SOLVER CHANGES
 

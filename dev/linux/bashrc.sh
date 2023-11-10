@@ -44,7 +44,6 @@ if [ -d "/opt/mamba-src" ]; then
 fi
 
 cd /opt/conda-libmamba-solver-src
-sudo /opt/conda/bin/python -m pip install ./dev/collect_upstream_conda_tests/ --no-deps
 sudo /opt/conda/bin/python -m pip install -e . --no-deps
 
 cd /opt/conda-src

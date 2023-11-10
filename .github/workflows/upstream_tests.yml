@@ -156,9 +156,6 @@ jobs:
           call .\dev-init.bat
           if errorlevel 1 exit 1
           :: /original logic
-          :: Install test collection plugin
-          python -m pip install -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver\dev\collect_upstream_conda_tests"
-          if errorlevel 1 exit 1
           :: Install conda-libmamba-solver
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
@@ -445,7 +442,6 @@ jobs:
           ./dev/macos/setup.sh
           # /original setup
           python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
-          python -m pip install ../conda-libmamba-solver/dev/collect_upstream_conda_tests -vv
           python -m pip install ../conda-libmamba-solver -vv --no-deps
           conda info -a
           # /CONDA-LIBMAMBA-SOLVER CHANGE
