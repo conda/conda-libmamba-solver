@@ -224,9 +224,9 @@ jobs:
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         # CONDA-LIBMAMBA-SOLVER CHANGES:
         # - changed the paths to the volume(s) (plural, we also need conda-libmamba-solver)
-        # - changed the script being run to our vendored copy (last line)  
+        # - changed the script being run to our vendored copy (last line)
         run: >
-          docker run --rm 
+          docker run --rm
           -v ${GITHUB_WORKSPACE}/conda:/opt/conda-src
           -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
