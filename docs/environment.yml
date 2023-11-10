@@ -73,4 +73,3 @@ dependencies:
   - zipp=3.10.0
   - pip:
       - conda-sphinx-theme
-
