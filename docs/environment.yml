@@ -72,4 +72,4 @@ dependencies:
   - yaml=0.2.5
   - zipp=3.10.0
   - pip:
-      - conda-sphinx-theme
+      - conda-sphinx-theme==0.1.1
