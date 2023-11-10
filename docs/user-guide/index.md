@@ -1,4 +1,4 @@
-# Getting started
+# User Guide
 
 The `conda-libmamba-solver` plugin allows you to use `libmamba`, the same `libsolv`-powered solver used by `mamba` and `micromamba`, directly in `conda`.
 
@@ -57,3 +57,15 @@ Finally, if you need to revert the default configuration back to `classic`, you 
 If you are unsure what configuration is being used by conda, you can inspect
 it with `conda config --show-sources`.
 ```
+
+```{toctree}
+:hidden:
+
+subcommands
+configuration
+faq
+libmamba-vs-classic
+performance
+more-resources
+```
+
