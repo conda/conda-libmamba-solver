@@ -4,20 +4,19 @@
 name: Upstream tests # CONDA-LIBMAMBA-SOLVER CHANGE
 
 on:
-  # NOTE: github.event context is push payload:
-  # https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#push
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#push
   push:
     branches:
       - main
       - feature/**
+      - '[0-9].*.x'  # e.g., 4.14.x
+      - '[0-9][0-9].*.x'  # e.g., 23.3.x
 
-  # NOTE: github.event context is pull_request payload:
-  # https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
   pull_request:
-  # CONDA-LIBMAMBA-SOLVER CHANGE
-  schedule:
-    - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
-  # /CONDA-LIBMAMBA-SOLVER CHANGE
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_dispatch
+  workflow_dispatch:
 
 concurrency:
   # Concurrency group that uses the workflow name and PR number if available
@@ -28,29 +27,24 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
-env:
-  # see https://github.com/conda/conda-libmamba-solver/pull/159
-  MINIO_RELEASE: 'archive/minio.RELEASE.2023-03-13T19-46-17Z'
-
 jobs:
   # detect whether any code changes are included in this PR
   changes:
     runs-on: ubuntu-latest
     permissions:
+      # necessary to detect changes
+      # https://github.com/dorny/paths-filter#supported-workflows
       pull-requests: read
     outputs:
       code: ${{ steps.filter.outputs.code }}
     steps:
       - uses: actions/checkout@v3
         # dorny/paths-filter needs git clone for push events
-        # https://github.com/marketplace/actions/paths-changes-filter#supported-workflows
-        # CONDA-LIBMAMBA-SOLVER CHANGE
+        # https://github.com/dorny/paths-filter#supported-workflows
         if: github.event_name != 'pull_request'
-      - uses: dorny/paths-filter@4512585405083f25c027a35db413c2b3b9006d50
+      - uses: dorny/paths-filter@v2.11.1
         id: filter
         with:
-          # CONDA-LIBMAMBA-SOLVER CHANGE
-          # changed some paths:
           filters: |
             code:
               - 'conda_libmamba_solver/**'
@@ -58,7 +52,7 @@ jobs:
               - '*.py'
               - 'recipe/**'
               - '.github/workflows/upstream_tests.yml'
-          # /CONDA-LIBMAMBA-SOLVER CHANGE
+              - 'dev/**'
 
   # windows test suite
   windows:
@@ -81,12 +75,10 @@ jobs:
     env:
       OS: Windows
       PYTHON: ${{ matrix.python-version }}
-      CONDA_SUBDIR: ${{ matrix.conda-subdir }}
       TEST_SPLITS: 3
       TEST_GROUP: ${{ matrix.test-group }}
     steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -122,16 +114,6 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
             hashFiles('recipe/meta.yaml', 'dev/windows/setup.bat', 'tests/requirements.txt') }}
 
-      - name: Cache minio
-        uses: actions/cache@v3
-        env:
-          # Increase this value to reset cache
-          CACHE_NUMBER: 3
-        with:
-          path: minio.exe
-          key:
-            ${{ runner.os }}-${{ env.MINIO_RELEASE && env.MINIO_RELEASE || 'minio' }}-${{ env.CACHE_NUMBER }}
-
       - name: Set temp dirs correctly
         # https://github.com/actions/virtual-environments/issues/712
         run: |
@@ -139,13 +121,18 @@ jobs:
           echo "TEMP=$env:USERPROFILE\AppData\Local\Temp" >> $env:GITHUB_ENV
           echo "TMP=$env:USERPROFILE\AppData\Local\Temp" >> $env:GITHUB_ENV
 
-      - name: Setup environment
+      - name: Setup environment for defaults
         shell: cmd
-        # CONDA-LIBMAMBA-SOLVER CHANGE
-        working-directory: conda
+        if: matrix.default-channel == 'defaults'
+        run: |
+          call .\dev\windows\setup.bat
+
+      - name: Setup environment for conda-forge
+        shell: cmd
+        if: matrix.default-channel == 'conda-forge'
         env:
           CONDA_CHANNELS: ${{ matrix.default-channel }}
-          CONDA_CHANNEL_PRIORITY: ${{ matrix.default-channel == 'conda-forge' && 'strict' || 'flexible' }}
+          CONDA_CHANNEL_PRIORITY: strict
         run: |
           :: extend conda requirements with our own
           type "%GITHUB_WORKSPACE%\conda-libmamba-solver\dev\requirements.txt" >> .\tests\requirements.txt
@@ -165,31 +152,27 @@ jobs:
           if errorlevel 1 exit 1
         # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.conda-subdir }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
-        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: cmd
-        env:
-          CONDA_SOLVER: libmamba  # CONDA-LIBMAMBA-SOLVER CHANGE
+        working-directory: conda
         run: |
           call .\dev\windows\${{ matrix.test-type }}.bat
 
       - uses: codecov/codecov-action@v3
         with:
-          flags: ${{ matrix.test-type }}
-          env_vars: OS,PYTHON
+          flags: ${{ matrix.test-type }},${{ runner.os }},${{ matrix.python-version }}
 
       - name: Upload test results
-        if: always()
+        if: '!cancelled()'
         uses: actions/upload-artifact@v3
         with:
           # name has to be unique, to not overwrite uploads of other matrix runs. sha1 is optional and only to differentiate
           # when locally dowloading and comparing results of different workflow runs.
-          name: test-results-${{ github.sha }}-${{ runner.os }}-${{ matrix.default-channel }}-${{ matrix.python-version }}-${{ matrix.conda-subdir }}-${{ matrix.test-type }}-${{ matrix.test-group }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
+          name: test-results-${{ github.sha }}-${{ runner.os }}-${{ matrix.default-channel }}-${{ matrix.python-version }}-${{ matrix.test-type }}-${{ matrix.test-group }}
           path: |
-            conda/.coverage
-            conda/.test_durations_${OS}
-            conda/test-report.xml
+            .coverage
+            .\tools\durations\${{ runner.os }}.json
+            test-report.xml
           retention-days: 1
 
   # linux test suite
@@ -236,108 +219,29 @@ jobs:
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
-        env:
-          CONDA_SOLVER: libmamba  # CONDA-LIBMAMBA-SOLVER CHANGE;
-          # we also added '-e CONDA_SOLVER' to the docker options below
-          # changes the paths to the volume(s) (plural, we also need conda-libmamba-solver)
-          # and changed the script being run to our vendored copy (last line)
         run: >
-          docker run --rm
-          -v ${GITHUB_WORKSPACE}/conda:/opt/conda-src
-          -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
+          docker run
+          --rm -v ${GITHUB_WORKSPACE}/conda:/opt/conda-src
+          --rm -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
           -e TEST_SPLITS
           -e TEST_GROUP
-          -e CONDA_SOLVER
           ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
           /opt/conda-libmamba-solver-src/dev/linux/upstream_${{ matrix.test-type }}.sh
 
       - uses: codecov/codecov-action@v3
         with:
-          flags: ${{ matrix.test-type }}
-          env_vars: OS,PYTHON
+          flags: ${{ matrix.test-type }},${{ runner.os }},${{ matrix.python-version }}
 
       - name: Upload test results
-        if: always()
+        if: '!cancelled()'
         uses: actions/upload-artifact@v3
         with:
           # name has to be unique, to not overwrite uploads of other matrix runs. sha1 is optional and only to differentiate
           # when locally dowloading and comparing results of different workflow runs.
           name: test-results-${{ github.sha }}-${{ runner.os }}-${{ matrix.default-channel }}-${{ matrix.python-version }}-${{ matrix.test-type }}-${{ matrix.test-group }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
           path: |
             conda/.coverage
-            conda/.test_durations_${OS}
-            conda/test-report.xml
-          retention-days: 1
-
-  # linux-qemu test suite
-  linux-qemu:
-    # only run test suite if there are code changes
-    needs: changes
-    if: false # needs.changes.outputs.code == 'true' # CONDA-LIBMAMBA-SOLVER CHANGE
-
-    # Run one single fast test per docker+qemu emulated linux platform to test that
-    # test execution is possible there (container+tools+dependencies work). Can be
-    # changed / extended to run specific tests in case there are platform related
-    # things to test. Running more tests is time consuming due to emulation
-    # (factor 2-10x slower).
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        default-channel: ['defaults', 'conda-forge']
-        python-version: ['3.11']
-        platform: ['arm64', 'ppc64le']
-    env:
-      OS: linux-${{ matrix.platform }}
-      PYTHON: ${{ matrix.python-version }}
-    steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-          path: conda-libmamba-solver
-      # /CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-        # Equivalent to locally run:
-        #   `docker run --privileged --rm tonistiigi/binfmt --install all`
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      # - export CONDA_SOLVER
-      # -
-      - name: Python linux-${{ matrix.platform }} on ${{ matrix.default-channel }}, ${{ matrix.python-version }} tests
-        run: >
-          docker run
-          --rm
-          -v ${PWD}:/opt/conda-src
-          -v ${GITHUB_WORKSPACE}/conda-libmamba-solver:/opt/conda-libmamba-solver-src
-          --platform linux/${{ matrix.platform }}
-          -e TEST_SPLITS
-          -e TEST_GROUP
-          ghcr.io/conda/conda-ci:main-linux-python${{ matrix.python-version }}${{ matrix.default-channel == 'conda-forge' && '-conda-forge' || '' }}
-          bash -c "source /opt/conda/etc/profile.d/conda.sh; \
-                   pytest --cov=conda -k test_DepsModifier_contract"
-
-      - name: Upload test results
-        if: always()
-        uses: actions/upload-artifact@v3
-        with:
-          # name has to be unique, to not overwrite uploads of other matrix runs. sha1 is optional and only to differentiate
-          # when locally dowloading and comparing results of different workflow runs.
-          name: test-results-${{ github.sha }}-linux-${{ matrix.platform }}-qemu-${{ matrix.default-channel }}-${{ matrix.python-version }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
-          path: |
-            conda/.coverage
+            conda/./tools/durations/${{ runner.os }}.json
             conda/test-report.xml
           retention-days: 1
 
@@ -401,16 +305,6 @@ jobs:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
             hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}
 
-      - name: Cache minio
-        uses: actions/cache@v3
-        env:
-          # Increase this value to reset cache
-          CACHE_NUMBER: 3
-        with:
-          path: minio
-          key:
-            ${{ runner.os }}-${{ env.MINIO_RELEASE && env.MINIO_RELEASE || 'minio' }}-${{ env.CACHE_NUMBER }}
-
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
         if: matrix.default-channel == 'defaults'
@@ -449,35 +343,33 @@ jobs:
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: bash -el {0}
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        env:
-          CONDA_SOLVER: libmamba  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: |
           ./dev/macos/${{ matrix.test-type }}.sh
 
       - uses: codecov/codecov-action@v3
         with:
-          flags: ${{ matrix.test-type }}
-          env_vars: OS,PYTHON
+          flags: ${{ matrix.test-type }},${{ runner.os }},${{ matrix.python-version }}
 
       - name: Upload test results
-        if: always()
+        if: '!cancelled()'
         uses: actions/upload-artifact@v3
         with:
           # name has to be unique, to not overwrite uploads of other matrix runs. sha1 is optional and only to differentiate
           # when locally dowloading and comparing results of different workflow runs.
           name: test-results-${{ github.sha }}-${{ runner.os }}-${{ matrix.default-channel }}-${{ matrix.python-version }}-${{ matrix.test-type }}-${{ matrix.test-group }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
           path: |
             conda/.coverage
-            conda/.test_durations_${OS}
+            conda/tools/durations/${{ runner.os }}.json
             conda/test-report.xml
           retention-days: 1
 
   # aggregate and upload
   aggregate:
     # only aggregate test suite if there are code changes
-    needs: [changes, windows, linux, linux-qemu, macos]
-    if: needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
+    needs: [changes, windows, linux, macos]
+    if: >-
+      !cancelled()
+      && needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     steps:
@@ -501,8 +393,8 @@ jobs:
   # required check
   analyze:
     name: Analyze results
-    needs: [windows, linux, linux-qemu, macos, aggregate]
-    if: always()
+    needs: [windows, linux, macos, aggregate]
+    if: '!cancelled()'
 
     runs-on: ubuntu-latest
     steps:
@@ -537,15 +429,14 @@ jobs:
     # only build canary build if
     # - prior steps succeeded,
     # - this is the main repo, and
-    # - event triggered by push, and  # CONDA-LIBMAMBA-SOLVER CHANGE
-    # - we are on the main (or feature) branch
+    # - we are on the main, feature, or release branch
     if: >-
-      success()
+      !cancelled()
       && !github.event.repository.fork
-      && github.event_name == 'push'
       && (
         github.ref_name == 'main'
         || startsWith(github.ref_name, 'feature/')
+        || endsWith(github.ref_name, '.x')
       )
     strategy:
       matrix:
@@ -566,8 +457,34 @@ jobs:
           clean: true
           fetch-depth: 0
 
+      # Explicitly use Python 3.11 since each of the OSes has a different default Python
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Detect label
+        shell: python
+        run: |
+          from pathlib import Path
+          from re import match
+          from os import environ
+
+          if "${{ github.ref_name }}" == "main":
+              # main branch commits are uploaded to the dev label
+              label = "dev"
+          elif "${{ github.ref_name }}".startswith("feature/"):
+              # feature branch commits are uploaded to a custom label
+              label = "${{ github.ref_name }}"
+          else:
+              # release branch commits are added to the rc label
+              # see https://github.com/conda/infrastructure/issues/760
+              _, name = "${{ github.repository }}".split("/")
+              label = f"rc-{name}-${{ github.ref_name }}"
+
+          Path(environ["GITHUB_ENV"]).write_text(f"ANACONDA_ORG_LABEL={label}")
+
       - name: Create and upload canary build
-        uses: conda/actions/canary-release@v22.10.0
+        uses: conda/actions/canary-release@v23.7.0
         env:
           # Run conda-build in isolated activation to properly package conda
           _CONDA_BUILD_ISOLATED_ACTIVATION: 1
@@ -575,5 +492,5 @@ jobs:
           package-name: ${{ github.event.repository.name }}
           subdir: ${{ matrix.subdir }}
           anaconda-org-channel: conda-canary
-          anaconda-org-label: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+          anaconda-org-label: ${{ env.ANACONDA_ORG_LABEL }}
           anaconda-org-token: ${{ secrets.ANACONDA_ORG_CONDA_CANARY_TOKEN }}
