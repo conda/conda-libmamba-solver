@@ -19,7 +19,7 @@ DATA = Path(__file__).parent / "data"
         if (x / "meta.yaml").is_file()
     ],
 )
-def test_build_recipe(recipe):
+def test_build_recipe(recipe, tmp_path):
     """
     Adapted from
     https://github.com/mamba-org/boa/blob/3213180564/tests/test_mambabuild.py#L6
@@ -29,6 +29,7 @@ def test_build_recipe(recipe):
     expected_fail_recipes = ["baddeps"]
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
+    env["CONDA_BLD_PATH"] = str(tmp_path)
     recipe_name = Path(recipe).name
     if recipe_name in expected_fail_recipes:
         with pytest.raises(CalledProcessError):

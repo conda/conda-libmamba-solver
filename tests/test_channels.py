@@ -232,10 +232,12 @@ def test_encoding_file_paths(tmp_path: Path):
     assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
 
 
-def test_conda_build_with_aliased_channels():
+def test_conda_build_with_aliased_channels(tmp_path):
     "https://github.com/conda/conda-libmamba-solver/issues/363"
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
+    env = os.environ.copy()
+    env["CONDA_BLD_PATH"] = str(tmp_path / "conda-bld")
     try:
         _setup_conda_forge_as_defaults(Path.home(), force=True)
         conda_subprocess(
@@ -243,6 +245,7 @@ def test_conda_build_with_aliased_channels():
             DATA / "conda_build_recipes" / "jedi",
             "--channel=defaults",
             capture_output=False,
+            env=env,
         )
     finally:
         if condarc_contents:
