@@ -2,8 +2,8 @@
 
 ## What's the difference between the available solvers in `conda`?
 
-Please refer to the section "Differences between `libmamba` and `classic`" in
-the [`libmamba-vs-classic`](./libmamba-vs-classic.md#differences-between-libmamba-and-classic) docs.
+Please refer to the section "Technical differences between `libmamba` and `classic`" in
+the [`libmamba-vs-classic`](./libmamba-vs-classic.md#technical-differences-between-libmamba-and-classic) docs.
 
 ## How do I uninstall it?
 
