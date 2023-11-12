@@ -820,8 +820,9 @@ class LibMambaSolver(Solver):
             else:
                 log.warn("Tried to unlink %s but it is not installed or manageable?", filename)
 
+        for_conda_build = self._called_from_conda_build()
         for channel, filename, json_payload in to_link:
-            record = self._package_record_from_json_payload(index, channel, filename, json_payload)
+            record = self._package_record_from_json_payload(index, channel, filename, json_payload, for_conda_build=for_conda_build)
             # We need this check below to make sure noarch package get reinstalled
             # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
@@ -842,7 +843,7 @@ class LibMambaSolver(Solver):
             )
 
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
-        if on_win and self._called_from_conda_build():
+        if on_win and for_conda_build:
             for record in out_state.records.values():
                 if "%" not in str(record):
                     continue
@@ -851,14 +852,15 @@ class LibMambaSolver(Solver):
                 record.channel.name = percent_decode(record.channel.name)
 
     def _package_record_from_json_payload(
-        self, index: LibMambaIndexHelper, channel: str, pkg_filename: str, json_payload: str
+        self, index: LibMambaIndexHelper, channel: str, pkg_filename: str, json_payload: str, 
+        for_conda_build: bool = False,
     ) -> PackageRecord:
         """
         The libmamba transactions cannot return full-blown objects from the C/C++ side.
         Instead, it returns the instructions to build one on the Python side:
 
         channel_info: dict
-            Channel data, as built in .index.LibmambaIndexHelper._fetch_channel()
+            Channel datas, as built in .index.LibmambaIndexHelper._fetch_channel()
             This is retrieved from the .index._index mapping, keyed by channel URLs
         pkg_filename: str
             The filename (.tar.bz2 or .conda) of the selected record.
@@ -884,11 +886,11 @@ class LibMambaSolver(Solver):
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
         kwargs["channel"] = channel_info.channel
-        if self._called_from_conda_build():
+        if for_conda_build:
             # conda-build expects multichannel instances in the Dist->PackageRecord mapping
             # see https://github.com/conda/conda-libmamba-solver/issues/363
-            for multichannel_name, channels in context.custom_multichannels.items():
-                urls = [url for c in channels for url in c.urls(with_credentials=False)]
+            for multichannel_name, mc_channels in context.custom_multichannels.items():
+                urls = [url for c in mc_channels for url in c.urls(with_credentials=False)]
                 if channel_info.noauth_url in urls:
                     kwargs["channel"] = multichannel_name
                     break
