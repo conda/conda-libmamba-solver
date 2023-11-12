@@ -243,6 +243,7 @@ def test_conda_build_with_aliased_channels(tmp_path):
         conda_subprocess(
             "build",
             DATA / "conda_build_recipes" / "jedi",
+            "--override-channels",
             "--channel=defaults",
             capture_output=False,
             env=env,
