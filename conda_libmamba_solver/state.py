@@ -233,7 +233,7 @@ class SolverInputState:
         can generate an equivalent ``MatchSpec`` object with ``.to_match_spec()``.
         Records are toposorted.
         """
-        return MappingProxyType({pkg.name: pkg for pkg in self.prefix_data.iter_records_sorted()})
+        return MappingProxyType(dict(sorted(self.prefix_data._prefix_records.items())))
 
     @property
     def history(self) -> Mapping[str, MatchSpec]:
