@@ -70,6 +70,8 @@ Once the cache has been populated, we can instantiate 'libmamba.Repo' objects di
 We maintain a map of subdir-specific URLs to `conda.model.channel.Channel`
 and `libmamba.Repo` objects.
 """
+from __future__ import annotations
+
 import logging
 import os
 from dataclasses import dataclass
@@ -156,8 +158,8 @@ class LibMambaIndexHelper(IndexHelper):
         """
         for url, info in self._index.items():
             if url.startswith("file://"):
-                url, json_path = self._fetch_channel(url)
-                new = self._json_path_to_repo_info(url, json_path)
+                url, json_path, overlay_path = self._fetch_channel(url)
+                new = self._json_path_to_repo_info(url, json_path, overlay_path)
                 self._repos[self._repos.index(info.repo)] = new.repo
                 self._index[url] = new
         set_channel_priorities(self._index)
@@ -215,7 +217,7 @@ class LibMambaIndexHelper(IndexHelper):
         finally:
             os.unlink(f.name)
 
-    def _fetch_channel(self, url: str) -> Tuple[str, os.PathLike]:
+    def _fetch_channel(self, url: str) -> Tuple[str, Path, Path | None]:
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
@@ -228,13 +230,23 @@ class LibMambaIndexHelper(IndexHelper):
                 del SubdirData._cache_[(url, self._repodata_fn)]
             # /Workaround
 
-        log.debug("Fetching %s with SubdirData.repo_fetch", channel)
-        subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
-        json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
+        # repo_fetch is created on each property access
+        repo_fetch = SubdirData(channel, repodata_fn=self._repodata_fn).repo_fetch
+        overlay_path = None
+        if hasattr(repo_fetch, "fetch_latest_path_and_overlay"):
+            log.debug(
+                "Fetching %s with SubdirData.repo_fetch.fetch_latest_path_and_overlay", channel
+            )
+            json_path, overlay_path, _ = repo_fetch.fetch_latest_path_and_overlay()
+        else:
+            log.debug("Fetching %s with SubdirData.repo_fetch", channel)
+            json_path, _ = repo_fetch.fetch_latest_path()
 
-        return url, json_path
+        return url, json_path, overlay_path
 
-    def _json_path_to_repo_info(self, url: str, json_path: str) -> Optional[_ChannelRepoInfo]:
+    def _json_path_to_repo_info(
+        self, url: str, json_path: str | Path, overlay_path: Path | None
+    ) -> Optional[_ChannelRepoInfo]:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
         json_path = Path(json_path)
@@ -263,7 +275,11 @@ class LibMambaIndexHelper(IndexHelper):
         else:
             path_to_use = json_path
 
-        repo = api.Repo(self._pool, noauth_url, str(path_to_use), escape_channel_url(noauth_url))
+        if(overlay_path):
+            # from https://github.com/mamba-org/mamba/pull/2969
+            repo = api.Repo(self._pool, noauth_url, str(path_to_use), str(overlay_path), escape_channel_url(noauth_url))
+        else:
+            repo = api.Repo(self._pool, noauth_url, str(path_to_use), escape_channel_url(noauth_url))
         return _ChannelRepoInfo(
             repo=repo,
             channel=channel,
