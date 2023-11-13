@@ -822,7 +822,9 @@ class LibMambaSolver(Solver):
 
         for_conda_build = self._called_from_conda_build()
         for channel, filename, json_payload in to_link:
-            record = self._package_record_from_json_payload(index, channel, filename, json_payload, for_conda_build=for_conda_build)
+            record = self._package_record_from_json_payload(
+                index, channel, filename, json_payload, for_conda_build=for_conda_build
+            )
             # We need this check below to make sure noarch package get reinstalled
             # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
@@ -852,7 +854,11 @@ class LibMambaSolver(Solver):
                 record.channel.name = percent_decode(record.channel.name)
 
     def _package_record_from_json_payload(
-        self, index: LibMambaIndexHelper, channel: str, pkg_filename: str, json_payload: str, 
+        self,
+        index: LibMambaIndexHelper,
+        channel: str,
+        pkg_filename: str,
+        json_payload: str,
         for_conda_build: bool = False,
     ) -> PackageRecord:
         """

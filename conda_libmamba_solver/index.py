@@ -236,7 +236,9 @@ class LibMambaIndexHelper(IndexHelper):
 
         return url, json_path
 
-    def _json_path_to_repo_info(self, url: str, json_path: str, try_solv: bool = False) -> Optional[_ChannelRepoInfo]:
+    def _json_path_to_repo_info(
+        self, url: str, json_path: str, try_solv: bool = False
+    ) -> Optional[_ChannelRepoInfo]:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
         json_path = Path(json_path)
@@ -247,7 +249,7 @@ class LibMambaIndexHelper(IndexHelper):
             json_stat = None
         if try_solv:
             try:
-                solv_path = json_path.parent / f"{json_path.stem}.solv" 
+                solv_path = json_path.parent / f"{json_path.stem}.solv"
                 solv_stat = solv_path.stat()
             except OSError as exc:
                 log.debug("Failed to stat %s", solv_path, exc_info=exc)
