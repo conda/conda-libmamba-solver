@@ -289,7 +289,7 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
         conda_subprocess(
             "create",
             "-p",
-            _get_temp_prefix(),
+            _get_temp_prefix(use_restricted_unicode=on_win),
             "--solver=libmamba",
             "test-package",
         )

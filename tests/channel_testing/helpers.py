@@ -10,7 +10,6 @@ import sys
 from typing import Tuple
 
 import pytest
-from conda.common.compat import on_win
 from conda.testing.integration import _get_temp_prefix, run_command
 from xprocess import ProcessStarter
 
@@ -142,7 +141,7 @@ def create_with_channel(
             "conda",
             "create",
             "-p",
-            _get_temp_prefix(use_restricted_unicode=on_win),
+            _get_temp_prefix(),
             f"--solver={solver}",
             "--json",
             "--override-channels",
@@ -158,7 +157,7 @@ def create_with_channel(
 def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> Tuple[str, str, int]:
     stdout, stderr, returncode = run_command(
         "create",
-        _get_temp_prefix(use_restricted_unicode=on_win),
+        _get_temp_prefix(),
         f"--solver={solver}",
         "--json",
         "--override-channels",
