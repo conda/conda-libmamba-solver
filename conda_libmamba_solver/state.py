@@ -231,8 +231,9 @@ class SolverInputState:
         """
         This exposes the installed packages in the prefix. Note that a ``PackageRecord``
         can generate an equivalent ``MatchSpec`` object with ``.to_match_spec()``.
+        Records are toposorted.
         """
-        return MappingProxyType(self.prefix_data._prefix_records)
+        return MappingProxyType({pkg.name: pkg for pkg in self.prefix_data.iter_records_sorted()})
 
     @property
     def history(self) -> Mapping[str, MatchSpec]:
@@ -281,12 +282,14 @@ class SolverInputState:
         - almost all packages if update_all is true
         - etc
         """
-        pkgs = {pkg: MatchSpec(pkg) for pkg in self.aggressive_updates if pkg in self.installed}
+        installed = self.installed
+        pinned = self.pinned
+        pkgs = {pkg: MatchSpec(pkg) for pkg in self.aggressive_updates if pkg in installed}
         if context.auto_update_conda and paths_equal(self.prefix, context.root_prefix):
             pkgs.setdefault("conda", MatchSpec("conda"))
         if self.update_modifier.UPDATE_ALL:
-            for pkg in self.installed:
-                if pkg != "python" and pkg not in self.pinned:
+            for pkg in installed:
+                if pkg != "python" and pkg not in pinned:
                     pkgs.setdefault(pkg, MatchSpec(pkg))
         return MappingProxyType(pkgs)
 
