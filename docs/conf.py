@@ -104,11 +104,11 @@ sitemap_url_scheme = "{link}"
 # -- For sphinx_reredirects ------------------------------------------------
 
 redirects = {
-    "getting-started": "user-guide",
-    "faq": "user-guide/faq",
-    "configuration": "user-guide/configuration",
-    "libmamba-vs-classic": "user-guide/libmamba-vs-classic",
-    "more-resources": "user-guide/more-resources",
-    "performance": "user-guide/performance",
-    "subcommands": "user-guide/subcommands",
+    "getting-started": "../user-guide/",
+    "faq": "../user-guide/faq/",
+    "configuration": "../user-guide/configuration/",
+    "libmamba-vs-classic": "../user-guide/libmamba-vs-classic/",
+    "more-resources": "../user-guide/more-resources/",
+    "performance": "../user-guide/performance/",
+    "subcommands": "../user-guide/subcommands/",
 }
