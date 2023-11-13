@@ -57,7 +57,7 @@ html_theme = "conda_sphinx_theme"
 html_static_path = ["_static"]
 
 html_css_files = [
-    "custom.css",
+    "css/custom.css",
 ]
 
 # Serving the robots.txt since we want to point to the sitemap.xml file
