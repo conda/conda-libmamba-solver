@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Ensure installed packages are always sorted to avoid injecting accidental randomness in the solve process. (#378)
+* Ensure installed and virtual packages are always sorted to avoid injecting accidental randomness in the solve process. (#378)
 
 ### Deprecations
 

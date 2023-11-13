@@ -262,7 +262,7 @@ class SolverInputState:
         cannot be (un)installed, they only represent constrains for other packages. By convention,
         their names start with a double underscore.
         """
-        return MappingProxyType(self._virtual)
+        return MappingProxyType(dict(sorted(self._virtual.items())))
 
     @property
     def aggressive_updates(self) -> Mapping[str, MatchSpec]:
