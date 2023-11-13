@@ -1,0 +1,8 @@
+
+/**
+ * This rule is here to avoid the scrollbar appearing this
+ * is not hosted on ReadTheDocs
+ */
+#rtd-footer-container {
+    display: none;
+}
