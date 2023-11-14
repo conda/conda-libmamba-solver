@@ -408,7 +408,7 @@ class LibMambaSolver(Solver):
         else:
             tasks = self._specs_to_tasks_add(in_state, out_state)
         print(
-            "Created following tasks:\n", 
+            "Created following tasks:\n",
             json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
         )
         return tasks
