@@ -512,7 +512,11 @@ class SolverOutputState:
             "history",
             "aggressive_updates",
         ):
-            for name, spec in sorted(getattr(sis, group).items(), key=sort_by_spec_strictness):
+            for name, spec in sorted(
+                getattr(sis, group).items(), 
+                key=sort_by_spec_strictness, 
+                reverse=True,
+            ):
                 specs_by_strictness.setdefault(name, spec)
         for record_group in ("installed", "virtual"):
             for name, record in getattr(sis, record_group).items():
