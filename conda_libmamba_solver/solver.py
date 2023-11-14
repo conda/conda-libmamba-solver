@@ -403,7 +403,7 @@ class LibMambaSolver(Solver):
         log.debug("Creating tasks for %s specs", len(out_state.specs))
         if in_state.is_removing:
             tasks = self._specs_to_tasks_remove(in_state, out_state)
-        if self._called_from_conda_build():
+        elif self._called_from_conda_build():
             tasks = self._specs_to_tasks_conda_build(in_state, out_state)
         else:
             tasks = self._specs_to_tasks_add(in_state, out_state)
