@@ -378,7 +378,9 @@ class LibMambaSolver(Solver):
         new_conflicts = self._maybe_raise_for_problems(
             problems, old_conflicts, out_state.pins, index._channels
         )
-        log.debug("Attempt %d failed with %s conflicts:\n%s", attempt, len(new_conflicts), problems)
+        log.debug(
+            "Attempt %d failed with %s conflicts:\n%s", attempt, len(new_conflicts), problems
+        )
         out_state.conflicts.update(new_conflicts)
         return False
 
@@ -524,7 +526,7 @@ class LibMambaSolver(Solver):
             ALLOW_UNINSTALL,
             USERINSTALLED,
             LOCK,
-        ):  
+        ):
             if task_type in tasks:
                 returned_tasks[task_type] = tasks[task_type]
         return returned_tasks

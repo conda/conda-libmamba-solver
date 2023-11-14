@@ -82,7 +82,7 @@ from conda.models.match_spec import MatchSpec
 from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
-from .utils import compatible_specs, EnumAsBools
+from .utils import EnumAsBools, compatible_specs
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -500,7 +500,7 @@ class SolverOutputState:
     @property
     def specs(self):
         """
-        Merge all possible sources of input package specs, sorted by their input category and 
+        Merge all possible sources of input package specs, sorted by their input category and
         strictness. It's just meant to be an enumeration of all possible inputs, not a ready-to-use
         list of specs for a solver.
         """
@@ -513,8 +513,8 @@ class SolverOutputState:
             "aggressive_updates",
         ):
             for name, spec in sorted(
-                getattr(sis, group).items(), 
-                key=sort_by_spec_strictness, 
+                getattr(sis, group).items(),
+                key=sort_by_spec_strictness,
                 reverse=True,
             ):
                 specs_by_strictness.setdefault(name, spec)
@@ -569,7 +569,7 @@ class SolverOutputState:
                 # Return early, with the current solution (at this point, .records is set
                 # to the map of installed packages)
                 return self.current_solution
-        
+
     def check_for_pin_conflicts(self, index):
         """
         Last part of the logic, common to addition and removal of packages. Originally,
@@ -709,9 +709,7 @@ class SolverOutputState:
                 if installed:
                     self.records[name] = installed
                 else:
-                    self.records.pop(
-                        record.name
-                    )
+                    self.records.pop(record.name)
 
         elif sis.update_modifier.UPDATE_DEPS:
             # Here we have to SAT solve again :(  It's only now that we know the dependency
