@@ -433,12 +433,15 @@ class LibMambaSolver(Solver):
         if installed_python and to_be_installed_python:
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
-        # Add specs to install
-        # SolverOutputState.specs has been populated at initialization with what the classic
-        # logic considers should be the target version for each package in the environment
-        # and requested changes. We are _not_ following those targets here, but we do iterate
-        # over the list to decide what to do with each package.
-        for name, _classic_logic_spec in sorted(out_state.specs.items()):
+        # Task types
+        ADD_PIN = "ADD_PIN", api.SOLVER_NOOP
+        INSTALL = "INSTALL", api.SOLVER_INSTALL
+        UPDATE = "UPDATE", api.SOLVER_UPDATE
+        ALLOW_UNINSTALL = "ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL
+        USERINSTALLED = "USERINSTALLED", api.SOLVER_USERINSTALLED
+        LOCK = "LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK
+
+        for name in out_state.specs:
             if name.startswith("__"):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
@@ -452,14 +455,14 @@ class LibMambaSolver(Solver):
             conflicting: MatchSpec = self._check_spec_compat(out_state.conflicts.get(name))
 
             if name in user_installed and not in_state.prune and not conflicting:
-                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
+                tasks[USERINSTALLED].append(installed_spec_str)
 
             # These specs are explicit in some sort of way
             if pinned and not pinned.is_name_only_spec:
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
                 # name-only pins are treated as locks when installed, see below
-                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(self._spec_to_str(pinned))
+                tasks[ADD_PIN].append(self._spec_to_str(pinned))
             # in libmamba, pins and installs are compatible tasks (pin only constrains,
             # does not 'request' a package). In classic, pins were actually targeted installs
             # so they were exclusive
@@ -472,31 +475,31 @@ class LibMambaSolver(Solver):
                 else:
                     spec_str = self._spec_to_str(requested)
                 if installed:
-                    tasks[("UPDATE", api.SOLVER_UPDATE)].append(spec_str)
-                    tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                    tasks[UPDATE].append(spec_str)
+                    tasks[ALLOW_UNINSTALL].append(name)
                 else:
-                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec_str)
+                    tasks[INSTALL].append(spec_str)
             elif name in in_state.always_update:
-                tasks[("UPDATE", api.SOLVER_UPDATE)].append(name)
-                tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                tasks[UPDATE].append(name)
+                tasks[ALLOW_UNINSTALL].append(name)
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
             elif in_state.prune:
                 continue
             elif name == "python" and installed and not pinned:
                 pyver = ".".join(installed.version.split(".")[:2])
-                tasks[("ADD_PIN", api.SOLVER_NOOP)].append(f"python {pyver}.*")
+                tasks[ADD_PIN].append(f"python {pyver}.*")
             elif history:
                 if conflicting and history.strictness == 3:
                     # relax name-version-build (strictness=3) history specs that cause conflicts
                     # this is called neutering and makes test_neutering_of_historic_specs pass
                     spec = f"{name} {history.version}.*" if history.version else name
-                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(spec)
+                    tasks[INSTALL].append(spec)
                 else:
-                    tasks[("INSTALL", api.SOLVER_INSTALL)].append(self._spec_to_str(history))
+                    tasks[INSTALL].append(self._spec_to_str(history))
             elif installed:
                 if conflicting:
-                    tasks[("ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL)].append(name)
+                    tasks[ALLOW_UNINSTALL].append(name)
                 else:
                     # we freeze everything else as installed
                     lock = in_state.update_modifier.FREEZE_INSTALLED
@@ -509,11 +512,22 @@ class LibMambaSolver(Solver):
                                 lock = False
                                 break
                     if lock:
-                        tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(
-                            installed_spec_str
-                        )
+                        tasks[LOCK].append(installed_spec_str)
 
-        return dict(tasks)
+        # Sort tasks by priority
+        # This ensures that more important tasks are added to the solver first
+        returned_tasks = {}
+        for task_type in (
+            ADD_PIN,
+            INSTALL,
+            UPDATE,
+            ALLOW_UNINSTALL,
+            USERINSTALLED,
+            LOCK,
+        ):  
+            if task_type in tasks:
+                returned_tasks[task_type] = tasks[task_type]
+        return returned_tasks
 
     def _specs_to_tasks_remove(self, in_state: SolverInputState, out_state: SolverOutputState):
         # TODO: Consider merging add/remove in a single logic this so there's no split
