@@ -407,8 +407,8 @@ class LibMambaSolver(Solver):
             tasks = self._specs_to_tasks_conda_build(in_state, out_state)
         else:
             tasks = self._specs_to_tasks_add(in_state, out_state)
-        print(
-            "Created following tasks:\n",
+        log.debug(
+            "Created following tasks:\n%s",
             json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
         )
         return tasks
