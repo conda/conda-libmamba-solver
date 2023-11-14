@@ -402,10 +402,16 @@ class LibMambaSolver(Solver):
     def _specs_to_tasks(self, in_state: SolverInputState, out_state: SolverOutputState):
         log.debug("Creating tasks for %s specs", len(out_state.specs))
         if in_state.is_removing:
-            return self._specs_to_tasks_remove(in_state, out_state)
-        if self._called_from_conda_build():
-            return self._specs_to_tasks_conda_build(in_state, out_state)
-        return self._specs_to_tasks_add(in_state, out_state)
+            tasks = self._specs_to_tasks_remove(in_state, out_state)
+        elif self._called_from_conda_build():
+            tasks = self._specs_to_tasks_conda_build(in_state, out_state)
+        else:
+            tasks = self._specs_to_tasks_add(in_state, out_state)
+        log.debug(
+            "Created following tasks:\n%s",
+            json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
+        )
+        return tasks
 
     @staticmethod
     def _spec_to_str(spec):
@@ -456,7 +462,7 @@ class LibMambaSolver(Solver):
         # logic considers should be the target version for each package in the environment
         # and requested changes. We are _not_ following those targets here, but we do iterate
         # over the list to decide what to do with each package.
-        for name, _classic_logic_spec in out_state.specs.items():
+        for name, _classic_logic_spec in sorted(out_state.specs.items()):
             if name.startswith("__"):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
