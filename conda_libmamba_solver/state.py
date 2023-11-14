@@ -65,16 +65,13 @@ as well as richer logging for each action.
 import logging
 from os import PathLike
 from types import MappingProxyType
-from typing import Iterable, Mapping, Optional, Type, Union
+from typing import Dict, Iterable, Optional, Tuple, Type, Union
 
 from boltons.setutils import IndexedSet
-from conda import CondaError
 from conda.auxlib import NULL
-from conda.auxlib.ish import dals
 from conda.base.constants import DepsModifier, UpdateModifier
 from conda.base.context import context
-from conda.common.io import dashlist
-from conda.common.path import get_major_minor_version, paths_equal
+from conda.common.path import paths_equal
 from conda.core.index import _supplement_index_with_system
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import get_pinned_specs
@@ -85,8 +82,7 @@ from conda.models.match_spec import MatchSpec
 from conda.models.prefix_graph import PrefixGraph
 from conda.models.records import PackageRecord
 
-from .models import EnumAsBools, TrackedMap
-from .utils import compatible_specs
+from .utils import compatible_specs, EnumAsBools
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -227,7 +223,7 @@ class SolverInputState:
     # Prefix state pools
 
     @property
-    def installed(self) -> Mapping[str, PackageRecord]:
+    def installed(self) -> Dict[str, PackageRecord]:
         """
         This exposes the installed packages in the prefix. Note that a ``PackageRecord``
         can generate an equivalent ``MatchSpec`` object with ``.to_match_spec()``.
@@ -236,7 +232,7 @@ class SolverInputState:
         return MappingProxyType(dict(sorted(self.prefix_data._prefix_records.items())))
 
     @property
-    def history(self) -> Mapping[str, MatchSpec]:
+    def history(self) -> Dict[str, MatchSpec]:
         """
         These are the specs that the user explicitly asked for in previous operations
         on the prefix. See :class:`History` for more details.
@@ -244,7 +240,7 @@ class SolverInputState:
         return MappingProxyType(self._history)
 
     @property
-    def pinned(self) -> Mapping[str, MatchSpec]:
+    def pinned(self) -> Dict[str, MatchSpec]:
         """
         These specs represent hard constrains on what package versions can be installed
         on the environment. The packages here returned don't need to be already installed.
@@ -256,7 +252,7 @@ class SolverInputState:
         return MappingProxyType(self._pinned)
 
     @property
-    def virtual(self) -> Mapping[str, MatchSpec]:
+    def virtual(self) -> Dict[str, MatchSpec]:
         """
         System properties exposed as virtual packages (e.g. ``__glibc=2.17``). These packages
         cannot be (un)installed, they only represent constrains for other packages. By convention,
@@ -265,7 +261,7 @@ class SolverInputState:
         return MappingProxyType(dict(sorted(self._virtual.items())))
 
     @property
-    def aggressive_updates(self) -> Mapping[str, MatchSpec]:
+    def aggressive_updates(self) -> Dict[str, MatchSpec]:
         """
         Packages that the solver will always try to update. As such, they will never have an
         associated version or build constrain. Note that the packages here returned do not need to
@@ -274,7 +270,7 @@ class SolverInputState:
         return MappingProxyType(self._aggressive_updates)
 
     @property
-    def always_update(self) -> Mapping[str, MatchSpec]:
+    def always_update(self) -> Dict[str, MatchSpec]:
         """
         Merged lists of packages that should always be updated, depending on the flags, including:
         - aggressive_updates
@@ -294,7 +290,7 @@ class SolverInputState:
         return MappingProxyType(pkgs)
 
     @property
-    def do_not_remove(self) -> Mapping[str, MatchSpec]:
+    def do_not_remove(self) -> Dict[str, MatchSpec]:
         """
         Packages that are protected by the solver so they are not accidentally removed. This list
         is not configurable, but hardcoded for legacy reasons.
@@ -302,7 +298,7 @@ class SolverInputState:
         return MappingProxyType(self._do_not_remove)
 
     @property
-    def requested(self) -> Mapping[str, MatchSpec]:
+    def requested(self) -> Dict[str, MatchSpec]:
         """
         Packages that the user has explicitly asked for in this operation.
         """
@@ -426,8 +422,6 @@ class SolverInputState:
 
 
 class SolverOutputState:
-    # TODO: This object is starting to look _a lot_ like conda.core.solve itself...
-    # Consider merging this with a base class in conda.core.solve
     """
     This is the main mutable object we will massage before passing the result of the computation
     (the ``specs`` mapping) to the solver. It will also store the result of the solve (in
@@ -437,19 +431,15 @@ class SolverOutputState:
     ----------
     solver_input_state
         This instance provides the initial state for the output.
-    specs
-        Mapping of package names to ``MatchSpec`` objects that will override the initialization
-        driven by ``solver_input_state`` (check ``._initialize_specs_from_input_state()`` for more
-        details).
     records
-        Mapping of package names to ``PackageRecord`` objects. If not provided, it will be
+        Dict of package names to ``PackageRecord`` objects. If not provided, it will be
         initialized from the ``installed`` records in ``solver_input_state``.
     for_history
-        Mapping of package names to ``MatchSpec`` objects. These specs will be written to
+        Dict of package names to ``MatchSpec`` objects. These specs will be written to
         the prefix history once the solve is complete. Its default initial value is taken from the
         explicitly requested packages in the ``solver_input_state`` instance.
     neutered
-        Mapping of package names to ``MatchSpec`` objects. These specs are also written to
+        Dict of package names to ``MatchSpec`` objects. These specs are also written to
         the prefix history, as part of the neutered specs. If not provided, their default value is
         a blank mapping.
     conflicts
@@ -486,108 +476,18 @@ class SolverOutputState:
         self,
         *,
         solver_input_state: SolverInputState,
-        specs: Optional[Mapping[str, MatchSpec]] = None,
-        records: Optional[Mapping[str, PackageRecord]] = None,
-        for_history: Optional[Mapping[str, MatchSpec]] = None,
-        neutered: Optional[Mapping[str, MatchSpec]] = None,
-        conflicts: Optional[Mapping[str, MatchSpec]] = None,
-        pins: Optional[Mapping[str, MatchSpec]] = None,
+        records: Optional[Dict[str, PackageRecord]] = None,
+        for_history: Optional[Dict[str, MatchSpec]] = None,
+        neutered: Optional[Dict[str, MatchSpec]] = None,
+        conflicts: Optional[Dict[str, MatchSpec]] = None,
+        pins: Optional[Dict[str, MatchSpec]] = None,
     ):
         self.solver_input_state: SolverInputState = solver_input_state
-
-        self.records: Mapping[str, PackageRecord] = TrackedMap("records")
-        if records:
-            self.records.update(records, reason="Initialized from explicitly passed arguments")
-        elif solver_input_state.installed:
-            self.records.update(
-                solver_input_state.installed,
-                reason="Initialized from installed packages in prefix",
-            )
-
-        self.specs: Mapping[str, MatchSpec] = TrackedMap("specs")
-        if specs:
-            self.specs.update(specs, reason="Initialized from explicitly passed arguments")
-        else:
-            self._initialize_specs_from_input_state()
-
-        self.for_history: Mapping[str, MatchSpec] = TrackedMap("for_history")
-        if for_history:
-            self.for_history.update(
-                for_history, reason="Initialized from explicitly passed arguments"
-            )
-        elif solver_input_state.requested:
-            self.for_history.update(
-                solver_input_state.requested,
-                reason="Initialized from requested specs in solver input state",
-            )
-
-        self.neutered: Mapping[str, MatchSpec] = TrackedMap(
-            "neutered", data=(neutered or {}), reason="From arguments"
-        )
-
-        # we track conflicts to relax some constrains and help the solver out
-        self.conflicts: Mapping[str, MatchSpec] = TrackedMap(
-            "conflicts", data=(conflicts or {}), reason="From arguments"
-        )
-
-        self.pins: Mapping[str, MatchSpec] = TrackedMap(
-            "pins", data=(pins or {}), reason="From arguments"
-        )
-
-    def _initialize_specs_from_input_state(self):
-        """
-        Provide the initial value for the ``.specs`` mapping. This depends on whether
-        there's a history available (existing prefix) or not (new prefix).
-        """
-        # Initialize specs following conda.core.solve._collect_all_metadata()
-
-        if self.solver_input_state.prune:
-            pass  # we do not initialize specs with history OR installed pkgs if we are pruning
-        # Otherwise, initialization depends on whether we have a history to work with or not
-        elif (
-            self.solver_input_state.history
-            and not self.solver_input_state.update_modifier.UPDATE_ALL
-        ):
-            # add in historically-requested specs
-            self.specs.update(self.solver_input_state.history, reason="As in history")
-            for name, record in self.solver_input_state.installed.items():
-                if name in self.solver_input_state.aggressive_updates:
-                    self.specs.set(
-                        name, MatchSpec(name), reason="Installed and in aggressive updates"
-                    )
-                elif name in self.solver_input_state.do_not_remove:
-                    # these are things that we want to keep even if they're not explicitly
-                    # specified.  This is to compensate for older installers not recording these
-                    # appropriately for them to be preserved.
-                    self.specs.set(
-                        name,
-                        MatchSpec(name),
-                        reason="Installed and protected in do_not_remove",
-                        overwrite=False,
-                    )
-                elif record.subdir == "pypi":
-                    # add in foreign stuff (e.g. from pip) into the specs
-                    # map. We add it so that it can be left alone more. This is a
-                    # declaration that it is manually installed, much like the
-                    # history map. It may still be replaced if it is in conflict,
-                    # but it is not just an indirect dep that can be pruned.
-                    self.specs.set(
-                        name,
-                        MatchSpec(name),
-                        reason="Installed from PyPI; protect from indirect pruning",
-                    )
-        else:
-            # add everything in prefix if we have no history to work with (e.g. with --update-all)
-            self.specs.update(
-                {name: MatchSpec(name) for name in self.solver_input_state.installed},
-                reason="Installed and no history available (prune=false)",
-            )
-
-        # Add virtual packages so they are taken into account by the solver
-        for name in self.solver_input_state.virtual:
-            # we only add a bare name spec here, no constrain! the constrain is only available
-            # in the index, since it will only contain a single value for the virtual package
-            self.specs.set(name, MatchSpec(name), reason="Virtual system", overwrite=False)
+        self.records: Dict[str, PackageRecord] = records or dict(solver_input_state.installed)
+        self.for_history: Dict[str, MatchSpec] = for_history or dict(solver_input_state.requested)
+        self.neutered: Dict[str, MatchSpec] = neutered or {}
+        self.conflicts: Dict[str, MatchSpec] = conflicts or {}
+        self.pins: Dict[str, MatchSpec] = pins or {}
 
     @property
     def current_solution(self):
@@ -596,6 +496,28 @@ class SolverOutputState:
         solver API. This is what you should return in ``Solver.solve_final_state()``.
         """
         return IndexedSet(PrefixGraph(self.records.values()).graph)
+
+    @property
+    def specs(self):
+        """
+        Merge all possible sources of input package specs, sorted by their input category and 
+        strictness. It's just meant to be an enumeration of all possible inputs, not a ready-to-use
+        list of specs for a solver.
+        """
+        sis = self.solver_input_state
+        specs_by_strictness = {}
+        for group in (
+            "requested",
+            "pinned",
+            "history",
+            "aggressive_updates",
+        ):
+            for name, spec in sorted(getattr(sis, group).items(), key=sort_by_spec_strictness):
+                specs_by_strictness.setdefault(name, spec)
+        for record_group in ("installed", "virtual"):
+            for name, record in getattr(sis, record_group).items():
+                specs_by_strictness.setdefault(name, record.to_match_spec())
+        return specs_by_strictness
 
     @property
     def real_specs(self):
@@ -611,344 +533,40 @@ class SolverOutputState:
         """
         return {name: spec for name, spec in self.specs.items() if name.startswith("__")}
 
-    def prepare_specs(self, index: IndexHelper) -> Mapping[str, MatchSpec]:
+    def early_exit(self) -> Dict[str, PackageRecord]:
         """
-        Main method to populate the ``specs`` mapping.
-        """
-        if self.solver_input_state.is_removing:
-            self._prepare_for_remove()
-        else:
-            self._prepare_for_add(index)
-        self._prepare_for_solve(index)
-        return self.specs
-
-    def _prepare_for_add(self, index: IndexHelper):
-        """
-        This is the core logic for specs processing. In contrast with the ``conda remove``
-        logic, this part is more intricate since it has to deal with details such as the
-        role of the history specs, aggressive updates, pinned packages and the deps / update
-        modifiers.
-
-        Parameters
-        ----------
-        index
-            Needed to query for the dependency tree of potentially conflicting
-            specs.
+        Operations that do not need a solver and might result in returning
+        early are collected here.
         """
         sis = self.solver_input_state
+        if sis.is_removing:
+            not_installed = [
+                spec for name, spec in sis.requested.items() if name not in sis.installed
+            ]
+            if not_installed:
+                exc = PackagesNotFoundError(not_installed)
+                exc.allow_retry = False
+                raise exc
 
-        # The constructor should have prepared the _basics_ of the specs / records maps. Now we
-        # we will try to refine the version constrains to minimize changes in the environment
-        # whenever possible. Take into account this is done iteratively together with the
-        # solver! self.records starts with the initial prefix state (if any), but accumulates
-        # solution attempts after each retry.
+            if sis.force_remove:
+                for name, spec in sis.requested.items():
+                    for record in sis.installed.values():
+                        if spec.match(record):
+                            self.records.pop(name)
+                            break
+                return self.current_solution
 
-        # ## Refine specs that match currently proposed solution
-        # ## (either prefix as is, or a failed attempt)
-
-        # First, let's see if the current specs are compatible with the current records. They
-        # should be unless something is very wrong with the prefix.
-
-        for name, spec in self.specs.items():
-            record_matches = [record for record in self.records.values() if spec.match(record)]
-
-            if not record_matches:
-                continue  # nothing to refine
-
-            if len(record_matches) != 1:  # something is very wrong!
-                self._raise_incompatible_spec_records(spec, record_matches)
-
-            # ok, now we can start refining
-            record = record_matches[0]
-            if record.is_unmanageable:
-                self.specs.set(
-                    name, record.to_match_spec(), reason="Spec matches unmanageable record"
-                )
-            elif name in sis.aggressive_updates:
-                self.specs.set(
-                    name, MatchSpec(name), reason="Spec matches record in aggressive updates"
-                )
-            elif name not in self.conflicts:
-                # TODO: and (name not in explicit_pool or record in explicit_pool[name]):
-                self.specs.set(
-                    name,
-                    record.to_match_spec(),
-                    reason="Spec matches record in explicit pool for its name",
-                )
-            elif name in sis.history:
-                # if the package was historically requested, we will honor that, but trying to
-                # keep the package as installed
-                #
-                # TODO: JRG: I don't know how mamba will handle _both_ a constrain and a target;
-                # play with priorities?
-                self.specs.set(
-                    name,
-                    MatchSpec(sis.history[name], target=record.dist_str()),
-                    reason="Spec matches record in history",
-                )
+        if sis.update_modifier.SPECS_SATISFIED_SKIP_SOLVE and not sis.is_removing:
+            for name, spec in sis.requested.items():
+                if name not in sis.installed:
+                    break
             else:
-                # every other spec that matches something installed will be configured with
-                # only a target. This is the case for conflicts, among others
-                self.specs.set(
-                    name, MatchSpec(name, target=record.dist_str()), reason="Spec matches record"
-                )
-
-        # ## Pinnings ###
-
-        # Now let's add the pinnings
-        # We want to pin packages that are
-        # - installed
-        # - requested by the user (if request and pin conflict, request takes precedence)
-        # - a dependency of something requested by the user
-        pin_overrides = set()
-        # The block using this object below has been deactivated.
-        # so we don't build this (potentially expensive) set anymore
-        # if sis.pinned:
-        #     explicit_pool = set(index.explicit_pool(sis.requested.values()))
-        for name, spec in sis.pinned.items():
-            pin = MatchSpec(spec, optional=False)
-            requested = name in sis.requested
-            if name in sis.installed and not requested:
-                self.specs.set(name, pin, reason="Pinned, installed and not requested")
-            elif requested:
-                # THIS BLOCK WOULD NEVER RUN
-                # classic solver would check compatibility between pinned and requested
-                # and let the user override pins in the CLI. libmamba doesn't allow
-                # the user to override pins. We will have raised an exception earlier
-                # We will keep this code here for reference
-                if True:  # compatible_specs(index, sis.requested[name], spec):
-                    # assume compatible, we will raise later otherwise
-                    reason = (
-                        "Pinned, installed and requested; constraining request "
-                        "as pin because they are compatible"
-                    )
-                    self.specs.set(name, pin, reason=reason)
-                    pin_overrides.add(name)
-                else:
-                    reason = (
-                        "Pinned, installed and requested; pin and request "
-                        "are conflicting, so adding user request due to higher precedence"
-                    )
-                    self.specs.set(name, sis.requested[name], reason=reason)
-            # always assume the pin will be needed
-            # elif name in explicit_pool:
-            # THIS BLOCK HAS BEEN DEACTIVATED
-            # the explicit pool is potentially expensive and we are not using it.
-            # leaving this here for reference. It's supposed to check whether the pin
-            # was going to be part of the environment because it shows up in the dependency
-            # tree of the explicitly requested specs.
-            # ---
-            # TODO: This might be introducing additional specs into the list if the pin
-            # matches a dependency of a request, but that dependency only appears in _some_
-            # of the request variants. For example, package A=2 depends on B, but package
-            # A=3 no longer depends on B. B will be part of A's explicit pool because it
-            # "could" be a dependency. If B happens to be pinned but A=3 ends up being the
-            # one chosen by the solver, then B would be included in the solution when it
-            # shouldn't. It's a corner case but it can happen so we might need to further
-            # restrict the explicit_pool to see. The original logic in the classic solver
-            # checked: `if explicit_pool[s.name] & ssc.r._get_package_pool([s]).get(s.name,
-            # set()):`
-            else:  # always add the pin for libmamba to consider it
-                self.specs.set(
-                    name,
-                    pin,
-                    reason="Pin matches one of the potential dependencies of user requests",
-                )
-            # In classic, this would notify the pin was being overridden by a request
-            # else:
-            #     log.warn(
-            #         "pinned spec %s conflicts with explicit specs. Overriding pinned spec.", spec
-            #     )
-
-        # ## Update modifiers ###
-
-        if sis.update_modifier.FREEZE_INSTALLED:
-            for name, record in sis.installed.items():
-                if name in self.conflicts:
-                    # TODO: Investigate why we use to_match_spec() here and other targets use
-                    # dist_str()
-                    self.specs.set(
-                        name,
-                        MatchSpec(name, target=record.to_match_spec(), optional=True),
-                        reason="Relaxing installed because it caused a conflict",
-                    )
-                else:
-                    self.specs.set(name, record.to_match_spec(), reason="Freezing as installed")
-
-        elif sis.update_modifier.UPDATE_ALL:
-            # NOTE: This logic is VERY similar to what we are doing in the class constructor (?)
-            # NOTE: we are REDEFINING the specs accumulated so far
-            old_specs = self.specs._data.copy()
-            self.specs.clear(reason="Redefining from scratch due to --update-all")
-            if sis.history:
-                # history is preferable because it has explicitly installed stuff in it.
-                # that simplifies our solution.
-                for name in sis.history:
-                    if name in sis.pinned:
-                        self.specs.set(
-                            name,
-                            old_specs[name],
-                            reason="Update all, with history, pinned: reusing existing entry",
-                        )
-                    else:
-                        self.specs.set(
-                            name,
-                            MatchSpec(name),
-                            reason="Update all, with history, not pinned: adding spec "
-                            "from history with no constraints",
-                        )
-
-                for name, record in sis.installed.items():
-                    if record.subdir == "pypi":
-                        self.specs.set(
-                            name,
-                            MatchSpec(name),
-                            reason="Update all, with history: treat pip installed "
-                            "stuff as explicitly installed",
-                        )
-                    elif name not in self.specs:
-                        self.specs.set(
-                            name,
-                            MatchSpec(name),
-                            reason="Update all, with history: "
-                            "adding name-only spec from installed",
-                        )
-            else:
-                for name in sis.installed:
-                    if name in sis.pinned:
-                        self.specs.set(
-                            name,
-                            old_specs[name],
-                            reason="Update all, no history, pinned: reusing existing entry",
-                        )
-                    else:
-                        self.specs.set(
-                            name,
-                            MatchSpec(name),
-                            reason="Update all, no history, not pinned: adding spec from "
-                            "installed with no constraints",
-                        )
-
-        elif sis.update_modifier.UPDATE_SPECS:
-            # this is the default behavior if no flags are passed
-            # NOTE: This _anticipates_ conflicts; we can also wait for the next attempt and
-            # get the real solver conflicts as part of self.conflicts -- that would simplify
-            # this logic a bit
-
-            # ensure that our self.specs_to_add are not being held back by packages in the env.
-            # This factors in pins and also ignores specs from the history.  It is unfreezing
-            # only for the indirect specs that otherwise conflict with update of the immediate
-            # request:
-            # pinned_requests = []
-            # for name, spec in sis.requested.items():
-            #     if name not in pin_overrides and name in sis.pinned:
-            #         continue
-            #     if name in sis.history:
-            #         continue
-            #     pinned_requests.append(sis.package_has_updates(spec))
-            #     # this ^ needs to be implemented, requires installed pool
-            # conflicts = sis.get_conflicting_specs(self.specs.values(), pinned_requests) or ()
-            for name in self.conflicts:
-                if (
-                    name not in sis.pinned
-                    and name not in sis.history
-                    and name not in sis.requested
-                ):
-                    self.specs.set(name, MatchSpec(name), reason="Relaxed because conflicting")
-
-        # ## Python pinning ###
-
-        # As a business rule, we never want to update python beyond the current minor version,
-        # unless that's requested explicitly by the user (which we actively discourage).
-
-        if "python" in self.records and "python" not in sis.requested:
-            record = self.records["python"]
-            if "python" not in self.conflicts and sis.update_modifier.FREEZE_INSTALLED:
-                self.specs.set(
-                    "python",
-                    record.to_match_spec(),
-                    reason="Freezing python due to business rule, freeze-installed, "
-                    "and no conflicts",
-                )
-            else:
-                # will our prefix record conflict with any explicit spec?  If so, don't add
-                # anything here - let python float when it hasn't been explicitly specified
-                spec = self.specs.get("python", MatchSpec("python"))
-                if spec.get("version"):
-                    reason = "Leaving Python pinning as it was calculated so far"
-                else:
-                    reason = "Pinning Python to match installed version"
-                    version = get_major_minor_version(record.version) + ".*"
-                    spec = MatchSpec(spec, version=version)
-
-                # There's a chance the selected version results in a conflict -- detect and
-                # report?
-                # specs = (spec, ) + tuple(sis.requested.values())
-                # if sis.get_conflicting_specs(specs, sis.requested.values()):
-                #     if not sis.installing:  # TODO: repodata checks?
-                #         # raises a hopefully helpful error message
-                #         sis.find_conflicts(specs)  # this might call the solver -- remove?
-                #     else:
-                #         # oops, no message?
-                #         raise LibMambaUnsatisfiableError(
-                #             "Couldn't find a Python version that does not conflict..."
-                #         )
-
-                self.specs.set("python", spec, reason=reason)
-
-        # ## Offline and aggressive updates ###
-
-        # For the aggressive_update_packages configuration parameter, we strip any target
-        # that's been set.
-
-        if not context.offline:
-            for name, spec in sis.aggressive_updates.items():
-                if name in self.specs:
-                    self.specs.set(name, spec, reason="Aggressive updates relaxation")
-
-        # ## User requested specs ###
-
-        # add in explicitly requested specs from specs_to_add
-        # this overrides any name-matching spec already in the spec map
-
-        for name, spec in sis.requested.items():
-            if name not in pin_overrides:
-                self.specs.set(name, spec, reason="Explicitly requested by user")
-
-        # ## Conda pinning ###
-
-        # As a business rule, we never want to downgrade conda below the current version,
-        # unless that's requested explicitly by the user (which we actively discourage).
-
-        if (
-            "conda" in self.specs
-            and "conda" in sis.installed
-            and paths_equal(sis.prefix, context.conda_prefix)
-        ):
-            record = sis.installed["conda"]
-            spec = self.specs["conda"]
-            required_version = f">={record.version}"
-            if not spec.get("version"):
-                spec = MatchSpec(spec, version=required_version)
-                reason = "Pinning conda with version greater than currently installed"
-                self.specs.set("conda", spec, reason=reason)
-            if context.auto_update_conda and "conda" not in sis.requested:
-                spec = MatchSpec("conda", version=required_version, target=None)
-                reason = "Pinning conda with version greater than currently installed, auto update"
-                self.specs.set("conda", spec, reason=reason)
-
-        # ## Extra logic ###
-        # this is where we are adding workarounds for mamba difference's in behavior, which
-        # might not belong here as they are solver specific
-
-        # next step -> .prepare_for_solve()
-
-    def _prepare_for_remove(self):
-        "Just add the user requested specs to ``specs``"
-        # This logic is simpler than when we are installing packages
-        self.specs.update(self.solver_input_state.requested, reason="Adding user-requested specs")
-
-    def _prepare_for_solve(self, index):
+                # All specs match a package in the current environment.
+                # Return early, with the current solution (at this point, .records is set
+                # to the map of installed packages)
+                return self.current_solution
+        
+    def check_for_pin_conflicts(self, index):
         """
         Last part of the logic, common to addition and removal of packages. Originally,
         the legacy logic will also minimize the conflicts here by doing a pre-solve
@@ -985,47 +603,6 @@ class SolverOutputState:
                 exc.allow_retry = False
                 raise exc
 
-        # ## Conflict minimization ###
-        # here conda.core.solve.classic.Solver._run_sat() enters a `while conflicting_specs` loop
-        # to neuter some of the specs in self.specs. In other solvers we let the solver run into
-        # them. We might need to add a hook here ?
-
-        # After this, we finally let the solver do its work. It will either finish with a final
-        # state or fail and repopulate the conflicts list in the SolverOutputState object
-
-    def early_exit(self):
-        """
-        Operations that do not need a solver and might result in returning
-        early are collected here.
-        """
-        sis = self.solver_input_state
-        if sis.is_removing:
-            not_installed = [
-                spec for name, spec in sis.requested.items() if name not in sis.installed
-            ]
-            if not_installed:
-                exc = PackagesNotFoundError(not_installed)
-                exc.allow_retry = False
-                raise exc
-
-            if sis.force_remove:
-                for name, spec in sis.requested.items():
-                    for record in sis.installed.values():
-                        if spec.match(record):
-                            self.records.pop(name)
-                            break
-                return self.current_solution
-
-        if sis.update_modifier.SPECS_SATISFIED_SKIP_SOLVE and not sis.is_removing:
-            for name, spec in sis.requested.items():
-                if name not in sis.installed:
-                    break
-            else:
-                # All specs match a package in the current environment.
-                # Return early, with the current solution (at this point, .records is set
-                # to the map of installed packages)
-                return self.current_solution
-
     def post_solve(self, solver: Type["Solver"]):
         """
         These tasks are performed _after_ the solver has done its work. It essentially
@@ -1048,18 +625,14 @@ class SolverOutputState:
         # ## Record history ###
         # user requested specs need to be annotated in history
         # we control that in .for_history
-        self.for_history.update(sis.requested, reason="User requested specs recorded to history")
+        self.for_history.update(sis.requested)
 
         # ## Neutered ###
         # annotate overridden history specs so they are written to disk
         for name, spec in sis.history.items():
             record = self.records.get(name)
             if record and not spec.match(record):
-                self.neutered.set(
-                    name,
-                    MatchSpec(name, version=record.version),
-                    reason="Solution required a history override",
-                )
+                self.neutered[name] = MatchSpec(name, version=record.version)
 
         # ## Add inconsistent packages back ###
         # direct result of the inconsistency analysis above
@@ -1090,8 +663,8 @@ class SolverOutputState:
                 for name, record in only_change_these.items():
                     original_state[name] = record
 
-            self.records.clear(reason="Redefining records due to --no-deps")
-            self.records.update(original_state, reason="Redefined records due to --no-deps")
+            self.records.clear()
+            self.records.update(original_state)
 
         elif sis.deps_modifier.ONLY_DEPS and not sis.update_modifier.UPDATE_DEPS:
             # Using a special instance of PrefixGraph to remove youngest child nodes that match
@@ -1124,19 +697,16 @@ class SolverOutputState:
                         spec = MatchSpec(dependency)
                         if spec.name not in self.specs:
                             # following https://github.com/conda/conda/pull/8766
-                            reason = "Recording deps brought by --only-deps as explicit"
-                            self.for_history.set(spec.name, spec, reason=reason)
+                            self.for_history[spec.name] = spec
                     to_remove.append(record.name)
 
             for name in to_remove:
                 installed = sis.installed.get(name)
                 if installed:
-                    self.records.set(
-                        name, installed, reason="Restoring originally installed due to --only-deps"
-                    )
+                    self.records[name] = installed
                 else:
                     self.records.pop(
-                        record.name, reason="Excluding from solution due to --only-deps"
+                        record.name
                     )
 
         elif sis.update_modifier.UPDATE_DEPS:
@@ -1148,32 +718,24 @@ class SolverOutputState:
             # target, and add them to `requested` so it gets recorded in the history file.
             #
             # It's like UPDATE_ALL, but only for certain dependency chains.
-            new_specs = TrackedMap("update_deps_specs")
+            new_specs = {}
 
             graph = PrefixGraph(self.records.values())
             for name, spec in sis.requested.items():
                 record = graph.get_node_by_name(name)
                 for ancestor in graph.all_ancestors(record):
-                    new_specs.set(
-                        ancestor.name,
-                        MatchSpec(ancestor.name),
-                        reason="New specs asked by --update-deps",
-                    )
+                    new_specs[ancestor.name] = MatchSpec(ancestor.name)
 
             # Remove pinned_specs
             for name, spec in sis.pinned.items():
-                new_specs.pop(
-                    name, None, reason="Exclude pinned packages from --update-deps specs"
-                )
+                new_specs.pop(name, None)
             # Follow major-minor pinning business rule for python
             if "python" in new_specs:
                 record = sis.installed["python"]
                 version = ".".join(record.version.split(".")[:2]) + ".*"
-                new_specs.set("python", MatchSpec(name="python", version=version))
+                new_specs["python"] = MatchSpec(name="python", version=version)
             # Add in the original `requested` on top.
-            new_specs.update(
-                sis.requested, reason="Add original requested specs on top for --update-deps"
-            )
+            new_specs.update(sis.requested)
 
             if sis.is_removing:
                 specs_to_add = ()
@@ -1202,10 +764,10 @@ class SolverOutputState:
                 )
                 records = {record.name: record for record in records}
 
-            self.records.clear(reason="Redefining due to --update-deps")
-            self.records.update(records, reason="Redefined due to --update-deps")
-            self.for_history.clear(reason="Redefining due to --update-deps")
-            self.for_history.update(new_specs, reason="Redefined due to --update-deps")
+            self.records.clear()
+            self.records.update(records)
+            self.for_history.clear()
+            self.for_history.update(new_specs)
 
             # Disable pruning regardless the original value
             # TODO: Why? Dive in https://github.com/conda/conda/pull/7719
@@ -1214,24 +776,15 @@ class SolverOutputState:
         # ## Prune ###
         # remove orphan leaves in the graph
         if sis.prune:
-            graph = PrefixGraph(list(self.records.values()), self.specs.values())
+            graph = PrefixGraph(list(self.records.values()), list(sis.requested.values()))
             graph.prune()
-            self.records.clear(reason="Pruning")
-            self.records.update({record.name: record for record in graph.graph}, reason="Pruned")
+            self.records.clear()
+            self.records.update({record.name: record for record in graph.graph})
 
-    @staticmethod
-    def _raise_incompatible_spec_records(spec, records):
-        "Raise an error if something is very wrong with the environment"
-        raise CondaError(
-            dals(
-                f"""
-                Conda encountered an error with your environment.  Please report an issue
-                at https://github.com/conda/conda/issues.  In your report, please include
-                the output of 'conda info' and 'conda list' for the active environment, along
-                with the command you invoked that resulted in this error.
-                pkg_name: {spec.name}
-                spec: {spec}
-                matches_for_spec: {dashlist(records, indent=4)}
-                """
-            )
-        )
+
+def sort_by_spec_strictness(key_value_tuple: Tuple[str, MatchSpec]):
+    """
+    Helper function to sort a list of (key, value) tuples by spec strictness
+    """
+    name, spec = key_value_tuple
+    return getattr(spec, "strictness", 0), name

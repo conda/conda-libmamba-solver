@@ -39,7 +39,6 @@ from conda.exceptions import (
     InvalidMatchSpec,
     InvalidSpec,
     PackagesNotFoundError,
-    SpecsConfigurationConflictError,
     UnsatisfiableError,
 )
 from conda.models.channel import Channel
@@ -152,7 +151,6 @@ class LibMambaSolver(Solver):
         out_state = SolverOutputState(solver_input_state=in_state)
 
         # These tasks do _not_ require a solver...
-        # TODO: Abstract away in the base class?
         none_or_final_state = out_state.early_exit()
         if none_or_final_state is not None:
             return none_or_final_state
@@ -160,7 +158,6 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         init_api_context()
         subdirs = self.subdirs
-        conda_bld_channels = ()
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
             # Problem: Conda build generates a custom index which happens to "forget" about
@@ -179,6 +176,7 @@ class LibMambaSolver(Solver):
             IndexHelper = _CachedLibMambaIndexHelper
         else:
             IndexHelper = LibMambaIndexHelper
+            conda_bld_channels = ()
 
         all_channels = [
             *conda_bld_channels,
@@ -268,7 +266,6 @@ class LibMambaSolver(Solver):
             int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
         )
         for attempt in range(1, max_attempts):
-            log.debug("Starting solver attempt %s", attempt)
             try:
                 solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
                 if solved:
@@ -279,7 +276,6 @@ class LibMambaSolver(Solver):
             else:  # didn't solve yet, but can retry
                 out_state = SolverOutputState(
                     solver_input_state=in_state,
-                    specs=dict(out_state.specs),
                     records=dict(out_state.records),
                     for_history=dict(out_state.for_history),
                     neutered=dict(out_state.neutered),
@@ -296,9 +292,7 @@ class LibMambaSolver(Solver):
                     # or name not in in_state.history
                     # or name not in in_state.requested
                     # or name not in in_state.pinned
-                },
-                reason="Last attempt: all installed packages exposed "
-                "as conflicts for maximum flexibility",
+                }
             )
             # we only check this for "desperate" strategies in _specs_to_tasks
             if self._command in (None, NULL):
@@ -321,13 +315,11 @@ class LibMambaSolver(Solver):
         return out_state
 
     def _log_info(self):
-        log.info("Using libmamba solver")
-        log.info("Conda version: %s", _conda_version)
-        log.info("Mamba version: %s", mamba_version())
+        log.info("conda version: %s", _conda_version)
+        log.info("conda-libmamba-solver version: %s", __version__)
+        log.info("libmambapy version: %s", mamba_version())
         log.info("Target prefix: %r", self.prefix)
         log.info("Command: %s", sys.argv)
-        log.info("Specs to add: %s", self.specs_to_add)
-        log.info("Specs to remove: %s", self.specs_to_remove)
 
     def _setup_solver(self, index: LibMambaIndexHelper):
         self._solver_options = solver_options = [
@@ -349,25 +341,16 @@ class LibMambaSolver(Solver):
     ):
         self._setup_solver(index)
 
-        log.debug("New solver attempt: #%d", attempt)
+        log.debug("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
 
-        # ## First, we need to obtain the list of specs ###
-        try:
-            out_state.prepare_specs(index)
-        except SpecsConfigurationConflictError as exc:
-            # in the last attempt we have marked everything
-            # as a conflict so everything gets unconstrained
-            # however this will be detected as a conflict with the
-            # pins, but we can ignore it because we did it ourselves
-            if self._command != "last_solve_attempt":
-                raise exc
-
-        log.debug("Computed specs: %s", out_state.specs)
-
-        # ## Convert to tasks
-        n_pins = 0
+        # ## Create tasks for the solver
         tasks = self._specs_to_tasks(in_state, out_state)
+        log.debug(
+            "Solver tasks:\n%s",
+            json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
+        )
+        n_pins = 0
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
             if task_name == "ADD_PIN" and attempt == 1:
@@ -387,7 +370,7 @@ class LibMambaSolver(Solver):
         solved = self.solver.solve()
 
         if solved:
-            out_state.conflicts.clear(reason="Solution found")
+            out_state.conflicts.clear()
             return solved
 
         problems = self.solver.problems_to_str()
@@ -395,23 +378,16 @@ class LibMambaSolver(Solver):
         new_conflicts = self._maybe_raise_for_problems(
             problems, old_conflicts, out_state.pins, index._channels
         )
-        log.debug("Attempt %d failed with %s conflicts", attempt, len(new_conflicts))
-        out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
+        log.debug("Attempt %d failed with %s conflicts:\n%s", attempt, len(new_conflicts), problems)
+        out_state.conflicts.update(new_conflicts)
         return False
 
     def _specs_to_tasks(self, in_state: SolverInputState, out_state: SolverOutputState):
-        log.debug("Creating tasks for %s specs", len(out_state.specs))
         if in_state.is_removing:
-            tasks = self._specs_to_tasks_remove(in_state, out_state)
-        elif self._called_from_conda_build():
-            tasks = self._specs_to_tasks_conda_build(in_state, out_state)
-        else:
-            tasks = self._specs_to_tasks_add(in_state, out_state)
-        log.debug(
-            "Created following tasks:\n%s",
-            json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
-        )
-        return tasks
+            return self._specs_to_tasks_remove(in_state, out_state)
+        if self._called_from_conda_build():
+            return self._specs_to_tasks_conda_build(in_state, out_state)
+        return self._specs_to_tasks_add(in_state, out_state)
 
     @staticmethod
     def _spec_to_str(spec):
@@ -545,7 +521,6 @@ class LibMambaSolver(Solver):
         tasks = defaultdict(list)
 
         # Protect history and aggressive updates from being uninstalled if possible
-
         for name, record in out_state.records.items():
             if name in in_state.history or name in in_state.aggressive_updates:
                 # MatchSpecs constructed from PackageRecords get parsed too
@@ -558,10 +533,10 @@ class LibMambaSolver(Solver):
         # --all
         # --no-deps
         # --deps-only
-        key = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
+        ERASE = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
         for name, spec in in_state.requested.items():
             spec = self._check_spec_compat(spec)
-            tasks[key].append(str(spec))
+            tasks[ERASE].append(str(spec))
 
         return dict(tasks)
 
@@ -569,13 +544,13 @@ class LibMambaSolver(Solver):
         self, in_state: SolverInputState, out_state: SolverOutputState
     ):
         tasks = defaultdict(list)
-        key = "INSTALL", api.SOLVER_INSTALL
-        for name, spec in out_state.specs.items():
+        INSTALL = "INSTALL", api.SOLVER_INSTALL
+        for name, spec in in_state.requested.items():
             if name.startswith("__"):
                 continue
             spec = self._check_spec_compat(spec)
             spec = self._fix_version_field_for_conda_build(spec)
-            tasks[key].append(spec.conda_build_form())
+            tasks[INSTALL].append(spec.conda_build_form())
 
         return dict(tasks)
 
@@ -821,7 +796,7 @@ class LibMambaSolver(Solver):
                     # ^ Do not try to unlink virtual pkgs, virtual eggs, etc
                     continue
                 if record.fn == filename:  # match!
-                    out_state.records.pop(name, None, reason="Unlinked by solver")
+                    out_state.records.pop(name, None)
                     break
             else:
                 log.warn("Tried to unlink %s but it is not installed or manageable?", filename)
@@ -843,9 +818,7 @@ class LibMambaSolver(Solver):
                 # Replace repodata-only record with local-info-rich record counterpart
                 record = already_installed_record
 
-            out_state.records.set(
-                record.name, record, reason="Part of solution calculated by libmamba"
-            )
+            out_state.records[record.name] = record
 
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
         if on_win and self._called_from_conda_build():
