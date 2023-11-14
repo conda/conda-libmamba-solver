@@ -213,7 +213,6 @@ class LibMambaSolver(Solver):
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            self._setup_solver(index)
             # This function will copy and mutate `out_state`
             # Make sure we get the latest copy to return the correct solution below
             out_state = self._solving_loop(in_state, out_state, index)
@@ -299,7 +298,7 @@ class LibMambaSolver(Solver):
                 self._command = "last_solve_attempt"
             else:
                 self._command += "+last_solve_attempt"
-            solved = self._solve_attempt(in_state, out_state, index)
+            solved = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
             if not solved:
                 message = self._prepare_problems_message(pins=out_state.pins)
                 exc = LibMambaUnsatisfiableError(message)
@@ -341,18 +340,16 @@ class LibMambaSolver(Solver):
     ):
         self._setup_solver(index)
 
-        log.debug("Solver attempt: #%d", attempt)
+        log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
 
         # ## Create tasks for the solver
         tasks = self._specs_to_tasks(in_state, out_state)
-        log.debug(
-            "Solver tasks:\n%s",
-            json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
-        )
+        tasks_as_str = json.dumps({k[0]: v for k, v in tasks.items()}, indent=2)
+        log.info("Solver tasks:\n%s", tasks_as_str)
         n_pins = 0
         for (task_name, task_type), specs in tasks.items():
-            log.debug("Adding task %s with specs %s", task_name, specs)
+            log.debug("Adding task %s", task_name)
             if task_name == "ADD_PIN" and attempt == 1:
                 # pins only need to be added once; since they persist in the pool
                 # adding them more times results in issues like #354
