@@ -26,9 +26,9 @@ from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,
     ChannelPriority,
-    on_win,
 )
 from conda.base.context import context
+from conda.common.compat import on_win
 from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
@@ -160,7 +160,6 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         init_api_context()
         subdirs = self.subdirs
-        conda_bld_channels = ()
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
             # Problem: Conda build generates a custom index which happens to "forget" about
@@ -179,6 +178,7 @@ class LibMambaSolver(Solver):
             IndexHelper = _CachedLibMambaIndexHelper
         else:
             IndexHelper = LibMambaIndexHelper
+            conda_bld_channels = ()
 
         all_channels = [
             *conda_bld_channels,
@@ -826,8 +826,11 @@ class LibMambaSolver(Solver):
             else:
                 log.warn("Tried to unlink %s but it is not installed or manageable?", filename)
 
+        for_conda_build = self._called_from_conda_build()
         for channel, filename, json_payload in to_link:
-            record = self._package_record_from_json_payload(index, channel, filename, json_payload)
+            record = self._package_record_from_json_payload(
+                index, channel, filename, json_payload, for_conda_build=for_conda_build
+            )
             # We need this check below to make sure noarch package get reinstalled
             # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
@@ -848,20 +851,28 @@ class LibMambaSolver(Solver):
             )
 
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
-        if on_win and self._called_from_conda_build():
+        if on_win and for_conda_build:
             for record in out_state.records.values():
-                record.channel.location = percent_decode(record.channel.location)
+                if "%" not in str(record):
+                    continue
+                if record.channel.location:  # multichannels like 'defaults' have no location
+                    record.channel.location = percent_decode(record.channel.location)
                 record.channel.name = percent_decode(record.channel.name)
 
     def _package_record_from_json_payload(
-        self, index: LibMambaIndexHelper, channel: str, pkg_filename: str, json_payload: str
+        self,
+        index: LibMambaIndexHelper,
+        channel: str,
+        pkg_filename: str,
+        json_payload: str,
+        for_conda_build: bool = False,
     ) -> PackageRecord:
         """
         The libmamba transactions cannot return full-blown objects from the C/C++ side.
         Instead, it returns the instructions to build one on the Python side:
 
         channel_info: dict
-            Channel data, as built in .index.LibmambaIndexHelper._fetch_channel()
+            Channel datas, as built in .index.LibmambaIndexHelper._fetch_channel()
             This is retrieved from the .index._index mapping, keyed by channel URLs
         pkg_filename: str
             The filename (.tar.bz2 or .conda) of the selected record.
@@ -887,6 +898,14 @@ class LibMambaSolver(Solver):
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
         kwargs["channel"] = channel_info.channel
+        if for_conda_build:
+            # conda-build expects multichannel instances in the Dist->PackageRecord mapping
+            # see https://github.com/conda/conda-libmamba-solver/issues/363
+            for multichannel_name, mc_channels in context.custom_multichannels.items():
+                urls = [url for c in mc_channels for url in c.urls(with_credentials=False)]
+                if channel_info.noauth_url in urls:
+                    kwargs["channel"] = multichannel_name
+                    break
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
