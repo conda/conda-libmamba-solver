@@ -264,6 +264,7 @@ class LibMambaSolver(Solver):
             2,
             int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
         )
+        out_state.check_for_pin_conflicts(index)
         for attempt in range(1, max_attempts):
             try:
                 solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
