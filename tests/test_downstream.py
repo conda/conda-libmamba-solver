@@ -11,27 +11,30 @@ from conda.base.context import context
 DATA = Path(__file__).parent / "data"
 
 
-def test_build_recipes():
+@pytest.mark.parametrize(
+    "recipe",
+    [
+        pytest.param(x, id=x.name)
+        for x in sorted((DATA / "conda_build_recipes").iterdir())
+        if (x / "meta.yaml").is_file()
+    ],
+)
+def test_build_recipe(recipe):
     """
     Adapted from
     https://github.com/mamba-org/boa/blob/3213180564/tests/test_mambabuild.py#L6
 
     See /tests/data/conda_build_recipes/LICENSE for more details
     """
-    recipes_dir = DATA / "conda_build_recipes"
-
-    recipes = [str(x) for x in recipes_dir.iterdir() if x.is_dir()]
+    expected_fail_recipes = ["baddeps"]
     env = os.environ.copy()
     env["CONDA_SOLVER"] = "libmamba"
-    expected_fail_recipes = ["baddeps"]
-    for recipe in recipes:
-        recipe_name = Path(recipe).name
-        print(f"Running {recipe_name}")
-        if recipe_name in expected_fail_recipes:
-            with pytest.raises(CalledProcessError):
-                check_call(["conda-build", recipe], env=env)
-        else:
+    recipe_name = Path(recipe).name
+    if recipe_name in expected_fail_recipes:
+        with pytest.raises(CalledProcessError):
             check_call(["conda-build", recipe], env=env)
+    else:
+        check_call(["conda-build", recipe], env=env)
 
 
 def test_conda_lock(tmp_path):

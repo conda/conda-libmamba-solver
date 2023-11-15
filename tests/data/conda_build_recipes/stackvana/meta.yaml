@@ -1,5 +1,6 @@
 {% set name = "stackvana-core" %}
 {% set version = "0.2021.43" %}
+{% set eups_product = "lsst_distrib" %}
 
 package:
   name: {{ name|lower }}
@@ -15,11 +16,45 @@ outputs:
       script:
         - echo "BUILDING IMPL" >> $PREFIX/stackvana-core-impl  # [unix]
         - echo "BUILDING IMPL" >> %PREFIX%/stackvana-core-impl  # [win]
+    test:
+      commands:
+        - echo OK
   - name: stackvana-core
     version: {{ version }}
-    run_exports:
-      - {{ pin_subpackage('stackvana-core-impl', exact=True) }}
-
+    build:
+      script:
+        - echo "BUILDING CORE" >> $PREFIX/stackvana-core  # [unix]
+        - echo "BUILDING CORE" >> %PREFIX%/stackvana-core  # [win]
+      run_exports:
+        - {{ pin_subpackage('stackvana-core-impl', exact=True) }}
     requirements:
       run:
         - {{ pin_subpackage('stackvana-core-impl', exact=True) }}
+    test:
+      commands:
+        - echo OK
+  - name: stackvana-{{ eups_product }}
+    version: {{ version }}
+    build:
+      script:
+        - echo "BUILDING {{ eups_product }}" >> $PREFIX/stackvana-{{ eups_product }}  # [unix]
+        - echo "BUILDING {{ eups_product }}" >> %PREFIX%/stackvana-{{ eups_product }}  # [win]
+    requirements:
+      host:
+        - stackvana-core =={{ version }}
+      run:
+        - stackvana-core =={{ version }}
+    test:
+      commands:
+        - echo OK
+  - name: stackvana
+    version: {{ version }}
+    build:
+      script:
+        - echo "BUILDING STACKVANA" >> $PREFIX/stackvana  # [unix]
+        - echo "BUILDING STACKVANA" >> %PREFIX%/stackvana  # [win]
+    requirements:
+        - {{ pin_subpackage("stackvana-" ~ eups_product, max_pin="x.x.x") }}
+    test:
+      commands:
+        - echo OK
