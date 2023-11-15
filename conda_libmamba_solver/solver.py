@@ -280,6 +280,7 @@ class LibMambaSolver(Solver):
                     for_history=dict(out_state.for_history),
                     neutered=dict(out_state.neutered),
                     conflicts=dict(out_state.conflicts),
+                    pins=dict(out_state.pins),
                 )
         if not solved:
             log.debug("Last attempt: reporting all installed as conflicts")
@@ -708,54 +709,29 @@ class LibMambaSolver(Solver):
         return unsatisfiable
 
     def _prepare_problems_message(self, pins=None):
-        legacy_errors = self.solver.problems_to_str()
-        if " - " not in legacy_errors:
+        message = self.solver.problems_to_str()
+        explain = True
+        if " - " not in message:
             # This makes 'explain_problems()' crash. Anticipate.
-            return "Failed with empty error message."
-        if "unsupported request" in legacy_errors:
+            message = "Failed with empty error message."
+            explain = False
+        elif "unsupported request" in message:
             # This error makes 'explain_problems()' crash. Anticipate.
             log.info("Failed to explain problems. Unsupported request.")
-            return legacy_errors
-        if "is excluded by strict repo priority" in legacy_errors:
+            explain = False
+        elif "is excluded by strict repo priority" in message:
             # This will cause a lot of warnings until implemented in detail explanations
             log.info("Skipping error explanation. Excluded by strict repo priority.")
-            return legacy_errors
-        try:
-            explained_errors = self.solver.explain_problems()
-        except Exception as exc:
-            log.warning("Failed to explain problems", exc_info=exc)
-            return self._explain_with_pins(legacy_errors, pins)
-        else:
-            msg = f"{legacy_errors}\n{explained_errors}"
-            return self._explain_with_pins(msg, pins)
-
-    def _explain_with_pins(self, message, pins):
-        """
-        Add info about pins to the error message.
-        This might be temporary as libmamba improves their error messages.
-        As of 1.5.0, if a pin introduces a conflict, it results in a cryptic error message like:
-
-        ```
-        Encountered problems while solving:
-          - cannot install both pin-1-1 and pin-1-1
-
-        Could not solve for environment specs
-        The following packages are incompatible
-        └─ pin-1 is installable with the potential options
-            ├─ pin-1 1, which can be installed;
-            └─ pin-1 1 conflicts with any installable versions previously reported.
-        ```
-
-        Since the pin-N name is masked, we add the following snippet underneath:
-
-        ```
-        Pins seem to be involved in the conflict. Currently pinned specs:
-         - python 2.7.* (labeled as 'pin-1')
-
-        If Python is involved, try adding it explicitly to the command-line.
-        ```
-        """
-        if pins and "pin-1" in message:  # add info about pins for easier debugging
+            explain = False
+       
+        if explain:
+            try:
+                explained_errors = self.solver.explain_problems()
+                message += "\n" + explained_errors
+            except Exception as exc:
+                log.warning("Failed to explain problems", exc_info=exc)
+        
+        if pins and " pin-" in message:  # add info about pins for easier debugging
             pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
             for pin_name, spec in pins.items():
                 pin_message += f" - {spec} (labeled as '{pin_name}')\n"
