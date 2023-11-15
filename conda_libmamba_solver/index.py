@@ -155,10 +155,12 @@ class LibMambaIndexHelper(IndexHelper):
         Reload a channel that was previously loaded from a local directory.
         """
         for noauth_url, info in self._index.items():
-            if noauth_url.startswith("file://"):
+            if noauth_url.startswith("file://") or info.channel.scheme == "file":
                 url, json_path = self._fetch_channel(info.full_url)
-                new = self._json_path_to_repo_info(url, json_path)
-                self._repos[self._repos.index(info.repo)] = new.repo
+                repo_position = self._repos.index(info.repo)
+                info.repo.clear(True)
+                new = self._json_path_to_repo_info(url, json_path, try_solv=False)
+                self._repos[repo_position] = new.repo
                 self._index[noauth_url] = new
         set_channel_priorities(self._index)
 
@@ -234,20 +236,26 @@ class LibMambaIndexHelper(IndexHelper):
 
         return url, json_path
 
-    def _json_path_to_repo_info(self, url: str, json_path: str) -> Optional[_ChannelRepoInfo]:
+    def _json_path_to_repo_info(
+        self, url: str, json_path: str, try_solv: bool = False
+    ) -> Optional[_ChannelRepoInfo]:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
         json_path = Path(json_path)
-        solv_path = json_path.parent / f"{json_path.stem}.solv"
         try:
             json_stat = json_path.stat()
         except OSError as exc:
             log.debug("Failed to stat %s", json_path, exc_info=exc)
             json_stat = None
-        try:
-            solv_stat = solv_path.stat()
-        except OSError as exc:
-            log.debug("Failed to stat %s", solv_path, exc_info=exc)
+        if try_solv:
+            try:
+                solv_path = json_path.parent / f"{json_path.stem}.solv"
+                solv_stat = solv_path.stat()
+            except OSError as exc:
+                log.debug("Failed to stat %s", solv_path, exc_info=exc)
+                solv_stat = None
+        else:
+            solv_path = None
             solv_stat = None
 
         if solv_stat is None and json_stat is None:
