@@ -2,17 +2,17 @@
   email: jaimergp@users.noreply.github.com
   aliases:
   - jaimergp
-  num_commits: 112
+  num_commits: 118
   first_commit: 2022-01-31 17:24:37
   github: jaimergp
 - name: Jannis Leidel
   email: jannis@leidel.info
-  num_commits: 35
+  num_commits: 38
   first_commit: 2022-02-17 14:48:48
   github: jezdez
 - name: pre-commit-ci[bot]
   email: 66853113+pre-commit-ci[bot]@users.noreply.github.com
-  num_commits: 31
+  num_commits: 32
   first_commit: 2022-11-22 08:39:31
   github: pre-commit-ci[bot]
 - name: Christopher Ostrouchov
@@ -52,3 +52,7 @@
   email: jakirkham@gmail.com
   num_commits: 1
   first_commit: 2023-04-18 12:42:06
+- name: Travis Hathaway
+  email: travis.j.hathaway@gmail.com
+  num_commits: 2
+  first_commit: 2023-11-10 15:58:32
