@@ -13,6 +13,25 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.11.1 (2023-11-16)
+
+### Enhancements
+
+* Raise a friendlier `InvalidSpec` error instead of `RuntimeError` when libmamba detects a problem in the configured solver jobs. (#352 via #357)
+* Ensure specs, `SolverInputState.installed` and `SolverInputState.virtual` containers are consistently sorted. (#378)
+
+### Bug fixes
+
+* Configure pinned specs just once to avoid solver bugs related with their persistence (i.e. inability to downgrade environments if pinned specs are present and a transient dependency needs to be removed). (#354 via #355)
+* Detect whether a channel is part of a multichannel so the latter is used in the `PackageRecord` entries for conda-build. Fixes an issue with conda-build and custom multichannels. (#363 via #365)
+* Allow authenticated URLs in `default_channels` and other multichannels. (#364 via #366)
+* Preserve authentication while reloading local channels. (#366)
+
+### Contributors
+
+* @jaimergp
+
+
 ## 23.11.0 (2023-11-02)
 
 ### Bug fixes
@@ -29,6 +48,11 @@ Remember to update the hyperlinks at the bottom.
 ### Other
 
 * Require `libmambapy >=1.5.3` for improved signal handling and `MatchSpec` syntax compliance. (#347)
+
+### Contributors
+
+* @dholth
+* @jaimergp
 
 
 

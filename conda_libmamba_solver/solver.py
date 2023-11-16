@@ -26,9 +26,9 @@ from conda.base.constants import (
     REPODATA_FN,
     UNKNOWN_CHANNEL,
     ChannelPriority,
-    on_win,
 )
 from conda.base.context import context
+from conda.common.compat import on_win
 from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
@@ -37,6 +37,7 @@ from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
     InvalidMatchSpec,
+    InvalidSpec,
     PackagesNotFoundError,
     SpecsConfigurationConflictError,
     UnsatisfiableError,
@@ -159,7 +160,6 @@ class LibMambaSolver(Solver):
         # From now on we _do_ require a solver and the index
         init_api_context()
         subdirs = self.subdirs
-        conda_bld_channels = ()
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
             # Problem: Conda build generates a custom index which happens to "forget" about
@@ -178,6 +178,7 @@ class LibMambaSolver(Solver):
             IndexHelper = _CachedLibMambaIndexHelper
         else:
             IndexHelper = LibMambaIndexHelper
+            conda_bld_channels = ()
 
         all_channels = [
             *conda_bld_channels,
@@ -269,7 +270,7 @@ class LibMambaSolver(Solver):
         for attempt in range(1, max_attempts):
             log.debug("Starting solver attempt %s", attempt)
             try:
-                solved = self._solve_attempt(in_state, out_state, index)
+                solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
                 if solved:
                     break
             except (UnsatisfiableError, PackagesNotFoundError):
@@ -344,10 +345,11 @@ class LibMambaSolver(Solver):
         in_state: SolverInputState,
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
+        attempt: int = 1,
     ):
         self._setup_solver(index)
 
-        log.debug("New solver attempt")
+        log.debug("New solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
 
         # ## First, we need to obtain the list of specs ###
@@ -364,18 +366,22 @@ class LibMambaSolver(Solver):
         log.debug("Computed specs: %s", out_state.specs)
 
         # ## Convert to tasks
-        out_state.pins.clear()
         n_pins = 0
         tasks = self._specs_to_tasks(in_state, out_state)
         for (task_name, task_type), specs in tasks.items():
             log.debug("Adding task %s with specs %s", task_name, specs)
-            if task_name == "ADD_PIN":
+            if task_name == "ADD_PIN" and attempt == 1:
+                # pins only need to be added once; since they persist in the pool
+                # adding them more times results in issues like #354
                 for spec in specs:
                     n_pins += 1
                     self.solver.add_pin(spec)
                     out_state.pins[f"pin-{n_pins}"] = spec
             else:
-                self.solver.add_jobs(specs, task_type)
+                try:
+                    self.solver.add_jobs(specs, task_type)
+                except RuntimeError as exc:
+                    raise InvalidSpec(str(exc))
 
         # ## Run solver
         solved = self.solver.solve()
@@ -389,17 +395,23 @@ class LibMambaSolver(Solver):
         new_conflicts = self._maybe_raise_for_problems(
             problems, old_conflicts, out_state.pins, index._channels
         )
-        log.debug("Attempt failed with %s conflicts", len(new_conflicts))
+        log.debug("Attempt %d failed with %s conflicts", attempt, len(new_conflicts))
         out_state.conflicts.update(new_conflicts.items(), reason="New conflict found")
         return False
 
     def _specs_to_tasks(self, in_state: SolverInputState, out_state: SolverOutputState):
         log.debug("Creating tasks for %s specs", len(out_state.specs))
         if in_state.is_removing:
-            return self._specs_to_tasks_remove(in_state, out_state)
-        if self._called_from_conda_build():
-            return self._specs_to_tasks_conda_build(in_state, out_state)
-        return self._specs_to_tasks_add(in_state, out_state)
+            tasks = self._specs_to_tasks_remove(in_state, out_state)
+        elif self._called_from_conda_build():
+            tasks = self._specs_to_tasks_conda_build(in_state, out_state)
+        else:
+            tasks = self._specs_to_tasks_add(in_state, out_state)
+        log.debug(
+            "Created following tasks:\n%s",
+            json.dumps({k[0]: v for k, v in tasks.items()}, indent=2),
+        )
+        return tasks
 
     @staticmethod
     def _spec_to_str(spec):
@@ -450,7 +462,7 @@ class LibMambaSolver(Solver):
         # logic considers should be the target version for each package in the environment
         # and requested changes. We are _not_ following those targets here, but we do iterate
         # over the list to decide what to do with each package.
-        for name, _classic_logic_spec in out_state.specs.items():
+        for name, _classic_logic_spec in sorted(out_state.specs.items()):
             if name.startswith("__"):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
@@ -814,8 +826,11 @@ class LibMambaSolver(Solver):
             else:
                 log.warn("Tried to unlink %s but it is not installed or manageable?", filename)
 
+        for_conda_build = self._called_from_conda_build()
         for channel, filename, json_payload in to_link:
-            record = self._package_record_from_json_payload(index, channel, filename, json_payload)
+            record = self._package_record_from_json_payload(
+                index, channel, filename, json_payload, for_conda_build=for_conda_build
+            )
             # We need this check below to make sure noarch package get reinstalled
             # record metadata coming from libmamba is incomplete and won't pass the
             # noarch checks -- to fix it, we swap the metadata-only record with its locally
@@ -836,20 +851,28 @@ class LibMambaSolver(Solver):
             )
 
         # Fixes conda-build tests/test_api_build.py::test_croot_with_spaces
-        if on_win and self._called_from_conda_build():
+        if on_win and for_conda_build:
             for record in out_state.records.values():
-                record.channel.location = percent_decode(record.channel.location)
+                if "%" not in str(record):
+                    continue
+                if record.channel.location:  # multichannels like 'defaults' have no location
+                    record.channel.location = percent_decode(record.channel.location)
                 record.channel.name = percent_decode(record.channel.name)
 
     def _package_record_from_json_payload(
-        self, index: LibMambaIndexHelper, channel: str, pkg_filename: str, json_payload: str
+        self,
+        index: LibMambaIndexHelper,
+        channel: str,
+        pkg_filename: str,
+        json_payload: str,
+        for_conda_build: bool = False,
     ) -> PackageRecord:
         """
         The libmamba transactions cannot return full-blown objects from the C/C++ side.
         Instead, it returns the instructions to build one on the Python side:
 
         channel_info: dict
-            Channel data, as built in .index.LibmambaIndexHelper._fetch_channel()
+            Channel datas, as built in .index.LibmambaIndexHelper._fetch_channel()
             This is retrieved from the .index._index mapping, keyed by channel URLs
         pkg_filename: str
             The filename (.tar.bz2 or .conda) of the selected record.
@@ -875,6 +898,14 @@ class LibMambaSolver(Solver):
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
         kwargs["channel"] = channel_info.channel
+        if for_conda_build:
+            # conda-build expects multichannel instances in the Dist->PackageRecord mapping
+            # see https://github.com/conda/conda-libmamba-solver/issues/363
+            for multichannel_name, mc_channels in context.custom_multichannels.items():
+                urls = [url for c in mc_channels for url in c.urls(with_credentials=False)]
+                if channel_info.noauth_url in urls:
+                    kwargs["channel"] = multichannel_name
+                    break
         kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
         if not kwargs.get("subdir"):  # missing in old channels
             kwargs["subdir"] = channel_info.channel.subdir
