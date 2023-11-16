@@ -70,6 +70,8 @@ Once the cache has been populated, we can instantiate 'libmamba.Repo' objects di
 We maintain a map of subdir-specific URLs to `conda.model.channel.Channel`
 and `libmamba.Repo` objects.
 """
+from __future__ import annotations
+
 import logging
 import os
 from dataclasses import dataclass
@@ -109,8 +111,8 @@ class LibMambaIndexHelper(IndexHelper):
     def __init__(
         self,
         installed_records: Iterable[PackageRecord] = (),
-        channels: Iterable[Union[Channel, str]] = None,
-        subdirs: Iterable[str] = None,
+        channels: Iterable[Channel | str] | None = None,
+        subdirs: Iterable[str] | None = None,
         repodata_fn: str = REPODATA_FN,
         query_format=api.QueryFormat.JSON,
     ):
@@ -279,7 +281,7 @@ class LibMambaIndexHelper(IndexHelper):
             noauth_url=noauth_url,
         )
 
-    def _load_channels(self) -> Dict[str, _ChannelRepoInfo]:
+    def _load_channels(self) -> dict[str, _ChannelRepoInfo]:
         # 1. Obtain and deduplicate URLs from channels
         urls = []
         seen_noauth = set()
@@ -330,24 +332,22 @@ class LibMambaIndexHelper(IndexHelper):
         return repo
 
     def whoneeds(
-        self, query: Union[str, MatchSpec], records=True
-    ) -> Union[Iterable[PackageRecord], dict, str]:
+        self, query: str | MatchSpec, records=True
+    ) -> Iterable[PackageRecord] | dict | str:
         result_str = self._query.whoneeds(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
 
     def depends(
-        self, query: Union[str, MatchSpec], records=True
-    ) -> Union[Iterable[PackageRecord], dict, str]:
+        self, query: str | MatchSpec, records=True
+    ) -> Iterable[PackageRecord] | dict | str:
         result_str = self._query.depends(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
         return result_str
 
-    def search(
-        self, query: Union[str, MatchSpec], records=True
-    ) -> Union[Iterable[PackageRecord], dict, str]:
+    def search(self, query: str | MatchSpec, records=True) -> Iterable[PackageRecord] | dict | str:
         result_str = self._query.find(self._prepare_query(query), self._format)
         if self._format == api.QueryFormat.JSON:
             return self._process_query_result(result_str, records=records)
@@ -364,7 +364,7 @@ class LibMambaIndexHelper(IndexHelper):
                 explicit_pool.add(record.name)
         return tuple(explicit_pool)
 
-    def _prepare_query(self, query: Union[str, MatchSpec]) -> str:
+    def _prepare_query(self, query: str | MatchSpec) -> str:
         if isinstance(query, str):
             if "[" not in query:
                 return query
@@ -391,7 +391,7 @@ class LibMambaIndexHelper(IndexHelper):
         self,
         result_str,
         records=True,
-    ) -> Union[Iterable[PackageRecord], dict]:
+    ) -> Iterable[PackageRecord] | dict:
         result = json_load(result_str)
         if result.get("result", {}).get("status") != "OK":
             query_type = result.get("query", {}).get("type", "<Unknown>")
