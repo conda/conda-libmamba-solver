@@ -173,7 +173,7 @@ class LibMambaIndexHelper(IndexHelper):
         This is done by rebuilding a repodata.json-like dictionary, which is
         then exported to a temporary file that will be loaded with 'libmambapy.Repo'.
         """
-        exported = {"packages": {}}
+        exported = {"packages": {}, "packages.conda": {}}
         additional_infos = {}
         for record in records:
             record_data = dict(record.dump())
@@ -197,7 +197,10 @@ class LibMambaIndexHelper(IndexHelper):
                     if field == "timestamp" and value:
                         value = int(value * 1000)  # from s to ms
                     record_data[field] = value
-            exported["packages"][record.fn] = record_data
+            if record.fn.endswith(".conda"):
+                exported["packages.conda"][record.fn] = record_data
+            else:
+                exported["packages"][record.fn] = record_data
 
             # extra info for libmamba
             info = api.ExtraPkgInfo()
