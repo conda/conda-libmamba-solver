@@ -264,7 +264,6 @@ class LibMambaSolver(Solver):
             2,
             int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
         )
-        out_state.check_for_pin_conflicts(index)
         for attempt in range(1, max_attempts):
             try:
                 solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
@@ -322,7 +321,7 @@ class LibMambaSolver(Solver):
         log.info("Target prefix: %r", self.prefix)
         log.info("Command: %s", sys.argv)
 
-    def _setup_solver(self, index: LibMambaIndexHelper):
+    def _setup_solver(self, pool: api.Pool):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
         ]
@@ -331,7 +330,7 @@ class LibMambaSolver(Solver):
         if self.specs_to_remove and self._command in ("remove", None, NULL):
             solver_options.append((api.SOLVER_FLAG_ALLOW_UNINSTALL, 1))
 
-        self.solver = api.Solver(index._pool, self._solver_options)
+        self.solver = api.Solver(pool, self._solver_options)
 
     def _solve_attempt(
         self,
@@ -340,10 +339,14 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         attempt: int = 1,
     ):
-        self._setup_solver(index)
+        self._setup_solver(index._pool)
 
         log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
+
+        # Check pin-spec compatibility
+        if attempt == 1:
+            out_state.check_for_pin_conflicts(index)
 
         # ## Create tasks for the solver
         tasks = self._specs_to_tasks(in_state, out_state)
