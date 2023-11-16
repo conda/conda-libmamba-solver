@@ -219,7 +219,7 @@ class LibMambaIndexHelper(IndexHelper):
         finally:
             os.unlink(f.name)
 
-    def _fetch_channel(self, url: str) -> Tuple[str, os.PathLike]:
+    def _fetch_channel(self, url: str) -> tuple[str, os.PathLike]:
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
@@ -240,7 +240,7 @@ class LibMambaIndexHelper(IndexHelper):
 
     def _json_path_to_repo_info(
         self, url: str, json_path: str, try_solv: bool = False
-    ) -> Optional[_ChannelRepoInfo]:
+    ) -> _ChannelRepoInfo | None:
         channel = Channel.from_url(url)
         noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
         json_path = Path(json_path)
