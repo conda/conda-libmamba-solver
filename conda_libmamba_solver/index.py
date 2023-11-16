@@ -78,7 +78,7 @@ from dataclasses import dataclass
 from functools import lru_cache, partial
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Dict, Iterable, Optional, Tuple, Union
+from typing import Iterable
 
 import libmambapy as api
 from conda.base.constants import REPODATA_FN
