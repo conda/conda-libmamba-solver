@@ -9,5 +9,6 @@ Authors are sorted alphabetically.
 * John Kirkham
 * Ken Odegard
 * Matthew R. Becker
+* Travis Hathaway
 * conda-bot
 * pre-commit-ci[bot]
