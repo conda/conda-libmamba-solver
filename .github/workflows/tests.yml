@@ -82,7 +82,6 @@ jobs:
                         --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
                         --file /opt/conda-libmamba-solver-src/tests/requirements.txt &&
                    sudo /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src --no-deps -vvv &&
-                   sudo /opt/conda/bin/python -m pip install /opt/conda-libmamba-solver-src/dev/collect_upstream_conda_tests/ -vvv &&
                    source /opt/conda-src/dev/linux/bashrc.sh &&
                    /opt/conda/bin/python -m pytest /opt/conda-libmamba-solver-src -vv -m 'not slow'"
 
@@ -167,7 +166,6 @@ jobs:
             --file ../conda-libmamba-solver/tests/requirements.txt \
             python=${{ matrix.python-version }}
           conda update openssl ca-certificates certifi
-          python -m pip install ../conda-libmamba-solver/dev/collect_upstream_conda_tests -vv
           conda info
           python -c "from importlib.metadata import version; print('libmambapy', version('libmambapy'))"
 
@@ -262,8 +260,6 @@ jobs:
         working-directory: conda
         run: |
           call .\dev-init.bat
-          if errorlevel 1 exit 1
-          python -m pip install -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver\dev\collect_upstream_conda_tests"
           if errorlevel 1 exit 1
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1

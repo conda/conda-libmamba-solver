@@ -5,7 +5,6 @@ ci:
 exclude: |
   (?x)^(
     tests/data/ |
-    tests/_reposerver\.py |
     conda_libmamba_solver/mamba_utils\.py
   )/
 repos:
@@ -29,7 +28,7 @@ repos:
         args: ["--py38-plus"]
         exclude: ^conda/exports.py
   - repo: https://github.com/psf/black
-    rev: 23.10.1
+    rev: 23.11.0
     hooks:
       - id: black
         exclude: tests/_reposerver\.py
@@ -65,4 +64,4 @@ repos:
       - id: insert-license
         files: \.py$
         args: [--license-filepath, .github/disclaimer.txt, --no-extra-eol]
-        exclude: ^(tests/repodata_time_machine.py|mamba_utils\.py)  # extend global exclude
+        exclude: ^(tests/repodata_time_machine.py|mamba_utils\.py|tests/channel_testing/helpers\.py|tests/channel_testing/reposerver\.py)  # extend global exclude

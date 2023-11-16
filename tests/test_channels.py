@@ -5,18 +5,25 @@ import json
 import os
 import shutil
 import sys
-from datetime import datetime
 from pathlib import Path
 
 import pytest
-from conda.common.compat import on_linux
+from conda.base.context import reset_context
+from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.models.channel import Channel
 from conda.testing.integration import _get_temp_prefix, make_temp_env
 from conda.testing.integration import run_command as conda_inprocess
 
+from .channel_testing.helpers import http_server_auth_basic  # noqa: F401
+from .channel_testing.helpers import http_server_auth_basic_email  # noqa: F401
+from .channel_testing.helpers import http_server_auth_none  # noqa: F401
+from .channel_testing.helpers import http_server_auth_token  # noqa: F401
+from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
+
+DATA = Path(__file__).parent / "data"
 
 
 def test_channel_matchspec():
@@ -84,9 +91,19 @@ def test_channels_installed_unavailable():
         assert retcode == 0
 
 
-def _setup_channels_alias(prefix):
+def _setup_conda_forge_as_defaults(prefix, force=False):
     write_env_config(
         prefix,
+        force=force,
+        channels=["defaults"],
+        default_channels=["conda-forge"],
+    )
+
+
+def _setup_channels_alias(prefix, force=False):
+    write_env_config(
+        prefix,
+        force=force,
         channels=["conda-forge", "defaults"],
         channel_alias="https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
         migrated_channel_aliases=["https://conda.anaconda.org"],
@@ -98,9 +115,10 @@ def _setup_channels_alias(prefix):
     )
 
 
-def _setup_channels_custom(prefix):
+def _setup_channels_custom(prefix, force=False):
     write_env_config(
         prefix,
+        force=force,
         channels=["conda-forge", "defaults"],
         custom_channels={
             "conda-forge": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
@@ -108,10 +126,6 @@ def _setup_channels_custom(prefix):
     )
 
 
-@pytest.mark.skipif(
-    datetime.now() < datetime(2023, 6, 15),
-    reason="Skip until 2023-06-15; remote server has been flaky lately",
-)
 @pytest.mark.parametrize(
     "config_env",
     (
@@ -216,3 +230,71 @@ def test_encoding_file_paths(tmp_path: Path):
     print(process.stderr, file=sys.stderr)
     assert process.returncode == 0
     assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
+
+
+def test_conda_build_with_aliased_channels(tmp_path):
+    "https://github.com/conda/conda-libmamba-solver/issues/363"
+    condarc = Path.home() / ".condarc"
+    condarc_contents = condarc.read_text() if condarc.is_file() else None
+    env = os.environ.copy()
+    if on_win:
+        env["CONDA_BLD_PATH"] = str(Path(os.environ.get("RUNNER_TEMP", tmp_path), "bld"))
+    else:
+        env["CONDA_BLD_PATH"] = str(tmp_path / "conda-bld")
+    try:
+        _setup_conda_forge_as_defaults(Path.home(), force=True)
+        conda_subprocess(
+            "build",
+            DATA / "conda_build_recipes" / "jedi",
+            "--override-channels",
+            "--channel=defaults",
+            capture_output=False,
+            env=env,
+        )
+    finally:
+        if condarc_contents:
+            condarc.write_text(condarc_contents)
+        else:
+            condarc.unlink()
+
+
+def test_http_server_auth_none(http_server_auth_none):
+    create_with_channel(http_server_auth_none)
+
+
+def test_http_server_auth_basic(http_server_auth_basic):
+    create_with_channel(http_server_auth_basic)
+
+
+def test_http_server_auth_basic_email(http_server_auth_basic_email):
+    create_with_channel(http_server_auth_basic_email)
+
+
+def test_http_server_auth_token(http_server_auth_token):
+    create_with_channel(http_server_auth_token)
+
+
+def test_http_server_auth_token_in_defaults(http_server_auth_token):
+    condarc = Path.home() / ".condarc"
+    condarc_contents = condarc.read_text() if condarc.is_file() else None
+    try:
+        write_env_config(
+            Path.home(),
+            force=True,
+            channels=["defaults"],
+            default_channels=[http_server_auth_token],
+        )
+        reset_context()
+        conda_subprocess("info", capture_output=False)
+        conda_subprocess(
+            "create",
+            "-p",
+            _get_temp_prefix(use_restricted_unicode=on_win),
+            "--solver=libmamba",
+            "test-package",
+        )
+    finally:
+        if condarc_contents:
+            condarc.write_text(condarc_contents)
+        else:
+            condarc.unlink()
