@@ -726,14 +726,14 @@ class LibMambaSolver(Solver):
             # This will cause a lot of warnings until implemented in detail explanations
             log.info("Skipping error explanation. Excluded by strict repo priority.")
             explain = False
-       
+
         if explain:
             try:
                 explained_errors = self.solver.explain_problems()
                 message += "\n" + explained_errors
             except Exception as exc:
                 log.warning("Failed to explain problems", exc_info=exc)
-        
+
         if pins and " pin-" in message:  # add info about pins for easier debugging
             pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
             for pin_name, spec in pins.items():
