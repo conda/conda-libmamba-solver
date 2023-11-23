@@ -282,8 +282,8 @@ class LibMambaSolver(Solver):
             return max_attempts_from_env
         if in_state.update_modifier.FREEZE_INSTALLED:
             # this the default, but can be overriden with --update-specs
-            # TODO: should we cap this at a reasonable number? some base envs have 100s of pkgs
-            return n_installed
+            # we cap at 10 attempts to avoid things getting too slow in large environments
+            return min(10, n_installed)
         return 1
 
     def _solving_loop(
