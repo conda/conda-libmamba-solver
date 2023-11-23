@@ -411,8 +411,12 @@ class LibMambaIndexHelper(IndexHelper):
 _CachedLibMambaIndexHelper = lru_cache(maxsize=None)(LibMambaIndexHelper)
 
 
-# conda-build needs to operate offline for the index
 def _LibMambaIndexHelperOffline(*args, **kwargs):
+    """
+    conda-build needs to operate offline so the index doesn't get updated
+    accidentally during long build phases.
+
+    See https://github.com/conda/conda-libmamba-solver/issues/386
+    """
     with context._override("offline", True):
-        helper = _CachedLibMambaIndexHelper(*args, **kwargs)
-        return helper
+        return _CachedLibMambaIndexHelper(*args, **kwargs)
