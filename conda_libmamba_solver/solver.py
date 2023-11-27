@@ -63,6 +63,7 @@ class LibMambaSolver(Solver):
     Cleaner implementation using the ``state`` module helpers.
     """
 
+    MAX_SOLVER_ATTEMPTS_CAP = 10
     _uses_ssc = False
 
     def __init__(
@@ -274,7 +275,7 @@ class LibMambaSolver(Solver):
             if max_attempts_from_env > n_installed:
                 log.warning(
                     "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
-                    "installed packages (%s) and will be ignored.",
+                    "installed packages (%s). Using that one instead.",
                     max_attempts_from_env,
                     n_installed,
                 )
@@ -282,8 +283,9 @@ class LibMambaSolver(Solver):
             return max_attempts_from_env
         if in_state.update_modifier.FREEZE_INSTALLED:
             # this the default, but can be overriden with --update-specs
-            # we cap at 10 attempts to avoid things getting too slow in large environments
-            return min(10, n_installed)
+            # we cap at MAX_SOLVER_ATTEMPTS_CAP attempts to avoid things 
+            # getting too slow in large environments
+            return min(self.MAX_SOLVER_ATTEMPTS_CAP, n_installed)
         return 1
 
     def _solving_loop(
