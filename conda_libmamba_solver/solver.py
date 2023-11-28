@@ -283,7 +283,7 @@ class LibMambaSolver(Solver):
             return max_attempts_from_env
         if in_state.update_modifier.FREEZE_INSTALLED:
             # this the default, but can be overriden with --update-specs
-            # we cap at MAX_SOLVER_ATTEMPTS_CAP attempts to avoid things 
+            # we cap at MAX_SOLVER_ATTEMPTS_CAP attempts to avoid things
             # getting too slow in large environments
             return min(self.MAX_SOLVER_ATTEMPTS_CAP, n_installed)
         return 1
