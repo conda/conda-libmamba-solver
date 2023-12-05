@@ -36,6 +36,7 @@ from conda.common.url import join_url, percent_decode
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
+    CondaValueError,
     InvalidMatchSpec,
     InvalidSpec,
     PackagesNotFoundError,
@@ -62,6 +63,7 @@ class LibMambaSolver(Solver):
     Cleaner implementation using the ``state`` module helpers.
     """
 
+    MAX_SOLVER_ATTEMPTS_CAP = 10
     _uses_ssc = False
 
     def __init__(
@@ -256,6 +258,38 @@ class LibMambaSolver(Solver):
                 return "Getting pinned dependencies"
         return "Solving environment"
 
+    def _max_attempts(self, in_state: SolverInputState, default: int = 1):
+        from_env_var = os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS")
+        installed_count = len(in_state.installed)
+        if from_env_var:
+            try:
+                max_attempts_from_env = int(from_env_var)
+            except ValueError:
+                raise CondaValueError(
+                    f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{from_env_var}'. Must be int."
+                )
+            if max_attempts_from_env < 1:
+                raise CondaValueError(
+                    f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{max_attempts_from_env}'. Must be >=1."
+                )
+            elif max_attempts_from_env > installed_count:
+                log.warning(
+                    "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
+                    "installed packages (%s). Using that one instead.",
+                    max_attempts_from_env,
+                    installed_count,
+                )
+                return installed_count
+            else:
+                return max_attempts_from_env
+        elif in_state.update_modifier.FREEZE_INSTALLED:
+            # this the default, but can be overriden with --update-specs
+            # we cap at MAX_SOLVER_ATTEMPTS_CAP attempts to avoid things
+            # getting too slow in large environments
+            return min(self.MAX_SOLVER_ATTEMPTS_CAP, installed_count)
+        else:
+            return default
+
     def _solving_loop(
         self,
         in_state: SolverInputState,
@@ -263,11 +297,7 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
     ):
         solved = False
-        max_attempts = max(
-            2,
-            int(os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", len(in_state.installed))) + 1,
-        )
-        for attempt in range(1, max_attempts):
+        for attempt in range(1, self._max_attempts(in_state) + 1):
             log.debug("Starting solver attempt %s", attempt)
             try:
                 solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
