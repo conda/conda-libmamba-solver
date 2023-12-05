@@ -420,6 +420,7 @@ class _LibMambaIndexForCondaBuild(LibMambaIndexHelper):
     the condarc configuration might be ignored, resulting in bad index configuration
     and missing packages anyway.
     """
+
     def __init__(self, *args, **kwargs):
         if VersionOrder(conda_version) <= VersionOrder("23.10.0"):
             log.warning(
