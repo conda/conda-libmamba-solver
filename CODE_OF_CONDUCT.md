@@ -1,6 +1,6 @@
 # Conda Organization Code of Conduct
 
-> **Note**
+> [!NOTE]
 > Below is the short version of our CoC, see the long version [here](https://github.com/conda-incubator/governance/blob/main/CODE_OF_CONDUCT.md).
 
 # The Short Version
@@ -17,4 +17,4 @@ Thank you for helping make this a welcoming, friendly community for all.
 
 * Report a code of conduct incident [using a form](https://form.jotform.com/221527028480048).
 * Report a code of conduct incident via email: [conduct@conda.org](mailto:conduct@conda.org).
-* Contact [an individual committee member](https://github.com/conda-incubator/governance/blob/main/CODE_OF_CONDUCT.md#committee-membership) or [CoC event representative](https://github.com/conda-incubator/governance/blob/main/CODE_OF_CONDUCT.md#coc-representatives) to report an incident in confidence.
+* Contact [an individual committee member](#committee-membership) or [CoC event representative](#coc-representatives) to report an incident in confidence.
