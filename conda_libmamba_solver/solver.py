@@ -50,7 +50,7 @@ from conda.models.version import VersionOrder
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
-from .index import LibMambaIndexHelper, _CachedLibMambaIndexHelper
+from .index import LibMambaIndexHelper, _LibMambaIndexForCondaBuild
 from .mamba_utils import init_api_context, mamba_version
 from .state import SolverInputState, SolverOutputState
 from .utils import is_channel_available
@@ -177,7 +177,7 @@ class LibMambaSolver(Solver):
                 rec.channel: None for rec in self._index if rec.channel.scheme == "file"
             }
             # Cache indices for conda-build, it gets heavy otherwise
-            IndexHelper = _CachedLibMambaIndexHelper
+            IndexHelper = _LibMambaIndexForCondaBuild
         else:
             IndexHelper = LibMambaIndexHelper
             conda_bld_channels = ()

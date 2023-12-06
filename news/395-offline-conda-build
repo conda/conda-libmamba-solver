@@ -1,0 +1,20 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* Instantiate `IndexHelper` in offline mode for compatibility with conda-build. Otherwise
+  the index can get out of sync during long build processes. (#386 via #395)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
