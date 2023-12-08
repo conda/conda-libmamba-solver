@@ -26,7 +26,6 @@ eval "$(sudo /opt/conda/bin/python -m conda init --dev bash)"
 conda-build tests/test-recipes/activate_deactivate_package tests/test-recipes/pre_link_messages_package
 conda info
 # put temporary files on same filesystem
-# put temporary files on same filesystem
 export TMP=$HOME/pytesttmp
 mkdir -p $TMP
 python -m pytest \
