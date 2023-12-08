@@ -36,3 +36,4 @@ python -m pytest \
     -m "integration" \
     --splits=${TEST_SPLITS} \
     --group=${TEST_GROUP}
+python -m conda.common.io
