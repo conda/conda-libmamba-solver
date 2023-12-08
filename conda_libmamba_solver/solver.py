@@ -389,9 +389,10 @@ class LibMambaSolver(Solver):
     def _specs_to_tasks(self, in_state: SolverInputState, out_state: SolverOutputState):
         if in_state.is_removing:
             return self._specs_to_tasks_remove(in_state, out_state)
-        if self._called_from_conda_build():
+        elif self._called_from_conda_build():
             return self._specs_to_tasks_conda_build(in_state, out_state)
-        return self._specs_to_tasks_add(in_state, out_state)
+        else:
+            return self._specs_to_tasks_add(in_state, out_state)
 
     @staticmethod
     def _spec_to_str(spec):
