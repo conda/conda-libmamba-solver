@@ -298,3 +298,31 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
             condarc.write_text(condarc_contents)
         else:
             condarc.unlink()
+
+
+def test_local_spec():
+    "https://github.com/conda/conda-libmamba-solver/issues/398"
+    env = os.environ.copy()
+    env["CONDA_BLD_PATH"] = str(DATA / "mamba_repo")
+    process = conda_subprocess(
+        "create",
+        "-p",
+        _get_temp_prefix(use_restricted_unicode=on_win),
+        "--dry-run",
+        "--solver=libmamba",
+        "--channel=local",
+        "test-package",
+        env=env,
+    )
+    assert process.returncode == 0
+
+    process = conda_subprocess(
+        "create",
+        "-p",
+        _get_temp_prefix(use_restricted_unicode=on_win),
+        "--dry-run",
+        "--solver=libmamba",
+        "local::test-package",
+        env=env,
+    )
+    assert process.returncode == 0
