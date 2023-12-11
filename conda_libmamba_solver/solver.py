@@ -279,7 +279,7 @@ class LibMambaSolver(Solver):
                 return installed_count
             else:
                 return max_attempts_from_env
-        elif in_state.update_modifier.FREEZE_INSTALLED:
+        elif in_state.update_modifier.FREEZE_INSTALLED and installed_count:
             # this the default, but can be overriden with --update-specs
             # we cap at MAX_SOLVER_ATTEMPTS_CAP attempts to avoid things
             # getting too slow in large environments
