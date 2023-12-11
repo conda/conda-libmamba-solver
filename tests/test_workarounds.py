@@ -128,4 +128,5 @@ def test_gpytorch_noarch(tmp_path):
         "gpytorch",
         check=True,
     )
-    sp.run([tmp_path / "bin" / "python",  "-c",  "import gpytorch"], check=True)
+    python = (tmp_path / "python.exe") if on_win else (tmp_path / "bin" / "python")
+    sp.run([python, "-c",  "import gpytorch"], check=True)
