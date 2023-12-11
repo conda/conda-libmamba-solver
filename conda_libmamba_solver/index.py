@@ -233,6 +233,8 @@ class LibMambaIndexHelper(IndexHelper):
             # Workaround some testing issues - TODO: REMOVE
             # Fix conda.testing.helpers._patch_for_local_exports by removing last line
             for key, cached in list(SubdirData._cache_.items()):
+                if not isinstance(key, tuple):
+                    continue  # should not happen, but avoid IndexError just in case
                 if key[:2] == (url, self._repodata_fn) and cached._mtime == float("inf"):
                     del SubdirData._cache_[key]
             # /Workaround
