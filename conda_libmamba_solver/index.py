@@ -81,15 +81,17 @@ from tempfile import NamedTemporaryFile
 from typing import Iterable
 
 import libmambapy as api
+from conda import __version__ as conda_version
 from conda.base.constants import REPODATA_FN
-from conda.base.context import context
-from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
+from conda.base.context import context, reset_context
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, env_var
 from conda.common.serialize import json_dump, json_load
 from conda.common.url import percent_decode, remove_auth, split_anaconda_token
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
+from conda.models.version import VersionOrder
 
 from .mamba_utils import set_channel_priorities
 from .state import IndexHelper
@@ -410,5 +412,27 @@ class LibMambaIndexHelper(IndexHelper):
         return result
 
 
-# for conda-build
-_CachedLibMambaIndexHelper = lru_cache(maxsize=None)(LibMambaIndexHelper)
+@lru_cache(maxsize=None)
+class _LibMambaIndexForCondaBuild(LibMambaIndexHelper):
+    """
+    See https://github.com/conda/conda-libmamba-solver/issues/386
+
+    conda-build needs to operate offline so the index doesn't get updated
+    accidentally during long build phases. However, this is only guaranteed
+    to work if https://github.com/conda/conda/pull/13357 is applied. Otherwise
+    the condarc configuration might be ignored, resulting in bad index configuration
+    and missing packages anyway.
+    """
+
+    def __init__(self, *args, **kwargs):
+        if VersionOrder(conda_version) <= VersionOrder("23.10.0"):
+            log.warning(
+                "conda-build requires conda >=23.11.0 for offline index support. "
+                "Falling back to online index. This might result in KeyError messages, "
+                "specially if the remote repodata is updated during the build phase. "
+                "See https://github.com/conda/conda-libmamba-solver/issues/386."
+            )
+            super().__init__(*args, **kwargs)
+        else:
+            with env_var("CONDA_OFFLINE", "true", callback=reset_context):
+                super().__init__(*args, **kwargs)
