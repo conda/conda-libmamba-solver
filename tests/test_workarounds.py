@@ -11,6 +11,8 @@ import time
 import pytest
 from conda.common.compat import on_win
 
+from .utils import conda_subprocess
+
 
 def test_matchspec_star_version():
     """
@@ -109,3 +111,21 @@ def test_ctrl_c(stage):
         p.wait(timeout=30)
         assert p.returncode != 0
         assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+
+
+def test_gpytorch_noarch(tmp_path):
+    "https://github.com/conda/conda/issues/13412"
+    conda_subprocess(
+        "create",
+        "-y",
+        "-p",
+        tmp_path,
+        "--override-channels",
+        "--solver=libmamba",
+        "--channel=pytorch",
+        "--channel=gpytorch",
+        "--channel=defaults",
+        "gpytorch",
+        check=True,
+    )
+    sp.run([tmp_path / "bin" / "python",  "-c",  "import gpytorch"], check=True)
