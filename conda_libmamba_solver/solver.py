@@ -314,6 +314,7 @@ class LibMambaSolver(Solver):
                     for_history=dict(out_state.for_history),
                     neutered=dict(out_state.neutered),
                     conflicts=dict(out_state.conflicts),
+                    pins=dict(out_state.pins),
                 )
         if not solved:
             log.debug("Last attempt: reporting all installed as conflicts")
