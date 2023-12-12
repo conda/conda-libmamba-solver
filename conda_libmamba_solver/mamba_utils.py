@@ -131,7 +131,14 @@ def init_api_context() -> api.Context:
             )
     api_ctx.custom_channels = additional_custom_channels
 
-    additional_custom_multichannels = {}
+    additional_custom_multichannels = {
+        # Define manually to override hardcoded values in libmamba
+        # See https://github.com/mamba-org/mamba/pull/3056#issuecomment-1851576025
+        "local": [
+            _get_base_url(x.url(with_credentials=True)) 
+            for x in context.custom_multichannels["local"]
+        ]
+    }
     for el in context.custom_multichannels:
         if el not in RESERVED_NAMES:
             additional_custom_multichannels[el] = []
