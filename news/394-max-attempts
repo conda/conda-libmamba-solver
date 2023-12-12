@@ -1,6 +1,6 @@
 ### Enhancements
 
-* Add some boundary checks to `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS`. (#394)
+* Add some boundary checks to `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS`. (#394, #403)
 
 ### Bug fixes
 
