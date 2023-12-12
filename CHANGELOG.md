@@ -35,8 +35,6 @@ Remember to update the hyperlinks at the bottom.
 * @jaimergp
 * @jezdez
 * @travishathaway made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/370
-* @conda-bot
-* @pre-commit-ci[bot]
 
 
 ## 23.11.1 (2023-11-16)
