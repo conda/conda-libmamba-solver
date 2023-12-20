@@ -128,7 +128,8 @@ class LibMambaIndexHelper(IndexHelper):
             has_zst=[],
         )
         for channel in self._channels:
-            self._channel_context.make_channel(channel.base_url)
+            url = channel.urls(with_credentials=True, subdirs=("",))[0]
+            self._channel_context.make_channel(url)
         self._pool = api.Pool(self._channel_context)
 
         installed_repo = self._load_installed(installed_records)
