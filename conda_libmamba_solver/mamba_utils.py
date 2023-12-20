@@ -87,7 +87,7 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
 def init_api_context() -> api.Context:
     # This function has to be called BEFORE 1st initialization of the context
     api.Context.use_default_signal_handler(False)
-    api_ctx = api.Context()
+    api_ctx = api.Context.instance()
 
     # Output params
     api_ctx.output_params.json = context.json
@@ -146,10 +146,10 @@ def init_api_context() -> api.Context:
     ]
 
     if context.channel_priority is ChannelPriority.STRICT:
-        api_ctx.channel_priority = api.ChannelPriority.kStrict
+        api_ctx.channel_priority = api.ChannelPriority.Strict
     elif context.channel_priority is ChannelPriority.FLEXIBLE:
-        api_ctx.channel_priority = api.ChannelPriority.kFlexible
+        api_ctx.channel_priority = api.ChannelPriority.Flexible
     elif context.channel_priority is ChannelPriority.DISABLED:
-        api_ctx.channel_priority = api.ChannelPriority.kDisabled
+        api_ctx.channel_priority = api.ChannelPriority.Disabled
 
     return api_ctx
