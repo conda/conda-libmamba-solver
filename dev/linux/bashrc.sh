@@ -19,7 +19,7 @@ function recompile-mamba () {
         -DCMAKE_INSTALL_PREFIX=/opt/conda \
         -DCMAKE_PREFIX_PATH=/opt/conda \
         -DBUILD_LIBMAMBAPY=ON
-    sudo /opt/conda/bin/cmake --build build/ -j
+    sudo /opt/conda/bin/cmake --build build/ -j4
     sudo make install -C build/
     popd
   else
@@ -28,6 +28,7 @@ function recompile-mamba () {
 }
 
 sudo /opt/conda/condabin/conda install -y -p /opt/conda --repodata-fn repodata.json \
+    --channel conda-forge/label/mamba_dev \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \
     --file /opt/conda-libmamba-solver-src/tests/requirements.txt
 
