@@ -914,37 +914,25 @@ class LibMambaSolver(Solver):
             return PackageRecord(**json.loads(json_payload))
 
         kwargs = json.loads(json_payload)
-        try:
-            channel_info = index.get_info(channel)
-        except KeyError:
-            # this channel was never used to build the index, which
-            # means we obtained an already installed PackageRecord
-            # whose metadata contains a channel that doesn't exist
-            pd = PrefixData(self.prefix)
-            record = pd.get(kwargs["name"])
-            if record and record.fn == pkg_filename:
-                return record
-
-        # Otherwise, these are records from the index
-        kwargs["fn"] = pkg_filename
-        kwargs["channel"] = channel_info.channel
         if for_conda_build:
             # conda-build expects multichannel instances in the Dist->PackageRecord mapping
             # see https://github.com/conda/conda-libmamba-solver/issues/363
+            try:
+                channel_info = index.get_info(channel)
+            except KeyError:
+                # this channel was never used to build the index, which
+                # means we obtained an already installed PackageRecord
+                # whose metadata contains a channel that doesn't exist
+                pd = PrefixData(self.prefix)
+                record = pd.get(kwargs["name"])
+                if record and record.fn == pkg_filename:
+                    return record
             for multichannel_name, mc_channels in context.custom_multichannels.items():
                 urls = [url for c in mc_channels for url in c.urls(with_credentials=False)]
                 if channel_info.noauth_url in urls:
                     kwargs["channel"] = multichannel_name
                     break
-        kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
-        if not kwargs.get("subdir"):  # missing in old channels
-            kwargs["subdir"] = channel_info.channel.subdir
-        if kwargs["subdir"] == "noarch":
-            # libmamba doesn't keep 'noarch' type around, so infer for now
-            if any(dep.split()[0] in ("python", "pypy") for dep in kwargs.get("depends", ())):
-                kwargs["noarch"] = "python"
-            else:
-                kwargs["noarch"] = "generic"
+
         return PackageRecord(**kwargs)
 
     def _check_spec_compat(self, match_spec: Union[MatchSpec, None]) -> Union[MatchSpec, None]:
