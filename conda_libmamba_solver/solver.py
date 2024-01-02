@@ -411,7 +411,7 @@ class LibMambaSolver(Solver):
                 try:
                     self.solver.add_jobs(specs, task_type)
                 except RuntimeError as exc:
-                    raise InvalidSpec(str(exc))
+                    raise InvalidSpec(f"Task type {task_name} for specs {specs} failed with: {exc}")
 
         # ## Run solver
         solved = self.solver.solve()
@@ -506,7 +506,10 @@ class LibMambaSolver(Solver):
             conflicting: MatchSpec = self._check_spec_compat(out_state.conflicts.get(name))
 
             if name in user_installed and not in_state.prune and not conflicting:
-                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(installed_spec_str)
+                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(
+                    # TODO: Consider using installed_spec_str here for more accurate info
+                    installed.to_match_spec().conda_build_form()
+                )
 
             # These specs are explicit in some sort of way
             if pinned and not pinned.is_name_only_spec:
