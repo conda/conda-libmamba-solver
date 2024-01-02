@@ -123,13 +123,7 @@ class LibMambaIndexHelper(IndexHelper):
         self._repodata_fn = repodata_fn
 
         self._repos = []
-        self._channel_context = api.ChannelContext(
-            params=api.specs.ChannelResolveParams(platforms=set(self._subdirs)),
-            has_zst=[],
-        )
-        for channel in self._channels:
-            url = Channel(channel).urls(with_credentials=True, subdirs=("",))[0]
-            self._channel_context.make_channel(url)
+        self._channel_context = api.ChannelContext.make_conda_compatible(api.Context.instance())
         self._pool = api.Pool(self._channel_context)
 
         installed_repo = self._load_installed(installed_records)
