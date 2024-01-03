@@ -13,6 +13,30 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 23.12.0 (2023-12-12)
+
+### Enhancements
+
+* Add some boundary checks to `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS`. (#394, #403)
+
+### Bug fixes
+
+* Instantiate `IndexHelper` in offline mode for compatibility with conda-build. Otherwise
+  the index can get out of sync during long build processes. (#386 via #395)
+
+### Docs
+
+* Use new conda-sphinx-theme for documentation site. (#367 via #370)
+* Reorganize the layout of the documentation site. (#370)
+
+### Contributors
+
+* @dholth
+* @jaimergp
+* @jezdez
+* @travishathaway made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/370
+
+
 ## 23.11.1 (2023-11-16)
 
 ### Enhancements

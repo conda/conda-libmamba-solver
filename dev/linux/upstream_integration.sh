@@ -28,5 +28,11 @@ conda info
 # put temporary files on same filesystem
 export TMP=$HOME/pytesttmp
 mkdir -p $TMP
-python -m pytest --cov=conda --store-durations --durations-path=.test_durations_${OS} --splitting-algorithm=least_duration --basetemp=$TMP -m "integration" -v --splits ${TEST_SPLITS} --group=${TEST_GROUP}
+python -m pytest \
+    --cov=conda \
+    --durations-path=./tools/durations/Linux.json \
+    --basetemp=$TMP \
+    -m "integration" \
+    --splits=${TEST_SPLITS} \
+    --group=${TEST_GROUP}
 python -m conda.common.io

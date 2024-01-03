@@ -177,7 +177,7 @@ class LibMambaIndexHelper(IndexHelper):
         This is done by rebuilding a repodata.json-like dictionary, which is
         then exported to a temporary file that will be loaded with 'libmambapy.Repo'.
         """
-        exported = {"packages": {}}
+        exported = {"packages": {}, "packages.conda": {}}
         additional_infos = {}
         for record in records:
             record_data = dict(record.dump())
@@ -201,7 +201,10 @@ class LibMambaIndexHelper(IndexHelper):
                     if field == "timestamp" and value:
                         value = int(value * 1000)  # from s to ms
                     record_data[field] = value
-            exported["packages"][record.fn] = record_data
+            if record.fn.endswith(".conda"):
+                exported["packages.conda"][record.fn] = record_data
+            else:
+                exported["packages"][record.fn] = record_data
 
             # extra info for libmamba
             info = api.ExtraPkgInfo()
@@ -229,9 +232,11 @@ class LibMambaIndexHelper(IndexHelper):
         if "PYTEST_CURRENT_TEST" in os.environ:
             # Workaround some testing issues - TODO: REMOVE
             # Fix conda.testing.helpers._patch_for_local_exports by removing last line
-            maybe_cached = SubdirData._cache_.get((url, self._repodata_fn))
-            if maybe_cached and maybe_cached._mtime == float("inf"):
-                del SubdirData._cache_[(url, self._repodata_fn)]
+            for key, cached in list(SubdirData._cache_.items()):
+                if not isinstance(key, tuple):
+                    continue  # should not happen, but avoid IndexError just in case
+                if key[:2] == (url, self._repodata_fn) and cached._mtime == float("inf"):
+                    del SubdirData._cache_[key]
             # /Workaround
 
         log.debug("Fetching %s with SubdirData.repo_fetch", channel)
