@@ -567,7 +567,7 @@ class LibMambaSolver(Solver):
                                 break
                     if lock:
                         tasks[("LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK)].append(
-                            installed_spec_str
+                            installed.to_match_spec().conda_build_form()
                         )
 
         return dict(tasks)
