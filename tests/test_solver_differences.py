@@ -15,7 +15,7 @@ from .repodata_time_machine import repodata_time_machine
 from .utils import conda_subprocess
 
 
-@pytest.mark.skipif(not on_linux, reason="Only relevant on Linux")
+@pytest.mark.skip(reason="Fixed by #381. v1.8.2 is now found.")
 def test_pydantic_182_not_on_python_311():
     """
     See daico007's report on https://github.com/conda/conda-libmamba-solver/issues/115
@@ -27,6 +27,9 @@ def test_pydantic_182_not_on_python_311():
       because it's noarch with an open-ended upper bound.
     - If we do specify that we want a Python version for which pydantic 1.8.2 is available,
       libsolv correctly finds it.
+
+    After #381, where stricter specs are ordered first in the solver task, the solver
+    does find the correct pydantic as classic does.
     """
     env = os.environ.copy()
     env["CONDA_SUBDIR"] = "linux-64"
@@ -68,7 +71,7 @@ def test_pydantic_182_not_on_python_311():
     )
     data = json.loads(p.stdout)
     pydantic = next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "pydantic")
-    assert pydantic["version"] != "1.8.2"
+    assert pydantic["version"] != "1.8.2"  # this was the bug, now fixed
 
     p = conda_subprocess(
         *args,
@@ -162,7 +165,8 @@ def test_old_panel(tmp_path):
     """
     https://github.com/conda/conda-libmamba-solver/issues/64
 
-    Note we cannot reproduce the original error even with the "time-machine'd" repodata.
+    We could not reproduce this test until #381. Note this is not a problem
+    in the non-time-machine'd repodata (as of 2023-11-16 at least).
     """
     os.chdir(tmp_path)
     print("Patching repodata...")
@@ -219,4 +223,7 @@ def test_old_panel(tmp_path):
         )
         data = json.loads(p.stdout)
         panel = next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "panel")
-        assert panel["version"] == "0.14.0a2"
+        if solver == "classic":
+            assert panel["version"] == "0.14.0a2"
+        else:
+            assert panel["version"] == "0.1.0a14"

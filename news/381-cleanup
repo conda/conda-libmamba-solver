@@ -1,0 +1,20 @@
+### Enhancements
+
+* Remove old `SolverOutputState.specs` preparation logic from `state.py`, which was no longer in use since 23.9.0, and provide a simpler approach that simply enumerates the known specs in a well-specified order. This list is then consumed by `Solver._specs_to_tasks()` as usual. The
+chosen order prioritizes explicitly requested specs with stricter constraints over implicit ones or name-only specs (e.g. a CLI-specified `name=version=build` will be sent to the solver before CLI-specified `name=version` and `name`). (#381)
+
+### Bug fixes
+
+* Fix a regression introduced in #378, where certain solves would hard crash due to the given specs input order. (#391 via #381)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
