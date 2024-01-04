@@ -7,5 +7,3 @@ conda-forge/label/mamba_dev::libmamba>=2.0.0a0
 conda-forge/label/mamba_dev::libmambapy>=2.0.0a0
 # be explicit about sqlite because sometimes it's removed from the env :shrug:
 sqlite
-# Workaround for Windows breakage
-fmt!=10.2.0
