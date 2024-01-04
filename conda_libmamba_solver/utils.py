@@ -1,6 +1,7 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from enum import Enum
 from functools import lru_cache
 from logging import getLogger
 from pathlib import Path
@@ -91,3 +92,35 @@ def compatible_specs(index, specs, raise_not_found=True):
             return False
 
     return bool(matched)
+
+
+class EnumAsBools:
+    """
+    Allows an Enum to be bool-evaluated with attribute access.
+
+    >>> update_modifier = UpdateModifier("update_deps")
+    >>> update_modifier_as_bools = EnumAsBools(update_modifier)
+    >>> update_modifier == UpdateModifier.UPDATE_DEPS  # from this
+        True
+    >>> update_modidier_as_bools.UPDATE_DEPS  # to this
+        True
+    >>> update_modifier_as_bools.UPDATE_ALL
+        False
+    """
+
+    def __init__(self, enum: Enum):
+        self._enum = enum
+        self._names = {v.name for v in self._enum.__class__.__members__.values()}
+
+    def __getattr__(self, name: str):
+        if name in ("name", "value"):
+            return getattr(self._enum, name)
+        if name in self._names:
+            return self._enum.name == name
+        raise AttributeError(f"'{name}' is not a valid name for {self._enum.__class__.__name__}")
+
+    def __eq__(self, obj: object):
+        return self._enum.__eq__(obj)
+
+    def _dict(self):
+        return {name: self._enum.name == name for name in self._names}
