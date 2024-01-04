@@ -32,7 +32,7 @@ from conda.common.compat import on_win
 from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
-from conda.common.url import join_url, percent_decode
+from conda.common.url import percent_decode
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
@@ -397,7 +397,7 @@ class LibMambaSolver(Solver):
                 try:
                     self.solver.add_jobs(specs, task_type)
                 except RuntimeError as exc:
-                    raise InvalidSpec(f"Task type {task_name} for specs {specs} failed with: {exc}")
+                    raise InvalidSpec(f"Task {task_name} for {specs} failed with: {exc}")
 
         # ## Run solver
         solved = self.solver.solve()
