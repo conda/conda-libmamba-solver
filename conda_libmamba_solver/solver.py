@@ -903,7 +903,8 @@ class LibMambaSolver(Solver):
                 if channel_info.noauth_url in urls:
                     kwargs["channel"] = multichannel_name
                     break
-
+        if (channel := kwargs["channel"]).startswith("file://") and "%" in channel:
+            kwargs["channel"] = percent_decode(channel)
         return PackageRecord(**kwargs)
 
     def _check_spec_compat(self, match_spec: Union[MatchSpec, None]) -> Union[MatchSpec, None]:
