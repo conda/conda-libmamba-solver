@@ -482,7 +482,9 @@ class LibMambaSolver(Solver):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
-                installed_spec_str = self._spec_to_str(installed.to_match_spec())
+                installed_spec_str = self._spec_to_str(
+                    self._check_spec_compat(installed.to_match_spec())
+                )
             else:
                 installed_spec_str = None
             requested: MatchSpec = self._check_spec_compat(in_state.requested.get(name))
@@ -925,11 +927,24 @@ class LibMambaSolver(Solver):
         if match_spec is None:
             return None
         supported = "name", "version", "build", "channel", "subdir"
+        droppable = ("url",)
         unsupported_but_set = []
+        to_drop = set()
+        to_keep = {}
         for field in match_spec.FIELD_NAMES:
             value = match_spec.get_raw_value(field)
-            if value and field not in supported:
-                unsupported_but_set.append(field)
+            if value:
+                if (
+                    (field == "channel" and str(value) == "<unknown>")
+                    or (field == "subdir" and "channel" in to_drop)
+                    or field in droppable
+                ):
+                    # These make libmamba segfault but don't add useful info
+                    to_drop.add(field)
+                elif field not in supported:
+                    unsupported_but_set.append(field)
+                else:
+                    to_keep[field] = value
         if unsupported_but_set:
             raise InvalidMatchSpec(
                 match_spec,
@@ -937,6 +952,9 @@ class LibMambaSolver(Solver):
                 f"You can only use {supported}, but you tried to use "
                 f"{tuple(unsupported_but_set)}.",
             )
+        if to_drop:
+            log.debug("Dropping unsupported fields from %s: %s", match_spec, sorted(to_drop))
+            match_spec = MatchSpec(**to_keep)
         if (
             match_spec.get_raw_value("channel") == "defaults"
             and context.default_channels == DEFAULT_CHANNELS
