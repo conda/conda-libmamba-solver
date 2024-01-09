@@ -13,7 +13,7 @@ from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.models.channel import Channel
-from conda.testing.integration import _get_temp_prefix, make_temp_env
+from conda.testing.integration import _get_temp_prefix, make_temp_env, package_is_installed
 from conda.testing.integration import run_command as conda_inprocess
 
 from .channel_testing.helpers import http_server_auth_basic  # noqa: F401
@@ -298,3 +298,18 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
             condarc.write_text(condarc_contents)
         else:
             condarc.unlink()
+
+
+def test_unknown_channels_do_not_crash(tmp_path):
+    "https://github.com/conda/conda-libmamba-solver/issues/418"
+    DATA = Path(__file__).parent / "data"
+    test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
+    with make_temp_env("ca-certificates") as prefix:
+        # copy pkg to a new non-channel-like location without repodata around to obtain
+        # '<unknown>' channel and reproduce the issue
+        temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
+        shutil.copy(test_pkg, temp_pkg)
+        conda_inprocess("install", prefix, str(temp_pkg))
+        assert package_is_installed(prefix, "test-package")
+        conda_inprocess("install", prefix, "zlib")
+        assert package_is_installed(prefix, "zlib")
