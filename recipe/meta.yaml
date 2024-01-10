@@ -22,7 +22,7 @@ requirements:
   run:
     - python >=3.8
     - conda >=23.7.3
-    - libmambapy >=1.5.3
+    - libmambapy >=1.5.6
     - boltons >=23.0.0
 
 test:
