@@ -483,8 +483,8 @@ class LibMambaSolver(Solver):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
-                # TODO: We should use str(installed.to_match_spec()) but that's causing
-                # issues in libmamba's channel validation (raising InvalidSpec) when the
+                # TODO: We should use str(_check_spec_compat(installed.to_match_spec())) but that's
+                # causing issues in libmamba's channel validation (raising InvalidSpec) when the
                 # package is not present in the configured channels. This is a workaround.
                 installed_spec_str = installed.to_match_spec().conda_build_form()
             else:
@@ -918,11 +918,24 @@ class LibMambaSolver(Solver):
         if match_spec is None:
             return None
         supported = "name", "version", "build", "channel", "subdir"
+        droppable = ("url",)
         unsupported_but_set = []
+        to_drop = set()
+        to_keep = {}
         for field in match_spec.FIELD_NAMES:
             value = match_spec.get_raw_value(field)
-            if value and field not in supported:
-                unsupported_but_set.append(field)
+            if value:
+                if (
+                    (field == "channel" and str(value) == "<unknown>")
+                    or (field == "subdir" and "channel" in to_drop)
+                    or field in droppable
+                ):
+                    # These make libmamba segfault but don't add useful info
+                    to_drop.add(field)
+                elif field not in supported:
+                    unsupported_but_set.append(field)
+                else:
+                    to_keep[field] = value
         if unsupported_but_set:
             raise InvalidMatchSpec(
                 match_spec,
@@ -930,6 +943,9 @@ class LibMambaSolver(Solver):
                 f"You can only use {supported}, but you tried to use "
                 f"{tuple(unsupported_but_set)}.",
             )
+        if to_drop:
+            log.debug("Dropping unsupported fields from %s: %s", match_spec, sorted(to_drop))
+            match_spec = MatchSpec(**to_keep)
         if (
             match_spec.get_raw_value("channel") == "defaults"
             and context.default_channels == DEFAULT_CHANNELS
