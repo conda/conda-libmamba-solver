@@ -1,6 +1,7 @@
 ### Enhancements
 
 * Update integrations to use `libmamba` 2.0. (#414)
+* Do allow `repodata_fn='current_repodata.json'` if explicitly configured by the user. (#414)
 
 ### Bug fixes
 
