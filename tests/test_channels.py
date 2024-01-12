@@ -314,9 +314,11 @@ def test_local_spec():
         _get_temp_prefix(use_restricted_unicode=on_win),
         "--dry-run",
         "--solver=libmamba",
+        "--override-channels",
         "--channel=local",
         "test-package",
         env=env,
+        capture_output=False,
     )
     assert process.returncode == 0
 
@@ -326,8 +328,11 @@ def test_local_spec():
         _get_temp_prefix(use_restricted_unicode=on_win),
         "--dry-run",
         "--solver=libmamba",
+        "--override-channels",
+        "--channel=conda-test",  # just a small one to make the test quicker
         "local::test-package",
         env=env,
+        capture_output=False,
     )
     assert process.returncode == 0
 

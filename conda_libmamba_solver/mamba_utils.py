@@ -131,7 +131,10 @@ def init_api_context() -> api.Context:
             )
     api_ctx.custom_channels = additional_custom_channels
 
-    additional_custom_multichannels = {}
+    additional_custom_multichannels = {
+        "local": list(context.conda_build_local_paths),
+        "defaults": [channel.url(with_credentials=True) for channel in context.default_channels],
+    }
     for el in context.custom_multichannels:
         if el not in RESERVED_NAMES:
             additional_custom_multichannels[el] = []
@@ -144,9 +147,6 @@ def init_api_context() -> api.Context:
     api_ctx.default_channels = [
         _get_base_url(x.url(with_credentials=True)) for x in context.default_channels
     ]
-
-    if hasattr(api_ctx, "conda_build_local_paths"):
-        api_ctx.conda_build_local_paths = list(context.conda_build_local_paths)
 
     if context.channel_priority is ChannelPriority.STRICT:
         api_ctx.channel_priority = api.ChannelPriority.Strict
