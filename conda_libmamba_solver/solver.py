@@ -100,8 +100,13 @@ class LibMambaSolver(Solver):
         self._solver_options = None
 
         # we want to support arbitrary repodata fns, but we ignore current_repodata
-        keys_set_by_user = {key for _, config in context.collect_all().items() for key in config}
-        if self._repodata_fn == "current_repodata.json" and "repodata_fns" not in keys_set_by_user:
+        is_repodata_fn_set = False
+        for config in context.collect_all().values():
+            for key, value in config.items():
+                if key == "repodata_fns" and value:
+                    is_repodata_fn_set = True
+                    break
+        if self._repodata_fn == "current_repodata.json" and not is_repodata_fn_set:
             log.debug(f"Ignoring repodata_fn='current_repodata.json', defaulting to {REPODATA_FN}")
             self._repodata_fn = REPODATA_FN
 
