@@ -145,7 +145,8 @@ def init_api_context() -> api.Context:
         _get_base_url(x.url(with_credentials=True)) for x in context.default_channels
     ]
 
-    api_ctx.conda_build_local_paths = list(context.conda_build_local_paths)
+    if hasattr(api_ctx, "conda_build_local_paths"):
+        api_ctx.conda_build_local_paths = list(context.conda_build_local_paths)
 
     if context.channel_priority is ChannelPriority.STRICT:
         api_ctx.channel_priority = api.ChannelPriority.Strict
