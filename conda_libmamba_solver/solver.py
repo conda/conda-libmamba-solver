@@ -895,6 +895,9 @@ class LibMambaSolver(Solver):
             channel_info = index.get_info(channel)
         except KeyError:
             channel_info = None
+        if on_win:
+            kwargs["channel"] = percent_decode(kwargs["channel"])
+            kwargs["url"] = percent_decode(kwargs["url"])
         if channel_info and channel_info.full_url != channel_info.noauth_url:
             kwargs["url"] = kwargs["url"].replace(channel_info.noauth_url, channel_info.full_url)
         if for_conda_build:
