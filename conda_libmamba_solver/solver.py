@@ -891,12 +891,16 @@ class LibMambaSolver(Solver):
             return PackageRecord(**json.loads(json_payload))
 
         kwargs = json.loads(json_payload)
+        try:
+            channel_info = index.get_info(channel)
+        except KeyError:
+            channel_info = None
+        if channel_info and channel_info.full_url != channel_info.noauth_url:
+            kwargs["url"] = kwargs["url"].replace(channel_info.noauth_url, channel_info.full_url)
         if for_conda_build:
             # conda-build expects multichannel instances in the Dist->PackageRecord mapping
             # see https://github.com/conda/conda-libmamba-solver/issues/363
-            try:
-                channel_info = index.get_info(channel)
-            except KeyError:
+            if channel_info is None:
                 # this channel was never used to build the index, which
                 # means we obtained an already installed PackageRecord
                 # whose metadata contains a channel that doesn't exist
