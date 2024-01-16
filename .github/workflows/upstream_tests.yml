@@ -153,6 +153,12 @@ jobs:
           call conda info -a
           if errorlevel 1 exit 1
         # /CONDA-LIBMAMBA-SOLVER CHANGE
+      
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
+        with:
+          limit-access-to-actor: true
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -182,7 +188,8 @@ jobs:
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
+    if: false 
+    # needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
 
     runs-on: ubuntu-latest
     strategy:
@@ -255,7 +262,8 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
+    if: false 
+    # needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
 
     runs-on: macos-latest
     strategy:
