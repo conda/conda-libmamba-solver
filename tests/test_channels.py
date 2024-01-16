@@ -355,7 +355,7 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     https://github.com/conda/conda-libmamba-solver/issues/396
     
     constructor installers have a `-k` switch (keep) to leave the
-    pkgs/ cache prepopulated. Offline pdating from the cache should be a
+    pkgs/ cache prepopulated. Offline updating from the cache should be a
     harmless no-op, not a hard crash.
     """
     miniforge_url = (
@@ -366,9 +366,10 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     # bkfp: batch, keep, force, prefix
     check_call(["bash", str(tmp_path / "miniforge.sh"), "-bkfp", tmp_path / "miniforge"])
     env = os.environ.copy()
+    env["CONDA_ROOT_PREFIX"] = str(tmp_path / "miniforge")
     env["CONDA_PKGS_DIRS"] = str(tmp_path / "miniforge" / "pkgs")
     env["CONDA_ENVS_DIRS"] = str(tmp_path / "miniforge" / "envs")
-    env["HOME"] = str(tmp_path)
+    env["HOME"] = str(tmp_path)  # ignore ~/.condarc
     args = (
         "update",
         "-p",
