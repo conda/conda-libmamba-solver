@@ -6,6 +6,8 @@ import os
 import shutil
 import sys
 from pathlib import Path
+from subprocess import check_call
+from urllib.request import urlretrieve
 
 import pytest
 from conda.base.context import reset_context
@@ -345,3 +347,38 @@ def test_unknown_channels_do_not_crash(tmp_path):
         assert package_is_installed(prefix, "test-package")
         conda_inprocess("install", prefix, "zlib")
         assert package_is_installed(prefix, "zlib")
+
+
+@pytest.mark.skipif(not on_linux, reason="Only run on Linux")
+def test_use_cache_works_offline_fresh_install_keep(tmp_path):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/396
+    
+    constructor installers have a `-k` switch (keep) to leave the
+    pkgs/ cache prepopulated. Offline pdating from the cache should be a
+    harmless no-op, not a hard crash.
+    """
+    miniforge_url = (
+        "https://github.com/conda-forge/miniforge/releases/"
+        f"latest/download/Miniforge3-Linux-{os.uname().machine}.sh"
+    )
+    urlretrieve(miniforge_url, tmp_path / "miniforge.sh")
+    # bkfp: batch, keep, force, prefix
+    check_call(["bash", str(tmp_path / "miniforge.sh"), "-bkfp", tmp_path / "miniforge"])
+    env = os.environ.copy()
+    env["CONDA_PKGS_DIRS"] = str(tmp_path / "miniforge" / "pkgs")
+    env["CONDA_ENVS_DIRS"] = str(tmp_path / "miniforge" / "envs")
+    env["HOME"] = str(tmp_path)
+    args = (
+        "update",
+        "-p",
+        tmp_path / "miniforge",
+        "--all",
+        "--dry-run",
+        "--override-channels",
+        "--channel=conda-forge",
+    )
+    kwargs = dict(capture_output=False, check=True, env=env)
+    conda_subprocess(*args, "--offline", **kwargs)
+    conda_subprocess(*args, "--use-index-cache", **kwargs)
+    conda_subprocess(*args, "--offline", "--use-index-cache", **kwargs)
