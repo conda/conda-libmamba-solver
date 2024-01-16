@@ -353,7 +353,7 @@ def test_unknown_channels_do_not_crash(tmp_path):
 def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     """
     https://github.com/conda/conda-libmamba-solver/issues/396
-    
+
     constructor installers have a `-k` switch (keep) to leave the
     pkgs/ cache prepopulated. Offline updating from the cache should be a
     harmless no-op, not a hard crash.
