@@ -1,6 +1,6 @@
 ### Enhancements
 
-* <news item>
+* Load `pkgs_dirs` records when called in offline mode. (#396 via #423)
 
 ### Bug fixes
 
