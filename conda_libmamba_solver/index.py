@@ -87,6 +87,7 @@ from conda.base.context import context, reset_context
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, env_var
 from conda.common.serialize import json_dump, json_load
 from conda.common.url import percent_decode, remove_auth, split_anaconda_token
+from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
@@ -103,6 +104,7 @@ log = logging.getLogger(f"conda.{__name__}")
 @dataclass(frozen=True)
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
+
     channel: Channel
     repo: api.Repo
     full_url: str
@@ -117,6 +119,7 @@ class LibMambaIndexHelper(IndexHelper):
         subdirs: Iterable[str] | None = None,
         repodata_fn: str = REPODATA_FN,
         query_format=api.QueryFormat.JSON,
+        load_pkgs_cache: bool = False,
     ):
         self._channels = context.channels if channels is None else channels
         self._subdirs = context.subdirs if subdirs is None else subdirs
@@ -127,6 +130,9 @@ class LibMambaIndexHelper(IndexHelper):
 
         installed_repo = self._load_installed(installed_records)
         self._repos.append(installed_repo)
+
+        if load_pkgs_cache:
+            self._repos.extend(self._load_pkgs_cache())
 
         self._index = self._load_channels()
         self._repos += [info.repo for info in self._index.values()]
@@ -212,7 +218,7 @@ class LibMambaIndexHelper(IndexHelper):
                 info.noarch = record.noarch.value
             if record.channel and record.channel.subdir_url:
                 info.repo_url = record.channel.subdir_url
-            additional_infos[record.name] = info
+            additional_infos[record.fn] = info
 
         with NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
             f.write(json_dump(exported))
@@ -337,6 +343,17 @@ class LibMambaIndexHelper(IndexHelper):
         set_channel_priorities(index)
 
         return index
+
+    def _load_pkgs_cache(self, pkgs_dirs=None) -> Iterable[api.Repo]:
+        if pkgs_dirs is None:
+            pkgs_dirs = context.pkgs_dirs
+        repos = []
+        for path in pkgs_dirs:
+            package_cache_data = PackageCacheData(path)
+            package_cache_data.load()
+            repo = self._repo_from_records(self._pool, path, package_cache_data.values())
+            repos.append(repo)
+        return repos
 
     def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
         repo = self._repo_from_records(self._pool, "installed", records)
