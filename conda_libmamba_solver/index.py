@@ -242,6 +242,8 @@ class LibMambaIndexHelper(IndexHelper):
         log.debug("Fetching %s with SubdirData.repo_fetch", channel)
         subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
         if context.offline or context.use_index_cache:
+            # This might not exist (yet, anymore), but that's ok because we'll check
+            # for existence later and safely ignore if needed
             json_path = subdir_data.cache_path_json
         else:
             json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
