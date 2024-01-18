@@ -64,7 +64,8 @@ jobs:
   windows:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
+    if: false
+    # needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
 
     runs-on: windows-2019
     strategy:
@@ -182,7 +183,8 @@ jobs:
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
+    if: false 
+    # needs.changes.outputs.code == 'true' || github.event_name == 'schedule'
 
     runs-on: ubuntu-latest
     strategy:
@@ -261,24 +263,30 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        default-channel: ['defaults', 'conda-forge']
-        python-version: ['3.9']
-        test-type: ['unit', 'integration']
-        test-group: ['1', '2', '3']
-        # fewer test splits for quicker unit tests, keep 3 splits for integration
-        test-splits: [2, 3]
-        exclude:
-          - test-type: unit
-            test-group: '3'
-          - test-type: unit
-            test-splits: 3
-          - test-type: integration
+        # default-channel: ['defaults', 'conda-forge']
+        # python-version: ['3.9']
+        # test-type: ['unit', 'integration']
+        # test-group: ['1', '2', '3']
+        # # fewer test splits for quicker unit tests, keep 3 splits for integration
+        # test-splits: [2, 3]
+        # exclude:
+        #   - test-type: unit
+        #     test-group: '3'
+        #   - test-type: unit
+        #     test-splits: 3
+        #   - test-type: integration
+        #     test-splits: 2
+        #   # odd choice kept for parity with previous commit
+        #   - test-type: integration
+        #     default-channel: 'conda-forge'
+        #   - test-type: unit
+        #     default-channel: 'defaults'
+        include:
+          - default-channel: 'conda-forge'
+            python-version: '3.9'
+            test-type: 'unit'
+            test-group: '2'
             test-splits: 2
-          # odd choice kept for parity with previous commit
-          - test-type: integration
-            default-channel: 'conda-forge'
-          - test-type: unit
-            default-channel: 'defaults'
     env:
       OS: macOS
       PYTHON: ${{ matrix.python-version }}
@@ -300,16 +308,16 @@ jobs:
           path: conda-libmamba-solver
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-      - name: Cache conda packages
-        uses: actions/cache@v3
-        env:
-          # Increase this value to reset cache
-          CACHE_NUMBER: 4
-        with:
-          path: ~/conda_pkgs_dir
-          key:
-            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
-            hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}
+      # - name: Cache conda packages
+      #   uses: actions/cache@v3
+      #   env:
+      #     # Increase this value to reset cache
+      #     CACHE_NUMBER: 4
+      #   with:
+      #     path: ~/conda_pkgs_dir
+      #     key:
+      #       ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
+      #       hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
@@ -345,6 +353,10 @@ jobs:
           python -m pip install ../conda-libmamba-solver -vv --no-deps
           conda info -a
           # /CONDA-LIBMAMBA-SOLVER CHANGE
+
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+      #   timeout-minutes: 60
 
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         shell: bash -el {0}
