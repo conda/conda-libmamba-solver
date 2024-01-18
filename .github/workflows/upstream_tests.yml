@@ -308,16 +308,16 @@ jobs:
           path: conda-libmamba-solver
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-      # - name: Cache conda packages
-      #   uses: actions/cache@v3
-      #   env:
-      #     # Increase this value to reset cache
-      #     CACHE_NUMBER: 4
-      #   with:
-      #     path: ~/conda_pkgs_dir
-      #     key:
-      #       ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
-      #       hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}
+      - name: Cache conda packages
+        uses: actions/cache@v3
+        env:
+          # Increase this value to reset cache
+          CACHE_NUMBER: 4
+        with:
+          path: ~/conda_pkgs_dir
+          key:
+            ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
+            hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
