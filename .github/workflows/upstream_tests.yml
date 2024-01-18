@@ -312,7 +312,7 @@ jobs:
         uses: actions/cache@v3
         env:
           # Increase this value to reset cache
-          CACHE_NUMBER: 4
+          CACHE_NUMBER: 5
         with:
           path: ~/conda_pkgs_dir
           key:
