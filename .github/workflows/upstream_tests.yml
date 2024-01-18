@@ -317,7 +317,7 @@ jobs:
           path: ~/conda_pkgs_dir
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
-            hashFiles('conda/recipe/meta.yaml', 'conda/dev/macos/setup.sh', 'conda/tests/requirements.txt') }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+            hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
