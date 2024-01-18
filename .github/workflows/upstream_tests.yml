@@ -120,7 +120,7 @@ jobs:
           path: C:\Miniconda\envs\conda-test-env\pkgs
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
-            hashFiles('recipe/meta.yaml', 'dev/windows/setup.bat', 'tests/requirements.txt') }}
+            hashFiles('conda/recipe/meta.yaml', 'conda/dev/windows/setup.bat', 'conda/tests/requirements.txt') }}  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Set temp dirs correctly
         # https://github.com/actions/virtual-environments/issues/712
@@ -312,12 +312,12 @@ jobs:
         uses: actions/cache@v3
         env:
           # Increase this value to reset cache
-          CACHE_NUMBER: 5
+          CACHE_NUMBER: 4
         with:
           path: ~/conda_pkgs_dir
           key:
             ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }}-py${{ env.PYTHON }}-${{ matrix.default-channel }}-${{
-            hashFiles('recipe/meta.yaml', 'dev/macos/setup.sh', 'tests/requirements.txt') }}
+            hashFiles('conda/recipe/meta.yaml', 'conda/dev/macos/setup.sh', 'conda/tests/requirements.txt') }}  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
