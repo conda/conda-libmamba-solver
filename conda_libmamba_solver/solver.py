@@ -902,11 +902,12 @@ class LibMambaSolver(Solver):
                     record = next((r for r in pcd.values() if r.fn == pkg_filename), None)
                     if record:
                         return record
-
             pd = PrefixData(self.prefix)
-            record = pd.get(kwargs["name"])
+            record = pd.get(kwargs["name"], default=None)
             if record and record.fn == pkg_filename:
                 return record
+            # No luck? Cross our fingers and return the record from the JSON payload straight
+            return PackageRecord(**kwargs)
 
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
