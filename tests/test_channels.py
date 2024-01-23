@@ -379,7 +379,7 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
         "--override-channels",
         "--channel=conda-forge",
     )
-    kwargs = dict(capture_output=False, check=True, env=env)
+    kwargs = {"capture_output": False, "check": True, "env": env}
     conda_subprocess(*args, "--offline", **kwargs)
     conda_subprocess(*args, "--use-index-cache", **kwargs)
     conda_subprocess(*args, "--offline", "--use-index-cache", **kwargs)
