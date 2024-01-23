@@ -41,6 +41,7 @@ from conda.exceptions import (
     InvalidMatchSpec,
     InvalidSpec,
     PackagesNotFoundError,
+    ParseError,
     UnsatisfiableError,
 )
 from conda.models.channel import Channel
@@ -881,7 +882,12 @@ class LibMambaSolver(Solver):
         json_payload: str
             A str-encoded JSON payload with the PackageRecord kwargs.
         """
-        kwargs = json.loads(json_payload)
+        try:
+            kwargs = json.loads(json_payload)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            channel_name = Channel(channel).canonical_name
+            msg = f"Could not parse JSON payload for {channel_name}::{pkg_filename}"
+            raise ParseError(msg) from exc
 
         # conda-lock will inject virtual packages, but these are not in the index
         if pkg_filename.startswith("__") and "/@/" in channel:
