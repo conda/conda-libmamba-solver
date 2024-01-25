@@ -33,6 +33,7 @@ from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
 from conda.common.url import join_url, percent_decode
+from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
@@ -40,6 +41,7 @@ from conda.exceptions import (
     InvalidMatchSpec,
     InvalidSpec,
     PackagesNotFoundError,
+    ParseError,
     UnsatisfiableError,
 )
 from conda.models.channel import Channel
@@ -207,6 +209,7 @@ class LibMambaSolver(Solver):
                 channels=all_channels,
                 subdirs=subdirs,
                 repodata_fn=self._repodata_fn,
+                load_pkgs_cache=context.offline,
             )
             index.reload_local_channels()
 
@@ -879,21 +882,38 @@ class LibMambaSolver(Solver):
         json_payload: str
             A str-encoded JSON payload with the PackageRecord kwargs.
         """
+        try:
+            kwargs = json.loads(json_payload)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            channel_name = Channel(channel).canonical_name
+            msg = f"Could not parse JSON payload for {channel_name}::{pkg_filename}"
+            raise ParseError(msg) from exc
+
         # conda-lock will inject virtual packages, but these are not in the index
         if pkg_filename.startswith("__") and "/@/" in channel:
-            return PackageRecord(**json.loads(json_payload))
+            return PackageRecord(**kwargs)
 
-        kwargs = json.loads(json_payload)
         try:
             channel_info = index.get_info(channel)
         except KeyError:
-            # this channel was never used to build the index, which
-            # means we obtained an already installed PackageRecord
+            # this channel was never used to build the remote index, which
+            # can mean two things: it comes from pkgs_dirs (offline)
+            # or we obtained an already installed PackageRecord
             # whose metadata contains a channel that doesn't exist
+            # in both cases, we can return the record from the correct object
+            if context.offline:
+                for path in context.pkgs_dirs:
+                    pcd = PackageCacheData(path)
+                    pcd.load()
+                    record = next((r for r in pcd.values() if r.fn == pkg_filename), None)
+                    if record:
+                        return record
             pd = PrefixData(self.prefix)
-            record = pd.get(kwargs["name"])
+            record = pd.get(kwargs["name"], default=None)
             if record and record.fn == pkg_filename:
                 return record
+            # No luck? Cross our fingers and return the record from the JSON payload straight
+            return PackageRecord(**kwargs)
 
         # Otherwise, these are records from the index
         kwargs["fn"] = pkg_filename
