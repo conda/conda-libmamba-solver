@@ -947,7 +947,7 @@ class LibMambaSolver(Solver):
         if match_spec is None:
             return None
         supported = "name", "version", "build", "channel", "subdir"
-        droppable = ("url",)
+        droppable = ("url", "md5", "sha256")
         unsupported_but_set = []
         to_drop = set()
         to_keep = {}
