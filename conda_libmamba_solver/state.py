@@ -544,21 +544,28 @@ class SolverOutputState:
         """
         sis = self.solver_input_state
         if sis.is_removing:
-            not_installed = [
-                spec for name, spec in sis.requested.items() if name not in sis.installed
-            ]
+            # Make sure that requested packages to be removed match
+            # an installed record. Otherwise, raise an error.
+            # When 'remove --force' is set, remove the package without solving.
+            if sis.force_remove:
+                force_remove_solution = self.current_solution
+            not_installed = []
+            for name, spec in sis.requested.items():
+                for record in sis.installed.values():
+                    if spec.match(record):
+                        if sis.force_remove:
+                            force_remove_solution.remove(name)
+                        break
+                else:
+                    not_installed.append(spec)
+
             if not_installed:
                 exc = PackagesNotFoundError(not_installed)
                 exc.allow_retry = False
                 raise exc
 
             if sis.force_remove:
-                for name, spec in sis.requested.items():
-                    for record in sis.installed.values():
-                        if spec.match(record):
-                            self.records.pop(name)
-                            break
-                return self.current_solution
+                return force_remove_solution
 
         if sis.update_modifier.SPECS_SATISFIED_SKIP_SOLVE and not sis.is_removing:
             for name, spec in sis.requested.items():

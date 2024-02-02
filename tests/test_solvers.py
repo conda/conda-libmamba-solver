@@ -515,7 +515,8 @@ def test_remove_globbed_package_names(solver):
         data = json.loads(process.stdout)
         assert data.get("success")
         assert any(pkg["name"] == "zlib" for pkg in data["actions"]["UNLINK"])
-        assert all(pkg["name"] != "zlib" for pkg in data["actions"]["LINK"])
+        if "LINK" in data["actions"]:
+            assert all(pkg["name"] != "zlib" for pkg in data["actions"]["LINK"])
         # if ca-certificates is in the unlink list, it should also be in the link list (reinstall)
         for package in data["actions"]["UNLINK"]:
             if package["name"] == "ca-certificates":
