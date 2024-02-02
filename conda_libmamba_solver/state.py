@@ -554,7 +554,7 @@ class SolverOutputState:
                 for record in sis.installed.values():
                     if spec.match(record):
                         if sis.force_remove:
-                            force_remove_solution.remove(name)
+                            force_remove_solution.remove(record)
                         break
                 else:
                     not_installed.append(spec)
