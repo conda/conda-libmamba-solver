@@ -15,7 +15,6 @@ from conda.base.context import context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.exceptions import DryRunExit
 from conda.testing.integration import (
     Commands,
     make_temp_env,
@@ -26,7 +25,6 @@ from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
-from conda_libmamba_solver.mamba_utils import mamba_version
 
 from .utils import conda_subprocess
 
@@ -496,3 +494,29 @@ def test_python_downgrade_with_pins_removes_truststore():
                 # shouldn't have changed!
                 assert "zstd" not in link_dict
                 assert "zstd" not in unlink_dict
+
+
+@pytest.mark.parametrize("solver", ("classic", "libmamba"))
+def test_remove_globbed_package_names(solver):
+    "https://github.com/conda/conda-libmamba-solver/issues/434"
+    with make_temp_env("zlib", "ca-certificates") as prefix:
+        process = conda_subprocess(
+            "remove",
+            "--yes",
+            f"--prefix={prefix}",
+            "*lib*",
+            "--dry-run",
+            "--json",
+            f"--solver={solver}",
+        )
+        print(process.stdout)
+        print(process.stderr, file=sys.stderr)
+        assert process.returncode == 0
+        data = json.loads(process.stdout)
+        assert data.get("success")
+        assert any(pkg["name"] == "zlib" for pkg in data["actions"]["UNLINK"])
+        assert all(pkg["name"] != "zlib" for pkg in data["actions"]["LINK"])
+        # if ca-certificates is in the unlink list, it should also be in the link list (reinstall)
+        for package in data["actions"]["UNLINK"]:
+            if package["name"] == "ca-certificates":
+                assert any(pkg["name"] == "ca-certificates" for pkg in data["actions"]["LINK"])
