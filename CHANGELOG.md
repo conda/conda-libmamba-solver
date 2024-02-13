@@ -13,6 +13,31 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.1.0 (2024-01-29)
+
+### Enhancements
+
+* Prioritize explicitly requested specs with stricter constraints over implicit ones or name-only specs (e.g. a CLI-specified `name=version=build` will be sent to the solver before CLI-specified `name=version` and `name`). This happens to fix #391. (#381)
+* Load `pkgs_dirs` records when called in offline mode. (#396 via #423)
+
+### Bug fixes
+
+* Fix a regression introduced in #378, where certain solves would hard crash due to the given specs input order. (#391 via #381)
+* Properly propagate customized local channels (conda-build workspaces). Requires `libmamba 1.5.6` or above. (#398 via #401)
+* Do not raise an error if an unsupported `MatchSpec` field can be safely dropped instead. Currently ignoring `url`, `md5` and `sha256`. (#418 via #421, #427 via #429).
+* Do not crash if a stateless repodata cache is accessed with `--offline` or `--use-index-cache`. (#396 via #423).
+
+### Other
+
+* Remove old `SolverOutputState.specs` preparation logic from `state.py`, which was no longer in use since 23.9.0. Instead, enumerate all known specs in a certain order (see Enhancements for details). This list is then consumed by `Solver._specs_to_tasks()` as usual. (#381)
+
+### Contributors
+
+* @isuruf made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/401
+* @jaimergp
+
+
+
 ## 23.12.0 (2023-12-12)
 
 ### Enhancements
