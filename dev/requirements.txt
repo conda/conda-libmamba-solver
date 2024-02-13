@@ -7,3 +7,7 @@ conda-forge/label/mamba_dev::libmamba>=2.0.0a2
 conda-forge/label/mamba_dev::libmambapy>=2.0.0a2
 # be explicit about sqlite because sometimes it's removed from the env :shrug:
 sqlite
+# workarounds for v2
+conda-forge::libarchive
+conda-forge::libcurl
+conda-forge::libsolv
