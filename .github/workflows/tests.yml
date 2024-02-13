@@ -31,7 +31,6 @@ env:
 
 jobs:
   linux:
-    if: false
     name: Linux, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
     runs-on: ubuntu-latest
     strategy:
@@ -100,7 +99,6 @@ jobs:
           retention-days: 1
 
   macos:
-    if: false
     name: MacOS, Python ${{ matrix.python-version }}, ${{ matrix.default-channel }}
     runs-on: macos-latest
     strategy:
@@ -268,11 +266,11 @@ jobs:
           python -m pip install --no-deps -vv "%GITHUB_WORKSPACE%\conda-libmamba-solver"
           if errorlevel 1 exit 1
 
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 60
-        with:
-          limit-access-to-actor: true
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+      #   timeout-minutes: 60
+      #   with:
+      #     limit-access-to-actor: true
 
       - name: Python ${{ matrix.python-version }}
         shell: cmd
