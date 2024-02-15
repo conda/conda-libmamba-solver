@@ -15,7 +15,6 @@ from conda.base.context import context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.exceptions import DryRunExit
 from conda.testing.integration import (
     Commands,
     make_temp_env,
@@ -26,7 +25,6 @@ from conda.testing.solver_helpers import SolverTests
 
 from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
-from conda_libmamba_solver.mamba_utils import mamba_version
 
 from .utils import conda_subprocess
 
