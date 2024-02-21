@@ -77,15 +77,14 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Iterable
 
-import libmambapy as api
+import libmambapy as lmp
 from conda import __version__ as conda_version
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context, reset_context
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, env_var
-from conda.common.serialize import json_dump, json_load
+from conda.common.serialize import json_load
 from conda.common.url import percent_decode, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
@@ -105,7 +104,8 @@ log = logging.getLogger(f"conda.{__name__}")
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
     channel: Channel
-    repo: api.Repo
+    pool: lmp.Pool
+    repo: lmp.Repo
     full_url: str
     noauth_url: str
 
@@ -117,7 +117,7 @@ class LibMambaIndexHelper(IndexHelper):
         channels: Iterable[Channel | str] | None = None,
         subdirs: Iterable[str] | None = None,
         repodata_fn: str = REPODATA_FN,
-        query_format=api.QueryFormat.JSON,
+        query_format=lmp.QueryResultFormat.Json,
         load_pkgs_cache: bool = False,
     ):
         self._channels = context.channels if channels is None else channels
@@ -125,8 +125,8 @@ class LibMambaIndexHelper(IndexHelper):
         self._repodata_fn = repodata_fn
 
         self._repos = []
-        self._channel_context = api.ChannelContext.make_conda_compatible(api.Context.instance())
-        self._pool = api.Pool(self._channel_context)
+        self._channel_context = lmp.ChannelContext.make_conda_compatible(lmp.Context.instance())
+        self._pool = lmp.Pool(self._channel_context)
 
         installed_repo = self._load_installed(installed_records)
         self._repos.append(installed_repo)
@@ -137,7 +137,7 @@ class LibMambaIndexHelper(IndexHelper):
         self._index = self._load_channels()
         self._repos += [info.repo for info in self._index.values()]
 
-        self._query = api.Query(self._pool)
+        self._query = partial(lmp.Query, self._pool)
         self._format = query_format
 
     def get_info(self, key: str) -> _ChannelRepoInfo:
@@ -175,16 +175,15 @@ class LibMambaIndexHelper(IndexHelper):
         set_channel_priorities(self._index)
 
     def _repo_from_records(
-        self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
-    ) -> api.Repo:
+        self, pool: lmp.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
+    ) -> lmp.Repo:
         """
         Build a libmamba 'Repo' object from conda 'PackageRecord' objects.
 
         This is done by rebuilding a repodata.json-like dictionary, which is
         then exported to a temporary file that will be loaded with 'libmambapy.Repo'.
         """
-        exported = {"packages": {}, "packages.conda": {}}
-        additional_infos = {}
+        exported = []
         for record in records:
             record_data = dict(record.dump())
             # These fields are expected by libmamba, but they don't always appear
@@ -207,28 +206,34 @@ class LibMambaIndexHelper(IndexHelper):
                     if field == "timestamp" and value:
                         value = int(value * 1000)  # from s to ms
                     record_data[field] = value
-            if record.fn.endswith(".conda"):
-                exported["packages.conda"][record.fn] = record_data
+            pkg_info = lmp.specs.PackageInfo(record_data["name"], record_data["version"], record_data["build"], record_data["build_number"])
+            pkg_info.package_url = record_data.get("url", "")
+            pkg_info.license = record_data.get("license", "")
+            pkg_info.md5 = record_data.get("md5", "")
+            pkg_info.sha256 = record_data.get("sha256", "")
+            # pkg_info.signatures = record_data.get("signatures", "")
+            pkg_info.track_features = record_data.get("track_features", "")
+            pkg_info.depends = record_data.get("depends", "")
+            pkg_info.constrains = record_data.get("constrains", "")
+            # pkg_info.defaulted_keys = record_data.get("defaulted_keys", "")
+            noarch_type = record_data.get("noarch")
+            if noarch_type == "python":
+                pkg_info.noarch = lmp.specs.NoArchType.Python
+            elif noarch_type == "generic":
+                pkg_info.noarch = lmp.specs.NoArchType.Generic
             else:
-                exported["packages"][record.fn] = record_data
+                pkg_info.noarch = lmp.specs.NoArchType.No
+            pkg_info.size = record_data.get("size", 0)
+            pkg_info.timestamp = record_data.get("timestamp", 0)
+            exported.append(pkg_info)
 
-            # extra info for libmamba
-            info = api.ExtraPkgInfo()
-            if record.noarch:
-                info.noarch = record.noarch.value
-            if record.channel and record.channel.subdir_url:
-                info.repo_url = record.channel.subdir_url
-            additional_infos[record.fn] = info
+        repo = pool.add_repo_from_packages(
+            packages=exported, 
+            name=repo_name,
+            add_pip_as_python_dependency=context.add_pip_as_python_dependency,
+        )
+        return repo
 
-        with NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
-            f.write(json_dump(exported))
-
-        try:
-            repo = api.Repo(pool, repo_name, f.name, "")
-            repo.add_extra_pkg_info(additional_infos)
-            return repo
-        finally:
-            os.unlink(f.name)
 
     def _fetch_channel(self, url: str) -> tuple[str, os.PathLike]:
         channel = Channel.from_url(url)
@@ -291,9 +296,25 @@ class LibMambaIndexHelper(IndexHelper):
         else:
             path_to_use = json_path
 
-        repo = api.Repo(self._pool, noauth_url, str(path_to_use), escape_channel_url(noauth_url))
+        if path_to_use.suffix == ".solv":
+            repo = self._pool.add_repo_from_native_serialization(
+                path=lmp.Path(str(path_to_use)),
+                url=url,
+                add_pip_as_python_dependency=context.add_pip_as_python_dependency,
+            )
+        else:
+            repo = self._pool.add_repo_from_repodata_json(
+                path=lmp.Path(str(path_to_use)),
+                url=url,
+                add_pip_as_python_dependency=context.add_pip_as_python_dependency,
+            )
+            # self._pool.native_serialize_repo(
+            #     repo=repo,
+            #     path=lmp.Path(str(json_path.with_suffix(".solv"))),
+
         return _ChannelRepoInfo(
             repo=repo,
+            pool=self._pool,
             channel=channel,
             full_url=url,
             noauth_url=noauth_url,
@@ -344,7 +365,7 @@ class LibMambaIndexHelper(IndexHelper):
 
         return index
 
-    def _load_pkgs_cache(self, pkgs_dirs=None) -> Iterable[api.Repo]:
+    def _load_pkgs_cache(self, pkgs_dirs=None) -> Iterable[lmp.Repo]:
         if pkgs_dirs is None:
             pkgs_dirs = context.pkgs_dirs
         repos = []
@@ -355,16 +376,16 @@ class LibMambaIndexHelper(IndexHelper):
             repos.append(repo)
         return repos
 
-    def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
+    def _load_installed(self, records: Iterable[PackageRecord]) -> lmp.Repo:
         repo = self._repo_from_records(self._pool, "installed", records)
-        repo.set_installed()
+        self._pool.set_installed_repo(repo)
         return repo
 
     def whoneeds(
         self, query: str | MatchSpec, records=True
     ) -> Iterable[PackageRecord] | dict | str:
         result_str = self._query.whoneeds(self._prepare_query(query), self._format)
-        if self._format == api.QueryFormat.JSON:
+        if self._format == lmp.QueryResultFormat.Json:
             return self._process_query_result(result_str, records=records)
         return result_str
 
@@ -372,13 +393,13 @@ class LibMambaIndexHelper(IndexHelper):
         self, query: str | MatchSpec, records=True
     ) -> Iterable[PackageRecord] | dict | str:
         result_str = self._query.depends(self._prepare_query(query), self._format)
-        if self._format == api.QueryFormat.JSON:
+        if self._format == lmp.QueryResultFormat.Json:
             return self._process_query_result(result_str, records=records)
         return result_str
 
     def search(self, query: str | MatchSpec, records=True) -> Iterable[PackageRecord] | dict | str:
         result_str = self._query.find(self._prepare_query(query), self._format)
-        if self._format == api.QueryFormat.JSON:
+        if self._format == lmp.QueryResultFormat.Json:
             return self._process_query_result(result_str, records=records)
         return result_str
 

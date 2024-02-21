@@ -27,6 +27,9 @@ function recompile-mamba () {
   fi
 }
 
+# Temporary
+sudo /opt/conda/condabin/conda remove -y -p /opt/conda --force mamba || true
+#/Temporary
 sudo /opt/conda/condabin/conda install -y -p /opt/conda --repodata-fn repodata.json \
     --channel conda-forge/label/mamba_dev \
     --file /opt/conda-libmamba-solver-src/dev/requirements.txt \

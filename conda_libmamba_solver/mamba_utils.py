@@ -79,7 +79,7 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
                 priority,
                 subpriority,
             )
-        info.repo.set_priority(priority, subpriority)
+        info.pool.set_repo_priority(info.repo, api.solver.libsolv.Priorities(priority, subpriority))
 
     return index
 
