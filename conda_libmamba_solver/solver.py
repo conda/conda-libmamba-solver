@@ -198,7 +198,7 @@ class LibMambaSolver(Solver):
                     all_channels.append(channel)
         all_channels.extend(in_state.maybe_free_channel())
 
-        all_channels = tuple(all_channels)
+        all_channels = tuple(dict.fromkeys(all_channels))
         with Spinner(
             self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
