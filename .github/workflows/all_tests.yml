@@ -74,16 +74,16 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.8', '3.12']
+        python-version: ['3.8', '3.11']
         default-channel: [defaults, conda-forge]
-        test-type: [cls, unit, integration]
+        test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
             python-version: '3.8'
           - test-type: unit
             test-group: 3
-          - test-type: cls
+          - test-type: conda-libmamba-solver
             test-group: 3
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
@@ -159,7 +159,7 @@ jobs:
 
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        if: ${{ matrix.test-type != 'cls' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: pytest
           --cov=conda
           --durations-path=tools\durations\${{ runner.os }}.json
@@ -168,9 +168,9 @@ jobs:
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run CLS Tests
+      - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'cls' }}
+        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: pytest
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
@@ -212,7 +212,7 @@ jobs:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
         default-channel: [defaults, conda-forge]
-        test-type: [cls, unit, integration]
+        test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - python-version: '3.8'
@@ -221,11 +221,11 @@ jobs:
             default-channel: conda-forge
           - python-version: '3.10'
             default-channel: conda-forge
-          - python-version: '3.11'
+          - python-version: '3.12'
             default-channel: conda-forge
           - test-type: unit
             test-group: 3
-          - test-type: cls
+          - test-type: conda-libmamba-solver
             test-group: 3
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
@@ -297,7 +297,7 @@ jobs:
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        if: ${{ matrix.test-type != 'cls' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: pytest
           --cov=conda
           --durations-path=tools/durations/${{ runner.os }}.json
@@ -306,9 +306,9 @@ jobs:
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run CLS Tests
+      - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'cls' }}
+        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: pytest
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
@@ -485,13 +485,13 @@ jobs:
       matrix:
         # test lower version (w/ osx-64 & defaults & unit tests) and upper version (w/ osx-arm64 & conda-forge & integration tests)
         arch: [osx-64, osx-arm64]
-        python-version: ['3.8', '3.12']
+        python-version: ['3.8', '3.11']
         default-channel: [defaults, conda-forge]
-        test-type: [cls, unit, integration]
+        test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - arch: osx-64
-            python-version: '3.12'
+            python-version: '3.11'
           - arch: osx-64
             default-channel: conda-forge
           - arch: osx-64
@@ -503,10 +503,10 @@ jobs:
           - arch: osx-arm64
             test-type: unit
           - arch: osx-arm64
-            test-type: cls
+            test-type: conda-libmamba-solver
           - test-type: unit
             test-group: 3
-          - test-type: cls
+          - test-type: conda-libmamba-solver
             test-group: 3
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
@@ -589,9 +589,9 @@ jobs:
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run CLS Tests
+      - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'cls' }}
+        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: pytest
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
