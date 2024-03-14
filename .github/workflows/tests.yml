@@ -64,7 +64,7 @@ jobs:
           repository: conda/conda
           path: conda
           # TEMP: Clone pre conda/conda#13162
-          ref: b619d59546be9464b5f8364ef506e37d291cca62
+          ref: 1f63bef4e47ef38c43acb7283a918fff74958c70
 
       - name: Python ${{ matrix.python-version }}
         run: >
@@ -129,7 +129,7 @@ jobs:
           repository: conda/conda
           path: conda
           # TEMP: Clone pre conda/conda#13162
-          ref: b619d59546be9464b5f8364ef506e37d291cca62
+          ref: 1f63bef4e47ef38c43acb7283a918fff74958c70
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
@@ -228,7 +228,7 @@ jobs:
           repository: conda/conda
           path: conda
           # TEMP: Clone pre conda/conda#13162
-          ref: b619d59546be9464b5f8364ef506e37d291cca62
+          ref: 1f63bef4e47ef38c43acb7283a918fff74958c70
 
       - name: Set temp dirs correctly
         # https://github.com/actions/virtual-environments/issues/712

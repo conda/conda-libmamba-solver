@@ -91,7 +91,7 @@ jobs:
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           # TEMP: Clone pre conda/conda#13162
-          ref: b619d59546be9464b5f8364ef506e37d291cca62
+          ref: 1f63bef4e47ef38c43acb7283a918fff74958c70
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -215,7 +215,7 @@ jobs:
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           # TEMP: Clone pre conda/conda#13162
-          ref: b619d59546be9464b5f8364ef506e37d291cca62
+          ref: 1f63bef4e47ef38c43acb7283a918fff74958c70
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -296,7 +296,7 @@ jobs:
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           # TEMP: Clone pre conda/conda#13162
-          ref: b619d59546be9464b5f8364ef506e37d291cca62
+          ref: 1f63bef4e47ef38c43acb7283a918fff74958c70
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
