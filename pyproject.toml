@@ -53,6 +53,7 @@ exclude = '''
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = [
+  "--color=yes",
   "--tb=native",
   "--strict-markers",
   "--xdoctest-modules",
