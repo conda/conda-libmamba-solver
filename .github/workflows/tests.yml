@@ -63,6 +63,8 @@ jobs:
           fetch-depth: 0
           repository: conda/conda
           path: conda
+          # TEMP: Clone pre conda/conda#13162
+          ref: b619d59546be9464b5f8364ef506e37d291cca62
 
       - name: Python ${{ matrix.python-version }}
         run: >
@@ -126,6 +128,8 @@ jobs:
           fetch-depth: 0
           repository: conda/conda
           path: conda
+          # TEMP: Clone pre conda/conda#13162
+          ref: b619d59546be9464b5f8364ef506e37d291cca62
 
       - uses: conda-incubator/setup-miniconda@v2
         name: Setup miniconda for defaults
@@ -223,6 +227,8 @@ jobs:
           fetch-depth: 0
           repository: conda/conda
           path: conda
+          # TEMP: Clone pre conda/conda#13162
+          ref: b619d59546be9464b5f8364ef506e37d291cca62
 
       - name: Set temp dirs correctly
         # https://github.com/actions/virtual-environments/issues/712
