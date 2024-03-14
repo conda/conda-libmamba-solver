@@ -125,7 +125,7 @@ jobs:
           run-post: false  # skip post cleanup
 
       - name: Clear history
-        run: echo > %CONDA_PREFIX%\conda-meta\history
+        run: Clear-Content $env:CONDA_PREFIX\conda-meta\history
 
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
