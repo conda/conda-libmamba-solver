@@ -655,3 +655,21 @@ jobs:
           # permit jobs to be skipped if there are no code changes (see changes job)
           allowed-skips: ${{ toJSON(needs) }}
           jobs: ${{ toJSON(needs) }}
+
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Checkout our source
+        uses: actions/checkout@v3
+        if: always() && github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
+
+      - name: Report failures
+        if: always() && github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CONDA_LIBMAMBA_SOLVER_ISSUES }}
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "Scheduled tests failed"
+        with:
+          filename: .github/TEST_FAILURE_REPORT_TEMPLATE.md
+          update_existing: true
+      # /CONDA-LIBMAMBA-SOLVER CHANGE
+
