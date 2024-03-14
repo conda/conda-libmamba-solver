@@ -12,18 +12,20 @@ our CI also runs the full `conda/conda` integration suite.
 
 ### Unit tests
 
-From the properly mounted `conda/conda` Docker container (see ["Development environment setup"](setup.md)):
+From the properly mounted `conda/conda` devcontainer (see ["Development environment setup"](setup.md)):
 
 ```bash
-$ cd /opt/conda-libmamba-solver-src
+$ cd /workspaces/conda-libmamba-solver
 $ pytest
 ```
 
-### Integration tests
+Or just use the PyTest integrations in VS Code (flask icon).
 
-From the properly mounted `conda/conda` Docker container (see ["Development environment setup"](setup.md)):
+### Upstream tests
+
+From the properly mounted `conda/conda` devcontainer (see ["Development environment setup"](setup.md)):
 
 ```bash
-$ cd /opt/conda-src
+$ cd /workspaces/conda
 $ CONDA_SOLVER=libmamba pytest
 ```
