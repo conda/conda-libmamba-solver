@@ -84,11 +84,13 @@ jobs:
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
             test-group: 3
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type != 'integration' && '2' || '3' }}
+      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
 
     steps:
@@ -173,11 +175,7 @@ jobs:
       - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        run: python -m pytest
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          -vv
-          -m "not slow"
+        run: python -m pytest -vv -m "not slow"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -228,10 +226,12 @@ jobs:
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
             test-group: 3
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type != 'integration' && '2' || '3' }}
+      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
@@ -313,11 +313,7 @@ jobs:
       - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        run: python -m pytest
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          -vv
-          -m "not slow"
+        run: python -m pytest -vv -m "not slow"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -511,10 +507,12 @@ jobs:
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
             test-group: 3
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type != 'integration' && '2' || '3' }}
+      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
@@ -598,11 +596,7 @@ jobs:
       - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        run: python -m pytest
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          -vv
-          -m "not slow"
+        run: python -m pytest -vv -m "not slow"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
