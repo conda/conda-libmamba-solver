@@ -1,4 +1,4 @@
-name: Upstream tests # CONDA-LIBMAMBA-SOLVER CHANGE
+name: Tests
 
 on:
   # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#push
@@ -59,10 +59,8 @@ jobs:
           filters: |
             code:
               - 'conda_libmamba_solver/**'
-              - 'tests/**'
               - '*.py'
-              - 'recipe/**'
-              - '.github/workflows/tests.yml'
+              - '.github/workflows/upstream_tests.yml'
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
   # windows test suite
@@ -75,13 +73,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.11"]
-        default-channel: [conda-forge]
-        include:
-          - python-version: "3.9"
-            default-channel: defaults
+        # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
+        python-version: ['3.8', '3.12']
+        default-channel: [defaults, conda-forge]
+        test-type: [cls, unit, integration]
+        test-group: [1, 2, 3]
+        exclude:
+          - default-channel: conda-forge
+            python-version: '3.8'
+          - test-type: unit
+            test-group: 3
+          - test-type: cls
+            test-group: 3
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
+      PYTEST_SPLITS: ${{ matrix.test-type != 'integration' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
 
     steps:
@@ -117,6 +124,9 @@ jobs:
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
 
+      - name: Clear history
+        run: echo > $CONDA_PREFIX\conda-meta\history
+
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
@@ -146,9 +156,26 @@ jobs:
       - name: Conda List
         run: conda list --show-channel-urls
 
-      - name: Run Tests
+      - name: Run Upstream Tests
+        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+        if: ${{ matrix.test-type != 'cls' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        run: pytest
+          --cov=conda
+          --durations-path=tools\durations\${{ runner.os }}.json
+          --group=${{ matrix.test-group }}
+          --splits=${{ env.PYTEST_SPLITS }}
+          -m "${{ env.PYTEST_MARKER }}"
+
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Run CLS Tests
         working-directory: conda-libmamba-solver
-        run: python -m pytest -vv -m "not slow" --timeout=600
+        if: ${{ matrix.test-type == 'cls' }}
+        run: pytest
+          --group=${{ matrix.test-group }}
+          --splits=${{ env.PYTEST_SPLITS }}
+          -vv
+          -m "not slow"
+      #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -181,18 +208,27 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python-version: "3.8"
-            default-channel: defaults
-          - python-version: "3.9"
-            default-channel: defaults
-          - python-version: "3.10"
-            default-channel: defaults
-          - python-version: "3.11"
+        # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
+        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        default-channel: [defaults, conda-forge]
+        test-type: [cls, unit, integration]
+        test-group: [1, 2, 3]
+        exclude:
+          - python-version: '3.8'
             default-channel: conda-forge
+          - python-version: '3.9'
+            default-channel: conda-forge
+          - python-version: '3.10'
+            default-channel: conda-forge
+          - python-version: '3.11'
+            default-channel: conda-forge
+          - test-type: unit
+            test-group: 3
+          - test-type: cls
+            test-group: 3
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
+      PYTEST_SPLITS: ${{ matrix.test-type != 'integration' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
@@ -227,6 +263,9 @@ jobs:
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
 
+      - name: Clear history
+        run: echo > $CONDA_PREFIX\conda-meta\history
+
       - name: Conda Install
         working-directory: conda
         run: conda install
@@ -239,7 +278,7 @@ jobs:
           --file ../conda-libmamba-solver/tests/requirements.txt
           ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
-      
+
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install conda-libmamba-solver/ conda/ -vv --no-deps
@@ -255,8 +294,25 @@ jobs:
         run: conda list --show-channel-urls
 
       - name: Run Tests
+        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+        if: ${{ matrix.test-type != 'cls' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        run: pytest
+          --cov=conda
+          --durations-path=tools/durations/${{ runner.os }}.json
+          --group=${{ matrix.test-group }}
+          --splits=${{ env.PYTEST_SPLITS }}
+          -m "${{ env.PYTEST_MARKER }}"
+
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Run CLS Tests
         working-directory: conda-libmamba-solver
-        run: python -m pytest -vv -m "not slow"
+        if: ${{ matrix.test-type == 'cls' }}
+        run: pytest
+          --group=${{ matrix.test-group }}
+          --splits=${{ env.PYTEST_SPLITS }}
+          -vv
+          -m "not slow"
+      #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -274,6 +330,142 @@ jobs:
             conda/test-report.xml
           retention-days: 1  # temporary, combined in aggregate below
 
+  # linux benchmarks
+  linux-benchmarks:
+    # only run test suite if there are code changes
+    # CONDA-LIBMAMBA-SOLVER CHANGE
+    # needs: changes
+    if: false
+    # needs.changes.outputs.code == 'true'
+    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}  # bash exit immediately on error + login shell
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12']
+    env:
+      REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Hash + Timestamp
+        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-benchmark-$(date -u "+%Y%m")" >> $GITHUB_ENV
+
+      - name: Cache Conda
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: cache-${{ env.HASH }}
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          condarc-file: .github/condarc-defaults
+          run-post: false  # skip post cleanup
+
+      - name: Clear history
+        run: echo > $CONDA_PREFIX\conda-meta\history
+
+      - name: Conda Install
+        run: conda install
+          --yes
+          --file tests/requirements.txt
+          --file tests/requirements-${{ runner.os }}.txt
+          --file tests/requirements-ci.txt
+          --file tests/requirements-s3.txt
+          ${{ env.REQUIREMENTS_TRUSTSTORE }}
+          python=${{ matrix.python-version }}
+
+      - name: Install CodSpeed
+        run: pip install git+https://github.com/kenodegard/pytest-codspeed.git@fix-outerr-redirects#egg=pytest-codspeed
+
+      - name: Conda Info
+        run: python -m conda info --verbose
+
+      - name: Conda Config
+        run: conda config --show-sources
+
+      - name: Conda List
+        run: conda list --show-channel-urls
+
+      - name: Run Benchmarks
+        uses: CodSpeedHQ/action@v2
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: $CONDA/envs/test/bin/pytest --codspeed
+
+  # linux-qemu test suite
+  linux-qemu:
+    # only run test suite if there are code changes
+    # CONDA-LIBMAMBA-SOLVER CHANGE
+    # needs: changes
+    if: false
+    # needs.changes.outputs.code == 'true'
+    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+
+    # Run one single fast test per docker+qemu emulated linux platform to test that
+    # test execution is possible there (container+tools+dependencies work). Can be
+    # changed / extended to run specific tests in case there are platform related
+    # things to test. Running more tests is time consuming due to emulation
+    # (factor 2-10x slower).
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}  # bash exit immediately on error + login shell
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12']
+        image: ['continuumio/miniconda3:latest', 'condaforge/miniforge3:latest']
+        platform: [arm64, ppc64le, s390x]
+        exclude:
+          - image: 'continuumio/miniconda3:latest'
+            platform: ppc64le
+          - image: 'condaforge/miniforge3:latest'
+            platform: s390x
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Run Tests
+        run: docker run
+          --rm
+          --volume ${PWD}:/opt/conda-src
+          --workdir /opt/conda-src
+          --platform linux/${{ matrix.platform }}
+          ${{ matrix.image }}
+          bash -lc
+          ". /opt/conda/etc/profile.d/conda.sh
+          && set -x
+          && conda create
+            --name test
+            --yes
+            --file tests/requirements.txt
+            --file tests/requirements-${{ runner.os }}.txt
+            --file tests/requirements-ci.txt
+            python=${{ matrix.python-version }}
+          && conda activate test
+          && python -m conda info --verbose
+          && conda config --show-sources
+          && conda list --show-channel-urls
+          && python -m pytest tests/test_api.py::test_DepsModifier_contract"
+
   # macos test suite
   macos:
     # only run test suite if there are code changes
@@ -288,12 +480,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - python-version: "3.8"
-            default-channel: "defaults"
-          - python-version: "3.11"
-            default-channel: "conda-forge"
+        # test lower version (w/ osx-64 & defaults & unit tests) and upper version (w/ osx-arm64 & conda-forge & integration tests)
+        arch: [osx-64, osx-arm64]
+        python-version: ['3.8', '3.12']
+        default-channel: [defaults, conda-forge]
+        test-type: [cls, unit, integration]
+        test-group: [1, 2, 3]
+        exclude:
+          - arch: osx-64
+            python-version: '3.12'
+          - arch: osx-64
+            default-channel: conda-forge
+          - arch: osx-64
+            test-type: integration
+          - arch: osx-arm64
+            python-version: '3.8'
+          - arch: osx-arm64
+            default-channel: defaults
+          - arch: osx-arm64
+            test-type: unit
+          - arch: osx-arm64
+            test-type: cls
+          - test-type: unit
+            test-group: 3
+          - test-type: cls
+            test-group: 3
     env:
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
+      PYTEST_SPLITS: ${{ matrix.test-type != 'integration' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
@@ -332,6 +546,9 @@ jobs:
           miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-arm64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
 
+      - name: Clear history
+        run: echo > $CONDA_PREFIX\conda-meta\history
+
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
@@ -360,8 +577,24 @@ jobs:
         run: conda list --show-channel-urls
 
       - name: Run Tests
+        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+        run: pytest
+          --cov=conda
+          --durations-path=tools/durations/${{ runner.os }}.json
+          --group=${{ matrix.test-group }}
+          --splits=${{ env.PYTEST_SPLITS }}
+          -m "${{ env.PYTEST_MARKER }}"
+
+      # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Run CLS Tests
         working-directory: conda-libmamba-solver
-        run: python -m pytest -vv -m "not slow"
+        if: ${{ matrix.test-type == 'cls' }}
+        run: pytest
+          --group=${{ matrix.test-group }}
+          --splits=${{ env.PYTEST_SPLITS }}
+          -vv
+          -m "not slow"
+      #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -408,7 +641,7 @@ jobs:
 
   # required check
   analyze:
-    needs: [windows, linux, macos, aggregate]
+    needs: [windows, linux, linux-qemu, linux-benchmarks, macos, aggregate]
     if: '!cancelled()'
 
     runs-on: ubuntu-latest
@@ -419,80 +652,3 @@ jobs:
           # permit jobs to be skipped if there are no code changes (see changes job)
           allowed-skips: ${{ toJSON(needs) }}
           jobs: ${{ toJSON(needs) }}
-
-  # canary builds
-  build:
-    needs: [analyze]
-    # only build canary build if
-    # - prior steps succeeded,
-    # - this is the main repo, and
-    # - we are on the main, feature, or release branch
-    if: >-
-      !cancelled()
-      && !github.event.repository.fork
-      && (
-        github.ref_name == 'main'
-        || startsWith(github.ref_name, 'feature/')
-        || endsWith(github.ref_name, '.x')
-      )
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            subdir: linux-64
-          - runner: macos-latest
-            subdir: osx-64
-          - runner: macos-14
-            subdir: osx-arm64
-          - runner: windows-latest
-            subdir: win-64
-    runs-on: ${{ matrix.runner }}
-    steps:
-      # Clean checkout of specific git ref needed for package metadata version
-      # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
-      - name: Checkout Source
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref }}
-          clean: true
-          fetch-depth: 0
-
-      # Explicitly use Python 3.11 since each of the OSes has a different default Python
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Detect Label
-        shell: python
-        run: |
-          from pathlib import Path
-          from re import match
-          from os import environ
-
-          if "${{ github.ref_name }}" == "main":
-              # main branch commits are uploaded to the dev label
-              label = "dev"
-          elif "${{ github.ref_name }}".startswith("feature/"):
-              # feature branch commits are uploaded to a custom label
-              label = "${{ github.ref_name }}"
-          else:
-              # release branch commits are added to the rc label
-              # see https://github.com/conda/infrastructure/issues/760
-              _, name = "${{ github.repository }}".split("/")
-              label = f"rc-{name}-${{ github.ref_name }}"
-
-          Path(environ["GITHUB_ENV"]).write_text(f"ANACONDA_ORG_LABEL={label}")
-
-      - name: Create & Upload
-        uses: conda/actions/canary-release@v24.2.0
-        env:
-          # Run conda-build in isolated activation to properly package conda
-          _CONDA_BUILD_ISOLATED_ACTIVATION: 1
-        with:
-          package-name: ${{ github.event.repository.name }}
-          subdir: ${{ matrix.subdir }}
-          anaconda-org-channel: conda-canary
-          anaconda-org-label: ${{ env.ANACONDA_ORG_LABEL }}
-          anaconda-org-token: ${{ secrets.CONDA_CANARY_ANACONDA_ORG_TOKEN }}
-          conda-build-arguments: '--override-channels -c conda-forge -c defaults'
