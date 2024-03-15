@@ -174,9 +174,8 @@ jobs:
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
-          python -m pip install -e ../conda/ -vv --no-deps
-          python -m pip conda init --all
-          . $CONDA_PREFIX\condabin\conda-hook.ps1
+          python -m pip install -e ../conda/ --no-deps
+          . $env:CONDA_PREFIX\condabin\conda-hook.ps1
           python -m pytest -vv -m "not slow"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
@@ -314,8 +313,7 @@ jobs:
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
-          python -m pip install -e ../conda/ -vv --no-deps
-          python -m pip conda init --all
+          python -m pip install -e ../conda/ --no-deps
           . $CONDA_PREFIX/etc/profile.d/conda.sh
           python -m pytest -vv -m "not slow"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
@@ -599,8 +597,7 @@ jobs:
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
-          python -m pip install -e ../conda/ -vv --no-deps
-          python -m pip conda init --all
+          python -m pip install -e ../conda/ --no-deps
           . $CONDA_PREFIX/etc/profile.d/conda.sh
           python -m pytest -vv -m "not slow"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
