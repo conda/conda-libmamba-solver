@@ -1,4 +1,4 @@
-conda-canary/label/rc-conda-build-24.3.x::conda-build  # TEMPORARY; revert to release version after 24.3.0 is released
+conda-canary/label/dev::conda-build  # TEMPORARY; revert to release version after 24.3.0 is released
 conda-forge::pytest-xprocess
 conda-index
 conda-lock
