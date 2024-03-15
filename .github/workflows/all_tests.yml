@@ -182,6 +182,7 @@ jobs:
           CALL %CONDA_PREFIX%\Scripts\activate.bat
           if errorlevel 1 exit 1
           python -m pytest -vv -m "not slow" || exit 1
+          exit 0
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage

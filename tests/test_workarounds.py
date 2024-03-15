@@ -34,7 +34,6 @@ def test_matchspec_star_version():
             "activate_deactivate_package=*=*0",
         ]
     )
-    raise ValueError("Forced failure")
 
 
 def test_build_string_filters():
