@@ -181,8 +181,7 @@ jobs:
           if errorlevel 1 exit 1
           CALL %CONDA_PREFIX%\Scripts\activate.bat
           if errorlevel 1 exit 1
-          CALL python -m pytest -vv -m "not slow"
-          if errorlevel 1 exit 1
+          python -m pytest -vv -m "not slow" || exit 1
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
