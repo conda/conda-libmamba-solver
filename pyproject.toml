@@ -58,7 +58,6 @@ addopts = [
   "--strict-markers",
   "--xdoctest-modules",
   "--xdoctest-style=google",
-  "--reruns=3",
 ]
 
 markers = [
@@ -71,4 +70,4 @@ profile = "black"
 filter_files = true
 
 [tool.ruff]
-line-lenth = 99
+line-length = 99

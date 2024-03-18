@@ -32,6 +32,7 @@ concurrency:
 env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
   CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
+  PYTEST_RERUN_FAILURES: 3
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -171,6 +172,7 @@ jobs:
           --durations-path=tools\durations\${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
+          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -185,7 +187,7 @@ jobs:
           if errorlevel 1 exit 1
           CALL %CONDA_PREFIX%\Scripts\activate.bat
           if errorlevel 1 exit 1
-          python -m pytest -vv -m "not slow" || exit 1
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} || exit 1
           exit 0
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
@@ -319,6 +321,7 @@ jobs:
           --durations-path=tools/durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
+          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -329,7 +332,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow"
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }}
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -606,6 +609,7 @@ jobs:
           --durations-path=tools/durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
+          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -616,7 +620,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow"
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }}
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
