@@ -322,8 +322,12 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow"
+          python -m pytest -vv -m "not slow" --sw
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
@@ -608,8 +612,12 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow"
+          python -m pytest -vv -m "not slow" --sw
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
+
+      - name: Setup tmate session
+        if: ${{ failure() }}
+        uses: mxschmitt/action-tmate@v3
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
