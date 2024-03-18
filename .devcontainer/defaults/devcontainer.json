@@ -1,0 +1,35 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/miniconda
+{
+    "name": "Miniconda (default-channel=defaults)",
+    "image": "continuumio/miniconda3:latest",
+
+    // Features to add to the dev container. More info: https://containers.dev/features.
+    // "features": {},
+
+    // Use 'forwardPorts' to make a list of ports inside the container available locally.
+    // "forwardPorts": [],
+    "mounts": [
+        "source=${localWorkspaceFolder}/../conda,target=/workspaces/conda,type=bind,consistency=cached",
+        "source=${localWorkspaceFolder}/../mamba,target=/workspaces/mamba,type=bind,consistency=cached"
+    ],
+    // Use 'postCreateCommand' to run commands after the container is created.
+    "postCreateCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh", 
+    // Use 'postStartCommand' to run commands after the container is started.
+    "postStartCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh",
+
+    // Configure tool-specific properties.
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "eamodio.gitlens",
+                "ms-toolsai.jupyter"
+            ]
+        }
+    }
+
+    // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+    // "remoteUser": "root",
+
+}

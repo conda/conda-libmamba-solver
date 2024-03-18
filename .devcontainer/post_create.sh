@@ -16,7 +16,6 @@ echo '' > /opt/conda/conda-meta/history
 
 # Install all dependencies
 /opt/conda/bin/conda install -n base --yes --quiet \
-    --override-channels --channel=defaults \
     --file="$CONDA_SRC/tests/requirements.txt" \
     --file="$CONDA_SRC/tests/requirements-ci.txt" \
     --file="$CONDA_SRC/tests/requirements-Linux.txt" \
