@@ -74,19 +74,23 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.8', '3.11']
+        python-version: ['3.8', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]
+        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
             python-version: '3.8'
+          - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
+            python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
+            python-version: '3.12'  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver
-            test-group: 2
-          - test-type: conda-libmamba-solver
-            test-group: 3
+          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
@@ -187,6 +191,7 @@ jobs:
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
+        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
@@ -219,7 +224,7 @@ jobs:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]
+        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - python-version: '3.8'
@@ -228,14 +233,16 @@ jobs:
             default-channel: conda-forge
           - python-version: '3.10'
             default-channel: conda-forge
+          - python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
+            default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
           - python-version: '3.12'
             default-channel: conda-forge
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver
-            test-group: 2
-          - test-type: conda-libmamba-solver
-            test-group: 3
+          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -327,6 +334,7 @@ jobs:
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
+        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
@@ -496,7 +504,7 @@ jobs:
         arch: [osx-64, osx-arm64]
         python-version: ['3.8', '3.11']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]
+        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - arch: osx-64
@@ -511,14 +519,14 @@ jobs:
             default-channel: defaults
           - arch: osx-arm64
             test-type: unit
-          - arch: osx-arm64
-            test-type: conda-libmamba-solver
+          - arch: osx-arm64  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver
-            test-group: 2
-          - test-type: conda-libmamba-solver
-            test-group: 3
+          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -613,6 +621,7 @@ jobs:
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v4
+        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
