@@ -17,6 +17,7 @@ eval "$(sudo /opt/conda/bin/python -m conda init --dev bash)"
 # make sure all test requirements are installed
 # CONDA LIBMAMBA SOLVER CHANGES
 sudo /opt/conda/bin/conda install --quiet -y --solver=classic --repodata-fn repodata.json \
+    --channel conda-forge/label/mamba_dev \
     --file "${CONDA_SRC}/tests/requirements.txt" \
     --file "${CONDA_SRC}/tests/requirements-s3.txt" \
     --file "${CONDA_LIBMAMBA_SOLVER_SRC}/dev/requirements.txt"

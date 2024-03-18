@@ -32,7 +32,7 @@ from conda.common.compat import on_win
 from conda.common.constants import NULL
 from conda.common.io import Spinner, timeout
 from conda.common.path import paths_equal
-from conda.common.url import join_url, percent_decode
+from conda.common.url import percent_decode
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
@@ -102,7 +102,13 @@ class LibMambaSolver(Solver):
         self._solver_options = None
 
         # we want to support arbitrary repodata fns, but we ignore current_repodata
-        if self._repodata_fn == "current_repodata.json":
+        is_repodata_fn_set = False
+        for config in context.collect_all().values():
+            for key, value in config.items():
+                if key == "repodata_fns" and value:
+                    is_repodata_fn_set = True
+                    break
+        if self._repodata_fn == "current_repodata.json" and not is_repodata_fn_set:
             log.debug(f"Ignoring repodata_fn='current_repodata.json', defaulting to {REPODATA_FN}")
             self._repodata_fn = REPODATA_FN
 
@@ -300,7 +306,7 @@ class LibMambaSolver(Solver):
         for attempt in range(1, self._max_attempts(in_state) + 1):
             log.debug("Starting solver attempt %s", attempt)
             try:
-                solved = self._solve_attempt(in_state, out_state, index, attempt=attempt)
+                solved, result, request = self._solve_attempt(in_state, out_state, index, attempt=attempt)
                 if solved:
                     break
             except (UnsatisfiableError, PackagesNotFoundError):
@@ -333,7 +339,7 @@ class LibMambaSolver(Solver):
                 self._command = "last_solve_attempt"
             else:
                 self._command += "+last_solve_attempt"
-            solved = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
+            solved, result, request = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
             if not solved:
                 message = self._prepare_problems_message(pins=out_state.pins)
                 exc = LibMambaUnsatisfiableError(message)
@@ -341,7 +347,7 @@ class LibMambaSolver(Solver):
                 raise exc
 
         # We didn't fail? Nice, let's return the calculated state
-        self._export_solved_records(in_state, out_state, index)
+        self._export_solved_records(result, request, in_state, out_state, index)
 
         # Run post-solve tasks
         out_state.post_solve(solver=self)
@@ -355,7 +361,7 @@ class LibMambaSolver(Solver):
         log.info("Target prefix: %r", self.prefix)
         log.info("Command: %s", sys.argv)
 
-    def _setup_solver(self, pool: api.Pool):
+    def _setup_solver(self):
         self._solver_options = solver_options = [
             (api.SOLVER_FLAG_ALLOW_DOWNGRADE, 1),
         ]
@@ -364,7 +370,7 @@ class LibMambaSolver(Solver):
         if self.specs_to_remove and self._command in ("remove", None, NULL):
             solver_options.append((api.SOLVER_FLAG_ALLOW_UNINSTALL, 1))
 
-        self.solver = api.Solver(pool, self._solver_options)
+        self.solver = api.solver.libsolv.Solver()
 
     def _solve_attempt(
         self,
@@ -373,7 +379,7 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         attempt: int = 1,
     ):
-        self._setup_solver(index._pool)
+        self._setup_solver()
 
         log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
@@ -387,29 +393,37 @@ class LibMambaSolver(Solver):
         tasks_as_str = json.dumps({k[0]: v for k, v in tasks.items()}, indent=2)
         log.info("Solver tasks:\n%s", tasks_as_str)
         n_pins = 0
-        for (task_name, task_type), specs in tasks.items():
+        request_items = []
+        for (task_name, _), specs in tasks.items():
             log.debug("Adding task %s", task_name)
             if task_name == "ADD_PIN" and attempt == 1:
                 # pins only need to be added once; since they persist in the pool
                 # adding them more times results in issues like #354
                 for spec in specs:
                     n_pins += 1
-                    self.solver.add_pin(spec)
+                    request_items.append(api.solver.Request.Pin(api.specs.MatchSpec(spec)))
                     out_state.pins[f"pin-{n_pins}"] = spec
             else:
-                try:
-                    self.solver.add_jobs(specs, task_type)
-                except RuntimeError as exc:
-                    raise InvalidSpec(str(exc))
+                for spec in specs:
+                    try:
+                        if task_name == "INSTALL":
+                            request_items.append(api.solver.Request.Install(api.specs.MatchSpec.parse(spec)))
+                        elif task_name == "UPDATE":
+                            request_items.append(api.solver.Request.Update(api.specs.MatchSpec.parse(spec)))
+                        elif task_name == "LOCK":
+                            request_items.append(api.solver.Request.Freeze(api.specs.MatchSpec.parse(spec)))
+                    except RuntimeError as exc:
+                        raise InvalidSpec(f"Task {task_name} for {specs} failed with: {exc}")
 
         # ## Run solver
-        solved = self.solver.solve()
-
+        request = api.solver.Request(request_items)
+        result = self.solver.solve(index._pool, request)
+        solved = isinstance(result, api.solver.Solution)
         if solved:
             out_state.conflicts.clear()
-            return solved
+            return solved, result, request
 
-        problems = self.solver.problems_to_str()
+        problems = result.problems_to_str()
         old_conflicts = out_state.conflicts.copy()
         new_conflicts = self._maybe_raise_for_problems(
             problems, old_conflicts, out_state.pins, index._channels
@@ -418,7 +432,7 @@ class LibMambaSolver(Solver):
             "Attempt %d failed with %s conflicts:\n%s", attempt, len(new_conflicts), problems
         )
         out_state.conflicts.update(new_conflicts)
-        return False
+        return False, result, request
 
     def _specs_to_tasks(self, in_state: SolverInputState, out_state: SolverOutputState):
         if in_state.is_removing:
@@ -473,21 +487,22 @@ class LibMambaSolver(Solver):
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
         # Task types
-        ADD_PIN = "ADD_PIN", api.SOLVER_NOOP
-        INSTALL = "INSTALL", api.SOLVER_INSTALL
-        UPDATE = "UPDATE", api.SOLVER_UPDATE
-        ALLOW_UNINSTALL = "ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL
-        USERINSTALLED = "USERINSTALLED", api.SOLVER_USERINSTALLED
-        LOCK = "LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK
+        ADD_PIN = "ADD_PIN", None #, api.SOLVER_NOOP
+        INSTALL = "INSTALL", None #, api.SOLVER_INSTALL
+        UPDATE = "UPDATE", None #, api.SOLVER_UPDATE
+        ALLOW_UNINSTALL = "ALLOW_UNINSTALL", None #, api.SOLVER_ALLOWUNINSTALL
+        USERINSTALLED = "USERINSTALLED", None #, api.SOLVER_USERINSTALLED
+        LOCK = "LOCK", None #, api.SOLVER_LOCK | api.SOLVER_WEAK
 
         for name in out_state.specs:
             if name.startswith("__"):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
-                installed_spec_str = self._spec_to_str(
-                    self._check_spec_compat(installed.to_match_spec())
-                )
+                # TODO: We should use str(_check_spec_compat(installed.to_match_spec())) but that's
+                # causing issues in libmamba's channel validation (raising InvalidSpec) when the
+                # package is not present in the configured channels. This is a workaround.
+                installed_spec_str = installed.to_match_spec().conda_build_form()
             else:
                 installed_spec_str = None
             requested: MatchSpec = self._check_spec_compat(in_state.requested.get(name))
@@ -806,6 +821,8 @@ class LibMambaSolver(Solver):
 
     def _export_solved_records(
         self,
+        solution: api.solver.Solution,
+        request: api.solver.Request,
         in_state: SolverInputState,
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
@@ -815,7 +832,8 @@ class LibMambaSolver(Solver):
 
         transaction = api.Transaction(
             index._pool,
-            self.solver,
+            request,
+            solution,
             api.MultiPackageCache(context.pkgs_dirs),
         )
         (names_to_add, names_to_remove), to_link, to_unlink = transaction.to_conda()
@@ -896,11 +914,17 @@ class LibMambaSolver(Solver):
         try:
             channel_info = index.get_info(channel)
         except KeyError:
+            channel_info = None
+        if on_win:
+            kwargs["channel"] = percent_decode(kwargs["channel"])
+            kwargs["url"] = percent_decode(kwargs["url"])
+        if channel_info and channel_info.full_url != channel_info.noauth_url:
+            kwargs["url"] = kwargs["url"].replace(channel_info.noauth_url, channel_info.full_url)
             # this channel was never used to build the remote index, which
             # can mean two things: it comes from pkgs_dirs (offline)
             # or we obtained an already installed PackageRecord
-            # whose metadata contains a channel that doesn't exist
-            # in both cases, we can return the record from the correct object
+            # whose metadata contains a channel that doesn't exist.
+            # In both cases, we can return the record from the correct object
             if context.offline:
                 for path in context.pkgs_dirs:
                     pcd = PackageCacheData(path)
@@ -921,20 +945,21 @@ class LibMambaSolver(Solver):
         if for_conda_build:
             # conda-build expects multichannel instances in the Dist->PackageRecord mapping
             # see https://github.com/conda/conda-libmamba-solver/issues/363
+            if channel_info is None:
+                # this channel was never used to build the index, which
+                # means we obtained an already installed PackageRecord
+                # whose metadata contains a channel that doesn't exist
+                pd = PrefixData(self.prefix)
+                record = pd.get(kwargs["name"])
+                if record and record.fn == pkg_filename:
+                    return record
             for multichannel_name, mc_channels in context.custom_multichannels.items():
                 urls = [url for c in mc_channels for url in c.urls(with_credentials=False)]
                 if channel_info.noauth_url in urls:
                     kwargs["channel"] = multichannel_name
                     break
-        kwargs["url"] = join_url(channel_info.full_url, pkg_filename)
-        if not kwargs.get("subdir"):  # missing in old channels
-            kwargs["subdir"] = channel_info.channel.subdir
-        if kwargs["subdir"] == "noarch":
-            # libmamba doesn't keep 'noarch' type around, so infer for now
-            if any(dep.split()[0] in ("python", "pypy") for dep in kwargs.get("depends", ())):
-                kwargs["noarch"] = "python"
-            else:
-                kwargs["noarch"] = "generic"
+        if (channel := str(kwargs["channel"])).startswith("file://") and "%" in channel:
+            kwargs["channel"] = percent_decode(channel)
         return PackageRecord(**kwargs)
 
     def _check_spec_compat(self, match_spec: Union[MatchSpec, None]) -> Union[MatchSpec, None]:

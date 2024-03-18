@@ -10,7 +10,7 @@ from conda.base.context import context
 from conda.cli import conda_argparse
 from conda.common.io import Spinner
 from conda.core.prefix_data import PrefixData
-from libmambapy import QueryFormat
+from libmambapy import QueryResultFormat
 
 from .index import LibMambaIndexHelper
 
@@ -131,15 +131,15 @@ def repoquery(args):
         installed_records = ()
 
     if context.json:
-        query_format = QueryFormat.JSON
+        query_format = QueryResultFormat.Json
     elif getattr(args, "tree", None):
-        query_format = QueryFormat.TREE
+        query_format = QueryResultFormat.Tree
     elif getattr(args, "recursive", None):
-        query_format = QueryFormat.RECURSIVETABLE
+        query_format = QueryResultFormat.RecursiveTable
     elif getattr(args, "pretty", None):
-        query_format = QueryFormat.PRETTY
+        query_format = QueryResultFormat.Pretty
     else:
-        query_format = QueryFormat.TABLE
+        query_format = QueryResultFormat.Table
 
     with Spinner(
         "Collecting package metadata",

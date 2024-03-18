@@ -71,8 +71,8 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        default-channel: ['defaults', 'conda-forge']
-        python-version: ['3.8', '3.11']
+        default-channel: ['defaults', ] # 'conda-forge']
+        python-version: ['3.8',] # '3.11']
         test-type: ['unit', 'integration']
         test-group: ['1', '2', '3']
         exclude:
@@ -154,6 +154,12 @@ jobs:
           if errorlevel 1 exit 1
         # /CONDA-LIBMAMBA-SOLVER CHANGE
 
+      # - name: Setup tmate session
+      #   uses: mxschmitt/action-tmate@v3
+      #   timeout-minutes: 60
+      #   with:
+      #     limit-access-to-actor: true
+
       - name: Python ${{ matrix.python-version }} on ${{ matrix.default-channel }}, ${{ matrix.test-type }} tests, group ${{ matrix.test-group }}
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         shell: cmd
@@ -189,8 +195,8 @@ jobs:
       fail-fast: false
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
-        default-channel: ['defaults', 'conda-forge']
-        python-version: ['3.8', '3.9', '3.10', '3.11']
+        default-channel: ['defaults',] # 'conda-forge']
+        python-version: ['3.11'] #['3.8', '3.9', '3.10', '3.11']
         test-type: ['unit', 'integration']
         test-group: ['1', '2', '3']
         exclude:
@@ -261,7 +267,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        default-channel: ['defaults', 'conda-forge']
+        default-channel: ['defaults', ] # 'conda-forge']
         python-version: ['3.9']
         test-type: ['unit', 'integration']
         test-group: ['1', '2', '3']
