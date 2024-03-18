@@ -592,6 +592,7 @@ jobs:
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+        if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
           --cov=conda
           --durations-path=tools/durations/${{ runner.os }}.json
