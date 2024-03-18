@@ -61,7 +61,7 @@ jobs:
             code:
               - 'conda_libmamba_solver/**'
               - '*.py'
-              - '.github/workflows/upstream_tests.yml'
+              - '.github/workflows/tests.yml'
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
   # windows test suite
