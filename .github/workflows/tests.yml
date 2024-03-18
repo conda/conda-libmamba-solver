@@ -130,7 +130,6 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda\
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
-          miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
 
       - name: Clear history
         run: Clear-Content $env:CONDA_PREFIX\conda-meta\history
@@ -287,7 +286,6 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
-          miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
 
       - name: Clear history
         run: echo > $CONDA_PREFIX\conda-meta\history
@@ -399,7 +397,6 @@ jobs:
         with:
           condarc-file: .github/condarc-defaults
           run-post: false  # skip post cleanup
-          miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
 
       - name: Clear history
         run: echo > $CONDA_PREFIX\conda-meta\history
@@ -575,7 +572,7 @@ jobs:
           run-post: false  # skip post cleanup
           # conda not preinstalled in arm64 runners
           miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
-          miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
+          miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-arm64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
 
       - name: Clear history
