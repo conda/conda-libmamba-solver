@@ -77,7 +77,7 @@ jobs:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
         python-version: ['3.8', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
         default-channel: [defaults, conda-forge]
-        test-type: ['integration'] # [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
@@ -217,8 +217,7 @@ jobs:
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -496,8 +495,7 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:
