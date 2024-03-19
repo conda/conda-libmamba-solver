@@ -62,6 +62,7 @@ jobs:
               - 'conda_libmamba_solver/**'
               - '*.py'
               - '.github/workflows/tests.yml'
+              - 'tests/**'
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
   # windows test suite
@@ -130,9 +131,6 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda\
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
-
-      - name: Clear history
-        run: Clear-Content $env:CONDA_PREFIX\conda-meta\history
 
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -281,9 +279,6 @@ jobs:
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
 
-      - name: Clear history
-        run: echo > $CONDA_PREFIX\conda-meta\history
-
       - name: Conda Install
         working-directory: conda
         run: conda install
@@ -391,9 +386,6 @@ jobs:
         with:
           condarc-file: .github/condarc-defaults
           run-post: false  # skip post cleanup
-
-      - name: Clear history
-        run: echo > $CONDA_PREFIX\conda-meta\history
 
       - name: Conda Install
         run: conda install
@@ -567,9 +559,6 @@ jobs:
           miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
           miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-arm64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
-
-      - name: Clear history
-        run: echo > $CONDA_PREFIX\conda-meta\history
 
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
