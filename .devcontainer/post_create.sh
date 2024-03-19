@@ -10,8 +10,15 @@
 
 set -euo pipefail
 
+HERE=$(dirname $0)
 CONDA_SRC=${CONDA_SRC:-/workspaces/conda}
 CONDA_LIBMAMBA_SOLVER_SRC=${CONDA_LIBMAMBA_SOLVER_SRC:-/workspaces/conda-libmamba-solver}
+
+if which apt-get > /dev/null; then
+    echo "Installing system dependencies"
+    apt-get update
+    xargs -a "$HERE/apt-deps.txt" apt-get install -y
+fi
 
 # Clear history to avoid unneeded conflicts
 echo "Clearing base history..."
