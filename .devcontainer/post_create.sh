@@ -20,14 +20,15 @@ if which apt-get > /dev/null; then
     xargs -a "$HERE/apt-deps.txt" apt-get install -y
 fi
 
-# Clear history to avoid unneeded conflicts
-echo "Clearing base history..."
-echo '' > /opt/conda/conda-meta/history
 
 if [ ! -f $CONDA_SRC/pyproject.toml ]; then
     echo "conda/conda not found, cloning..."
     git clone https://github.com/conda/conda $CONDA_SRC
 fi
+
+# Clear history to avoid unneeded conflicts
+echo "Clearing base history..."
+echo '' > /opt/conda/conda-meta/history
 
 echo "Installing dev & test dependencies..."
 /opt/conda/bin/conda install -n base --yes --quiet \
