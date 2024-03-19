@@ -53,11 +53,11 @@ exclude = '''
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = [
+  "--color=yes",
   "--tb=native",
   "--strict-markers",
   "--xdoctest-modules",
   "--xdoctest-style=google",
-  "--reruns=3",
 ]
 
 markers = [
@@ -70,4 +70,4 @@ profile = "black"
 filter_files = true
 
 [tool.ruff]
-line-lenth = 99
+line-length = 99
