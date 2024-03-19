@@ -6,16 +6,25 @@ The development workflow is streamlined for Linux thanks to the `devcontainer` c
 bundled in this repository. You'll need Docker and VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers):
 
 1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
-   (e.g. `~/devel/conda`, `~/devel/mamba` and `~/devel/conda-libmamba-solver`, respectively).
+   (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
    The location does not matter as long as both repositories have the same parent directory.
 2. Connect to the DevContainer image via the bottom-left menu (<kbd>❱❰</kbd>) and
-   click on "Reopen in Container".
-5. The image will be built and after a few minutes, you'll be dropped into a Bash shell. Enjoy!
+   click on "Reopen in Container". Pick one of the suggested configurations:
+   conda-forge or defaults. The only difference is the base installation (Miniforge and Miniconda,
+   respectively).
+3. The image will be built and after a couple minutes, you'll be dropped into a Bash shell. Enjoy!
    Since the local repositories are mounted, you can make modifications to the source live,
    and they will be reflected in the Docker instance automatically.
    Run `pytest` or `conda` as needed, no need to reload Docker!
-   However, if the debugging exercises result in a permanent modification
-   of the development environment, consider exiting Docker (via <kbd>Ctrl</kbd>+<kbd>D</kbd>) and starting step 2 again.
+4. If the development environment breaks, click again on <kbd>❱❰</kbd> and, this time, choose
+   "Rebuild container". You might need to Retry a couple times.
+
+```{note} Developing libmamba
+The devcontainer configuration also supports libmamba 1.x development. You just need to have the
+`mamba` repository cloned next to `conda` and `conda-libmamba-solver`. Once the container has
+started, run `develop-mamba` to set it up. If you are modifying C++ sources, re-run `develop-mamba`
+to rebuild the libraries.
+```
 
 ## General workflow
 
