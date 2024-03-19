@@ -5,7 +5,7 @@
 # - https://github.com/conda/conda is mounted at /workspaces/conda
 # - https://github.com/conda/conda-libmamba-solver is mounted at
 #   /workspaces/conda-libmamba-solver
-# - https://github.com/mamba-org/mamba is (optionally) mounted at 
+# - https://github.com/mamba-org/mamba is (optionally) mounted at
 #   /workspaces/mamba
 
 set -euo pipefail
@@ -46,7 +46,7 @@ function develop-mamba() {
     "$MINICONDA/bin/pip" install -e "$MAMBA_SRC/libmambapy/" --no-deps
     test -f "$MINICONDA/conda-meta/mamba-"*".json" && "$MINICONDA/bin/pip" install -e "$MAMBA_SRC/mamba/" --no-deps
     touch "$MAMBA_SRC/build/installed" || true
-  else  
+  else
     echo "Path '$MAMBA_SRC' @ 1.x not mounted so no mamba to develop"
   fi
 }

@@ -8,13 +8,13 @@ bundled in this repository. You'll need Docker and VS Code with the [Dev Contain
 1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
    (e.g. `~/devel/conda`, `~/devel/mamba` and `~/devel/conda-libmamba-solver`, respectively).
    The location does not matter as long as both repositories have the same parent directory.
-2. Connect to the DevContainer image via the bottom-left menu (<kbd>❱❰</kbd>) and 
+2. Connect to the DevContainer image via the bottom-left menu (<kbd>❱❰</kbd>) and
    click on "Reopen in Container".
-5. The image will be built and after a few minutes, you'll be dropped into a Bash shell. Enjoy! 
+5. The image will be built and after a few minutes, you'll be dropped into a Bash shell. Enjoy!
    Since the local repositories are mounted, you can make modifications to the source live,
    and they will be reflected in the Docker instance automatically.
    Run `pytest` or `conda` as needed, no need to reload Docker!
-   However, if the debugging exercises result in a permanent modification 
+   However, if the debugging exercises result in a permanent modification
    of the development environment, consider exiting Docker (via <kbd>Ctrl</kbd>+<kbd>D</kbd>) and starting step 2 again.
 
 ## General workflow

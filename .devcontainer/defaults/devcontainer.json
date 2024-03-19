@@ -14,7 +14,7 @@
         "source=${localWorkspaceFolder}/../mamba,target=/workspaces/mamba,type=bind,consistency=cached"
     ],
     // Use 'postCreateCommand' to run commands after the container is created.
-    "postCreateCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh", 
+    "postCreateCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh",
     // Use 'postStartCommand' to run commands after the container is started.
     "postStartCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh",
 

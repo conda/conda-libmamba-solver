@@ -5,7 +5,7 @@
 # - https://github.com/conda/conda is mounted at /workspaces/conda
 # - https://github.com/conda/conda-libmamba-solver is mounted at
 #   /workspaces/conda-libmamba-solver
-# - https://github.com/mamba-org/mamba is (optionally) mounted at 
+# - https://github.com/mamba-org/mamba is (optionally) mounted at
 #   /workspaces/mamba
 
 set -euo pipefail
