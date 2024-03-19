@@ -184,7 +184,7 @@ jobs:
           if errorlevel 1 exit 1
           CALL %CONDA_PREFIX%\Scripts\activate.bat
           if errorlevel 1 exit 1
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} || exit 1
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
           exit 0
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
@@ -325,7 +325,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }}
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -606,7 +606,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }}
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
