@@ -662,6 +662,7 @@ jobs:
     steps:
       - name: Determine Success
         uses: re-actors/alls-green@v1.2.2
+        id: alls-green  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           # permit jobs to be skipped if there are no code changes (see changes job)
           allowed-skips: ${{ toJSON(needs) }}
