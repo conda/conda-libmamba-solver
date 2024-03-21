@@ -10,10 +10,10 @@
 
 set -euo pipefail
 
-MINICONDA=${MINICONDA:-/opt/conda}
-CONDA_SRC=${CONDA_SRC:-/workspaces/conda}
-CONDA_LIBMAMBA_SOLVER_SRC=${CONDA_LIBMAMBA_SOLVER_SRC:-/workspaces/conda-libmamba-solver}
-MAMBA_SRC=${MAMBA_SRC:-/workspaces/mamba}
+BASE_CONDA=${BASE_CONDA:-/opt/conda}
+SRC_CONDA=${SRC_CONDA:-/workspaces/conda}
+SRC_CONDA_LIBMAMBA_SOLVER=${SRC_CONDA_LIBMAMBA_SOLVER:-/workspaces/conda-libmamba-solver}
+SRC_MAMBA=${SRC_MAMBA:-/workspaces/mamba}
 
 cat >> ~/.bashrc <<EOF
 function develop-mamba() (
@@ -23,8 +23,8 @@ function develop-mamba() (
     echo "Miniconda not compatible with develop-mamba"
     exit 1
   fi
-  if [ ! -f "$MAMBA_SRC/mamba/setup.py" ]; then
-    echo "Mamba 1.x not found at $MAMBA_SRC"
+  if [ ! -f "$SRC_MAMBA/mamba/setup.py" ]; then
+    echo "Mamba 1.x not found at $SRC_MAMBA"
     exit 1
   fi
   # Install mamba dev dependencies only once:
@@ -32,45 +32,45 @@ function develop-mamba() (
     # remove "sel(win)" in environment yaml hack since conda does not understand
     # libmamba specific specs
     echo "Installing mamba 1.x in dev mode..."
-    sed '/sel(.*)/d' "$MAMBA_SRC/mamba/environment-dev.yml" > /tmp/mamba-environment-dev.yml
-    CONDA_QUIET=1 "$MINICONDA/condabin/conda" env update -p "$MINICONDA" \
+    sed '/sel(.*)/d' "$SRC_MAMBA/mamba/environment-dev.yml" > /tmp/mamba-environment-dev.yml
+    CONDA_QUIET=1 "$BASE_CONDA/condabin/conda" env update -p "$BASE_CONDA" \
         --file /tmp/mamba-environment-dev.yml
-    "$MINICONDA/condabin/conda" install make -yq  # missing in mamba's dev env
+    "$BASE_CONDA/condabin/conda" install make -yq  # missing in mamba's dev env
     # Clean build directory to avoid issues with stale build files
-    test -f "$MAMBA_SRC/build/CMakeCache.txt" && rm -rf "$MAMBA_SRC/build"
+    test -f "$SRC_MAMBA/build/CMakeCache.txt" && rm -rf "$SRC_MAMBA/build"
   fi
   # Compile
-  cd "$MAMBA_SRC"
-  "$MINICONDA/bin/cmake" -B build/ \
+  cd "$SRC_MAMBA"
+  "$BASE_CONDA/bin/cmake" -B build/ \
       -DBUILD_LIBMAMBA=ON \
       -DBUILD_SHARED=ON \
-      -DCMAKE_INSTALL_PREFIX="$MINICONDA" \
-      -DCMAKE_PREFIX_PATH="$MINICONDA" \
+      -DCMAKE_INSTALL_PREFIX="$BASE_CONDA" \
+      -DCMAKE_PREFIX_PATH="$BASE_CONDA" \
       -DBUILD_LIBMAMBAPY=ON
-  "$MINICONDA/bin/cmake" --build build/ -j\${NPROC:-2}
+  "$BASE_CONDA/bin/cmake" --build build/ -j\${NPROC:-2}
   if [ ! -f ~/.mamba-develop-installed ]; then
-    "$MINICONDA/condabin/conda" remove -p "$MINICONDA" -yq --force libmambapy libmamba
+    "$BASE_CONDA/condabin/conda" remove -p "$BASE_CONDA" -yq --force libmambapy libmamba
   fi
   make install -C build/
   cd -
-  "$MINICONDA/bin/pip" install -e "$MAMBA_SRC/libmambapy/" --no-deps
-  test -f "$MINICONDA/conda-meta/mamba-"*".json" && "$MINICONDA/bin/pip" install -e "$MAMBA_SRC/mamba/" --no-deps
+  "$BASE_CONDA/bin/pip" install -e "$SRC_MAMBA/libmambapy/" --no-deps
+  test -f "$BASE_CONDA/conda-meta/mamba-"*".json" && "$BASE_CONDA/bin/pip" install -e "$SRC_MAMBA/mamba/" --no-deps
   touch ~/.mamba-develop-installed || true
 )
 EOF
 
-cd "$CONDA_SRC"
+cd "$SRC_CONDA"
 echo "Initializing conda in dev mode..."
-"$MINICONDA/bin/python" -m conda init --dev bash
+"$BASE_CONDA/bin/python" -m conda init --dev bash
 cd -
 
 echo "Installing conda-libmamba-solver in dev mode..."
-"$MINICONDA/bin/python" -m pip install -e "$CONDA_LIBMAMBA_SOLVER_SRC" --no-deps
+"$BASE_CONDA/bin/python" -m pip install -e "$SRC_CONDA_LIBMAMBA_SOLVER" --no-deps
 
 set -x
-conda list -p "$MINICONDA"
+conda list -p "$BASE_CONDA"
 conda info
 conda config --show-sources
 set +x
-test -f "$MAMBA_SRC/mamba/setup.py" \
-  && echo "Mamba mounted at $MAMBA_SRC; source ~/.bashrc and run develop-mamba() for dev-install"
+test -f "$SRC_MAMBA/mamba/setup.py" \
+  && echo "Mamba mounted at $SRC_MAMBA; source ~/.bashrc and run develop-mamba() for dev-install"

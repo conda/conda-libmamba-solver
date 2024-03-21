@@ -11,30 +11,31 @@
 set -euo pipefail
 
 HERE=$(dirname $0)
-CONDA_SRC=${CONDA_SRC:-/workspaces/conda}
-CONDA_LIBMAMBA_SOLVER_SRC=${CONDA_LIBMAMBA_SOLVER_SRC:-/workspaces/conda-libmamba-solver}
+BASE_CONDA=${BASE_CONDA:-/opt/conda}
+SRC_CONDA=${SRC_CONDA:-/workspaces/conda}
+SRC_CONDA_LIBMAMBA_SOLVER=${SRC_CONDA_LIBMAMBA_SOLVER:-/workspaces/conda-libmamba-solver}
 
 if which apt-get > /dev/null; then
     echo "Installing system dependencies"
     apt-get update
-    xargs -a "$HERE/apt-deps.txt" apt-get install -y
+    DEBIAN_FRONTEND=noninteractive xargs -a "$HERE/apt-deps.txt" apt-get install -y
 fi
 
 
-if [ ! -f $CONDA_SRC/pyproject.toml ]; then
-    echo "conda/conda not found! Please clone https://github.com/conda/conda and mount to $CONDA_SRC"
+if [ ! -f "$SRC_CONDA/pyproject.toml" ]; then
+    echo "https://github.com/conda/conda not found! Please clone or mount to $SRC_CONDA"
     exit 1
 fi
 
 # Clear history to avoid unneeded conflicts
 echo "Clearing base history..."
-echo '' > /opt/conda/conda-meta/history
+echo '' > "$BASE_CONDA/conda-meta/history"
 
 echo "Installing dev & test dependencies..."
-/opt/conda/bin/conda install -n base --yes --quiet \
-    --file="$CONDA_SRC/tests/requirements.txt" \
-    --file="$CONDA_SRC/tests/requirements-ci.txt" \
-    --file="$CONDA_SRC/tests/requirements-Linux.txt" \
-    --file="$CONDA_SRC/tests/requirements-s3.txt" \
-    --file="$CONDA_LIBMAMBA_SOLVER_SRC/dev/requirements.txt" \
-    --file="$CONDA_LIBMAMBA_SOLVER_SRC/tests/requirements.txt"
+"$BASE_CONDA/bin/conda" install -n base --yes --quiet \
+    --file="$SRC_CONDA/tests/requirements.txt" \
+    --file="$SRC_CONDA/tests/requirements-ci.txt" \
+    --file="$SRC_CONDA/tests/requirements-Linux.txt" \
+    --file="$SRC_CONDA/tests/requirements-s3.txt" \
+    --file="$SRC_CONDA_LIBMAMBA_SOLVER/dev/requirements.txt" \
+    --file="$SRC_CONDA_LIBMAMBA_SOLVER/tests/requirements.txt"
