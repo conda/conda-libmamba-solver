@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script assumes we are running in a Miniconda container where:
-# - /opt/conda is the Miniconda installation directory
+# - /opt/conda is the Miniconda or Miniforge installation directory
 # - https://github.com/conda/conda is mounted at /workspaces/conda
 # - https://github.com/conda/conda-libmamba-solver is mounted at
 #   /workspaces/conda-libmamba-solver

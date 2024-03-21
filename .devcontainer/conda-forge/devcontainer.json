@@ -1,5 +1,4 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
-// README at: https://github.com/devcontainers/templates/tree/main/src/miniconda
 {
     "name": "Miniforge (default-channel=conda-forge)",
     "image": "condaforge/miniforge3:latest",
@@ -21,6 +20,13 @@
     // Configure tool-specific properties.
     "customizations": {
         "vscode": {
+            "settings": {
+                "python.testing.pytestArgs": [
+                    "tests"
+                ],
+                "python.testing.unittestEnabled": false,
+                "python.testing.pytestEnabled": true
+            },
             "extensions": [
                 "charliermarsh.ruff",
                 "eamodio.gitlens",
@@ -29,7 +35,7 @@
         }
     }
 
-    // Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+// Adjust to connect as non-root instead. More info: https://aka.ms/dev-containers-non-root.
     // "remoteUser": "root",
 
 }
