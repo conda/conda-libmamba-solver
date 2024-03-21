@@ -20,6 +20,14 @@
     // Configure tool-specific properties.
     "customizations": {
         "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/opt/conda/bin/python",
+                "python.testing.pytestArgs": [
+                    "tests"
+                ],
+                "python.testing.unittestEnabled": false,
+                "python.testing.pytestEnabled": true
+            },
             "extensions": [
                 "charliermarsh.ruff",
                 "eamodio.gitlens",
@@ -28,7 +36,7 @@
         }
     }
 
-// Adjust to connect as non-root instead. More info: https://aka.ms/dev-containers-non-root.
+    // Adjust to connect as non-root instead. More info: https://aka.ms/dev-containers-non-root.
     // "remoteUser": "root",
 
 }

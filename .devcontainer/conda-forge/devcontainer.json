@@ -21,6 +21,7 @@
     "customizations": {
         "vscode": {
             "settings": {
+                "python.defaultInterpreterPath": "/opt/conda/bin/python",
                 "python.testing.pytestArgs": [
                     "tests"
                 ],
