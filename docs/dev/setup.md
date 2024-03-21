@@ -8,23 +8,61 @@ bundled in this repository. You'll need Docker and VS Code with the [Dev Contain
 1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
    (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
    The location does not matter as long as both repositories have the same parent directory.
-2. Connect to the DevContainer image via the bottom-left menu (<kbd>❱❰</kbd>) and
+2. Open your `conda-libmamba-solver` clone with VS Code.
+3. Connect to the DevContainer image via the bottom-left menu (<kbd>❱❰</kbd>) and
    click on "Reopen in Container". Pick one of the suggested configurations:
    conda-forge or defaults. The only difference is the base installation (Miniforge and Miniconda,
    respectively).
-3. The image will be built and after a couple minutes, you'll be dropped into a Bash shell. Enjoy!
+4. The image will be built and after a couple minutes, you'll be dropped into a Bash shell. Enjoy!
    Since the local repositories are mounted, you can make modifications to the source live,
    and they will be reflected in the Docker instance automatically.
    Run `pytest` or `conda` as needed, no need to reload Docker!
-4. If the development environment breaks, click again on <kbd>❱❰</kbd> and, this time, choose
+5. If the development environment breaks, click again on <kbd>❱❰</kbd> and, this time, choose
    "Rebuild container". You might need to Retry a couple times.
 
 ```{note} Developing libmamba
 The devcontainer configuration also supports libmamba 1.x development. You just need to have the
-`mamba` repository cloned next to `conda` and `conda-libmamba-solver`. Once the container has
-started, run `develop-mamba` to set it up. If you are modifying C++ sources, re-run `develop-mamba`
-to rebuild the libraries.
+`mamba-org/mamba` repository (branch `1.x`) cloned next to `conda` and `conda-libmamba-solver`.
+Once the container has started, run `develop-mamba` to set it up. 
+If you are modifying C++ sources, re-run `develop-mamba` to rebuild the libraries.
 ```
+
+## With regular Docker
+
+You can reuse the devcontainer scripts with regular Docker too.
+
+1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
+   (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
+   You should also clone `mamba-org/mamba` if you need to develop `libmamba`.
+   The location does not matter as long as all repositories have the same parent directory.
+2. Start a new Docker instance with this command. Adjust the local mounts as necessary.
+   
+   ```bash
+   # For defaults-based images, use:
+   $ docker run -it --rm \
+      -v ~/devel/conda:/workspaces/conda \
+      -v ~/devel/mamba:/workspaces/mamba \
+      -v ~/devel/conda-libmamba-solver:/workspaces/conda-libmamba-solver \
+      continuumio/miniconda3:latest \
+      bash
+   # For conda-forge-based images, use the following instead:
+   $ docker run -it --rm \
+      -v ~/devel/conda:/workspaces/conda \
+      -v ~/devel/mamba:/workspaces/mamba \
+      -v ~/devel/conda-libmamba-solver:/workspaces/conda-libmamba-solver \
+      condaforge/miniforge3:latest \
+      bash
+   ```
+3. Run the `post_create` and `post_start` scripts:
+   ```bash
+   $ bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh
+   $ bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh
+   ```
+4. If you want to develop with mamba in editable mode, run:
+   ```bash
+   $ source ~/.bashrc
+   $ develop-mamba
+   ```
 
 ## General workflow
 
@@ -59,11 +97,6 @@ $ cd $REPO_LOCATION
 $ python -m pip install --no-deps -e .
 ```
 
-For testing out the `libmamba` solve you can set it several ways:
- - environment variable `CONDA_SOLVER=libmamba`
- - pass a flag `--solver=libmamba`
- - setting the conda config `conda config --set solver=libmamba` which will modify your `condarc`
-
 ## Debugging `conda` and `conda-libmamba-solver`
 
 Once you have followed the steps described in the general workflow
@@ -85,14 +118,14 @@ investigate state.
 
 ```bash
 $ git clone "git@github.com:$YOUR_USERNAME/mamba" "$REPO_LOCATION"
-# cd $REPO_LOCATION
+$ cd $REPO_LOCATION
 ```
 
-3. Use the docker image for development suggested above and re-run
-   `recompile-mamba` whenever you make change to `mamba` in
-   $REPO_LOCATION. This should take less than a minute.
+3. Use the Docker image for development suggested above and re-run
+   `develop-mamba` whenever you make change to `mamba` in
+   `$REPO_LOCATION`. This should take less than a minute.
 
-We recommend debugging via either breakpoints and using gdb or print
+We recommend debugging via either breakpoints and using `gdb` or `print`
 statements via `std::cout << ... << std::endl`. The
 [following](https://github.com/costrouc/mamba/commit/99ac04ee9ca26c9579c67816cfba25bf310c30fb)
 shows an example of inserting print statements into the `libmamba`
