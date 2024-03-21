@@ -22,8 +22,8 @@ fi
 
 
 if [ ! -f $CONDA_SRC/pyproject.toml ]; then
-    echo "conda/conda not found, cloning..."
-    git clone https://github.com/conda/conda $CONDA_SRC
+    echo "conda/conda not found! Please clone https://github.com/conda/conda and mount to $CONDA_SRC"
+    exit 1
 fi
 
 # Clear history to avoid unneeded conflicts
