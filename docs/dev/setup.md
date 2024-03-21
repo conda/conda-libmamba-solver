@@ -23,7 +23,7 @@ bundled in this repository. You'll need Docker and VS Code with the [Dev Contain
 ```{note} Developing libmamba
 The devcontainer configuration also supports libmamba 1.x development. You just need to have the
 `mamba-org/mamba` repository (branch `1.x`) cloned next to `conda` and `conda-libmamba-solver`.
-Once the container has started, run `develop-mamba` to set it up. 
+Once the container has started, run `develop-mamba` to set it up.
 If you are modifying C++ sources, re-run `develop-mamba` to rebuild the libraries.
 ```
 
@@ -36,7 +36,7 @@ You can reuse the devcontainer scripts with regular Docker too.
    You should also clone `mamba-org/mamba` if you need to develop `libmamba`.
    The location does not matter as long as all repositories have the same parent directory.
 2. Start a new Docker instance with this command. Adjust the local mounts as necessary.
-   
+
    ```bash
    # For defaults-based images, use:
    $ docker run -it --rm \
