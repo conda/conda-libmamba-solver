@@ -10,20 +10,22 @@ The solver is a critical part of `conda` as a tool.
 In addition to unit tests for `conda_libmamba_solver`,
 our CI also runs the full `conda/conda` integration suite.
 
-### Unit tests
+### conda-libmamba-solver tests
 
-From the properly mounted `conda/conda` Docker container (see ["Development environment setup"](setup.md)):
+From the properly mounted devcontainer (see ["Development environment setup"](setup.md)):
 
 ```bash
-$ cd /opt/conda-libmamba-solver-src
+$ cd /workspaces/conda-libmamba-solver
 $ pytest
 ```
 
-### Integration tests
+Or just use the PyTest integrations in VS Code (flask icon).
 
-From the properly mounted `conda/conda` Docker container (see ["Development environment setup"](setup.md)):
+### Upstream tests
+
+From the properly mounted devcontainer (see ["Development environment setup"](setup.md)):
 
 ```bash
-$ cd /opt/conda-src
+$ cd /workspaces/conda
 $ CONDA_SOLVER=libmamba pytest
 ```

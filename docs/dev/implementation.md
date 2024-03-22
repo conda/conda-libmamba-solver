@@ -5,10 +5,11 @@ both within the `conda_libmamba_solver` package itself, and as a `conda` plugin.
 
 ## Repository structure
 
+* `.devcontainer`: Configuration for DevContainer development workflows.
 * `.github/workflows/`: CI pipelines to run unit and upstream tests, as well as linting and performance benchmarks. Some extra workflows might be added by the `conda/infra` settings.
 * `conda_libmamba_solver/`: The Python package. Check sections below for details.
 * `recipe/`: The conda-build recipe used for the PR build previews. It should be kept in sync with `conda-forge` and `defaults`.
-* `dev/`: Supporting scripts and configuration files to set up development environments.
+* `dev/`: Supporting configuration files to set up development environments.
 * `docs/`: Documentation sources.
 * `tests/`: pytest testing infrastructure.
 * `pyproject.toml`: Project metadata. See below for details.
