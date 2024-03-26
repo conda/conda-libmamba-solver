@@ -5,19 +5,23 @@
 import argparse
 import json
 import sys
+from itertools import chain
 
 from conda.base.context import context
 from conda.cli import conda_argparse
 from conda.common.io import Spinner
 from conda.core.prefix_data import PrefixData
-from libmambapy import QueryFormat
+from conda.exceptions import CondaError
+from conda.models.channel import Channel
+from conda.models.match_spec import MatchSpec
 
-from .index import LibMambaIndexHelper
+from libmambapy import Context as LibmambaContext
+from .index2 import LibMambaIndexHelper
 
 
 def configure_parser(parser: argparse.ArgumentParser):
     package_cmds = argparse.ArgumentParser(add_help=False)
-    package_cmds.add_argument("package_query", help="The target package.")
+    package_cmds.add_argument("specs", help="The target package(s).", nargs="+")
     package_grp = package_cmds.add_argument_group("Subcommand options")
     package_grp.add_argument(
         "-i",
@@ -26,7 +30,6 @@ def configure_parser(parser: argparse.ArgumentParser):
         default=True,
         help=argparse.SUPPRESS,
     )
-
     package_grp.add_argument(
         "-p",
         "--platform",
@@ -45,6 +48,11 @@ def configure_parser(parser: argparse.ArgumentParser):
         "--all-channels",
         action="store_true",
         help="Look at all channels (for depends / whoneeds).",
+    )
+    package_grp.add_argument(
+        "--use-cache-only",
+        action="store_true",
+        help="Search in pkgs_dirs too",
     )
 
     view_cmds = argparse.ArgumentParser(add_help=False)
@@ -98,7 +106,7 @@ def repoquery(args):
         channels = args.channel
     else:
         channels = None
-    if args.all_channels or (channels is None and args.subcmd == "search"):
+    if args.all_channels or channels is None:
         if channels:
             print("WARNING: Using all channels instead of configured channels\n", file=sys.stderr)
         channels = context.channels
@@ -130,32 +138,77 @@ def repoquery(args):
     else:
         installed_records = ()
 
-    if context.json:
-        query_format = QueryFormat.JSON
-    elif getattr(args, "tree", None):
-        query_format = QueryFormat.TREE
-    elif getattr(args, "recursive", None):
-        query_format = QueryFormat.RECURSIVETABLE
-    elif getattr(args, "pretty", None):
-        query_format = QueryFormat.PRETTY
+    if args.use_cache_only:
+        with Spinner(
+            "Collecting package metadata from pkgs_dirs",
+            enabled=not context.verbosity and not context.quiet,
+            json=context.json,
+        ):
+            index = LibMambaIndexHelper(
+                installed_records=(),
+                channels=(),
+                subdirs=(args.platform, "noarch"),
+                repodata_fn=context.repodata_fns[-1],
+                pkgs_dirs=context.pkgs_dirs,
+            )
     else:
-        query_format = QueryFormat.TABLE
+        channels_from_specs = []
+        for spec in args.specs:
+            ms = MatchSpec(spec)
+            channel = ms.get_exact_value("channel")
+            if channel:
+                channels_from_specs.append(channel)
+        with Spinner(
+            "Collecting package metadata",
+            enabled=not context.verbosity and not context.quiet,
+            json=context.json,
+        ):
+            index = LibMambaIndexHelper(
+                installed_records=installed_records,
+                channels=[Channel(c) for c in chain(channels or (), dict.fromkeys(channels_from_specs))],
+                subdirs=(args.platform, "noarch"),
+                repodata_fn=context.repodata_fns[-1],
+            )
 
-    with Spinner(
-        "Collecting package metadata",
-        enabled=not context.verbosity and not context.quiet,
-        json=context.json,
-    ):
-        index = LibMambaIndexHelper(
-            installed_records=installed_records,
-            channels=channels,
-            subdirs=(args.platform, "noarch"),
-            repodata_fn=context.repodata_fns[-1],
-            query_format=query_format,
+    if args.subcmd == "search":
+        result = index.search(args.specs, return_type="raw")
+        if context.json:
+            print(json.dumps(result.groupby("name").to_dict(), indent=2))
+        elif getattr(args, "pretty", None):
+            print(result.pretty(show_all_builds=True))
+        else:
+            print(result.groupby("name").table())
+    elif args.subcmd == "depends":
+        if len(args.specs) > 1:
+            raise CondaError("Only one query supported for 'depends'.")
+        result = index.depends(
+            args.specs[0],
+            tree=getattr(args, "tree", False) or getattr(args, "recursive", False),
+            return_type="raw",
         )
-
-    result = getattr(index, args.subcmd)(args.package_query, records=False)
-    if context.json:
-        print(json.dumps(result, indent=2))
+        if context.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        elif getattr(args, "tree", None) or getattr(args, "pretty", None):
+            # TODO: Report upstream
+            raise CondaError("--tree currently not available for this subcommand.")
+            print(result.tree(LibmambaContext.instance().graphics_params))
+        else:
+            print(result.sort("name").table())
+    elif args.subcmd == "whoneeds":
+        if len(args.specs) > 1:
+            raise CondaError("Only one query supported for 'whoneeds'.")
+        result = index.whoneeds(
+            args.specs[0],
+            tree=getattr(args, "tree", False) or getattr(args, "recursive", False),
+            return_type="raw",
+        )
+        if context.json:
+            print(json.dumps(result.to_dict(), indent=2))
+        elif getattr(args, "tree", None) or getattr(args, "pretty", None):
+            # TODO: Report upstream
+            raise CondaError("--tree currently not available for this subcommand.")
+            print(result.tree(LibmambaContext.instance().graphics_params))
+        else:
+            print(result.sort("name").table())
     else:
-        print(result)
+        raise CondaError(f"Unrecognized subcommand: {args.subcmd}")

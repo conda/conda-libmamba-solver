@@ -4,7 +4,7 @@
 from conda import plugins
 
 from .repoquery import configure_parser, repoquery
-from .solver import LibMambaSolver
+from .solver2 import LibMambaSolver
 
 
 @plugins.hookimpl

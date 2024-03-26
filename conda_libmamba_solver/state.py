@@ -87,19 +87,6 @@ from .utils import EnumAsBools, compatible_specs
 log = logging.getLogger(f"conda.{__name__}")
 
 
-class IndexHelper:
-    """
-    The _index_ refers to the combination of all configured channels and their
-    platform-corresponding subdirectories. It provides the sources for available
-    packages that can become part of a prefix state, eventually.
-
-    Subclass this helper to add custom repodata fetching if needed.
-    """
-
-    def explicit_pool(self, specs: Iterable[MatchSpec]) -> Iterable[str]:
-        raise NotImplementedError
-
-
 class SolverInputState:
     """
     Helper object to provide the input data needed to compute the state that will be
@@ -537,7 +524,7 @@ class SolverOutputState:
         """
         return {name: spec for name, spec in self.specs.items() if name.startswith("__")}
 
-    def early_exit(self) -> Dict[str, PackageRecord]:
+    def early_exit(self) -> IndexedSet[PackageRecord]:
         """
         Operations that do not need a solver and might result in returning
         early are collected here.

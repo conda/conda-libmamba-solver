@@ -95,7 +95,6 @@ from conda.models.records import PackageRecord
 from conda.models.version import VersionOrder
 
 from .mamba_utils import set_channel_priorities
-from .state import IndexHelper
 from .utils import escape_channel_url
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -110,7 +109,7 @@ class _ChannelRepoInfo:
     noauth_url: str
 
 
-class LibMambaIndexHelper(IndexHelper):
+class LibMambaIndexHelper:
     def __init__(
         self,
         installed_records: Iterable[PackageRecord] = (),
