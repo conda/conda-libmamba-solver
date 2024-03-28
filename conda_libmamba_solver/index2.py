@@ -77,7 +77,7 @@ import logging
 import os
 from functools import partial
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, Iterable, Literal, Tuple
+from typing import TYPE_CHECKING
 
 from conda.base.constants import REPODATA_FN
 from conda.base.context import context
@@ -87,13 +87,12 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from libmambapy import ChannelContext, Context, Query, QueryResult
+from libmambapy import ChannelContext, Context, Query
 from libmambapy.solver.libsolv import (
     Database,
     PipAsPythonDependency,
     Priorities,
     RepodataOrigin,
-    RepoInfo,
     UseOnlyTarBz2,
 )
 from libmambapy.specs import (
@@ -107,7 +106,11 @@ from libmambapy.specs import (
 )
 
 if TYPE_CHECKING:
+    from typing import Iterable, Literal
+
     from conda.gateways.repodata import RepodataState
+    from libmambapy import QueryResult
+    from libmambapy.solver.libsolv import RepoInfo
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -197,7 +200,7 @@ class LibMambaIndexHelper:
             repos.append(self._load_repo_info_from_json_path(json_path, url, state))
         return repos
 
-    def _channel_urls(self) -> Dict[str, Channel]:
+    def _channel_urls(self) -> dict[str, Channel]:
         urls = {}
         seen_noauth = set()
         channels_with_subdirs = []
@@ -225,7 +228,7 @@ class LibMambaIndexHelper:
                     seen_noauth.add(url)
         return urls
 
-    def _fetch_repodata_jsons(self, urls: Dict[str, str]):
+    def _fetch_repodata_jsons(self, urls: dict[str, str]):
         Executor = (
             DummyExecutor
             if context.debug or context.repodata_threads == 1
@@ -364,7 +367,7 @@ class LibMambaIndexHelper:
         result = Query.whoneeds(self.db, query, tree)
         return self._process_query_result(result, return_type)
 
-    def explicit_pool(self, specs: Iterable[MatchSpec]) -> Tuple[str]:
+    def explicit_pool(self, specs: Iterable[MatchSpec]) -> tuple[str]:
         """
         Returns all the package names that (might) depend on the passed specs
         """

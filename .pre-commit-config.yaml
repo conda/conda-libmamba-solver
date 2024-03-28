@@ -2,11 +2,14 @@
 ci:
   autofix_prs: false
 # generally speaking we ignore all vendored code as well as tests data
+# TODO: Restore index and solver exclude lines before merge
 exclude: |
   (?x)^(
-    tests/data/ |
+    tests/data/.* |
+    conda_libmamba_solver/index\.py |
+    conda_libmamba_solver/solver\.py |
     conda_libmamba_solver/mamba_utils\.py
-  )/
+  )$
 repos:
   # generic verification and formatting
   - repo: https://github.com/pre-commit/pre-commit-hooks

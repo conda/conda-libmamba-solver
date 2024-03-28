@@ -83,8 +83,9 @@ from conda.models.prefix_graph import PrefixGraph
 
 if TYPE_CHECKING:
     from os import PathLike
-    from typing import Iterable, Type
+    from typing import Iterable
 
+    from conda.core.solve import Solver
     from conda.models.records import PackageRecord
 
 from .utils import EnumAsBools, compatible_specs
@@ -606,7 +607,7 @@ class SolverOutputState:
                 exc.allow_retry = False
                 raise exc
 
-    def post_solve(self, solver: Type[Solver]):
+    def post_solve(self, solver: type[Solver]):
         """
         These tasks are performed _after_ the solver has done its work. It essentially
         post-processes the ``records`` mapping.

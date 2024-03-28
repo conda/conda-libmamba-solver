@@ -266,23 +266,23 @@ def test_conda_build_with_aliased_channels(tmp_path):
             condarc.unlink()
 
 
-def test_http_server_auth_none(http_server_auth_none):
+def test_http_server_auth_none(http_server_auth_none):  # noqa: F811
     create_with_channel(http_server_auth_none)
 
 
-def test_http_server_auth_basic(http_server_auth_basic):
+def test_http_server_auth_basic(http_server_auth_basic):  # noqa: F811
     create_with_channel(http_server_auth_basic)
 
 
-def test_http_server_auth_basic_email(http_server_auth_basic_email):
+def test_http_server_auth_basic_email(http_server_auth_basic_email):  # noqa: F811
     create_with_channel(http_server_auth_basic_email)
 
 
-def test_http_server_auth_token(http_server_auth_token):
+def test_http_server_auth_token(http_server_auth_token):  # noqa: F811
     create_with_channel(http_server_auth_token)
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):
+def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F811
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:

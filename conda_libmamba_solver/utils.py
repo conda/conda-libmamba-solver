@@ -1,6 +1,10 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+"""
+Miscellaneous utilities
+"""
+
 from enum import Enum
 from functools import lru_cache
 from logging import getLogger

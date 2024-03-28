@@ -2,12 +2,13 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import os
 import pathlib
 import socket
 import subprocess
 import sys
-from typing import Tuple
 
 import pytest
 from conda.testing.integration import _get_temp_prefix, run_command
@@ -60,6 +61,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
             return not error
 
     logfile = xprocess.ensure(name, Starter)
+    print("Logfile at", logfile)
 
     if user and password:
         yield f"http://{user}:{password}@localhost:{port}"
@@ -154,7 +156,7 @@ def create_with_channel(
     )
 
 
-def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> Tuple[str, str, int]:
+def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> tuple[str, str, int]:
     stdout, stderr, returncode = run_command(
         "create",
         _get_temp_prefix(),
