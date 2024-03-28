@@ -23,8 +23,8 @@ from conda.testing.integration import (
 )
 from conda.testing.solver_helpers import SolverTests
 
-from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
+from conda_libmamba_solver.solver import LibMambaSolver
 
 from .utils import conda_subprocess
 
@@ -485,7 +485,6 @@ def test_python_downgrade_with_pins_removes_truststore():
             data = json.loads(p.stdout)
             assert data.get("success")
             assert data.get("dry_run")
-            assertions = 0
             link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}
             unlink_dict = {pkg["name"]: pkg for pkg in data["actions"]["UNLINK"]}
             assert link_dict["python"]["version"].startswith("3.9.")

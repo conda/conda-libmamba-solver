@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 
-from conda_libmamba_solver.index import LibMambaIndexHelper
+from conda.models.channel import Channel
+
+from conda_libmamba_solver.index2 import LibMambaIndexHelper
 
 from .utils import conda_subprocess
 
@@ -23,7 +25,7 @@ def test_repoquery():
 
 
 def test_query_search():
-    index = LibMambaIndexHelper(channels=["conda-forge"])
+    index = LibMambaIndexHelper(channels=[Channel("conda-forge")])
     for query in (
         "ca-certificates",
         "ca-certificates =2022.9.24",
