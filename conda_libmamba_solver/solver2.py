@@ -16,7 +16,7 @@ from contextlib import suppress
 from functools import lru_cache
 from inspect import stack
 from textwrap import dedent
-from typing import Iterable, Mapping, Optional, Sequence, TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
@@ -31,7 +31,7 @@ from conda.base.constants import (
 from conda.base.context import context
 from conda.common.compat import on_win
 from conda.common.constants import NULL
-from conda.common.io import Spinner, timeout, time_recorder
+from conda.common.io import Spinner, time_recorder, timeout
 from conda.common.path import paths_equal
 from conda.common.url import join_url, percent_decode
 from conda.core.package_cache_data import PackageCacheData
@@ -49,9 +49,11 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
+from libmambapy import Palette
 from libmambapy.solver import Request, Solution
-from libmambapy.solver.libsolv import Solver as LibsolvSolver, UnSolvable
-from libmambapy.specs import MatchSpec as LibmambaMatchSpec, NoArchType, PackageInfo
+from libmambapy.solver.libsolv import Solver as LibsolvSolver
+from libmambapy.specs import MatchSpec as LibmambaMatchSpec
+from libmambapy.specs import NoArchType
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
@@ -62,6 +64,9 @@ from .utils import is_channel_available
 
 if TYPE_CHECKING:
     from conda.auxlib import _Null
+    from libmambapy.solver.libsolv import UnSolvable
+    from libmambapy.specs import PackageInfo
+
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -285,7 +290,7 @@ class LibMambaSolver(Solver):
         if isinstance(outcome, Solution):
             out_state.conflicts.clear()
             return True, outcome
-        problems = outcome.explain_problems()
+        print(outcome.explain_problems(index.db, Palette.no_color()))
         return False, outcome
 
     def _solver_flags(self) -> Request.Flags:
@@ -311,12 +316,14 @@ class LibMambaSolver(Solver):
 
         request_jobs = []
         json_friendly = {}
-        for (task_name, task_type), specs in jobs.items():
+        for JobType, specs in jobs.items():
             for spec in specs:
-                request_jobs.append(task_type(spec))
-                json_friendly.setdefault(task_name, []).append(str(spec))
-        json_str = json.dumps(json_friendly, indent=2)
-        log.info("The solver will handle these requests:\n%s", json_str)
+                spec = LibmambaMatchSpec.parse(str(spec))
+                request_jobs.append(JobType(spec))
+                json_friendly.setdefault(JobType.__name__, []).append(str(spec))
+        if log.isEnabledFor(logging.INFO):
+            json_str = json.dumps(json_friendly, indent=2)
+            log.info("The solver will handle these requests:\n%s", json_str)
         return request_jobs
 
     def _specs_to_request_jobs_add(self, in_state: SolverInputState, out_state: SolverOutputState):
@@ -349,38 +356,28 @@ class LibMambaSolver(Solver):
         if installed_python and to_be_installed_python:
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
-        # Job types
-        ADD_PIN = "ADD_PIN", Request.Pin
-        INSTALL = "INSTALL", Request.Install
-        UPDATE = "UPDATE", Request.Update
-        # ALLOW_UNINSTALL = "ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL
-        USERINSTALLED = "USERINSTALLED", Request.Keep
-        LOCK = "LOCK", Request.Freeze
-
         for name in out_state.specs:
             if name.startswith("__"):
                 continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
-                installed_libmamba_spec = self._conda_spec_to_libmamba_spec(
-                    self._check_spec_compat(installed.to_match_spec())
-                )
+                installed_spec = self._check_spec_compat(installed.to_match_spec())
             else:
-                installed_libmamba_spec = None
+                installed_spec = None
             requested: MatchSpec = self._check_spec_compat(in_state.requested.get(name))
             history: MatchSpec = self._check_spec_compat(in_state.history.get(name))
             pinned: MatchSpec = self._check_spec_compat(in_state.pinned.get(name))
             conflicting: MatchSpec = self._check_spec_compat(out_state.conflicts.get(name))
 
             if name in user_installed and not in_state.prune and not conflicting:
-                tasks[USERINSTALLED].append(installed_libmamba_spec)
+                tasks[Request.Keep].append(installed_spec)
 
             # These specs are explicit in some sort of way
             if pinned and not pinned.is_name_only_spec:
                 # these are the EXPLICIT pins; conda also uses implicit pinning to
                 # constrain updates too but those can be overridden in case of conflicts.
                 # name-only pins are treated as locks when installed, see below
-                tasks[ADD_PIN].append(self._conda_spec_to_libmamba_spec(pinned))
+                tasks[Request.Pin].append(pinned)
             # in libmamba, pins and installs are compatible tasks (pin only constrains,
             # does not 'request' a package). In classic, pins were actually targeted installs
             # so they were exclusive
@@ -389,16 +386,16 @@ class LibMambaSolver(Solver):
                     # for name-only specs, this is a no-op; we already added the pin above
                     # but we will constrain it again in the install task to have better
                     # error messages if not solvable
-                    libmamba_spec = self._conda_spec_to_libmamba_spec(pinned)
+                    spec = pinned
                 else:
-                    libmamba_spec = self._conda_spec_to_libmamba_spec(requested)
+                    spec = requested
                 if installed:
-                    tasks[UPDATE].append(libmamba_spec)
+                    tasks[Request.Update].append(spec)
                     # tasks[ALLOW_UNINSTALL].append(name)
                 else:
-                    tasks[INSTALL].append(libmamba_spec)
+                    tasks[Request.Install].append(spec)
             elif name in in_state.always_update:
-                tasks[UPDATE].append(name)
+                tasks[Request.Update].append(name)
                 # tasks[ALLOW_UNINSTALL].append(name)
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
@@ -406,18 +403,18 @@ class LibMambaSolver(Solver):
                 continue
             elif name == "python" and installed and not pinned:
                 pyver = ".".join(installed.version.split(".")[:2])
-                tasks[ADD_PIN].append(f"python {pyver}.*")
+                tasks[Request.Pin].append(f"python {pyver}.*")
             elif history:
                 if conflicting and history.strictness == 3:
                     # relax name-version-build (strictness=3) history specs that cause conflicts
                     # this is called neutering and makes test_neutering_of_historic_specs pass
-                    spec = f"{name} {history.version}.*" if history.version else name
-                    tasks[INSTALL].append(spec)
+                    spec_str = f"{name} {history.version}.*" if history.version else name
+                    tasks[Request.Install].append(spec_str)
                 else:
-                    tasks[INSTALL].append(self._conda_spec_to_libmamba_spec(history))
+                    tasks[Request.Install].append(history)
             elif installed:
                 if conflicting:
-                    ...
+                    ... # TODO
                     # tasks[ALLOW_UNINSTALL].append(name)
                 else:
                     # we freeze everything else as installed
@@ -431,18 +428,18 @@ class LibMambaSolver(Solver):
                                 lock = False
                                 break
                     if lock:
-                        tasks[LOCK].append(installed_libmamba_spec)
+                        tasks[Request.Freeze].append(installed_spec)
 
         # Sort tasks by priority
         # This ensures that more important tasks are added to the solver first
         returned_tasks = {}
         for task_type in (
-            ADD_PIN,
-            INSTALL,
-            UPDATE,
+            Request.Pin,
+            Request.Install,
+            Request.Update,
             # ALLOW_UNINSTALL,
-            USERINSTALLED,
-            LOCK,
+            Request.Keep,
+            Request.Freeze,
         ):
             if task_type in tasks:
                 returned_tasks[task_type] = tasks[task_type]
@@ -461,17 +458,16 @@ class LibMambaSolver(Solver):
                 # MatchSpecs constructed from PackageRecords get parsed too
                 # strictly if exported via str(). Use .conda_build_form() directly.
                 spec = record.to_match_spec().conda_build_form()
-                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(spec)
+                tasks[Request.Keep].append(spec)
 
         # No complications here: delete requested and their deps
         # TODO: There are some flags to take care of here, namely:
         # --all
         # --no-deps
         # --deps-only
-        ERASE = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
         for name, spec in in_state.requested.items():
             spec = self._check_spec_compat(spec)
-            tasks[ERASE].append(str(spec))
+            tasks[Request.Remove].append(str(spec))
 
         return dict(tasks)
 
@@ -479,13 +475,12 @@ class LibMambaSolver(Solver):
         self, in_state: SolverInputState, out_state: SolverOutputState
     ):
         tasks = defaultdict(list)
-        INSTALL = "INSTALL", api.SOLVER_INSTALL
         for name, spec in in_state.requested.items():
             if name.startswith("__"):
                 continue
             spec = self._check_spec_compat(spec)
             spec = self._fix_version_field_for_conda_build(spec)
-            tasks[INSTALL].append(spec.conda_build_form())
+            tasks[Request.Install].append(spec.conda_build_form())
 
         return dict(tasks)
 
@@ -515,18 +510,18 @@ class LibMambaSolver(Solver):
         return PackageRecord(
             name=pkg.name,
             version=pkg.version,
-            build=pkg.build_string,
+            build=pkg.build_string,  # NOTE: Different attribute name
             build_number=pkg.build_number,
             channel=pkg.channel,
-            url=pkg.package_url,
-            subdir=pkg.platform,
-            fn=pkg.filename,
+            url=pkg.package_url,  # NOTE: Different attribute name
+            subdir=pkg.platform,  # NOTE: Different attribute name
+            fn=pkg.filename,  # NOTE: Different attribute name
             license=pkg.license,
             md5=pkg.md5,
             sha256=pkg.sha256,
             signatures=pkg.signatures,
             track_features=pkg.track_features,
-            depends=pkg.dependencies,
+            depends=pkg.dependencies,  # NOTE: Different attribute name
             constrains=pkg.constrains,
             defaulted_keys=pkg.defaulted_keys,
             noarch=noarch,
