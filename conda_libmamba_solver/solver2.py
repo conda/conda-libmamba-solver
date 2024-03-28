@@ -49,11 +49,14 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
+from libmambapy.solver import Request, Solution
+from libmambapy.solver.libsolv import Solver as LibsolvSolver, UnSolvable
+from libmambapy.specs import MatchSpec as LibmambaMatchSpec, NoArchType, PackageInfo
 
 from . import __version__
 from .exceptions import LibMambaUnsatisfiableError
 from .index2 import LibMambaIndexHelper
-from .mamba_utils import init_api_context, mamba_version
+from .mamba_utils import mamba_version
 from .state import SolverInputState, SolverOutputState
 from .utils import is_channel_available
 
@@ -152,7 +155,11 @@ class LibMambaSolver(Solver):
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
-            solution = self._solving_loop()
+            # This function will copy and mutate `out_state`
+            # Make sure we get the latest copy to return the correct solution below
+            out_state = self._solving_loop(in_state, out_state, index)
+            self.neutered_specs = tuple(out_state.neutered.values())
+            solution = out_state.current_solution
 
         # Check whether conda can be updated; this is normally done in .solve_for_diff()
         # but we are doing it now so we can reuse the index
@@ -160,9 +167,8 @@ class LibMambaSolver(Solver):
 
         return solution
 
-    #####
-    # Metadata collection
-    #####
+    # region Metadata collection
+    ###########################
 
     def _collect_all_metadata_spinner_message(
         self,
@@ -187,13 +193,8 @@ class LibMambaSolver(Solver):
             f"Collecting package metadata ({self._repodata_fn})"
         )
 
-    def _collect_channel_list(
-        self, in_state: SolverInputState
-    ) -> List[Channel]:
-        channels = [
-            *self.channels,
-            *in_state.channels_from_specs()
-        ]
+    def _collect_channel_list(self, in_state: SolverInputState) -> List[Channel]:
+        channels = [*self.channels, *in_state.channels_from_specs()]
 
         # TODO: Deprecate 'channels_from_installed' functionality?
         override = (getattr(context, "_argparse_args", None) or {}).get("override_channels")
@@ -205,7 +206,7 @@ class LibMambaSolver(Solver):
                 # Only add to list if resource is available; check has timeout=1s
                 if timeout(1, is_channel_available, channel.base_url, default_return=False):
                     channels.append(channel)
-        
+
         channels.extend(in_state.maybe_free_channel())
         return channels
 
@@ -221,7 +222,7 @@ class LibMambaSolver(Solver):
 
     @time_recorder(module_name=__name__)
     def _collect_all_metadata(
-        self, 
+        self,
         channels: Iterable[Channel],
         conda_build_channels: Iterable[Channel],
         in_state: SolverInputState,
@@ -229,16 +230,20 @@ class LibMambaSolver(Solver):
         index = LibMambaIndexHelper(
             channels=[*conda_build_channels, *channels],
             repodata_fn=self._repodata_fn,
-            installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
+            installed_records=(
+                *in_state.installed.values(),
+                *in_state.virtual.values(),
+            ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)
         return index
 
-    #####
-    # Solving
-    #####
+    # endregion
+
+    # region Solving
+    ###############
 
     def _solving_loop_spinner_message(self) -> str:
         """This shouldn't be our responsibility, but the CLI / app's..."""
@@ -253,11 +258,286 @@ class LibMambaSolver(Solver):
         return "Solving environment"
 
     @time_recorder(module_name=__name__)
-    def _solving_loop() -> IndexedSet[PackageRecord]: ...
+    def _solving_loop(
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+        index: LibMambaIndexHelper,
+    ) -> IndexedSet[PackageRecord]:
+        for attempt in range(1, self._max_attempts(in_state) + 1):
+            solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt)
+            if solved:
+                return self._export_solution(out_state, outcome)
 
-    #####
-    # General helpers
-    #####
+    def _solve_attempt(
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+        index: LibMambaIndexHelper,
+        attempt: int = 1,
+    ) -> tuple[bool, Solution | UnSolvable]:
+        log.info("Solver attempt: #%d", attempt)
+        flags = self._solver_flags()
+        jobs = self._specs_to_request_jobs(in_state, out_state)
+        request = Request(jobs=jobs, flags=flags)
+        solver = LibsolvSolver()
+        outcome = solver.solve(index.db, request)
+        if isinstance(outcome, Solution):
+            out_state.conflicts.clear()
+            return True, outcome
+        problems = outcome.explain_problems()
+        return False, outcome
+
+    def _solver_flags(self) -> Request.Flags:
+        flags = Request.Flags()
+        flags.allow_downgrade = True
+        if context.channel_priority is ChannelPriority.STRICT:
+            flags.strict_repo_priority = True
+        if self.specs_to_remove and self._command in ("remove", None, NULL):
+            flags.allow_uninstall = True
+        return flags
+
+    def _specs_to_request_jobs(
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+    ) -> list[Request.Job]:
+        if in_state.is_removing:
+            jobs = self._specs_to_request_jobs_remove(in_state, out_state)
+        elif self._called_from_conda_build():
+            jobs = self._specs_to_request_jobs_conda_build(in_state, out_state)
+        else:
+            jobs = self._specs_to_request_jobs_add(in_state, out_state)
+
+        request_jobs = []
+        json_friendly = {}
+        for (task_name, task_type), specs in jobs.items():
+            for spec in specs:
+                request_jobs.append(task_type(spec))
+                json_friendly.setdefault(task_name, []).append(str(spec))
+        json_str = json.dumps(json_friendly, indent=2)
+        log.info("The solver will handle these requests:\n%s", json_str)
+        return request_jobs
+
+    def _specs_to_request_jobs_add(self, in_state: SolverInputState, out_state: SolverOutputState):
+        tasks = defaultdict(list)
+
+        # Protect history and aggressive updates from being uninstalled if possible. From libsolv
+        # docs: "The matching installed packages are considered to be installed by a user, thus not
+        # installed to fulfill some dependency. This is needed input for the calculation of
+        # unneeded packages for jobs that have the SOLVER_CLEANDEPS flag set."
+        user_installed = {
+            pkg
+            for pkg in (
+                *in_state.history,
+                *in_state.aggressive_updates,
+                *in_state.pinned,
+                *in_state.do_not_remove,
+            )
+            if pkg in in_state.installed
+        }
+
+        # Fast-track python version changes (Part 1/2)
+        # ## When the Python version changes, this implies all packages depending on
+        # ## python will be reinstalled too. This can mean that we'll have to try for every
+        # ## installed package to result in a conflict before we get to actually solve everything
+        # ## A workaround is to let all non-noarch python-depending specs to "float" by marking
+        # ## them as a conflict preemptively
+        python_version_might_change = False
+        installed_python = in_state.installed.get("python")
+        to_be_installed_python = out_state.specs.get("python")
+        if installed_python and to_be_installed_python:
+            python_version_might_change = not to_be_installed_python.match(installed_python)
+
+        # Job types
+        ADD_PIN = "ADD_PIN", Request.Pin
+        INSTALL = "INSTALL", Request.Install
+        UPDATE = "UPDATE", Request.Update
+        # ALLOW_UNINSTALL = "ALLOW_UNINSTALL", api.SOLVER_ALLOWUNINSTALL
+        USERINSTALLED = "USERINSTALLED", Request.Keep
+        LOCK = "LOCK", Request.Freeze
+
+        for name in out_state.specs:
+            if name.startswith("__"):
+                continue  # ignore virtual packages
+            installed: PackageRecord = in_state.installed.get(name)
+            if installed:
+                installed_libmamba_spec = self._conda_spec_to_libmamba_spec(
+                    self._check_spec_compat(installed.to_match_spec())
+                )
+            else:
+                installed_libmamba_spec = None
+            requested: MatchSpec = self._check_spec_compat(in_state.requested.get(name))
+            history: MatchSpec = self._check_spec_compat(in_state.history.get(name))
+            pinned: MatchSpec = self._check_spec_compat(in_state.pinned.get(name))
+            conflicting: MatchSpec = self._check_spec_compat(out_state.conflicts.get(name))
+
+            if name in user_installed and not in_state.prune and not conflicting:
+                tasks[USERINSTALLED].append(installed_libmamba_spec)
+
+            # These specs are explicit in some sort of way
+            if pinned and not pinned.is_name_only_spec:
+                # these are the EXPLICIT pins; conda also uses implicit pinning to
+                # constrain updates too but those can be overridden in case of conflicts.
+                # name-only pins are treated as locks when installed, see below
+                tasks[ADD_PIN].append(self._conda_spec_to_libmamba_spec(pinned))
+            # in libmamba, pins and installs are compatible tasks (pin only constrains,
+            # does not 'request' a package). In classic, pins were actually targeted installs
+            # so they were exclusive
+            if requested:
+                if requested.is_name_only_spec and pinned and not pinned.is_name_only_spec:
+                    # for name-only specs, this is a no-op; we already added the pin above
+                    # but we will constrain it again in the install task to have better
+                    # error messages if not solvable
+                    libmamba_spec = self._conda_spec_to_libmamba_spec(pinned)
+                else:
+                    libmamba_spec = self._conda_spec_to_libmamba_spec(requested)
+                if installed:
+                    tasks[UPDATE].append(libmamba_spec)
+                    # tasks[ALLOW_UNINSTALL].append(name)
+                else:
+                    tasks[INSTALL].append(libmamba_spec)
+            elif name in in_state.always_update:
+                tasks[UPDATE].append(name)
+                # tasks[ALLOW_UNINSTALL].append(name)
+            # These specs are "implicit"; the solver logic massages them for better UX
+            # as long as they don't cause trouble
+            elif in_state.prune:
+                continue
+            elif name == "python" and installed and not pinned:
+                pyver = ".".join(installed.version.split(".")[:2])
+                tasks[ADD_PIN].append(f"python {pyver}.*")
+            elif history:
+                if conflicting and history.strictness == 3:
+                    # relax name-version-build (strictness=3) history specs that cause conflicts
+                    # this is called neutering and makes test_neutering_of_historic_specs pass
+                    spec = f"{name} {history.version}.*" if history.version else name
+                    tasks[INSTALL].append(spec)
+                else:
+                    tasks[INSTALL].append(self._conda_spec_to_libmamba_spec(history))
+            elif installed:
+                if conflicting:
+                    ...
+                    # tasks[ALLOW_UNINSTALL].append(name)
+                else:
+                    # we freeze everything else as installed
+                    lock = in_state.update_modifier.FREEZE_INSTALLED
+                    if pinned and pinned.is_name_only_spec:
+                        # name-only pins are treated as locks when installed
+                        lock = True
+                    if python_version_might_change and installed.noarch is None:
+                        for dep in installed.depends:
+                            if MatchSpec(dep).name in ("python", "python_abi"):
+                                lock = False
+                                break
+                    if lock:
+                        tasks[LOCK].append(installed_libmamba_spec)
+
+        # Sort tasks by priority
+        # This ensures that more important tasks are added to the solver first
+        returned_tasks = {}
+        for task_type in (
+            ADD_PIN,
+            INSTALL,
+            UPDATE,
+            # ALLOW_UNINSTALL,
+            USERINSTALLED,
+            LOCK,
+        ):
+            if task_type in tasks:
+                returned_tasks[task_type] = tasks[task_type]
+        return returned_tasks
+
+    def _specs_to_request_jobs_remove(
+        self, in_state: SolverInputState, out_state: SolverOutputState
+    ):
+        # TODO: Consider merging add/remove in a single logic this so there's no split
+
+        tasks = defaultdict(list)
+
+        # Protect history and aggressive updates from being uninstalled if possible
+        for name, record in out_state.records.items():
+            if name in in_state.history or name in in_state.aggressive_updates:
+                # MatchSpecs constructed from PackageRecords get parsed too
+                # strictly if exported via str(). Use .conda_build_form() directly.
+                spec = record.to_match_spec().conda_build_form()
+                tasks[("USERINSTALLED", api.SOLVER_USERINSTALLED)].append(spec)
+
+        # No complications here: delete requested and their deps
+        # TODO: There are some flags to take care of here, namely:
+        # --all
+        # --no-deps
+        # --deps-only
+        ERASE = ("ERASE | CLEANDEPS", api.SOLVER_ERASE | api.SOLVER_CLEANDEPS)
+        for name, spec in in_state.requested.items():
+            spec = self._check_spec_compat(spec)
+            tasks[ERASE].append(str(spec))
+
+        return dict(tasks)
+
+    def _specs_to_request_jobs_conda_build(
+        self, in_state: SolverInputState, out_state: SolverOutputState
+    ):
+        tasks = defaultdict(list)
+        INSTALL = "INSTALL", api.SOLVER_INSTALL
+        for name, spec in in_state.requested.items():
+            if name.startswith("__"):
+                continue
+            spec = self._check_spec_compat(spec)
+            spec = self._fix_version_field_for_conda_build(spec)
+            tasks[INSTALL].append(spec.conda_build_form())
+
+        return dict(tasks)
+
+    def _export_solution(self, out_state: SolverOutputState, solution: Solution):
+        for action in solution.actions:
+            record_to_install: PackageInfo = getattr(action, "install", None)
+            record_to_remove: PackageInfo = getattr(action, "remove", None)
+            if record_to_install:
+                if record_to_install.name.startswith("__"):
+                    continue
+                record = self._package_info_to_package_record(record_to_install)
+                out_state.records[record.name] = record
+            elif record_to_remove:
+                if record_to_remove.name.startswith("__"):
+                    continue
+                record = self._package_info_to_package_record(record_to_remove)
+                out_state.records.pop(record.name, None)
+        return out_state
+
+    def _package_info_to_package_record(self, pkg: PackageInfo) -> PackageRecord:
+        if pkg.noarch == NoArchType.Python:
+            noarch = "python"
+        elif pkg.noarch == NoArchType.Generic:
+            noarch = "generic"
+        else:
+            noarch = None
+        return PackageRecord(
+            name=pkg.name,
+            version=pkg.version,
+            build=pkg.build_string,
+            build_number=pkg.build_number,
+            channel=pkg.channel,
+            url=pkg.package_url,
+            subdir=pkg.platform,
+            fn=pkg.filename,
+            license=pkg.license,
+            md5=pkg.md5,
+            sha256=pkg.sha256,
+            signatures=pkg.signatures,
+            track_features=pkg.track_features,
+            depends=pkg.dependencies,
+            constrains=pkg.constrains,
+            defaulted_keys=pkg.defaulted_keys,
+            noarch=noarch,
+            size=pkg.size,
+            timestamp=pkg.timestamp,
+        )
+
+    # endregion
+
+    # region General helpers
+    #######################
 
     def _log_info(self):
         log.info("conda version: %s", _conda_version)
@@ -265,20 +545,6 @@ class LibMambaSolver(Solver):
         log.info("libmambapy version: %s", mamba_version())
         log.info("Target prefix: %r", self.prefix)
         log.info("Command: %s", sys.argv)
-
-    def _maybe_ignore_current_repodata(self) -> str:
-        is_repodata_fn_set = False
-        for config in context.collect_all().values():
-            for key, value in config.items():
-                if key == "repodata_fns" and value:
-                    is_repodata_fn_set = True
-                    break
-        if self._repodata_fn == "current_repodata.json" and not is_repodata_fn_set:
-            log.debug(
-                "Ignoring repodata_fn='current_repodata.json', defaulting to %s", REPODATA_FN
-            )
-            return REPODATA_FN
-        return self._repodata_fn
 
     def _called_from_conda_build(self) -> bool:
         """
@@ -299,6 +565,59 @@ class LibMambaSolver(Solver):
             # frame[3] contains the name of the function in that frame of the stack
             and {"install_actions", "get_install_actions"} <= {frame[3] for frame in stack()}
         )
+
+    def _check_spec_compat(self, spec: MatchSpec | None) -> MatchSpec | None:
+        return spec
+
+    def _conda_spec_to_libmamba_spec(self, spec: MatchSpec) -> LibmambaMatchSpec:
+        return LibmambaMatchSpec.parse(str(spec))
+
+    def _maybe_ignore_current_repodata(self) -> str:
+        is_repodata_fn_set = False
+        for config in context.collect_all().values():
+            for key, value in config.items():
+                if key == "repodata_fns" and value:
+                    is_repodata_fn_set = True
+                    break
+        if self._repodata_fn == "current_repodata.json" and not is_repodata_fn_set:
+            log.debug(
+                "Ignoring repodata_fn='current_repodata.json', defaulting to %s",
+                REPODATA_FN,
+            )
+            return REPODATA_FN
+        return self._repodata_fn
+
+    def _max_attempts(self, in_state: SolverInputState, default: int = 1):
+        from_env_var = os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS")
+        installed_count = len(in_state.installed)
+        if from_env_var:
+            try:
+                max_attempts_from_env = int(from_env_var)
+            except ValueError:
+                raise CondaValueError(
+                    f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{from_env_var}'. Must be int."
+                )
+            if max_attempts_from_env < 1:
+                raise CondaValueError(
+                    f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{max_attempts_from_env}'. Must be >=1."
+                )
+            elif max_attempts_from_env > installed_count:
+                log.warning(
+                    "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
+                    "installed packages (%s). Using that one instead.",
+                    max_attempts_from_env,
+                    installed_count,
+                )
+                return installed_count
+            else:
+                return max_attempts_from_env
+        elif in_state.update_modifier.FREEZE_INSTALLED and installed_count:
+            # this the default, but can be overriden with --update-specs
+            # we cap at MAX_SOLVER_ATTEMPTS_CAP attempts to avoid things
+            # getting too slow in large environments
+            return min(self.MAX_SOLVER_ATTEMPTS_CAP, installed_count)
+        else:
+            return default
 
     def _notify_conda_outdated(
         self,
@@ -391,3 +710,5 @@ class LibMambaSolver(Solver):
                 ),
                 file=sys.stderr,
             )
+
+    # endregion

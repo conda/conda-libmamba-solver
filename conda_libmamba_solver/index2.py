@@ -155,6 +155,9 @@ class LibMambaIndexHelper:
             subpriority = 0 if repo.name == "noarch" else 1
             self.db.set_repo_priority(repo, Priorities(priority, subpriority))
 
+    def reload_channel(self, channel: Channel):
+        raise NotImplementedError  # TODO
+
     def _init_db_from_context(self) -> Database:
         return Database(ChannelContext.make_conda_compatible(Context.instance()).params())
 
@@ -192,8 +195,6 @@ class LibMambaIndexHelper:
             current_working_dir=os.getcwd(),
         )
         return Database(params)
-
-    def reload_channel(self, channel: Channel): ...
 
     def _load_channels(self):
         urls_to_channel = self._channel_urls()
@@ -324,7 +325,7 @@ class LibMambaIndexHelper:
             build_number=record.build_number,
             channel=str(record.channel),
             package_url=record.get("url") or "",
-            subdir=record.subdir,
+            platform=record.subdir,
             filename=record.fn,
             license=record.get("license") or "",
             md5=record.md5,
@@ -339,12 +340,12 @@ class LibMambaIndexHelper:
             timestamp=int((record.get("timestamp") or 0) * 1000),
         )
 
-    ###
-    # Repoquery
-    ###
+    #region Repoquery
+    #################
+
     def search(
         self,
-        queries: Union[Iterable[str | MatchSpec], [str | MatchSpec]],
+        queries: Iterable[str | MatchSpec] | str | MatchSpec,
         return_type: Literal["records", "dict", "raw"] = "records",
     ) -> Iterable[PackageRecord] | dict | QueryResult:
         if isinstance(queries, (str, MatchSpec)):
@@ -402,3 +403,5 @@ class LibMambaIndexHelper:
             return pkg_records
         # return_type == "dict"
         return result
+
+    #endregion
