@@ -31,7 +31,8 @@
             "extensions": [
                 "charliermarsh.ruff",
                 "eamodio.gitlens",
-                "ms-toolsai.jupyter"
+                "ms-toolsai.jupyter",
+                "be5invis.toml"
             ]
         }
     }

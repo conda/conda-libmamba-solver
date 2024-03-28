@@ -23,19 +23,28 @@ function develop-mamba() (
     echo "Miniconda not compatible with develop-mamba"
     exit 1
   fi
-  if [ ! -f "$SRC_MAMBA/mamba/setup.py" ]; then
-    echo "Mamba 1.x not found at $SRC_MAMBA"
+  if [ ! -f "$SRC_MAMBA/libmamba/CMakeLists.txt" ]; then
+    echo "Could not find mamba-org/mamba at $SRC_MAMBA"
     exit 1
+  fi
+  if [ -f "$SRC_MAMBA/mamba/setup.py" ]; then
+    echo "Mamba 1.x found at $SRC_MAMBA"
+    mamba_version=1
+    environment_yaml="$SRC_MAMBA/mamba/environment-dev.yml" 
+  else
+    echo "Mamba 2.x found at $SRC_MAMBA"
+    environment_yaml="$SRC_MAMBA/dev/environment-dev.yml" 
+    mamba_version=2
   fi
   # Install mamba dev dependencies only once:
   if [ ! -f ~/.mamba-develop-installed ]; then
     # remove "sel(win)" in environment yaml hack since conda does not understand
     # libmamba specific specs
-    echo "Installing mamba 1.x in dev mode..."
-    sed '/sel(.*)/d' "$SRC_MAMBA/mamba/environment-dev.yml" > /tmp/mamba-environment-dev.yml
+    sed '/sel(.*)/d' "\$environment_yaml" > /tmp/mamba-environment-dev.yml
+    # Environment.yml is missing make
+    echo "  - make" >> /tmp/mamba-environment-dev.yml
     CONDA_QUIET=1 "$BASE_CONDA/condabin/conda" env update -p "$BASE_CONDA" \
         --file /tmp/mamba-environment-dev.yml
-    "$BASE_CONDA/condabin/conda" install make -yq  # missing in mamba's dev env
     # Clean build directory to avoid issues with stale build files
     test -f "$SRC_MAMBA/build/CMakeCache.txt" && rm -rf "$SRC_MAMBA/build"
   fi
@@ -54,7 +63,11 @@ function develop-mamba() (
   make install -C build/
   cd -
   "$BASE_CONDA/bin/pip" install -e "$SRC_MAMBA/libmambapy/" --no-deps
-  test -f "$BASE_CONDA/conda-meta/mamba-"*".json" && "$BASE_CONDA/bin/pip" install -e "$SRC_MAMBA/mamba/" --no-deps
+  if [ "\$mamba_version" == "1" ]; then
+    test -f "$BASE_CONDA/conda-meta/mamba-"*".json" && "$BASE_CONDA/bin/pip" install -e "$SRC_MAMBA/mamba/" --no-deps
+  else
+    echo "Mamba binary installation not supported yet"
+  fi
   touch ~/.mamba-develop-installed || true
 )
 EOF
