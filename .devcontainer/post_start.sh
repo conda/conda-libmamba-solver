@@ -30,10 +30,10 @@ function develop-mamba() (
   if [ -f "$SRC_MAMBA/mamba/setup.py" ]; then
     echo "Mamba 1.x found at $SRC_MAMBA"
     mamba_version=1
-    environment_yaml="$SRC_MAMBA/mamba/environment-dev.yml" 
+    environment_yaml="$SRC_MAMBA/mamba/environment-dev.yml"
   else
     echo "Mamba 2.x found at $SRC_MAMBA"
-    environment_yaml="$SRC_MAMBA/dev/environment-dev.yml" 
+    environment_yaml="$SRC_MAMBA/dev/environment-dev.yml"
     mamba_version=2
   fi
   # Install mamba dev dependencies only once:

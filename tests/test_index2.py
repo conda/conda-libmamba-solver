@@ -1,14 +1,13 @@
 import os
 
 import pytest
+from conda.base.context import reset_context
 from conda.common.compat import on_win
-from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.index2 import LibMambaIndexHelper
-
 
 initialize_logging()
 
@@ -54,8 +53,8 @@ def test_defaults_use_only_tar_bz2(monkeypatch: pytest.MonkeyPatch, only_tar_bz2
     n_repos = 3 if on_win else 2
     assert len(libmamba_index.repos) == n_repos
 
-    libmamba_dot_conda_total = 0 
-    libmamba_tar_bz2_total = 0 
+    libmamba_dot_conda_total = 0
+    libmamba_tar_bz2_total = 0
     for repo in libmamba_index.repos:
         for pkg in libmamba_index.db.packages_in_repo(repo):
             if pkg.package_url.endswith(".conda"):

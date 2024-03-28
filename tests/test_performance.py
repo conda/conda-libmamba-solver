@@ -4,6 +4,7 @@
 """
 Measure the speed and memory usage of the different backend solvers
 """
+
 import os
 import shutil
 

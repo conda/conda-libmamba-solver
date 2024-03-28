@@ -8,6 +8,7 @@ This exception is only used in conda-build, so we can't import it directly.
 conda_build is not a dependency, but we only import this when conda-build is calling the
 solver, so it's fine to import it here.
 """
+
 from conda_build.exceptions import DependencyNeedsBuildingError
 
 

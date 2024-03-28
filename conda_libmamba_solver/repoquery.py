@@ -14,8 +14,8 @@ from conda.core.prefix_data import PrefixData
 from conda.exceptions import CondaError
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
-
 from libmambapy import Context as LibmambaContext
+
 from .index2 import LibMambaIndexHelper
 
 
@@ -165,7 +165,9 @@ def repoquery(args):
         ):
             index = LibMambaIndexHelper(
                 installed_records=installed_records,
-                channels=[Channel(c) for c in chain(channels or (), dict.fromkeys(channels_from_specs))],
+                channels=[
+                    Channel(c) for c in chain(channels or (), dict.fromkeys(channels_from_specs))
+                ],
                 subdirs=(args.platform, "noarch"),
                 repodata_fn=context.repodata_fns[-1],
             )

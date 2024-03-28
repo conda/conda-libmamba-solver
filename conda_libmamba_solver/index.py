@@ -70,6 +70,7 @@ Once the cache has been populated, we can instantiate 'libmamba.Repo' objects di
 We maintain a map of subdir-specific URLs to `conda.model.channel.Channel`
 and `libmamba.Repo` objects.
 """
+
 from __future__ import annotations
 
 import logging
@@ -103,6 +104,7 @@ log = logging.getLogger(f"conda.{__name__}")
 @dataclass(frozen=True)
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
+
     channel: Channel
     repo: api.Repo
     full_url: str

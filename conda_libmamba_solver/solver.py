@@ -6,6 +6,7 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
 """
+
 import json
 import logging
 import os

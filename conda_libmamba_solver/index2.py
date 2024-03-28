@@ -75,43 +75,36 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass
-from functools import lru_cache, partial
+from functools import partial
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Iterable, Dict, TYPE_CHECKING, Tuple, List, Literal, Union
+from typing import TYPE_CHECKING, Dict, Iterable, Literal, Tuple
 
-from conda import __version__ as conda_version
 from conda.base.constants import REPODATA_FN
-from conda.base.context import context, reset_context
-from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, env_var
-from conda.common.serialize import json_dump, json_load
-from conda.common.url import percent_decode, remove_auth, split_anaconda_token
+from conda.base.context import context
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
-from conda.exceptions import CondaError
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from conda.models.version import VersionOrder
-from libmambapy import QueryResult, Query, ChannelContext, Context
+from libmambapy import ChannelContext, Context, Query, QueryResult
 from libmambapy.solver.libsolv import (
     Database,
-    RepoInfo,
     PipAsPythonDependency,
     Priorities,
-    UseOnlyTarBz2,
     RepodataOrigin,
+    RepoInfo,
+    UseOnlyTarBz2,
 )
 from libmambapy.specs import (
     Channel as LibmambaChannel,
+)
+from libmambapy.specs import (
     ChannelResolveParams,
-    PackageInfo,
     CondaURL,
     NoArchType,
+    PackageInfo,
 )
-
-from .utils import escape_channel_url
 
 if TYPE_CHECKING:
     from conda.gateways.repodata import RepodataState
@@ -340,7 +333,7 @@ class LibMambaIndexHelper:
             timestamp=int((record.get("timestamp") or 0) * 1000),
         )
 
-    #region Repoquery
+    # region Repoquery
     #################
 
     def search(
@@ -404,4 +397,4 @@ class LibMambaIndexHelper:
         # return_type == "dict"
         return result
 
-    #endregion
+    # endregion
