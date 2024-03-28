@@ -23,8 +23,8 @@ from conda.testing.integration import (
 )
 from conda.testing.solver_helpers import SolverTests
 
-from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
+from conda_libmamba_solver.solver import LibMambaSolver
 
 from .utils import conda_subprocess
 
