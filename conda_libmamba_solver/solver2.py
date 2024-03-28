@@ -9,40 +9,28 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import sys
 from collections import defaultdict
 from contextlib import suppress
 from functools import lru_cache
 from inspect import stack
 from textwrap import dedent
-from typing import TYPE_CHECKING, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING
 
-from boltons.setutils import IndexedSet
 from conda import __version__ as _conda_version
 from conda.base.constants import (
-    DEFAULT_CHANNELS,
     REPODATA_FN,
     UNKNOWN_CHANNEL,
     ChannelPriority,
-    DepsModifier,
-    UpdateModifier,
 )
 from conda.base.context import context
-from conda.common.compat import on_win
 from conda.common.constants import NULL
 from conda.common.io import Spinner, time_recorder, timeout
 from conda.common.path import paths_equal
-from conda.common.url import join_url, percent_decode
-from conda.core.package_cache_data import PackageCacheData
-from conda.core.prefix_data import PrefixData
 from conda.core.solve import Solver
 from conda.exceptions import (
     CondaValueError,
-    InvalidMatchSpec,
-    InvalidSpec,
     PackagesNotFoundError,
-    ParseError,
     UnsatisfiableError,
 )
 from conda.models.channel import Channel
@@ -63,11 +51,19 @@ from .state import SolverInputState, SolverOutputState
 from .utils import is_channel_available
 
 if TYPE_CHECKING:
+    from typing import Iterable, Mapping, Sequence
+
+    from boltons.setutils import IndexedSet
     from conda.auxlib import _Null
-    from libmambapy.solver.libsolv import UnSolvable
+    from conda.base.constants import (
+        DepsModifier,
+        UpdateModifier,
+    )
+    from libmambapy.solver.libsolv import Database, UnSolvable
     from libmambapy.specs import PackageInfo
 
 
+_mamba_output_palette = Palette.terminal() if sys.stdin.isatty() else Palette.no_color()
 log = logging.getLogger(f"conda.{__name__}")
 
 
@@ -198,7 +194,7 @@ class LibMambaSolver(Solver):
             f"Collecting package metadata ({self._repodata_fn})"
         )
 
-    def _collect_channel_list(self, in_state: SolverInputState) -> List[Channel]:
+    def _collect_channel_list(self, in_state: SolverInputState) -> list[Channel]:
         channels = [*self.channels, *in_state.channels_from_specs()]
 
         # TODO: Deprecate 'channels_from_installed' functionality?
@@ -215,7 +211,7 @@ class LibMambaSolver(Solver):
         channels.extend(in_state.maybe_free_channel())
         return channels
 
-    def _collect_channel_list_conda_build(self) -> List[Channel]:
+    def _collect_channel_list_conda_build(self) -> list[Channel]:
         if self._called_from_conda_build():
             # We need to recover the local dirs (conda-build's local, output_folder, etc)
             # from the index. This is a bit of a hack, but it works.
@@ -270,9 +266,53 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
     ) -> IndexedSet[PackageRecord]:
         for attempt in range(1, self._max_attempts(in_state) + 1):
-            solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt)
-            if solved:
-                return self._export_solution(out_state, outcome)
+            try:
+                solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt)
+                if solved:
+                    break
+            except (UnsatisfiableError, PackagesNotFoundError):
+                solved = False
+                break  # try with last attempt
+            else:  # didn't solve yet, but can retry
+                out_state = SolverOutputState(
+                    solver_input_state=in_state,
+                    records=dict(out_state.records),
+                    for_history=dict(out_state.for_history),
+                    neutered=dict(out_state.neutered),
+                    conflicts=dict(out_state.conflicts),
+                )
+        if not solved:
+            log.debug("Last attempt: reporting all installed as conflicts")
+            out_state.conflicts.update(
+                {
+                    name: record.to_match_spec()
+                    for name, record in in_state.installed.items()
+                    # TODO: These conditions might not be needed here
+                    if not record.is_unmanageable
+                    # or name not in in_state.history
+                    # or name not in in_state.requested
+                    # or name not in in_state.pinned
+                }
+            )
+            # we only check this for "desperate" strategies in _specs_to_tasks
+            if self._command in (None, NULL):
+                self._command = "last_solve_attempt"
+            else:
+                self._command += "+last_solve_attempt"
+            solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
+            if not solved:
+                message = self._prepare_problems_message(outcome, index.db)
+                exc = LibMambaUnsatisfiableError(message)
+                exc.allow_retry = False
+                raise exc
+
+        # We didn't fail? Nice, let's return the calculated state
+        self._export_solution(out_state, outcome)
+
+        # Run post-solve tasks
+        out_state.post_solve(solver=self)
+
+        return out_state
 
     def _solve_attempt(
         self,
@@ -282,6 +322,7 @@ class LibMambaSolver(Solver):
         attempt: int = 1,
     ) -> tuple[bool, Solution | UnSolvable]:
         log.info("Solver attempt: #%d", attempt)
+        log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
         flags = self._solver_flags()
         jobs = self._specs_to_request_jobs(in_state, out_state)
         request = Request(jobs=jobs, flags=flags)
@@ -290,7 +331,16 @@ class LibMambaSolver(Solver):
         if isinstance(outcome, Solution):
             out_state.conflicts.clear()
             return True, outcome
-        print(outcome.explain_problems(index.db, Palette.no_color()))
+
+        problems = outcome.problems_to_str(index.db)
+        old_conflicts = out_state.conflicts.copy()
+        new_conflicts = self._maybe_raise_for_problems(
+            outcome, index.db, problems, old_conflicts, index.channels
+        )
+        log.debug(
+            "Attempt %d failed with %s conflicts:\n%s", attempt, len(new_conflicts), problems
+        )
+        out_state.conflicts.update(new_conflicts)
         return False, outcome
 
     def _solver_flags(self) -> Request.Flags:
@@ -414,7 +464,7 @@ class LibMambaSolver(Solver):
                     tasks[Request.Install].append(history)
             elif installed:
                 if conflicting:
-                    ... # TODO
+                    ...  # TODO
                     # tasks[ALLOW_UNINSTALL].append(name)
                 else:
                     # we freeze everything else as installed
@@ -531,6 +581,164 @@ class LibMambaSolver(Solver):
 
     # endregion
 
+    # region Error reporting
+    @classmethod
+    def _parse_problems(cls, problems: str) -> Mapping[str, MatchSpec]:
+        """
+        Problems can signal either unsatisfiability or unavailability.
+        First will raise LibmambaUnsatisfiableError.
+        Second will raise PackagesNotFoundError.
+
+        Libmamba can return spec strings in two formats:
+        - With dashes, e.g. package-1.2.3-h5487548_0
+        - à la conda-build, e.g. package 1.2.*
+        - just names, e.g. package
+        """
+        conflicts = []
+        not_found = []
+        problem_lines = problems.splitlines()[1:]
+        for line in problem_lines:
+            line = line.strip()
+            words = line.split()
+            if not line.startswith("- "):
+                continue
+            if "none of the providers can be installed" in line:
+                if words[1] != "package" or words[3] != "requires":
+                    raise ValueError(f"Unknown message: {line}")
+                conflicts.append(cls._matchspec_from_error_str(words[2]))
+                end = words.index("but")
+                conflicts.append(cls._matchspec_from_error_str(words[4:end]))
+            elif "- nothing provides" in line:
+                marker = next((i for (i, w) in enumerate(words) if w == "needed"), None)
+                if marker:
+                    conflicts.append(cls._matchspec_from_error_str(words[-1]))
+                start = 3 if marker == 4 else 4
+                not_found.append(cls._matchspec_from_error_str(words[start:marker]))
+            elif "has constraint" in line and "conflicting with" in line:
+                # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014
+                # conflicting with zlib-1.2.13-h998d150_0
+                conflicts.append(cls._matchspec_from_error_str(words[-1]))
+            elif "cannot install both pin-" in line and "and pin-" in line:
+                # a pin is in conflict with another pin
+                pin_a = words[3].rsplit("-", 1)[0]
+                pin_b = words[5].rsplit("-", 1)[0]
+                conflicts.append(MatchSpec(pin_a))
+                conflicts.append(MatchSpec(pin_b))
+            elif "is excluded by strict repo priority" in line:
+                # package python-3.7.6-h0371630_2 is excluded by strict repo priority
+                conflicts.append(cls._matchspec_from_error_str(words[2]))
+            else:
+                log.debug("! Problem line not recognized: %s", line)
+
+        return {
+            "conflicts": {s.name: s for s in conflicts},
+            "not_found": {s.name: s for s in not_found},
+        }
+
+    def _maybe_raise_for_problems(
+        self,
+        unsolvable: UnSolvable,
+        db: Database,
+        problems: str | Mapping,
+        previous_conflicts: Mapping[str, MatchSpec] = None,
+        channels: Iterable[Channel] = (),
+    ):
+        if isinstance(problems, str):
+            parsed_problems = self._parse_problems(problems)
+
+        # We allow conda-build (if present) to process the exception early
+        self._maybe_raise_for_conda_build(
+            {**parsed_problems["conflicts"], **parsed_problems["not_found"]},
+            message=self._prepare_problems_message(unsolvable, db),
+        )
+
+        unsatisfiable = parsed_problems["conflicts"]
+        not_found = parsed_problems["not_found"]
+        if not unsatisfiable and not_found:
+            log.debug(
+                "Inferred PackagesNotFoundError %s from conflicts:\n%s",
+                tuple(not_found.keys()),
+                problems,
+            )
+            # This is not a conflict, but a missing package in the channel
+            exc = PackagesNotFoundError(
+                tuple(not_found.values()), tuple(channels or self.channels)
+            )
+            exc.allow_retry = False
+            raise exc
+
+        previous = previous_conflicts or {}
+        previous_set = set(previous.values())
+        current_set = set(unsatisfiable.values())
+
+        diff = current_set.difference(previous_set)
+        if len(diff) > 1 and "python" in unsatisfiable:
+            # Only report python as conflict if it's the only conflict reported
+            # This helps us prioritize neutering for other dependencies first
+            unsatisfiable.pop("python")
+
+        if (previous and (previous_set == current_set)) or len(diff) >= 10:
+            # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
+            message = self._prepare_problems_message(unsolvable, db)
+            exc = LibMambaUnsatisfiableError(message)
+            # do not allow conda.cli.install to try more things
+            exc.allow_retry = False
+            raise exc
+        return unsatisfiable
+
+    def _prepare_problems_message(self, unsolvable: UnSolvable, db: Database):
+        message = unsolvable.problems_to_str(db)
+        explain = True
+        if " - " not in message:
+            # This makes 'explain_problems()' crash. Anticipate.
+            message = "Failed with empty error message."
+            explain = False
+        elif "unsupported request" in message:
+            # This error makes 'explain_problems()' crash. Anticipate.
+            log.info("Failed to explain problems. Unsupported request.")
+            explain = False
+        elif "is excluded by strict repo priority" in message:
+            # This will cause a lot of warnings until implemented in detail explanations
+            log.info("Skipping error explanation. Excluded by strict repo priority.")
+            explain = False
+
+        if explain:
+            try:
+                explained_errors = unsolvable.explain_problems(db, _mamba_output_palette)
+                message += "\n" + explained_errors
+            except Exception as exc:
+                log.warning("Failed to explain problems", exc_info=exc)
+
+        return message
+
+    def _maybe_raise_for_conda_build(
+        self,
+        conflicting_specs: Mapping[str, MatchSpec],
+        message: str = None,
+    ):
+        # TODO: Remove this hack for conda-build compatibility >_<
+        # conda-build expects a slightly different exception format
+        # good news is that we don't need to retry much, because all
+        # conda-build envs are fresh - if we found a conflict, we report
+        # right away to let conda build handle it
+        if not self._called_from_conda_build():
+            return
+
+        from .conda_build_exceptions import ExplainedDependencyNeedsBuildingError
+
+        # the patched index should contain the arch we are building this env for
+        # if the index is empty, we default to whatever platform we are running on
+        subdir = next((subdir for subdir in self.subdirs if subdir != "noarch"), context.subdir)
+        exc = ExplainedDependencyNeedsBuildingError(
+            packages=list(conflicting_specs.keys()),
+            matchspecs=list(conflicting_specs.values()),
+            subdir=subdir,
+            explanation=message,
+        )
+        raise exc
+
+    # endregion
+
     # region General helpers
     #######################
 
@@ -566,6 +774,22 @@ class LibMambaSolver(Solver):
 
     def _conda_spec_to_libmamba_spec(self, spec: MatchSpec) -> LibmambaMatchSpec:
         return LibmambaMatchSpec.parse(str(spec))
+
+    @staticmethod
+    def _matchspec_from_error_str(spec: str | Sequence[str]):
+        try:
+            if isinstance(spec, str):
+                name, version, build = spec.rsplit("-", 2)
+                return MatchSpec(name=name, version=version, build=build)
+            else:
+                kwargs = {"name": spec[0].rstrip(",")}
+                if len(spec) >= 2:
+                    kwargs["version"] = spec[1].rstrip(",")
+                if len(spec) == 3:
+                    kwargs["build"] = spec[2].rstrip(",")
+                return MatchSpec(**kwargs)
+        except Exception as exc:
+            raise ValueError(f"Could not parse spec: {spec}") from exc
 
     def _maybe_ignore_current_repodata(self) -> str:
         is_repodata_fn_set = False
