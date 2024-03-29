@@ -169,7 +169,7 @@ class LibMambaSolver(Solver):
         return solution
 
     # region Metadata collection
-    ###########################
+    ############################
 
     def _collect_all_metadata_spinner_message(
         self,
@@ -244,7 +244,7 @@ class LibMambaSolver(Solver):
     # endregion
 
     # region Solving
-    ###############
+    ################
 
     def _solving_loop_spinner_message(self) -> str:
         """This shouldn't be our responsibility, but the CLI / app's..."""
@@ -586,6 +586,8 @@ class LibMambaSolver(Solver):
     # endregion
 
     # region Error reporting
+    ########################
+
     @classmethod
     def _parse_problems(cls, problems: str) -> Mapping[str, MatchSpec]:
         """
@@ -744,7 +746,7 @@ class LibMambaSolver(Solver):
     # endregion
 
     # region General helpers
-    #######################
+    ########################
 
     def _log_info(self):
         log.info("conda version: %s", _conda_version)

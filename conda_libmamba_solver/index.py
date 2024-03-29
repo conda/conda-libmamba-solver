@@ -114,7 +114,7 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(f"conda.{__name__}")
-
+_db_log = logging.getLogger(f"conda.{__name__}.db")
 
 class LibMambaIndexHelper:
     """
@@ -190,7 +190,23 @@ class LibMambaIndexHelper:
             home_dir=str(Path.home()),
             current_working_dir=os.getcwd(),
         )
-        return Database(params)
+        db = Database(params)
+        try:
+            db.set_logger(self._logger_callback)
+        except TypeError:
+            pass  # error in alpha4, will be fixed in beta1
+        return db
+
+    @staticmethod
+    def _logger_callback(level, msg):
+        # from libmambapy.solver.libsolv import LogLevel
+        # levels = {
+        #     LogLevel.Debug: logging.INFO, # 0 -> 20
+        #     LogLevel.Warning: logging.WARNING, # 1 -> 30
+        #     LogLevel.Error: logging.ERROR, # 2 -> 40
+        #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
+        # }
+        _db_log.log((level.value + 2) * 10, msg)
 
     def _load_channels(self):
         urls_to_channel = self._channel_urls()
