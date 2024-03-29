@@ -7,7 +7,7 @@ from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
-from conda_libmamba_solver.index2 import LibMambaIndexHelper
+from conda_libmamba_solver.index import LibMambaIndexHelper
 
 initialize_logging()
 

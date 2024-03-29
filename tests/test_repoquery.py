@@ -5,7 +5,7 @@ import json
 
 from conda.models.channel import Channel
 
-from conda_libmamba_solver.index2 import LibMambaIndexHelper
+from conda_libmamba_solver.index import LibMambaIndexHelper
 
 from .utils import conda_subprocess
 

@@ -15,7 +15,7 @@ except ImportError:
 
 def get_solver_class(key="libmamba"):
     if key == "libmamba":
-        from .solver2 import LibMambaSolver
+        from .solver import LibMambaSolver
 
         return LibMambaSolver
     raise ValueError("Key must be 'libmamba'")

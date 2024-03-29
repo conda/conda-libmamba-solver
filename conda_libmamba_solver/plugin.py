@@ -8,7 +8,7 @@ Entry points for the conda plugin system
 from conda import plugins
 
 from .repoquery import configure_parser, repoquery
-from .solver2 import LibMambaSolver
+from .solver import LibMambaSolver
 
 
 @plugins.hookimpl

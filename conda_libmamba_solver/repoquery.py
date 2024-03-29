@@ -22,7 +22,7 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from libmambapy import Context as LibmambaContext
 
-from .index2 import LibMambaIndexHelper
+from .index import LibMambaIndexHelper
 
 
 def configure_parser(parser: argparse.ArgumentParser):
