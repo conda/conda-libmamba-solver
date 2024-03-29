@@ -323,7 +323,7 @@ class LibMambaSolver(Solver):
     ) -> tuple[bool, Solution | UnSolvable]:
         log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %s", out_state.conflicts)
-        flags = self._solver_flags()
+        flags = self._solver_flags(in_state)
         jobs = self._specs_to_request_jobs(in_state, out_state)
         request = Request(jobs=jobs, flags=flags)
         solver = LibsolvSolver()
@@ -343,13 +343,15 @@ class LibMambaSolver(Solver):
         out_state.conflicts.update(new_conflicts)
         return False, outcome
 
-    def _solver_flags(self) -> Request.Flags:
+    def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
         flags = Request.Flags()
         flags.allow_downgrade = True
-        if context.channel_priority is ChannelPriority.STRICT:
-            flags.strict_repo_priority = True
-        if self.specs_to_remove and self._command in ("remove", None, NULL):
-            flags.allow_uninstall = True
+        flags.allow_uninstall = self.specs_to_remove and self._command in ("remove", None, NULL)
+        flags.force_reinstall = in_state.force_reinstall
+        flags.keep_dependencies = True
+        flags.keep_user_specs = True
+        flags.order_request = False  # we do this ourselves
+        flags.strict_repo_priority = context.channel_priority is ChannelPriority.STRICT
         return flags
 
     def _specs_to_request_jobs(
