@@ -116,6 +116,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(f"conda.{__name__}")
 _db_log = logging.getLogger(f"conda.{__name__}.db")
 
+
 class LibMambaIndexHelper:
     """
     Interface between conda and libmamba for the purpose of building the "index".
@@ -212,8 +213,9 @@ class LibMambaIndexHelper:
         urls_to_channel = self._channel_urls()
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         repos = []
-        for url, (json_path, state) in urls_to_json_path_and_state.items():
-            repos.append(self._load_repo_info_from_json_path(json_path, url, state))
+        for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
+            url_no_cred = urls_to_channel[url_w_cred].url(with_credentials=False)
+            repos.append(self._load_repo_info_from_json_path(json_path, url_no_cred, state))
         return repos
 
     def _channel_urls(self) -> dict[str, Channel]:
@@ -284,14 +286,15 @@ class LibMambaIndexHelper:
 
         if repodata_origin:
             try:
+                log.debug("Loading %s from SOLV repodata at %s", channel_url, solv_path)
                 return self.db.add_repo_from_native_serialization(
-                    path=str(json_path),
+                    path=str(solv_path),
                     expected=repodata_origin,
                     channel_id=channel_url,
                     add_pip_as_python_dependency=context.add_pip_as_python_dependency,
                 )
             except Exception as exc:
-                log.debug("Could not load from serialized repdoata", exc_info=exc)
+                log.debug("Failed to load from SOLV. Trying JSON at %s", json_path, exc_info=exc)
 
         repo = self.db.add_repo_from_repodata_json(
             path=str(json_path),
