@@ -6,8 +6,8 @@ ci:
 exclude: |
   (?x)^(
     tests/data/.* |
-    conda_libmamba_solver/index\.py |
-    conda_libmamba_solver/solver\.py |
+    conda_libmamba_solver/_index_v1\.py |
+    conda_libmamba_solver/_solver_v1\.py |
     conda_libmamba_solver/mamba_utils\.py
   )$
 repos:
