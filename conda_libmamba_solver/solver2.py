@@ -346,7 +346,9 @@ class LibMambaSolver(Solver):
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
         flags = Request.Flags()
         flags.allow_downgrade = True
-        flags.allow_uninstall = self.specs_to_remove and self._command in ("remove", None, NULL)
+        flags.allow_uninstall = bool(
+            self.specs_to_remove and self._command in ("remove", None, NULL)
+        )
         flags.force_reinstall = in_state.force_reinstall
         flags.keep_dependencies = True
         flags.keep_user_specs = True
