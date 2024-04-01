@@ -644,14 +644,11 @@ class LibMambaSolver(Solver):
             elif line == "unsupported request":
                 # libmamba v2 has this message for package not found errors
                 # we need to double check with the explained problem
-                print(line)
-                print(explained_problems)
                 # if "does not exist" in explained_problems:
                 for explained_line in explained_problems.splitlines():
                     explained_line = explained_line.strip()
                     explained_words = explained_line.split()
                     if "does not exist" in explained_line:
-                        print(explained_line)
                         not_found.append(cls._matchspec_from_error_str(explained_words[1:3]))
                         break
             else:
@@ -812,9 +809,12 @@ class LibMambaSolver(Solver):
                 return MatchSpec(name=name, version=version, build=build)
             else:
                 kwargs = {"name": spec[0].rstrip(",")}
-                if len(spec) >= 2:
-                    kwargs["version"] = spec[1].rstrip(",")
-                if len(spec) == 3:
+                if len(spec) >= 2 and spec[1] != "=*":
+                    if spec[1].startswith("==") or not spec[1].startswith("="):
+                        kwargs["version"] = spec[1].rstrip(",")
+                    else:
+                        kwargs["version"] = spec[1][1:].rstrip(",") + ".*"
+                if len(spec) == 3 and spec[2] != "*":
                     kwargs["build"] = spec[2].rstrip(",")
                 return MatchSpec(**kwargs)
         except Exception as exc:
