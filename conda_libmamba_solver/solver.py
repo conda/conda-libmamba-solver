@@ -150,8 +150,7 @@ class LibMambaSolver(Solver):
                 conda_build_channels=conda_build_channels,
                 in_state=in_state,
             )
-
-        out_state.check_for_pin_conflicts(index)
+            out_state.check_for_pin_conflicts(index)
 
         with Spinner(
             self._solving_loop_spinner_message(),
