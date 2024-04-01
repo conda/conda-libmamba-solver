@@ -195,7 +195,16 @@ class LibMambaSolver(Solver):
         )
 
     def _collect_channel_list(self, in_state: SolverInputState) -> list[Channel]:
-        channels = [*self.channels, *in_state.channels_from_specs()]
+        channels = [*self.channels]
+        channels_by_name = {}
+        for channel in channels:
+            channels_by_name.setdefault(channel.name or channel.canonical.name, []).append(channel)
+        for spec_channel in in_state.channels_from_specs():
+            same_name = channels_by_name.get(spec_channel.name or spec_channel.canonical_name)
+            if same_name:
+                # do not add spec channel if there's already one with the same name
+                continue
+            channels.append(spec_channel)
 
         # TODO: Deprecate 'channels_from_installed' functionality?
         override = (getattr(context, "_argparse_args", None) or {}).get("override_channels")
@@ -287,18 +296,9 @@ class LibMambaSolver(Solver):
                 {
                     name: record.to_match_spec()
                     for name, record in in_state.installed.items()
-                    # TODO: These conditions might not be needed here
                     if not record.is_unmanageable
-                    # or name not in in_state.history
-                    # or name not in in_state.requested
-                    # or name not in in_state.pinned
                 }
             )
-            # we only check this for "desperate" strategies in _specs_to_tasks
-            if self._command in (None, NULL):
-                self._command = "last_solve_attempt"
-            else:
-                self._command += "+last_solve_attempt"
             solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
             if not solved:
                 message = self._prepare_problems_message(outcome, index.db)
@@ -331,15 +331,18 @@ class LibMambaSolver(Solver):
         if isinstance(outcome, Solution):
             out_state.conflicts.clear()
             return True, outcome
-
-        problems = outcome.problems_to_str(index.db)
         old_conflicts = out_state.conflicts.copy()
         new_conflicts = self._maybe_raise_for_problems(
-            outcome, index.db, problems, old_conflicts, index.channels
+            outcome, index, old_conflicts
         )
-        log.debug(
-            "Attempt %d failed with %s conflicts:\n%s", attempt, len(new_conflicts), problems
-        )
+        if log.isEnabledFor(logging.DEBUG):
+            problems_as_str = outcome.problems_to_str(index.db)
+            log.debug(
+                "Attempt %d failed with %s conflicts:\n%s",
+                attempt,
+                len(new_conflicts),
+                problems_as_str,
+            )
         out_state.conflicts.update(new_conflicts)
         return False, outcome
 
@@ -371,10 +374,11 @@ class LibMambaSolver(Solver):
         request_jobs = []
         json_friendly = {}
         for JobType, specs in jobs.items():
-            for spec in specs:
-                spec = LibmambaMatchSpec.parse(str(spec))
+            for conda_spec in specs:
+                spec = LibmambaMatchSpec.parse(str(conda_spec))
                 request_jobs.append(JobType(spec))
-                json_friendly.setdefault(JobType.__name__, []).append(str(spec))
+                if log.isEnabledFor(logging.INFO):
+                    json_friendly.setdefault(JobType.__name__, []).append(str(conda_spec))
         if log.isEnabledFor(logging.INFO):
             json_str = json.dumps(json_friendly, indent=2)
             log.info("The solver will handle these requests:\n%s", json_str)
@@ -589,7 +593,7 @@ class LibMambaSolver(Solver):
     ########################
 
     @classmethod
-    def _parse_problems(cls, problems: str) -> Mapping[str, MatchSpec]:
+    def _parse_problems(cls, unsolvable: UnSolvable, db: Database) -> Mapping[str, MatchSpec]:
         """
         Problems can signal either unsatisfiability or unavailability.
         First will raise LibmambaUnsatisfiableError.
@@ -602,18 +606,20 @@ class LibMambaSolver(Solver):
         """
         conflicts = []
         not_found = []
-        problem_lines = problems.splitlines()[1:]
-        for line in problem_lines:
-            line = line.strip()
+        problems = unsolvable.problems(db)
+        try:
+            explained_problems = unsolvable.explain_problems(db, Palette.no_color())
+        except Exception as exc:
+            log.debug("Cannot explain problems", exc_info=exc)
+            explained_problems = ""
+        for line in problems:
             words = line.split()
-            if not line.startswith("- "):
-                continue
             if "none of the providers can be installed" in line:
-                if words[1] != "package" or words[3] != "requires":
+                if words[0] != "package" or words[2] != "requires":
                     raise ValueError(f"Unknown message: {line}")
-                conflicts.append(cls._matchspec_from_error_str(words[2]))
+                conflicts.append(cls._matchspec_from_error_str(words[1]))
                 end = words.index("but")
-                conflicts.append(cls._matchspec_from_error_str(words[4:end]))
+                conflicts.append(cls._matchspec_from_error_str(words[3:end]))
             elif "- nothing provides" in line:
                 marker = next((i for (i, w) in enumerate(words) if w == "needed"), None)
                 if marker:
@@ -632,7 +638,20 @@ class LibMambaSolver(Solver):
                 conflicts.append(MatchSpec(pin_b))
             elif "is excluded by strict repo priority" in line:
                 # package python-3.7.6-h0371630_2 is excluded by strict repo priority
-                conflicts.append(cls._matchspec_from_error_str(words[2]))
+                conflicts.append(cls._matchspec_from_error_str(words[1]))
+            elif line == "unsupported request":
+                # libmamba v2 has this message for package not found errors
+                # we need to double check with the explained problem
+                print(line)
+                print(explained_problems)
+                # if "does not exist" in explained_problems:
+                for explained_line in explained_problems.splitlines():
+                    explained_line = explained_line.strip()
+                    explained_words = explained_line.split()
+                    if "does not exist" in explained_line:
+                        print(explained_line)
+                        not_found.append(cls._matchspec_from_error_str(explained_words[1:3]))
+                        break
             else:
                 log.debug("! Problem line not recognized: %s", line)
 
@@ -644,31 +663,28 @@ class LibMambaSolver(Solver):
     def _maybe_raise_for_problems(
         self,
         unsolvable: UnSolvable,
-        db: Database,
-        problems: str | Mapping,
+        index: LibMambaIndexHelper,
         previous_conflicts: Mapping[str, MatchSpec] = None,
-        channels: Iterable[Channel] = (),
     ):
-        if isinstance(problems, str):
-            parsed_problems = self._parse_problems(problems)
-
+        parsed_problems = self._parse_problems(unsolvable, index.db)
         # We allow conda-build (if present) to process the exception early
         self._maybe_raise_for_conda_build(
             {**parsed_problems["conflicts"], **parsed_problems["not_found"]},
-            message=self._prepare_problems_message(unsolvable, db),
+            message=self._prepare_problems_message(unsolvable, index.db),
         )
 
         unsatisfiable = parsed_problems["conflicts"]
         not_found = parsed_problems["not_found"]
         if not unsatisfiable and not_found:
-            log.debug(
-                "Inferred PackagesNotFoundError %s from conflicts:\n%s",
-                tuple(not_found.keys()),
-                problems,
-            )
+            if log.isEnabledFor(logging.DEBUG):
+                log.debug(
+                    "Inferred PackagesNotFoundError %s from conflicts:\n%s",
+                    tuple(not_found.keys()),
+                    unsolvable.problems(index.db),
+                )
             # This is not a conflict, but a missing package in the channel
             exc = PackagesNotFoundError(
-                tuple(not_found.values()), tuple(channels or self.channels)
+                tuple(not_found.values()), tuple(index.channels)
             )
             exc.allow_retry = False
             raise exc
@@ -685,7 +701,7 @@ class LibMambaSolver(Solver):
 
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
-            message = self._prepare_problems_message(unsolvable, db)
+            message = self._prepare_problems_message(unsolvable, index.db)
             exc = LibMambaUnsatisfiableError(message)
             # do not allow conda.cli.install to try more things
             exc.allow_retry = False
@@ -698,10 +714,6 @@ class LibMambaSolver(Solver):
         if " - " not in message:
             # This makes 'explain_problems()' crash. Anticipate.
             message = "Failed with empty error message."
-            explain = False
-        elif "unsupported request" in message:
-            # This error makes 'explain_problems()' crash. Anticipate.
-            log.info("Failed to explain problems. Unsupported request.")
             explain = False
         elif "is excluded by strict repo priority" in message:
             # This will cause a lot of warnings until implemented in detail explanations
@@ -776,7 +788,16 @@ class LibMambaSolver(Solver):
         )
 
     def _check_spec_compat(self, spec: MatchSpec | None) -> MatchSpec | None:
-        return spec
+        if spec is None:
+            return
+        spec_fields = {}
+        for field in spec.FIELD_NAMES:
+            value = spec.get_raw_value(field)
+            if value:
+                if field == "channel" and str(value) == "<unknown>":
+                    continue
+                spec_fields[field] = value
+        return MatchSpec(**spec_fields)
 
     def _conda_spec_to_libmamba_spec(self, spec: MatchSpec) -> LibmambaMatchSpec:
         return LibmambaMatchSpec.parse(str(spec))

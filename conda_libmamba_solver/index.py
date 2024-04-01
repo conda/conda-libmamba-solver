@@ -75,13 +75,15 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from conda.base.constants import REPODATA_FN
+from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
+from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
@@ -117,6 +119,25 @@ log = logging.getLogger(f"conda.{__name__}")
 _db_log = logging.getLogger(f"conda.{__name__}.db")
 
 
+@dataclass(frozen=True)
+class _ChannelRepoInfo:
+    "A dataclass mapping conda Channels, libmamba Repos and URLs"
+
+    channel: Channel | None
+    repo: RepoInfo
+    url_w_cred: str
+    url_no_cred: str
+
+    @property
+    def canonical_name(self):
+        if self.channel:
+            return self.channel.canonical_name
+        url_parts = self.url_no_cred.split("/")
+        if url_parts[-1] in KNOWN_SUBDIRS:
+            return url_parts[-2]
+        return url_parts[-1]
+
+
 class LibMambaIndexHelper:
     """
     Interface between conda and libmamba for the purpose of building the "index".
@@ -140,17 +161,12 @@ class LibMambaIndexHelper:
         self.subdirs = subdirs or context.subdirs
         self.repodata_fn = repodata_fn
         self.db = self._init_db()
-        self.repos = self._load_channels()
+        self.repos: list[_ChannelRepoInfo] = self._load_channels()
         if pkgs_dirs:
             self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
         if installed_records:
             self.repos.append(self._load_installed(installed_records))
-
-        n_repos = len(self.repos)
-        for i, repo in enumerate(self.repos):
-            priority = n_repos - i
-            subpriority = 0 if repo.name == "noarch" else 1
-            self.db.set_repo_priority(repo, Priorities(priority, subpriority))
+        self._set_repo_priorities()
 
     def reload_channel(self, channel: Channel):
         raise NotImplementedError  # TODO
@@ -160,12 +176,18 @@ class LibMambaIndexHelper:
 
     def _init_db(self) -> Database:
         custom_channels = {
+            # Add custom channels as a workaround for this weird conda behavior
+            # See https://github.com/conda/conda/issues/13501
+            **{c.name: c for c in self.channels if c.location != context.channel_alias.location},
+            **context.custom_channels,
+        }
+        custom_channels = {
             name: LibmambaChannel(
                 url=CondaURL.parse(channel.base_url),
                 display_name=name,
                 platforms=set(self.subdirs),
             )
-            for (name, channel) in context.custom_channels.items()
+            for (name, channel) in custom_channels.items()
             if channel.base_url
         }
         custom_multichannels = {
@@ -209,16 +231,26 @@ class LibMambaIndexHelper:
         # }
         _db_log.log((level.value + 2) * 10, msg)
 
-    def _load_channels(self):
+    def _load_channels(self) -> list[_ChannelRepoInfo]:
         urls_to_channel = self._channel_urls()
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
-        repos = []
+        channel_repo_infos = []
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
-            url_no_cred = urls_to_channel[url_w_cred].url(with_credentials=False)
-            repos.append(self._load_repo_info_from_json_path(json_path, url_no_cred, state))
-        return repos
+            url_no_token, _ = split_anaconda_token(url_w_cred)
+            url_no_cred = remove_auth(url_no_token)
+            repo = self._load_repo_info_from_json_path(json_path, url_no_cred, state)
+            channel_repo_infos.append(
+                _ChannelRepoInfo(
+                    channel=urls_to_channel[url_w_cred],
+                    repo=repo,
+                    url_w_cred=url_w_cred,
+                    url_no_cred=url_no_cred,
+                )
+            )
+        return channel_repo_infos
 
     def _channel_urls(self) -> dict[str, Channel]:
+        "Maps authenticated URLs to channel objects"
         urls = {}
         seen_noauth = set()
         channels_with_subdirs = []
@@ -283,23 +315,25 @@ class LibMambaIndexHelper:
             repodata_origin = RepodataOrigin(url=channel_url, etag=state.etag, mod=state.mod)
         else:
             repodata_origin = None
-
+        channel = Channel(channel_url)
+        channel_id = channel.name or channel.canonical_name
         if repodata_origin:
             try:
-                log.debug("Loading %s from SOLV repodata at %s", channel_url, solv_path)
+                log.debug(
+                    "Loading %s (%s) from SOLV repodata at %s", channel_id, channel_url, solv_path
+                )
                 return self.db.add_repo_from_native_serialization(
                     path=str(solv_path),
                     expected=repodata_origin,
-                    channel_id=channel_url,
+                    channel_id=channel_id,
                     add_pip_as_python_dependency=context.add_pip_as_python_dependency,
                 )
             except Exception as exc:
                 log.debug("Failed to load from SOLV. Trying JSON at %s", json_path, exc_info=exc)
-
         repo = self.db.add_repo_from_repodata_json(
             path=str(json_path),
             url=channel_url,
-            channel_id=channel_url,
+            channel_id=channel_id,
             add_pip_as_python_dependency=PipAsPythonDependency(
                 context.add_pip_as_python_dependency
             ),
@@ -313,7 +347,9 @@ class LibMambaIndexHelper:
         packages = [self._package_info_from_package_record(record) for record in records]
         repo = self.db.add_repo_from_packages(packages=packages, name="installed")
         self.db.set_installed_repo(repo)
-        return repo
+        return _ChannelRepoInfo(
+            channel=None, repo=repo, url_w_cred="installed", url_no_cred="installed"
+        )
 
     def _load_pkgs_cache(self, pkgs_dirs: Iterable[os.PathLike]) -> Iterable[RepoInfo]:
         repos = []
@@ -325,7 +361,12 @@ class LibMambaIndexHelper:
                 for record in package_cache_data.values()
             ]
             repo = self.db.add_repo_from_packages(packages=packages, name=path)
-            repos.append(repo)
+            path_as_url = path_to_url(path)
+            repos.append(
+                _ChannelRepoInfo(
+                    channel=None, repo=repo, url_w_cred=path_as_url, url_no_cred=path_as_url
+                )
+            )
         return repos
 
     def _package_info_from_package_record(self, record: PackageRecord) -> PackageInfo:
@@ -355,6 +396,48 @@ class LibMambaIndexHelper:
             size=record.get("size") or 0,
             timestamp=int((record.get("timestamp") or 0) * 1000),
         )
+
+    def _set_repo_priorities(self):
+        # channels = list(reversed(dict.fromkeys(repo.name.rsplit("/", 1)[0] for repo in self.repos)))
+        # for repo in self.repos:
+        #     priority = channels.index(repo.name.rsplit("/", 1)[0])
+        #     subpriority = 0 if repo.name.endswith("/noarch") else 1
+        #     logging.debug("Priorities for %s: %d, %d", repo.name, priority, subpriority)
+        #     self.db.set_repo_priority(repo, Priorities(priority, subpriority))
+        has_priority = context.channel_priority in [
+            ChannelPriority.STRICT,
+            ChannelPriority.FLEXIBLE,
+        ]
+
+        subprio_index = len(self.repos)
+        if has_priority:
+            # max channel priority value is the number of unique channels
+            channel_prio = len({repo.canonical_name for repo in self.repos})
+            current_channel_name = self.repos[0].canonical_name
+
+        for repo_info in self.repos:
+            if has_priority:
+                if repo_info.canonical_name != current_channel_name:
+                    channel_prio -= 1
+                    current_channel_name = repo_info.canonical_name
+                priority = channel_prio
+            else:
+                priority = 0
+            if has_priority:
+                # NOTE: -- This was originally 0, but we need 1.
+                # Otherwise, conda/conda @ test_create::test_force_remove fails :shrug:
+                subpriority = 1
+            else:
+                subpriority = subprio_index
+                subprio_index -= 1
+
+            log.debug(
+                "Channel: %s, prio: %s : %s",
+                repo_info.url_no_cred,
+                priority,
+                subpriority,
+            )
+            self.db.set_repo_priority(repo_info.repo, Priorities(priority, subpriority))
 
     # region Repoquery
     #################
