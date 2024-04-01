@@ -82,7 +82,7 @@ def compatible_specs(index, specs, raise_not_found=True):
         results = set(index.search(spec))
         if not results:
             if raise_not_found:
-                exc = PackagesNotFoundError([spec], index._channels)
+                exc = PackagesNotFoundError([spec], index.channels)
                 exc.allow_retry = False
                 raise exc
             return False
