@@ -55,8 +55,8 @@ def test_defaults_use_only_tar_bz2(monkeypatch: pytest.MonkeyPatch, only_tar_bz2
 
     libmamba_dot_conda_total = 0
     libmamba_tar_bz2_total = 0
-    for repo in libmamba_index.repos:
-        for pkg in libmamba_index.db.packages_in_repo(repo):
+    for repo_info in libmamba_index.repos:
+        for pkg in libmamba_index.db.packages_in_repo(repo_info.repo):
             if pkg.package_url.endswith(".conda"):
                 libmamba_dot_conda_total += 1
             elif pkg.package_url.endswith(".tar.bz2"):
