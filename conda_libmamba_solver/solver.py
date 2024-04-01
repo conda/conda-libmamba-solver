@@ -198,7 +198,7 @@ class LibMambaSolver(Solver):
         channels = [*self.channels]
         channels_by_name = {}
         for channel in channels:
-            channels_by_name.setdefault(channel.name or channel.canonical.name, []).append(channel)
+            channels_by_name.setdefault(channel.name or channel.canonical_name, []).append(channel)
         for spec_channel in in_state.channels_from_specs():
             same_name = channels_by_name.get(spec_channel.name or spec_channel.canonical_name)
             if same_name:
