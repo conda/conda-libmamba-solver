@@ -449,6 +449,7 @@ class LibMambaIndexHelper:
     ) -> Iterable[PackageRecord] | dict | QueryResult:
         if isinstance(queries, (str, MatchSpec)):
             queries = [queries]
+        queries = list(map(str, queries))
         result = Query.find(self.db, queries)
         return self._process_query_result(result, return_type)
 
@@ -458,6 +459,7 @@ class LibMambaIndexHelper:
         tree: bool = False,
         return_type: Literal["records", "dict", "raw"] = "records",
     ) -> Iterable[PackageRecord] | dict | QueryResult:
+        query = str(query)
         result = Query.depends(self.db, query, tree)
         return self._process_query_result(result, return_type)
 
@@ -467,6 +469,7 @@ class LibMambaIndexHelper:
         tree: bool = False,
         return_type: Literal["records", "dict", "raw"] = "records",
     ) -> Iterable[PackageRecord] | dict | QueryResult:
+        query = str(query)
         result = Query.whoneeds(self.db, query, tree)
         return self._process_query_result(result, return_type)
 

@@ -151,6 +151,8 @@ class LibMambaSolver(Solver):
                 in_state=in_state,
             )
 
+        out_state.check_for_pin_conflicts(index)
+
         with Spinner(
             self._solving_loop_spinner_message(),
             enabled=not context.verbosity and not context.quiet,
