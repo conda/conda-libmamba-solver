@@ -89,7 +89,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from libmambapy import ChannelContext, Context, LogLevel, Query
+from libmambapy import ChannelContext, Context, LogLevel, MambaNativeException, Query
 from libmambapy.solver.libsolv import (
     Database,
     PackageTypes,
@@ -348,7 +348,7 @@ class LibMambaIndexHelper:
 
     def _load_repo_info_from_json_path(
         self, json_path: str, channel_url: str, state: RepodataState
-    ) -> RepoInfo:
+    ) -> RepoInfo | None:
         json_path = Path(json_path)
         solv_path = json_path.with_suffix(".solv")
         if state:
@@ -370,19 +370,32 @@ class LibMambaIndexHelper:
                 )
             except Exception as exc:
                 log.debug("Failed to load from SOLV. Trying JSON at %s", json_path, exc_info=exc)
-        repo = self.db.add_repo_from_repodata_json(
-            path=str(json_path),
-            url=channel_url,
-            channel_id=channel_id,
-            add_pip_as_python_dependency=PipAsPythonDependency(
-                context.add_pip_as_python_dependency
-            ),
-            package_types=(
-                PackageTypes.TarBz2Only
-                if context.use_only_tar_bz2
-                else PackageTypes.CondaOrElseTarBz2
-            ),
-        )
+        try:
+            repo = self.db.add_repo_from_repodata_json(
+                path=str(json_path),
+                url=channel_url,
+                channel_id=channel_id,
+                add_pip_as_python_dependency=PipAsPythonDependency(
+                    context.add_pip_as_python_dependency
+                ),
+                package_types=(
+                    PackageTypes.TarBz2Only
+                    if context.use_only_tar_bz2
+                    else PackageTypes.CondaOrElseTarBz2
+                ),
+            )
+        except MambaNativeException as exc:
+            if "does not exist" in str(exc) and context.offline:
+                # Ignore errors in offline mode. This is needed to pass
+                # tests/test_create.py::test_offline_with_empty_index_cache.
+                # In offline mode, with no repodata cache available, conda can still
+                # create a channel from the pkgs/ content. For that to work, we must
+                # not error out this early. If the package is still not found, the solver
+                # will complain that the package cannot be found.
+                log.warning("Could not load repodata for %s.", channel_id)
+                log.debug("Ignored MambaNativeException in offline mode: %s", exc, exc_info=exc)
+                return None
+            raise exc
         if repodata_origin:
             self.db.native_serialize_repo(repo=repo, path=str(solv_path), metadata=repodata_origin)
         return repo
@@ -460,6 +473,8 @@ class LibMambaIndexHelper:
             current_channel_name = self.repos[0].canonical_name
 
         for repo_info in self.repos:
+            if repo_info.repo is None:
+                continue
             if has_priority:
                 if repo_info.canonical_name != current_channel_name:
                     channel_prio -= 1
