@@ -214,6 +214,18 @@ class LibMambaIndexHelper:
             current_working_dir=os.getcwd(),
         )
         db = Database(params)
+        self._set_logging(db)
+        return db
+
+    def _set_logging(self, db):
+        log_level = {
+            4: LogLevel.TRACE,
+            3: LogLevel.DEBUG,
+            2: LogLevel.INFO,
+            1: LogLevel.WARNING,
+            0: LogLevel.ERROR,
+        }
+        Context.instance().set_log_level(log_level[context.verbosity])
         if not os.getenv("PYTEST_CURRENT_TEST"):
             # The logging callback can slow things down; disable during
             # testing to avoid the performance hits.
@@ -221,7 +233,6 @@ class LibMambaIndexHelper:
                 db.set_logger(self._debug_logger_callback)
             elif context.verbosity in (1, 2):
                 db.set_logger(self._verbose_logger_callback)
-        return db
 
     @staticmethod
     def _debug_logger_callback(level, msg):
