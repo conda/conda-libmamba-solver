@@ -89,7 +89,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from libmambapy import ChannelContext, Context, Query
+from libmambapy import ChannelContext, Context, LogLevel, Query
 from libmambapy.solver.libsolv import (
     Database,
     PackageTypes,
@@ -324,6 +324,16 @@ class LibMambaIndexHelper:
         channel = Channel.from_url(url)
         if not channel.subdir:
             raise ValueError("Channel URLs must specify a subdir!")
+
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            # Workaround some testing issues - TODO: REMOVE
+            # Fix conda.testing.helpers._patch_for_local_exports by removing last line
+            for key, cached in list(SubdirData._cache_.items()):
+                if not isinstance(key, tuple):
+                    continue  # should not happen, but avoid IndexError just in case
+                if key[:2] == (url, self.repodata_fn) and cached._mtime == float("inf"):
+                    del SubdirData._cache_[key]
+            # /Workaround
 
         subdir_data = SubdirData(channel, repodata_fn=self.repodata_fn)
         if context.offline or context.use_index_cache:
