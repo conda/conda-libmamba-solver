@@ -333,9 +333,7 @@ class LibMambaSolver(Solver):
             out_state.conflicts.clear()
             return True, outcome
         old_conflicts = out_state.conflicts.copy()
-        new_conflicts = self._maybe_raise_for_problems(
-            outcome, index, old_conflicts
-        )
+        new_conflicts = self._maybe_raise_for_problems(outcome, index, old_conflicts)
         if log.isEnabledFor(logging.DEBUG):
             problems_as_str = outcome.problems_to_str(index.db)
             log.debug(
@@ -681,9 +679,7 @@ class LibMambaSolver(Solver):
                     unsolvable.explain_problems(index.db, Palette.no_color()),
                 )
             # This is not a conflict, but a missing package in the channel
-            exc = PackagesNotFoundError(
-                tuple(not_found.values()), tuple(index.channels)
-            )
+            exc = PackagesNotFoundError(tuple(not_found.values()), tuple(index.channels))
             exc.allow_retry = False
             raise exc
 
