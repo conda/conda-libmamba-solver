@@ -376,8 +376,8 @@ class LibMambaSolver(Solver):
         json_friendly = {}
         for JobType, specs in jobs.items():
             for conda_spec in specs:
-                spec = LibmambaMatchSpec.parse(str(conda_spec))
-                request_jobs.append(JobType(spec))
+                libmamba_spec = self._conda_spec_to_libmamba_spec(conda_spec)
+                request_jobs.append(JobType(libmamba_spec))
                 if log.isEnabledFor(logging.INFO):
                     json_friendly.setdefault(JobType.__name__, []).append(str(conda_spec))
         if log.isEnabledFor(logging.INFO):
@@ -602,7 +602,7 @@ class LibMambaSolver(Solver):
 
         Libmamba can return spec strings in two formats:
         - With dashes, e.g. package-1.2.3-h5487548_0
-        - à la conda-build, e.g. package 1.2.*
+        - à la conda-build, e.g. package 1.2.* *
         - just names, e.g. package
         """
         conflicts = []
@@ -678,7 +678,7 @@ class LibMambaSolver(Solver):
                 log.debug(
                     "Inferred PackagesNotFoundError %s from conflicts:\n%s",
                     tuple(not_found.keys()),
-                    unsolvable.problems(index.db),
+                    unsolvable.explain_problems(index.db, Palette.no_color()),
                 )
             # This is not a conflict, but a missing package in the channel
             exc = PackagesNotFoundError(
