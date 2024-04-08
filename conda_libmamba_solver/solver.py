@@ -349,9 +349,10 @@ class LibMambaSolver(Solver):
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
         flags = Request.Flags()
         flags.allow_downgrade = True
-        flags.allow_uninstall = bool(
-            self.specs_to_remove and self._command in ("remove", None, NULL)
-        )
+        # About flags.allow_uninstall = True:
+        # We used to set this to False on a global basis and then add jobs
+        # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
+        flags.allow_uninstall = True
         flags.force_reinstall = in_state.force_reinstall
         flags.keep_dependencies = True
         flags.keep_user_specs = True
@@ -472,8 +473,10 @@ class LibMambaSolver(Solver):
                     tasks[Request.Install].append(history)
             elif installed:
                 if conflicting:
-                    ...  # TODO: This breaks test_python_downgrade_with_pins_removes_truststore
-                    # tasks[ALLOW_UNINSTALL].append(name)
+                    # NOTE: We don't do anything now with conflicting installed.
+                    # We rely on Flags.allow_uninstall = True doing the right thing.
+                    # We are protecting important things with Keep or Freeze instead.
+                    pass
                 else:
                     # we freeze everything else as installed
                     lock = in_state.update_modifier.FREEZE_INSTALLED
@@ -495,7 +498,6 @@ class LibMambaSolver(Solver):
             Request.Pin,
             Request.Install,
             Request.Update,
-            # ALLOW_UNINSTALL,
             Request.Keep,
             Request.Freeze,
         ):
