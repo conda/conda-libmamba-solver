@@ -240,6 +240,7 @@ class LibMambaSolver(Solver):
     ) -> LibMambaIndexHelper:
         index = LibMambaIndexHelper(
             channels=[*conda_build_channels, *channels],
+            subdirs=self.subdirs,
             repodata_fn=self._repodata_fn,
             installed_records=(
                 *in_state.installed.values(),
