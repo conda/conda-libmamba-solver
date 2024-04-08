@@ -63,7 +63,8 @@ if TYPE_CHECKING:
     from libmambapy.specs import PackageInfo
 
 
-_mamba_output_palette = Palette.terminal() if sys.stdin.isatty() else Palette.no_color()
+_mamba_auto_palette = Palette.terminal() if sys.stdin.isatty() else Palette.no_color()
+_mamba_nocolor_palette = Palette.no_color()
 log = logging.getLogger(f"conda.{__name__}")
 
 
@@ -385,7 +386,11 @@ class LibMambaSolver(Solver):
             log.info("The solver will handle these requests:\n%s", json_str)
         return request_jobs
 
-    def _specs_to_request_jobs_add(self, in_state: SolverInputState, out_state: SolverOutputState):
+    def _specs_to_request_jobs_add(
+        self,
+        in_state: SolverInputState,
+        out_state: SolverOutputState,
+    ) -> dict[Request, list[MatchSpec | str]]:
         tasks = defaultdict(list)
 
         # Protect history and aggressive updates from being uninstalled if possible. From libsolv
@@ -507,7 +512,7 @@ class LibMambaSolver(Solver):
 
     def _specs_to_request_jobs_remove(
         self, in_state: SolverInputState, out_state: SolverOutputState
-    ):
+    ) -> dict[Request, list[MatchSpec | str]]:
         # TODO: Consider merging add/remove in a single logic this so there's no split
 
         tasks = defaultdict(list)
@@ -533,7 +538,7 @@ class LibMambaSolver(Solver):
 
     def _specs_to_request_jobs_conda_build(
         self, in_state: SolverInputState, out_state: SolverOutputState
-    ):
+    ) -> dict[Request, list[MatchSpec | str]]:
         tasks = defaultdict(list)
         for name, spec in in_state.requested.items():
             if name.startswith("__"):
@@ -549,7 +554,7 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         out_state: SolverOutputState,
         solution: Solution,
-    ):
+    ) -> SolverOutputState:
         for action in solution.actions:
             record_to_install: PackageInfo = getattr(action, "install", None)
             record_to_remove: PackageInfo = getattr(action, "remove", None)
@@ -626,7 +631,7 @@ class LibMambaSolver(Solver):
         not_found = []
         problems = unsolvable.problems(db)
         try:
-            explained_problems = unsolvable.explain_problems(db, Palette.no_color())
+            explained_problems = unsolvable.explain_problems(db, _mamba_nocolor_palette)
         except Exception as exc:
             log.debug("Cannot explain problems", exc_info=exc)
             explained_problems = ""
@@ -721,7 +726,7 @@ class LibMambaSolver(Solver):
             raise exc
         return unsatisfiable
 
-    def _prepare_problems_message(self, unsolvable: UnSolvable, db: Database):
+    def _prepare_problems_message(self, unsolvable: UnSolvable, db: Database) -> str:
         message = unsolvable.problems_to_str(db)
         explain = True
         if " - " not in message:
@@ -735,7 +740,7 @@ class LibMambaSolver(Solver):
 
         if explain:
             try:
-                explained_errors = unsolvable.explain_problems(db, _mamba_output_palette)
+                explained_errors = unsolvable.explain_problems(db, _mamba_auto_palette)
                 message += "\n" + explained_errors
             except Exception as exc:
                 log.warning("Failed to explain problems", exc_info=exc)
