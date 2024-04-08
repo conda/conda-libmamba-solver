@@ -92,10 +92,10 @@ from conda.models.records import PackageRecord
 from libmambapy import ChannelContext, Context, Query
 from libmambapy.solver.libsolv import (
     Database,
+    PackageTypes,
     PipAsPythonDependency,
     Priorities,
     RepodataOrigin,
-    UseOnlyTarBz2,
 )
 from libmambapy.specs import (
     Channel as LibmambaChannel,
@@ -116,7 +116,7 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(f"conda.{__name__}")
-_db_log = logging.getLogger(f"conda.{__name__}.db")
+_db_log = logging.getLogger("conda.libmamba.db")
 
 
 @dataclass(frozen=True)
@@ -214,22 +214,38 @@ class LibMambaIndexHelper:
             current_working_dir=os.getcwd(),
         )
         db = Database(params)
-        try:
-            db.set_logger(self._logger_callback)
-        except TypeError:
-            pass  # error in alpha4, will be fixed in beta1
+        if context.verbosity >= 3:
+            db.set_logger(self._debug_logger_callback)
+        elif context.verbosity in (1, 2):
+            db.set_logger(self._verbose_logger_callback)
         return db
 
     @staticmethod
-    def _logger_callback(level, msg):
+    def _debug_logger_callback(level, msg):
         # from libmambapy.solver.libsolv import LogLevel
         # levels = {
-        #     LogLevel.Debug: logging.INFO, # 0 -> 20
+        #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
         #     LogLevel.Warning: logging.WARNING, # 1 -> 30
         #     LogLevel.Error: logging.ERROR, # 2 -> 40
         #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
         # }
-        _db_log.log((level.value + 2) * 10, msg)
+        if level.value == 0:
+            # This incurs a large performance hit!
+            _db_log.debug(msg)
+        else:
+            _db_log.log((level.value + 2) * 10, msg)
+
+    @staticmethod
+    def _verbose_logger_callback(level, msg):
+        # from libmambapy.solver.libsolv import LogLevel
+        # levels = {
+        #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
+        #     LogLevel.Warning: logging.WARNING, # 1 -> 30
+        #     LogLevel.Error: logging.ERROR, # 2 -> 40
+        #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
+        # }
+        if level.value:
+            _db_log.log((level.value + 2) * 10, msg)
 
     def _load_channels(self) -> list[_ChannelRepoInfo]:
         urls_to_channel = self._channel_urls()
@@ -337,7 +353,11 @@ class LibMambaIndexHelper:
             add_pip_as_python_dependency=PipAsPythonDependency(
                 context.add_pip_as_python_dependency
             ),
-            use_only_tar_bz2=UseOnlyTarBz2(context.use_only_tar_bz2),
+            package_types=(
+                PackageTypes.TarBz2Only
+                if context.use_only_tar_bz2
+                else PackageTypes.CondaOrElseTarBz2
+            ),
         )
         if repodata_origin:
             self.db.native_serialize_repo(repo=repo, path=str(solv_path), metadata=repodata_origin)
