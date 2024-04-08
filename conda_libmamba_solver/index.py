@@ -214,10 +214,13 @@ class LibMambaIndexHelper:
             current_working_dir=os.getcwd(),
         )
         db = Database(params)
-        if context.verbosity >= 3:
-            db.set_logger(self._debug_logger_callback)
-        elif context.verbosity in (1, 2):
-            db.set_logger(self._verbose_logger_callback)
+        if not os.getenv("PYTEST_CURRENT_TEST"):
+            # The logging callback can slow things down; disable during
+            # testing to avoid the performance hits.
+            if context.verbosity >= 3:
+                db.set_logger(self._debug_logger_callback)
+            elif context.verbosity in (1, 2):
+                db.set_logger(self._verbose_logger_callback)
         return db
 
     @staticmethod
