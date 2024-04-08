@@ -82,8 +82,4 @@ def test_defaults_use_only_tar_bz2(monkeypatch: pytest.MonkeyPatch, only_tar_bz2
         assert libmamba_dot_conda_total == conda_dot_conda_total == 0
     else:
         assert conda_dot_conda_total == libmamba_dot_conda_total
-        # assert conda_tar_bz2_total == libmamba_tar_bz2_total
-        # Currently errors because libmamba does not deduplicate .tar.bz2 and .conda
-        # See https://github.com/mamba-org/mamba/issues/3250
-        # As of 2024-03-25:
-        # AssertionError: assert 5691 == 19967
+        assert conda_tar_bz2_total == libmamba_tar_bz2_total
