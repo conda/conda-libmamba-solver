@@ -450,9 +450,10 @@ def test_python_downgrade_with_pins_removes_truststore():
                 "--json",
                 "python=3.9",
                 env=env,
+                check=False,
             )
-            assert p.returncode == 0
             data = json.loads(p.stdout)
+            assert p.returncode == 0
             assert data.get("success")
             assert data.get("dry_run")
             link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}

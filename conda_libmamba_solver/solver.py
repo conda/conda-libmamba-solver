@@ -471,7 +471,7 @@ class LibMambaSolver(Solver):
                     tasks[Request.Install].append(history)
             elif installed:
                 if conflicting:
-                    ...  # TODO
+                    ...  # TODO: This breaks test_python_downgrade_with_pins_removes_truststore
                     # tasks[ALLOW_UNINSTALL].append(name)
                 else:
                     # we freeze everything else as installed
