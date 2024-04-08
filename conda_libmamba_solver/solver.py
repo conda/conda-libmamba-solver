@@ -308,7 +308,7 @@ class LibMambaSolver(Solver):
                 raise exc
 
         # We didn't fail? Nice, let's return the calculated state
-        self._export_solution(out_state, outcome)
+        self._export_solution(index, out_state, outcome)
 
         # Run post-solve tasks
         out_state.post_solve(solver=self)
@@ -541,36 +541,52 @@ class LibMambaSolver(Solver):
 
         return dict(tasks)
 
-    def _export_solution(self, out_state: SolverOutputState, solution: Solution):
+    def _export_solution(
+        self,
+        index: LibMambaIndexHelper,
+        out_state: SolverOutputState,
+        solution: Solution,
+    ):
         for action in solution.actions:
             record_to_install: PackageInfo = getattr(action, "install", None)
             record_to_remove: PackageInfo = getattr(action, "remove", None)
             if record_to_install:
                 if record_to_install.name.startswith("__"):
                     continue
-                record = self._package_info_to_package_record(record_to_install)
+                record = self._package_info_to_package_record(record_to_install, index)
                 out_state.records[record.name] = record
             elif record_to_remove:
                 if record_to_remove.name.startswith("__"):
                     continue
-                record = self._package_info_to_package_record(record_to_remove)
+                record = self._package_info_to_package_record(record_to_remove, index)
                 out_state.records.pop(record.name, None)
         return out_state
 
-    def _package_info_to_package_record(self, pkg: PackageInfo) -> PackageRecord:
+    def _package_info_to_package_record(
+        self,
+        pkg: PackageInfo,
+        index: LibMambaIndexHelper,
+    ) -> PackageRecord:
         if pkg.noarch == NoArchType.Python:
             noarch = "python"
         elif pkg.noarch == NoArchType.Generic:
             noarch = "generic"
         else:
             noarch = None
+        # The package download logic needs the URL with credentials
+        for repo_info in index.repos:
+            if pkg.package_url.startswith(repo_info.url_no_cred):
+                url = pkg.package_url.replace(repo_info.url_no_cred, repo_info.url_w_cred)
+                break
+        else:
+            url = pkg.package_url
         return PackageRecord(
             name=pkg.name,
             version=pkg.version,
             build=pkg.build_string,  # NOTE: Different attribute name
             build_number=pkg.build_number,
             channel=pkg.channel,
-            url=pkg.package_url,  # NOTE: Different attribute name
+            url=url,
             subdir=pkg.platform,  # NOTE: Different attribute name
             fn=pkg.filename,  # NOTE: Different attribute name
             license=pkg.license,
