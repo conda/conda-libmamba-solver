@@ -226,9 +226,8 @@ class LibMambaIndexHelper:
             0: LogLevel.ERROR,
         }
         Context.instance().set_log_level(log_level[context.verbosity])
-        if not os.getenv("PYTEST_CURRENT_TEST"):
-            # The logging callback can slow things down; disable during
-            # testing to avoid the performance hits.
+        if os.getenv("CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV"):
+            # The logging callback can slow things down; only enable with env var
             if context.verbosity >= 3:
                 db.set_logger(self._debug_logger_callback)
             elif context.verbosity in (1, 2):
