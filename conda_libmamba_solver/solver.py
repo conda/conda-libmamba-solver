@@ -502,8 +502,10 @@ class LibMambaSolver(Solver):
                                 break
                     if lock:
                         tasks[Request.Freeze].append(installed_spec)
-                    else:
-                        tasks[Request.Keep].append(name)
+                    # enabling this else branch makes
+                    # conda/conda's tests/core/test_solve.py::test_freeze_deps_1[libmamba] fail
+                    # else:
+                    #     tasks[Request.Keep].append(name)
 
         # Sort tasks by priority
         # This ensures that more important tasks are added to the solver first
