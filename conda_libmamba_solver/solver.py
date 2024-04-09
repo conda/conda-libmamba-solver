@@ -479,7 +479,15 @@ class LibMambaSolver(Solver):
                 if conflicting and history.strictness == 3:
                     # relax name-version-build (strictness=3) history specs that cause conflicts
                     # this is called neutering and makes test_neutering_of_historic_specs pass
-                    spec_str = f"{name} {history.version}.*" if history.version else name
+                    version = str(history.version or "")
+                    if version.startswith("=="):
+                        spec_str = f"{name} {version[2:]}"
+                    elif version.startswith(("!=", ">", "<")):
+                        spec_str = f"{name} {version}"
+                    elif version:
+                        spec_str = f"{name} {version}.*"
+                    else:
+                        spec_str = name
                     tasks[Request.Install].append(spec_str)
                 else:
                     tasks[Request.Install].append(history)
