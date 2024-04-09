@@ -292,6 +292,7 @@ class LibMambaSolver(Solver):
                     for_history=dict(out_state.for_history),
                     neutered=dict(out_state.neutered),
                     conflicts=dict(out_state.conflicts),
+                    pins=dict(out_state.pins),
                 )
         if not solved:
             log.debug("Last attempt: reporting all installed as conflicts")
@@ -304,7 +305,7 @@ class LibMambaSolver(Solver):
             )
             solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
             if not solved:
-                message = self._prepare_problems_message(outcome, index.db)
+                message = self._prepare_problems_message(outcome, index.db, out_state)
                 exc = LibMambaUnsatisfiableError(message)
                 exc.allow_retry = False
                 raise exc
@@ -335,7 +336,7 @@ class LibMambaSolver(Solver):
             out_state.conflicts.clear()
             return True, outcome
         old_conflicts = out_state.conflicts.copy()
-        new_conflicts = self._maybe_raise_for_problems(outcome, index, old_conflicts)
+        new_conflicts = self._maybe_raise_for_problems(outcome, index, out_state, old_conflicts)
         if log.isEnabledFor(logging.DEBUG):
             problems_as_str = outcome.problems_to_str(index.db)
             log.debug(
@@ -348,18 +349,21 @@ class LibMambaSolver(Solver):
         return False, outcome
 
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
-        flags = Request.Flags()
-        flags.allow_downgrade = True
-        # About flags.allow_uninstall = True:
-        # We used to set this to False on a global basis and then add jobs
-        # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
-        flags.allow_uninstall = True
-        flags.force_reinstall = in_state.force_reinstall
-        flags.keep_dependencies = True
-        flags.keep_user_specs = True
-        flags.order_request = False  # we do this ourselves
-        flags.strict_repo_priority = context.channel_priority is ChannelPriority.STRICT
-        return flags
+        flags = {
+            "allow_downgrade": True,
+            # About flags.allow_uninstall = True:
+            # We used to set this to False on a global basis and then add jobs
+            # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
+            "allow_uninstall": True,
+            "force_reinstall": in_state.force_reinstall,
+            "keep_dependencies": not in_state.prune,
+            "keep_user_specs": True,
+            "order_request": False,  # we do this ourselves
+            "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
+        }
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug("Using solver flags:\n%s", json.dumps(flags, indent=2))
+        return Request.Flags(**flags)
 
     def _specs_to_request_jobs(
         self,
@@ -376,11 +380,14 @@ class LibMambaSolver(Solver):
         request_jobs = []
         json_friendly = {}
         for JobType, specs in jobs.items():
-            for conda_spec in specs:
+            for idx, conda_spec in enumerate(specs, 1):
                 libmamba_spec = self._conda_spec_to_libmamba_spec(conda_spec)
                 request_jobs.append(JobType(libmamba_spec))
                 if log.isEnabledFor(logging.INFO):
                     json_friendly.setdefault(JobType.__name__, []).append(str(conda_spec))
+                if JobType == Request.Pin:
+                    conda_spec = MatchSpec(conda_spec)
+                    out_state.pins[f"pin-{idx}"] = conda_spec
         if log.isEnabledFor(logging.INFO):
             json_str = json.dumps(json_friendly, indent=2)
             log.info("The solver will handle these requests:\n%s", json_str)
@@ -455,12 +462,12 @@ class LibMambaSolver(Solver):
                     spec = requested
                 if installed:
                     tasks[Request.Update].append(spec)
-                    tasks[Request.Keep].append(name)
+                    if name not in (MatchSpec(spec).name for spec in tasks[Request.Keep]):
+                        tasks[Request.Keep].append(name)
                 else:
                     tasks[Request.Install].append(spec)
             elif name in in_state.always_update:
                 tasks[Request.Update].append(name)
-                tasks[Request.Keep].append(name)
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
             elif in_state.prune:
@@ -686,13 +693,14 @@ class LibMambaSolver(Solver):
         self,
         unsolvable: UnSolvable,
         index: LibMambaIndexHelper,
+        out_state: SolverOutputState,
         previous_conflicts: Mapping[str, MatchSpec] = None,
     ):
         parsed_problems = self._parse_problems(unsolvable, index.db)
         # We allow conda-build (if present) to process the exception early
         self._maybe_raise_for_conda_build(
             {**parsed_problems["conflicts"], **parsed_problems["not_found"]},
-            message=self._prepare_problems_message(unsolvable, index.db),
+            message=self._prepare_problems_message(unsolvable, index.db, out_state),
         )
 
         unsatisfiable = parsed_problems["conflicts"]
@@ -721,14 +729,16 @@ class LibMambaSolver(Solver):
 
         if (previous and (previous_set == current_set)) or len(diff) >= 10:
             # We have same or more (up to 10) unsatisfiable now! Abort to avoid recursion
-            message = self._prepare_problems_message(unsolvable, index.db)
+            message = self._prepare_problems_message(unsolvable, index.db, out_state)
             exc = LibMambaUnsatisfiableError(message)
             # do not allow conda.cli.install to try more things
             exc.allow_retry = False
             raise exc
         return unsatisfiable
 
-    def _prepare_problems_message(self, unsolvable: UnSolvable, db: Database) -> str:
+    def _prepare_problems_message(
+        self, unsolvable: UnSolvable, db: Database, out_state: SolverOutputState
+    ) -> str:
         message = unsolvable.problems_to_str(db)
         explain = True
         if " - " not in message:
@@ -746,7 +756,11 @@ class LibMambaSolver(Solver):
                 message += "\n" + explained_errors
             except Exception as exc:
                 log.warning("Failed to explain problems", exc_info=exc)
-
+        if out_state.pins and " pin-" in message:  # add info about pins for easier debugging
+            pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
+            for _, spec in out_state.pins.items():
+                pin_message += f" - {spec}\n"
+            message += f"\n\n{pin_message}"
         return message
 
     def _maybe_raise_for_conda_build(
