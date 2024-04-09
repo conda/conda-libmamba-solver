@@ -455,12 +455,12 @@ class LibMambaSolver(Solver):
                     spec = requested
                 if installed:
                     tasks[Request.Update].append(spec)
-                    # tasks[ALLOW_UNINSTALL].append(name)
+                    tasks[Request.Keep].append(name)
                 else:
                     tasks[Request.Install].append(spec)
             elif name in in_state.always_update:
                 tasks[Request.Update].append(name)
-                # tasks[ALLOW_UNINSTALL].append(name)
+                tasks[Request.Keep].append(name)
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
             elif in_state.prune:
@@ -495,6 +495,8 @@ class LibMambaSolver(Solver):
                                 break
                     if lock:
                         tasks[Request.Freeze].append(installed_spec)
+                    else:
+                        tasks[Request.Keep].append(name)
 
         # Sort tasks by priority
         # This ensures that more important tasks are added to the solver first
