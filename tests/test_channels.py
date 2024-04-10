@@ -164,7 +164,7 @@ def test_mirrors_do_not_leak_channels(config_env):
         env["CONDA_PREFIX"] = prefix  # fake activation so config is loaded
 
         # Create an environment using mirrored channels only
-        p = conda_subprocess("install", *common, "python", "pip", env=env)
+        p = conda_subprocess("install", *common, "ca-certificates", env=env)
         result = json.loads(p.stdout)
         if p.stderr:
             assert "conda.anaconda.org" not in p.stderr
@@ -177,7 +177,7 @@ def test_mirrors_do_not_leak_channels(config_env):
             ), pkg
 
         # Make a change to that channel
-        p = conda_subprocess("install", *common, "pytest", env=env)
+        p = conda_subprocess("install", *common, "zlib", env=env)
 
         # Ensure that the loaded channels are ONLY the mirrored ones
         result = json.loads(p.stdout)
