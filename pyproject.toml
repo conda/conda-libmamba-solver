@@ -54,7 +54,6 @@ exclude = '''
 minversion = "6.0"
 addopts = [
   "--color=yes",
-  "--tb=native",
   "--strict-markers",
   "--xdoctest-modules",
   "--xdoctest-style=google",
@@ -96,3 +95,8 @@ ignore = ["E402", "E501", "E722", "E731", "D101", "D102", "D103", "D104", "D105"
 extend-per-file-ignores = {"docs/*" = ["D1"], "tests/*" = ["D1"]}
 pydocstyle = {convention = "pep257"}
 flake8-type-checking = {exempt-modules = [], strict = true}
+
+# [tool.pyright]
+# include = ["conda_libmamba_solver"]
+# ignore = ["conda_libmamba_solver/*_v1.py"]
+# strict = ["**/"]
