@@ -58,16 +58,12 @@ def test_defaults_use_only_tar_bz2(monkeypatch: pytest.MonkeyPatch, only_tar_bz2
     n_repos = 3 if on_win else 2
     assert len(libmamba_index.repos) == n_repos
 
-    libmamba_dot_conda_total = 0
-    libmamba_tar_bz2_total = 0
-    for repo_info in libmamba_index.repos:
-        for pkg in libmamba_index.db.packages_in_repo(repo_info.repo):
-            if pkg.package_url.endswith(".conda"):
-                libmamba_dot_conda_total += 1
-            elif pkg.package_url.endswith(".tar.bz2"):
-                libmamba_tar_bz2_total += 1
-            else:
-                raise RuntimeError(f"Unrecognized package URL: {pkg.package_url}")
+    libmamba_dot_conda_total = libmamba_index.n_packages(
+        filter_=lambda pkg: pkg.package_url.endswith(".conda")
+    )
+    libmamba_tar_bz2_total = libmamba_index.n_packages(
+        filter_=lambda pkg: pkg.package_url.endswith(".tar.bz2")
+    )
 
     conda_dot_conda_total = 0
     conda_tar_bz2_total = 0
@@ -95,9 +91,7 @@ def test_reload_channels(tmp_path: Path):
     shutil.copy(DATA / "mamba_repo" / "noarch" / "repodata.json", tmp_path / "noarch")
     initial_repodata = (tmp_path / "noarch" / "repodata.json").read_text()
     index = LibMambaIndexHelper(channels=[Channel(str(tmp_path))])
-    initial_count = sum(
-        1 for repo_info in index.repos for _ in index.db.packages_in_repo(repo_info.repo)
-    )
+    initial_count = index.n_packages()
     SubdirData._cache_.clear()
 
     data = json.loads(initial_repodata)
@@ -109,7 +103,4 @@ def test_reload_channels(tmp_path: Path):
     assert initial_repodata != modified_repodata
     time.sleep(1)
     index.reload_channel(Channel(str(tmp_path)))
-    new_count = sum(
-        1 for repo_info in index.repos for _ in index.db.packages_in_repo(repo_info.repo)
-    )
-    assert new_count == initial_count + 1
+    assert index.n_packages() == initial_count + 1

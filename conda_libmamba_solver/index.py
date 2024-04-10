@@ -168,6 +168,22 @@ class LibMambaIndexHelper:
             self.repos.append(self._load_installed(installed_records))
         self._set_repo_priorities()
 
+    def n_packages(
+        self,
+        repos: Iterable[RepoInfo] | None = None,
+        filter_: callable | None = None,
+    ) -> int:
+        repos = repos or [repo_info.repo for repo_info in self.repos]
+        count = 0
+        for repo in repos:
+            if filter_:
+                for pkg in self.db.packages_in_repo(repo):
+                    if filter_(pkg):
+                        count += 1
+            else:
+                count += len(self.db.packages_in_repo(repo))
+        return count
+
     def reload_channel(self, channel: Channel):
         urls = {}
         for url in channel.urls(with_credentials=False, subdirs=self.subdirs):
