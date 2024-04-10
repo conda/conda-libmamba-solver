@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sys
 from collections import defaultdict
 from contextlib import suppress
@@ -785,7 +786,8 @@ class LibMambaSolver(Solver):
         # right away to let conda build handle it
         if not self._called_from_conda_build():
             return
-
+        if not conflicting_specs:
+            return
         from .conda_build_exceptions import ExplainedDependencyNeedsBuildingError
 
         # the patched index should contain the arch we are building this env for
@@ -845,6 +847,21 @@ class LibMambaSolver(Solver):
 
     def _conda_spec_to_libmamba_spec(self, spec: MatchSpec) -> LibmambaMatchSpec:
         return LibmambaMatchSpec.parse(str(spec))
+
+    @staticmethod
+    def _fix_version_field_for_conda_build(spec: MatchSpec):
+        """Fix taken from mambabuild"""
+        if spec.version:
+            only_dot_or_digit_re = re.compile(r"^[\d\.]+$")
+            version_str = str(spec.version)
+            if re.match(only_dot_or_digit_re, version_str):
+                spec_fields = spec.conda_build_form().split()
+                if version_str.count(".") <= 1:
+                    spec_fields[1] = version_str + ".*"
+                else:
+                    spec_fields[1] = version_str + "*"
+                return MatchSpec(" ".join(spec_fields))
+        return spec
 
     @staticmethod
     def _matchspec_from_error_str(spec: str | Sequence[str]):
