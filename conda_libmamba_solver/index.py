@@ -119,7 +119,6 @@ log = logging.getLogger(f"conda.{__name__}")
 _db_log = logging.getLogger("conda.libmamba.db")
 
 
-@dataclass(frozen=True)
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
 
