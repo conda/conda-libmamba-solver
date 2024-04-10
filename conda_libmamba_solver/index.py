@@ -421,7 +421,11 @@ class LibMambaIndexHelper:
 
     def _load_installed(self, records: Iterable[PackageRecord]) -> Iterable[RepoInfo]:
         packages = [self._package_info_from_package_record(record) for record in records]
-        repo = self.db.add_repo_from_packages(packages=packages, name="installed")
+        repo = self.db.add_repo_from_packages(
+            packages=packages,
+            name="installed",
+            add_pip_as_python_dependency=PipAsPythonDependency.No,
+            )
         self.db.set_installed_repo(repo)
         return _ChannelRepoInfo(
             channel=None, repo=repo, url_w_cred="installed", url_no_cred="installed"
