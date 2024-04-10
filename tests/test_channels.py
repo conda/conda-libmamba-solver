@@ -127,7 +127,7 @@ def _setup_channels_custom(prefix, force=False):
     write_env_config(
         prefix,
         force=force,
-        channels=["conda-forge", "defaults"],
+        channels=["conda-forge"],
         custom_channels={
             "conda-forge": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
         },
