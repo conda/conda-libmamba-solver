@@ -425,7 +425,7 @@ class LibMambaIndexHelper:
             packages=packages,
             name="installed",
             add_pip_as_python_dependency=PipAsPythonDependency.No,
-            )
+        )
         self.db.set_installed_repo(repo)
         return _ChannelRepoInfo(
             channel=None, repo=repo, url_w_cred="installed", url_no_cred="installed"
