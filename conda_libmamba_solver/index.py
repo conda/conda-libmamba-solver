@@ -290,10 +290,18 @@ class LibMambaIndexHelper:
             for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
-            noauth_urls = channel.urls(with_credentials=False, subdirs=(channel.subdir,))
+            noauth_urls = [
+                url
+                for url in channel.urls(with_credentials=False)
+                if url.endswith(tuple(self.subdirs))
+            ]
             if seen_noauth.issuperset(noauth_urls):
                 continue
-            auth_urls = channel.urls(with_credentials=True, subdirs=(channel.subdir,))
+            auth_urls = [
+                url
+                for url in channel.urls(with_credentials=True)
+                if url.endswith(tuple(self.subdirs))
+            ]
             if noauth_urls != auth_urls:  # authed channel always takes precedence
                 urls.update({url: channel for url in auth_urls})
                 seen_noauth.update(noauth_urls)
