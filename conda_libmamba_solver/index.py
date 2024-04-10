@@ -268,7 +268,10 @@ class LibMambaIndexHelper:
         if level.value:
             _db_log.log((level.value + 2) * 10, msg)
 
-    def _load_channels(self, urls_to_channel: dict[str, Channel] | None = None) -> list[_ChannelRepoInfo]:
+    def _load_channels(
+        self,
+        urls_to_channel: dict[str, Channel] | None = None,
+    ) -> list[_ChannelRepoInfo]:
         if urls_to_channel is None:
             urls_to_channel = self._channel_urls()
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
