@@ -1,4 +1,8 @@
+import json
 import os
+import shutil
+import time
+from pathlib import Path
 
 import pytest
 from conda.base.context import reset_context
@@ -10,6 +14,7 @@ from conda.models.channel import Channel
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
 initialize_logging()
+DATA = Path(__file__).parent / "data"
 
 
 def test_given_channels(monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike):
@@ -83,3 +88,28 @@ def test_defaults_use_only_tar_bz2(monkeypatch: pytest.MonkeyPatch, only_tar_bz2
     else:
         assert conda_dot_conda_total == libmamba_dot_conda_total
         assert conda_tar_bz2_total == libmamba_tar_bz2_total
+
+
+def test_reload_channels(tmp_path: Path):
+    (tmp_path / "noarch").mkdir(parents=True, exist_ok=True)
+    shutil.copy(DATA / "mamba_repo" / "noarch" / "repodata.json", tmp_path / "noarch")
+    initial_repodata = (tmp_path / "noarch" / "repodata.json").read_text()
+    index = LibMambaIndexHelper(channels=[Channel(str(tmp_path))])
+    initial_count = sum(
+        1 for repo_info in index.repos for _ in index.db.packages_in_repo(repo_info.repo)
+    )
+    SubdirData._cache_.clear()
+
+    data = json.loads(initial_repodata)
+    package = data["packages"]["test-package-0.1-0.tar.bz2"]
+    data["packages"]["test-package-copy-0.1-0.tar.bz2"] = {**package, "name": "test-package-copy"}
+    modified_repodata = json.dumps(data)
+    (tmp_path / "noarch" / "repodata.json").write_text(modified_repodata)
+
+    assert initial_repodata != modified_repodata
+    time.sleep(1)
+    index.reload_channel(Channel(str(tmp_path)))
+    new_count = sum(
+        1 for repo_info in index.repos for _ in index.db.packages_in_repo(repo_info.repo)
+    )
+    assert new_count == initial_count + 1

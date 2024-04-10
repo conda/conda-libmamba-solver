@@ -176,9 +176,9 @@ class LibMambaIndexHelper:
                     log.debug("Reloading repo %s", repo_info.url_no_cred)
                     urls[repo_info.url_w_cred] = channel
                     self.db.remove_repo(repo_info.repo)
-        for new_repo_info in self._load_channels(urls):
+        for new_repo_info in self._load_channels(urls, try_solv=False):
             for repo_info in self.repos:
-                if repo_info.url_no_cred == new_repo_info.url_w_cred:
+                if repo_info.url_no_cred == new_repo_info.url_no_cred:
                     repo_info.repo = new_repo_info.repo
         self._set_repo_priorities()
 
@@ -271,6 +271,7 @@ class LibMambaIndexHelper:
     def _load_channels(
         self,
         urls_to_channel: dict[str, Channel] | None = None,
+        try_solv: bool = True,
     ) -> list[_ChannelRepoInfo]:
         if urls_to_channel is None:
             urls_to_channel = self._channel_urls()
@@ -279,7 +280,12 @@ class LibMambaIndexHelper:
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
             url_no_token, _ = split_anaconda_token(url_w_cred)
             url_no_cred = remove_auth(url_no_token)
-            repo = self._load_repo_info_from_json_path(json_path, url_no_cred, state)
+            repo = self._load_repo_info_from_json_path(
+                json_path,
+                url_no_cred,
+                state,
+                try_solv=try_solv,
+            )
             channel_repo_infos.append(
                 _ChannelRepoInfo(
                     channel=urls_to_channel[url_w_cred],
@@ -366,7 +372,7 @@ class LibMambaIndexHelper:
         return url, json_path, state
 
     def _load_repo_info_from_json_path(
-        self, json_path: str, channel_url: str, state: RepodataState
+        self, json_path: str, channel_url: str, state: RepodataState, try_solv: bool = True
     ) -> RepoInfo | None:
         json_path = Path(json_path)
         solv_path = json_path.with_suffix(".solv")
@@ -376,7 +382,7 @@ class LibMambaIndexHelper:
             repodata_origin = None
         channel = Channel(channel_url)
         channel_id = channel.name or channel.canonical_name
-        if repodata_origin:
+        if try_solv and repodata_origin:
             try:
                 log.debug(
                     "Loading %s (%s) from SOLV repodata at %s", channel_id, channel_url, solv_path
@@ -415,7 +421,7 @@ class LibMambaIndexHelper:
                 log.debug("Ignored MambaNativeException in offline mode: %s", exc, exc_info=exc)
                 return None
             raise exc
-        if repodata_origin:
+        if try_solv and repodata_origin:
             self.db.native_serialize_repo(repo=repo, path=str(solv_path), metadata=repodata_origin)
         return repo
 
