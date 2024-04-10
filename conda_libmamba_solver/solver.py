@@ -141,7 +141,7 @@ class LibMambaSolver(Solver):
             return maybe_final_state
 
         channels = self._collect_channel_list(in_state)
-        conda_build_channels = self._collect_channel_list_conda_build()
+        conda_build_channels, subdirs = self._collect_channels_subdirs_from_conda_build()
         with Spinner(
             self._collect_all_metadata_spinner_message(channels, conda_build_channels),
             enabled=not context.verbosity and not context.quiet,
@@ -150,6 +150,7 @@ class LibMambaSolver(Solver):
             index = self._collect_all_metadata(
                 channels=channels,
                 conda_build_channels=conda_build_channels,
+                subdirs=subdirs,
                 in_state=in_state,
             )
             out_state.check_for_pin_conflicts(index)
@@ -223,26 +224,35 @@ class LibMambaSolver(Solver):
         channels.extend(in_state.maybe_free_channel())
         return channels
 
-    def _collect_channel_list_conda_build(self) -> list[Channel]:
+    def _collect_channels_subdirs_from_conda_build(self) -> tuple[list[Channel], list[str]]:
         if self._called_from_conda_build():
             # We need to recover the local dirs (conda-build's local, output_folder, etc)
             # from the index. This is a bit of a hack, but it works.
             conda_build_channels = {
-                rec.channel: None for rec in self._index if rec.channel.scheme == "file"
+                rec.channel: None for rec in (self._index or {}) if rec.channel.scheme == "file"
             }
-            return list(conda_build_channels)
-        return []
+            # Problem: Conda build generates a custom index which happens to "forget" about
+            # noarch on purpose when creating the build/host environments, since it merges
+            # both as if they were all in the native subdir. this causes package-not-found
+            # errors because we are not using the patched index.
+            # Fix: just add noarch to subdirs.
+            subdirs = self.subdirs
+            if "noarch" not in subdirs:
+                subdirs = *subdirs, "noarch"
+            return list(conda_build_channels), subdirs
+        return [], self.subdirs
 
     @time_recorder(module_name=__name__)
     def _collect_all_metadata(
         self,
         channels: Iterable[Channel],
         conda_build_channels: Iterable[Channel],
+        subdirs: Iterable[str],
         in_state: SolverInputState,
     ) -> LibMambaIndexHelper:
         index = LibMambaIndexHelper(
             channels=[*conda_build_channels, *channels],
-            subdirs=self.subdirs,
+            subdirs=subdirs,
             repodata_fn=self._repodata_fn,
             installed_records=(
                 *in_state.installed.values(),
