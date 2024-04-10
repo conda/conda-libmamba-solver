@@ -89,7 +89,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from libmambapy import ChannelContext, Context, LogLevel, MambaNativeException, Query
+from libmambapy import Context, LogLevel, MambaNativeException, Query
 from libmambapy.solver.libsolv import (
     Database,
     PackageTypes,
@@ -169,10 +169,18 @@ class LibMambaIndexHelper:
         self._set_repo_priorities()
 
     def reload_channel(self, channel: Channel):
-        raise NotImplementedError  # TODO
-
-    def _init_db_from_context(self) -> Database:
-        return Database(ChannelContext.make_conda_compatible(Context.instance()).params())
+        urls = {}
+        for url in channel.urls(with_credentials=False, subdirs=self.subdirs):
+            for repo_info in self.repos:
+                if repo_info.url_no_cred == url:
+                    log.debug("Reloading repo %s", repo_info.url_no_cred)
+                    urls[repo_info.url_w_cred] = channel
+                    self.db.remove_repo(repo_info.repo)
+        for new_repo_info in self._load_channels(urls):
+            for repo_info in self.repos:
+                if repo_info.url_no_cred == new_repo_info.url_w_cred:
+                    repo_info.repo = new_repo_info.repo
+        self._set_repo_priorities()
 
     def _init_db(self) -> Database:
         custom_channels = {
@@ -260,8 +268,9 @@ class LibMambaIndexHelper:
         if level.value:
             _db_log.log((level.value + 2) * 10, msg)
 
-    def _load_channels(self) -> list[_ChannelRepoInfo]:
-        urls_to_channel = self._channel_urls()
+    def _load_channels(self, urls_to_channel: dict[str, Channel] | None = None) -> list[_ChannelRepoInfo]:
+        if urls_to_channel is None:
+            urls_to_channel = self._channel_urls()
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         channel_repo_infos = []
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
