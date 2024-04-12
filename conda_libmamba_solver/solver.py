@@ -38,6 +38,7 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
+from libmambapy import Context as _LibmambaContext
 from libmambapy import Palette
 from libmambapy.solver import Request, Solution
 from libmambapy.solver.libsolv import Solver as LibsolvSolver
@@ -66,6 +67,8 @@ if TYPE_CHECKING:
 
 _mamba_auto_palette = Palette.terminal() if sys.stdin.isatty() else Palette.no_color()
 _mamba_nocolor_palette = Palette.no_color()
+_LibmambaContext.use_default_signal_handler(False)
+
 log = logging.getLogger(f"conda.{__name__}")
 
 

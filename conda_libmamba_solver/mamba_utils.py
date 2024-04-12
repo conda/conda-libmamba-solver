@@ -37,6 +37,8 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
     """
     This function was part of mamba.utils.load_channels originally.
     We just split it to reuse it a bit better.
+
+    DEPRECATED.
     """
     if not index:
         return index
