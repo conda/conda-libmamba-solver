@@ -715,7 +715,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             subdir: linux-64
-          - runner: macos-latest
+          - runner: macos-13
             subdir: osx-64
           - runner: macos-14
             subdir: osx-arm64
