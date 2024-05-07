@@ -790,7 +790,7 @@ class LibMambaSolver(Solver):
                 message += "\n" + explained_errors
             except Exception as exc:
                 log.warning("Failed to explain problems", exc_info=exc)
-        if out_state.pins and " pin-" in message:  # add info about pins for easier debugging
+        if out_state.pins and "pin on " in message:  # add info about pins for easier debugging
             pin_message = "Pins seem to be involved in the conflict. Currently pinned specs:\n"
             for _, spec in out_state.pins.items():
                 pin_message += f" - {spec}\n"
