@@ -40,7 +40,7 @@ from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
 from libmambapy import Context as _LibmambaContext
 from libmambapy import Palette
-from libmambapy.solver import Request, Solution
+from libmambapy.solver import ProblemsMessageFormat, Request, Solution
 from libmambapy.solver.libsolv import Solver as LibsolvSolver
 from libmambapy.specs import MatchSpec as LibmambaMatchSpec
 from libmambapy.specs import NoArchType
@@ -65,8 +65,13 @@ if TYPE_CHECKING:
     from libmambapy.specs import PackageInfo
 
 
-_mamba_auto_palette = Palette.terminal() if sys.stdin.isatty() else Palette.no_color()
-_mamba_nocolor_palette = Palette.no_color()
+# _indents = ["│  ", "   ", "├─ ", "└─ "]
+_use_color = all([sys.stdout.isatty(), sys.stdin.isatty()])
+_palette_no_color = Palette.no_color()
+_problems_format_nocolor = ProblemsMessageFormat()
+_problems_format_nocolor.unavailable = _palette_no_color.failure
+_problems_format_nocolor.available = _palette_no_color.success
+_problems_format_auto = ProblemsMessageFormat() if _use_color else _problems_format_nocolor
 _LibmambaContext.use_default_signal_handler(False)
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -664,7 +669,7 @@ class LibMambaSolver(Solver):
         not_found = []
         problems = unsolvable.problems(db)
         try:
-            explained_problems = unsolvable.explain_problems(db, _mamba_nocolor_palette)
+            explained_problems = unsolvable.explain_problems(db, _problems_format_nocolor)
         except Exception as exc:
             log.debug("Cannot explain problems", exc_info=exc)
             explained_problems = ""
@@ -734,7 +739,7 @@ class LibMambaSolver(Solver):
                 log.debug(
                     "Inferred PackagesNotFoundError %s from conflicts:\n%s",
                     tuple(not_found.keys()),
-                    unsolvable.explain_problems(index.db, Palette.no_color()),
+                    unsolvable.explain_problems(index.db, _problems_format_nocolor),
                 )
             # This is not a conflict, but a missing package in the channel
             exc = PackagesNotFoundError(tuple(not_found.values()), tuple(index.channels))
@@ -776,7 +781,7 @@ class LibMambaSolver(Solver):
 
         if explain:
             try:
-                explained_errors = unsolvable.explain_problems(db, _mamba_auto_palette)
+                explained_errors = unsolvable.explain_problems(db, _problems_format_auto)
                 message += "\n" + explained_errors
             except Exception as exc:
                 log.warning("Failed to explain problems", exc_info=exc)
