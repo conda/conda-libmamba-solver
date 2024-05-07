@@ -66,7 +66,12 @@ if TYPE_CHECKING:
 
 
 # _indents = ["│  ", "   ", "├─ ", "└─ "]
-_use_color = all([sys.stdout.isatty(), sys.stdin.isatty()])
+if os.getenv("NO_COLOR"):
+    _use_color = False
+elif os.getenv("FORCE_COLOR"):
+    _use_color = True
+else:
+    _use_color = all([sys.stdout.isatty(), sys.stdin.isatty()])
 _palette_no_color = Palette.no_color()
 _problems_format_nocolor = ProblemsMessageFormat()
 _problems_format_nocolor.unavailable = _palette_no_color.failure
