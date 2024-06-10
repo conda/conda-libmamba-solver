@@ -829,7 +829,7 @@ class LibMambaSolver(Solver):
                     out_state.records.pop(name, None)
                     break
             else:
-                log.warn("Tried to unlink %s but it is not installed or manageable?", filename)
+                log.warning("Tried to unlink %s but it is not installed or manageable?", filename)
 
         for_conda_build = self._called_from_conda_build()
         for channel, filename, json_payload in to_link:
