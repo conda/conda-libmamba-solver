@@ -278,7 +278,9 @@ class LibMambaIndexHelper(IndexHelper):
             solv_stat = None
 
         if solv_stat is None and json_stat is None:
-            log.warn("No repodata found for channel %s. Solve will fail.", channel.canonical_name)
+            log.warning(
+                "No repodata found for channel %s. Solve will fail.", channel.canonical_name
+            )
             return
         if solv_stat is None:
             path_to_use = json_path
