@@ -88,6 +88,7 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
     return index
 
 
+@lru_cache(maxsize=1)
 def init_libmamba_context() -> libmambapy.Context:
     # This function has to be called BEFORE 1st initialization of the context
     libmamba_context = libmambapy.Context(
