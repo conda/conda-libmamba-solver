@@ -242,14 +242,6 @@ class LibMambaIndexHelper:
         return db
 
     def _set_logging(self, db):
-        log_level = {
-            4: LogLevel.TRACE,
-            3: LogLevel.DEBUG,
-            2: LogLevel.INFO,
-            1: LogLevel.WARNING,
-            0: LogLevel.ERROR,
-        }
-        Context.instance().set_log_level(log_level[context.verbosity])
         if os.getenv("CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV"):
             # The logging callback can slow things down; only enable with env var
             if context.verbosity >= 3:

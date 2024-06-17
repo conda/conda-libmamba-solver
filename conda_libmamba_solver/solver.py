@@ -39,6 +39,8 @@ from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
 from libmambapy import Context as _LibmambaContext
+from libmambapy import ContextOptions as _LibmambaContextOptions
+from libmambapy import LogLevel as _LibmambaLogLevel
 from libmambapy import Palette
 from libmambapy.solver import ProblemsMessageFormat, Request, Solution
 from libmambapy.solver.libsolv import Solver as LibsolvSolver
@@ -77,8 +79,18 @@ _problems_format_nocolor = ProblemsMessageFormat()
 _problems_format_nocolor.unavailable = _palette_no_color.failure
 _problems_format_nocolor.available = _palette_no_color.success
 _problems_format_auto = ProblemsMessageFormat() if _use_color else _problems_format_nocolor
-_LibmambaContext.use_default_signal_handler(False)
-
+_libmamba_context = _LibmambaContext(
+    _LibmambaContextOptions(enable_logging_and_signal_handling=False)
+)
+_libmamba_context.set_log_level(
+    {
+        4: _LibmambaLogLevel.TRACE,
+        3: _LibmambaLogLevel.DEBUG,
+        2: _LibmambaLogLevel.INFO,
+        1: _LibmambaLogLevel.WARNING,
+        0: _LibmambaLogLevel.ERROR,
+    }[context.verbosity]
+)
 log = logging.getLogger(f"conda.{__name__}")
 
 
