@@ -701,7 +701,8 @@ class LibMambaSolver(Solver):
                     explained_line = explained_line.strip()
                     explained_words = explained_line.split()
                     if "does not exist" in explained_line:
-                        not_found.append(cls._matchspec_from_error_str(explained_words[1:3]))
+                        end = explained_words.index("does")
+                        not_found.append(cls._matchspec_from_error_str(explained_words[1:end]))
                         break
             else:
                 log.debug("! Problem line not recognized: %s", line)
