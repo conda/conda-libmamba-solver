@@ -188,6 +188,11 @@ def test_too_aggressive_update_to_conda_forge_packages():
     We expect a minimum change to the 'base' environment if we only ask for a single package.
     conda classic would just change a few (<5) packages, but libmamba seemed to upgrade
     EVERYTHING it can to conda-forge.
+
+    In June 2024 this test was updated so it updates zstd instead of libzlib. The latter
+    was probably part of a migration at some point in the 2nd quarter of 2024, which forced
+    a larger reinstallation. libzlib is in conda-forge, but only as zlib in defaults, so it was
+    not a good test case to begin with. zstd is in both
     """
     with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
         cmd = (
@@ -196,7 +201,7 @@ def test_too_aggressive_update_to_conda_forge_packages():
             prefix,
             "-c",
             "conda-forge",
-            "libzlib",
+            "zstd",
             "--json",
             "--dry-run",
             "-y",
