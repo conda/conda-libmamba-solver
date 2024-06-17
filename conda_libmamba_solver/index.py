@@ -89,7 +89,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from libmambapy import Context, LogLevel, MambaNativeException, Query
+from libmambapy import MambaNativeException, Query
 from libmambapy.solver.libsolv import (
     Database,
     PackageTypes,
