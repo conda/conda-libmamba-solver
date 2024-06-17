@@ -158,7 +158,7 @@ def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env):
 
         # Setup conda configuration
         config_env(prefix)
-        common = ["-yp", prefix, "--solver=libmamba","--json", "-vv"]
+        common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
 
         env = os.environ.copy()
         env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
