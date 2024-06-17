@@ -338,11 +338,7 @@ class LibMambaSolver(Solver):
         attempt: int = 1,
     ) -> tuple[bool, Solution | UnSolvable]:
         log.info("Solver attempt: #%d", attempt)
-        try:
-            log.error("Current conflicts (including learnt ones): %r", out_state.conflicts)
-        except TypeError:
-            breakpoint()
-            raise
+        log.debug("Current conflicts (including learnt ones): %r", out_state.conflicts)
         flags = self._solver_flags(in_state)
         jobs = self._specs_to_request_jobs(in_state, out_state)
         request = Request(jobs=jobs, flags=flags)
