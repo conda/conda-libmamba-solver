@@ -141,7 +141,7 @@ def _setup_channels_custom(prefix, force=False):
         _setup_channels_custom,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env):
+def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env):
     """
     https://github.com/conda/conda-libmamba-solver/issues/108
 
@@ -153,15 +153,15 @@ def test_mirrors_do_not_leak_channels(config_env):
     is undesirable.
     """
 
-    with env_vars({"CONDA_PKGS_DIRS": _get_temp_prefix()}), make_temp_env() as prefix:
+    with env_vars({"CONDA_PKGS_DIRS": tmp_path}), tmp_env() as prefix:
         assert (Path(prefix) / "conda-meta" / "history").exists()
 
         # Setup conda configuration
         config_env(prefix)
-        common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
+        common = ["-yp", prefix, "--solver=libmamba","--json", "-vv"]
 
         env = os.environ.copy()
-        env["CONDA_PREFIX"] = prefix  # fake activation so config is loaded
+        env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
 
         # Create an environment using mirrored channels only
         p = conda_subprocess("install", *common, "ca-certificates", env=env)
