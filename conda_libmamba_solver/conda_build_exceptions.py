@@ -26,6 +26,6 @@ class ExplainedDependencyNeedsBuildingError(DependencyNeedsBuildingError):
     def __str__(self) -> str:
         msg = self.message
         if not self.explanation:
-            # print simple message in log.warn() calls
+            # print simple message in log.warning() calls
             return msg
         return "\n".join([msg, self.explanation])
