@@ -1,6 +1,10 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+"""
+Miscellaneous utilities
+"""
+
 from enum import Enum
 from functools import lru_cache
 from logging import getLogger
@@ -78,7 +82,7 @@ def compatible_specs(index, specs, raise_not_found=True):
         results = set(index.search(spec))
         if not results:
             if raise_not_found:
-                exc = PackagesNotFoundError([spec], index._channels)
+                exc = PackagesNotFoundError([spec], index.channels)
                 exc.allow_retry = False
                 raise exc
             return False

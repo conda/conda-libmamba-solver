@@ -11,6 +11,7 @@ on Apr 27 2022
 
 See data/mamba_repo/LICENSE for full details
 """
+
 import argparse
 import base64
 import glob
@@ -260,6 +261,7 @@ class RepodataHeadersHandler(SimpleHTTPRequestHandler):
 
 class PackagesHeadersHandler(RepodataHeadersHandler):
     "Same as RepodataHeadersHandler, but it fails when tarballs are requested"
+
     path_suffix_to_debug = ".tar.bz2"
 
 

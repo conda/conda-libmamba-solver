@@ -32,7 +32,7 @@ concurrency:
 env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
   CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
-  PYTEST_RERUN_FAILURES: 3
+  PYTEST_RERUN_FAILURES: 0
   # See https://github.com/conda/conda/pull/13694
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
@@ -108,7 +108,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMPORARY
+          ref: libmamba-v2-fixes  # TEMPORARY
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -256,7 +258,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMPORARY
+          ref: libmamba-v2-fixes  # TEMPORARY
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -533,7 +537,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jaimergp/conda  # TEMPORARY
+          ref: libmamba-v2-fixes  # TEMPORARY
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -709,7 +715,7 @@ jobs:
         include:
           - runner: ubuntu-latest
             subdir: linux-64
-          - runner: macos-latest
+          - runner: macos-13
             subdir: osx-64
           - runner: macos-14
             subdir: osx-arm64
