@@ -385,6 +385,7 @@ class LibMambaIndexHelper:
     ) -> RepoInfo | None:
         if try_solv and on_win:
             # .solv loading is so slow on Windows is not even worth it. Use JSON instead.
+            # https://github.com/mamba-org/mamba/pull/2753#issuecomment-1739122830
             log.debug("Overriding truthy 'try_solv' as False on Windows for performance reasons.")
             try_solv = False
         json_path = Path(json_path)
