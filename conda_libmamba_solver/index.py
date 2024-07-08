@@ -511,7 +511,8 @@ class LibMambaIndexHelper:
                 priority,
                 subpriority,
             )
-            self.db.set_repo_priority(repo_info.repo, Priorities(priority, subpriority))
+            repo_info.repo.priority.priority = priority
+            repo_info.repo.priority.subpriority = subpriority
 
     # region Repoquery
     #################
