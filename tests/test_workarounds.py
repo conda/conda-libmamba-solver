@@ -101,14 +101,11 @@ def test_ctrl_c(stage):
             kernel.SetConsoleCtrlHandler(None, 1)
             kernel.GenerateConsoleCtrlEvent(0, 0)
             p.wait(timeout=TIMEOUT)
-            assert p.returncode != 0
-            # With libmamba v2, the process is killed from C++ or something
-            # and we don't see KeyboardInterrupt output (Python not involved?)
-            # assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
         finally:
             kernel.SetConsoleCtrlHandler(None, 0)
     else:
         p.send_signal(signal.SIGINT)
         p.wait(timeout=TIMEOUT)
-        assert p.returncode != 0
-        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+
+    assert p.returncode != 0
+    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
