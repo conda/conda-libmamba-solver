@@ -26,6 +26,8 @@ if TYPE_CHECKING:
 
     from conda.models.match_spec import MatchSpec
 
+    from .index import LibMambaIndexHelper
+
 log = getLogger(f"conda.{__name__}")
 
 
@@ -72,7 +74,7 @@ def is_channel_available(channel_url: str) -> bool:
 
 
 def compatible_specs(
-    index: type[IndexHelper], specs: Iterable[MatchSpec], raise_not_found: bool = True
+    index: type[LibMambaIndexHelper], specs: Iterable[MatchSpec], raise_not_found: bool = True
 ):
     """
     Assess whether the given specs are compatible with each other.
