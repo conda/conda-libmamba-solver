@@ -104,6 +104,8 @@ def test_reload_channels(tmp_path: Path):
     (tmp_path / "noarch" / "repodata.json").write_text(modified_repodata)
 
     assert initial_repodata != modified_repodata
+    # TODO: Remove this sleep after addressing
+    # https://github.com/conda/conda/issues/13783
     time.sleep(1)
     index.reload_channel(Channel(str(tmp_path)))
     assert index.n_packages() == initial_count + 1
