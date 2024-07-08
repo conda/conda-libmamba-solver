@@ -83,7 +83,7 @@ from conda.models.prefix_graph import PrefixGraph
 
 if TYPE_CHECKING:
     from os import PathLike
-    from typing import Iterable
+    from typing import Any, Iterable
 
     from conda.core.solve import Solver
     from conda.models.records import PackageRecord
@@ -201,7 +201,7 @@ class SolverInputState:
         # special cases
         self._do_not_remove = {p: MatchSpec(p) for p in self._DO_NOT_REMOVE_NAMES}
 
-    def _default_to_context_if_null(self, name, value, context=context):
+    def _default_to_context_if_null(self, name, value, context=context) -> Any:
         "Obtain default value from the context if value is set to NULL; otherwise leave as is"
         return getattr(context, name) if value is NULL else self._ENUM_STR_MAP.get(value, value)
 
@@ -483,7 +483,7 @@ class SolverOutputState:
         self.pins: dict[str, MatchSpec] = pins or {}
 
     @property
-    def current_solution(self):
+    def current_solution(self) -> IndexedSet[PackageRecord]:
         """
         Massage currently stored records so they can be returned as the type expected by the
         solver API. This is what you should return in ``Solver.solve_final_state()``.
@@ -491,7 +491,7 @@ class SolverOutputState:
         return IndexedSet(PrefixGraph(self.records.values()).graph)
 
     @property
-    def specs(self):
+    def specs(self) -> dict[str, MatchSpec]:
         """
         Merge all possible sources of input package specs, sorted by their input category and
         strictness. It's just meant to be an enumeration of all possible inputs, not a ready-to-use
@@ -517,14 +517,14 @@ class SolverOutputState:
         return specs_by_strictness
 
     @property
-    def real_specs(self):
+    def real_specs(self) -> dict[str, MatchSpec]:
         """
         Specs that are _not_ virtual.
         """
         return {name: spec for name, spec in self.specs.items() if not name.startswith("__")}
 
     @property
-    def virtual_specs(self):
+    def virtual_specs(self) -> dict[str, MatchSpec]:
         """
         Specs that are virtual.
         """
@@ -784,7 +784,7 @@ class SolverOutputState:
             self.records.update({record.name: record for record in graph.graph})
 
 
-def sort_by_spec_strictness(key_value_tuple: tuple[str, MatchSpec]):
+def sort_by_spec_strictness(key_value_tuple: tuple[str, MatchSpec]) -> tuple[int, str]:
     """
     Helper function to sort a list of (key, value) tuples by spec strictness
     """

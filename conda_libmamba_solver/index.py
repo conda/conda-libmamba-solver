@@ -119,7 +119,6 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger(f"conda.{__name__}")
-_db_log = logging.getLogger("conda.libmamba.db")
 
 
 @dataclass
@@ -310,7 +309,7 @@ class LibMambaIndexHelper:
                     seen_noauth.add(url)
         return urls
 
-    def _fetch_repodata_jsons(self, urls: dict[str, str]):
+    def _fetch_repodata_jsons(self, urls: dict[str, str]) -> dict[str, tuple[str, RepodataState]]:
         Executor = (
             DummyExecutor
             if context.debug or context.repodata_threads == 1
@@ -412,7 +411,7 @@ class LibMambaIndexHelper:
                 log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
 
-    def _load_installed(self, records: Iterable[PackageRecord]) -> Iterable[RepoInfo]:
+    def _load_installed(self, records: Iterable[PackageRecord]) -> RepoInfo:
         packages = [self._package_info_from_package_record(record) for record in records]
         repo = self.db.add_repo_from_packages(
             packages=packages,
@@ -424,7 +423,7 @@ class LibMambaIndexHelper:
             channel=None, repo=repo, url_w_cred="installed", url_no_cred="installed"
         )
 
-    def _load_pkgs_cache(self, pkgs_dirs: Iterable[os.PathLike]) -> Iterable[RepoInfo]:
+    def _load_pkgs_cache(self, pkgs_dirs: Iterable[os.PathLike]) -> list[RepoInfo]:
         repos = []
         for path in pkgs_dirs:
             package_cache_data = PackageCacheData(path)
@@ -521,7 +520,7 @@ class LibMambaIndexHelper:
         self,
         queries: Iterable[str | MatchSpec] | str | MatchSpec,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> Iterable[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict | QueryResult:
         if isinstance(queries, (str, MatchSpec)):
             queries = [queries]
         queries = list(map(str, queries))
@@ -533,7 +532,7 @@ class LibMambaIndexHelper:
         query: str | MatchSpec,
         tree: bool = False,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> Iterable[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict | QueryResult:
         query = str(query)
         result = Query.depends(self.db, query, tree)
         return self._process_query_result(result, return_type)
@@ -543,7 +542,7 @@ class LibMambaIndexHelper:
         query: str | MatchSpec,
         tree: bool = False,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> Iterable[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict | QueryResult:
         query = str(query)
         result = Query.whoneeds(self.db, query, tree)
         return self._process_query_result(result, return_type)
@@ -563,7 +562,7 @@ class LibMambaIndexHelper:
         self,
         result: QueryResult,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> Iterable[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict | QueryResult:
         if return_type == "raw":
             return result
         result = result.to_dict()

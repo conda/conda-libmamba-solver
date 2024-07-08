@@ -8,12 +8,12 @@
 # 2022.02.15: updated vendored parts to v0.21.2
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
 
+from __future__ import annotations
 import os
 import logging
 import sys
 from functools import lru_cache
 from importlib.metadata import version
-from typing import Dict
 
 import libmambapy
 from conda.base.constants import ChannelPriority
@@ -25,69 +25,16 @@ _db_log = logging.getLogger("conda.libmamba.db")
 
 
 @lru_cache(maxsize=1)
-def mamba_version():
+def mamba_version() -> str:
     return version("libmambapy")
 
 
-def _get_base_url(url, name=None):
+def _get_base_url(url: str, name: str | None = None):
     tmp = url.rsplit("/", 1)[0]
     if name:
         if tmp.endswith(name):
             return tmp.rsplit("/", 1)[0]
     return tmp
-
-
-def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: bool = None):
-    """
-    This function was part of mamba.utils.load_channels originally.
-    We just split it to reuse it a bit better.
-
-    DEPRECATED.
-    """
-    if not index:
-        return index
-
-    if has_priority is None:
-        has_priority = context.channel_priority in [
-            ChannelPriority.STRICT,
-            ChannelPriority.FLEXIBLE,
-        ]
-
-    subprio_index = len(index)
-    if has_priority:
-        # max channel priority value is the number of unique channels
-        channel_prio = len({info.channel.canonical_name for info in index.values()})
-        current_channel = next(iter(index.values())).channel.canonical_name
-
-    for info in index.values():
-        # add priority here
-        if has_priority:
-            if info.channel.canonical_name != current_channel:
-                channel_prio -= 1
-                current_channel = info.channel.canonical_name
-            priority = channel_prio
-        else:
-            priority = 0
-        if has_priority:
-            # NOTE: -- this is the whole reason we are vendoring this file --
-            # We are patching this from 0 to 1, starting with mamba 0.19
-            # Otherwise, test_create::test_force_remove fails :shrug:
-            subpriority = 1
-        else:
-            subpriority = subprio_index
-            subprio_index -= 1
-
-        if not context.json:
-            log.debug(
-                "Channel: %s, platform: %s, prio: %s : %s",
-                info.channel,
-                info.channel.subdir,
-                priority,
-                subpriority,
-            )
-        info.repo.set_priority(priority, subpriority)
-
-    return index
 
 
 @lru_cache(maxsize=1)
@@ -211,6 +158,7 @@ def database_logging(db: libmambapy.solver.libsolv.Database):
         db.set_logger(_verbose_logger_callback)
 
 
+def palettes_and_formats() -> tuple[libmambapy.solver.ProblemsMessageFormat, libmambapy.solver.ProblemsMessageFormat]:
     # _indents = ["│  ", "   ", "├─ ", "└─ "]
     if os.getenv("NO_COLOR"):
         use_color = False

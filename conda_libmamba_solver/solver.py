@@ -79,7 +79,7 @@ class LibMambaSolver(Solver):
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def user_agent():
+    def user_agent() -> str:
         """
         Expose this identifier to allow conda to extend its user agent if required
         """
@@ -864,7 +864,7 @@ class LibMambaSolver(Solver):
         return LibmambaMatchSpec.parse(str(spec))
 
     @staticmethod
-    def _fix_version_field_for_conda_build(spec: MatchSpec):
+    def _fix_version_field_for_conda_build(spec: MatchSpec) -> MatchSpec:
         """Fix taken from mambabuild"""
         if spec.version:
             only_dot_or_digit_re = re.compile(r"^[\d\.]+$")
@@ -879,7 +879,7 @@ class LibMambaSolver(Solver):
         return spec
 
     @staticmethod
-    def _matchspec_from_error_str(spec: str | Sequence[str]):
+    def _matchspec_from_error_str(spec: str | Sequence[str]) -> MatchSpec:
         try:
             if isinstance(spec, str):
                 name, version, build = spec.rsplit("-", 2)
@@ -912,7 +912,7 @@ class LibMambaSolver(Solver):
             return REPODATA_FN
         return self._repodata_fn
 
-    def _max_attempts(self, in_state: SolverInputState, default: int = 1):
+    def _max_attempts(self, in_state: SolverInputState, default: int = 1) -> int:
         from_env_var = os.environ.get("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS")
         installed_count = len(in_state.installed)
         if from_env_var:

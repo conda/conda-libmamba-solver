@@ -5,10 +5,12 @@
 Miscellaneous utilities
 """
 
-from enum import Enum
+from __future__ import annotations
+
 from functools import lru_cache
 from logging import getLogger
 from pathlib import Path
+from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from conda.base.context import context
@@ -18,10 +20,16 @@ from conda.common.url import urlparse
 from conda.exceptions import PackagesNotFoundError
 from conda.gateways.connection import session as gateway_session
 
+if TYPE_CHECKING:
+    from enum import Enum
+    from typing import Iterable
+
+    from conda.models.match_spec import MatchSpec
+
 log = getLogger(f"conda.{__name__}")
 
 
-def escape_channel_url(channel):
+def escape_channel_url(channel: str) -> str:
     if channel.startswith("file:"):
         if "%" in channel:  # it's escaped already
             return channel
@@ -45,7 +53,7 @@ def escape_channel_url(channel):
 
 
 @lru_cache(maxsize=None)
-def is_channel_available(channel_url) -> bool:
+def is_channel_available(channel_url: str) -> bool:
     if context.offline:
         # We don't know where the channel might be (even file:// might be a network share)
         # so we play it safe and assume it's not available
@@ -63,7 +71,9 @@ def is_channel_available(channel_url) -> bool:
         return False
 
 
-def compatible_specs(index, specs, raise_not_found=True):
+def compatible_specs(
+    index: type[IndexHelper], specs: Iterable[MatchSpec], raise_not_found: bool = True
+):
     """
     Assess whether the given specs are compatible with each other.
     This is done by querying the index for each spec and taking the

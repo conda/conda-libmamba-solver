@@ -13,7 +13,7 @@ except ImportError:
         __version__ = "0.0.0.unknown"
 
 
-def get_solver_class(key="libmamba"):
+def get_solver_class(key: str = "libmamba"):
     if key == "libmamba":
         from .solver import LibMambaSolver
 
