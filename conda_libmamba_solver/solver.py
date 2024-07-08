@@ -214,17 +214,6 @@ class LibMambaSolver(Solver):
                 continue
             channels.append(spec_channel)
 
-        # TODO: Deprecate 'channels_from_installed' functionality?
-        override = (getattr(context, "_argparse_args", None) or {}).get("override_channels")
-        if not os.getenv("CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED") and not override:
-            # see https://github.com/conda/conda-libmamba-solver/issues/108
-            all_urls_so_far = [url for c in channels for url in Channel(c).urls(False)]
-            installed_channels = in_state.channels_from_installed(seen=all_urls_so_far)
-            for channel in installed_channels:
-                # Only add to list if resource is available; check has timeout=1s
-                if timeout(1, is_channel_available, channel.base_url, default_return=False):
-                    channels.append(channel)
-
         channels.extend(in_state.maybe_free_channel())
         return channels
 

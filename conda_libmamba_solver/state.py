@@ -390,25 +390,6 @@ class SolverInputState:
                     channel = Channel(spec.original_spec_str.split("::")[0])
                 yield channel
 
-    def channels_from_installed(self, seen=None) -> Iterable[Channel]:
-        seen_urls = set(seen or [])
-        # See https://github.com/conda/conda/issues/11790
-        for record in self.installed.values():
-            if record.channel.auth or record.channel.token:
-                # skip if the channel has authentication info, because
-                # it might cause issues with expired tokens and what not
-                continue
-            if record.channel.name in ("@", "<develop>", "pypi"):
-                # These "channels" are not really channels, more like
-                # metadata placeholders
-                continue
-            if record.channel.base_url is None:
-                continue
-            if record.channel.subdir_url in seen_urls:
-                continue
-            seen_urls.add(record.channel.subdir_url)
-            yield record.channel
-
     def maybe_free_channel(self) -> Iterable[Channel]:
         if context.restore_free_channel:
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
