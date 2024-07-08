@@ -3,7 +3,7 @@ pip
 # run-time
 boltons>=23.0.0
 conda>=23.7.3
-conda-forge/label/mamba_dev::libmamba>=2.0.0beta3
-conda-forge/label/mamba_dev::libmambapy>=2.0.0beta3
+conda-forge/label/mamba_dev::libmamba>=2.0.0rc0
+conda-forge/label/mamba_dev::libmambapy>=2.0.0rc0
 # be explicit about sqlite because sometimes it's removed from the env :shrug:
 sqlite
