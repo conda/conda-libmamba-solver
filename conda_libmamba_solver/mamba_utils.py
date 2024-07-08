@@ -92,7 +92,10 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
 def init_libmamba_context() -> libmambapy.Context:
     # This function has to be called BEFORE 1st initialization of the context
     libmamba_context = libmambapy.Context(
-        # libmambapy.ContextOptions(enable_logging_and_signal_handling=False)
+        libmambapy.ContextOptions(
+            enable_signal_handling=False,
+            enable_logging=True,
+        )
     )
 
     # Output params
