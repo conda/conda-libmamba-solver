@@ -112,8 +112,6 @@ def init_libmamba_context() -> libmambapy.Context:
             0: libmambapy.LogLevel.ERROR,
         }[context.verbosity]
     )
-    libmamba_context.output_params.verbosity = context.verbosity
-    libmamba_context.set_verbosity(context.verbosity)
 
     # Prefix params
     libmamba_context.prefix_params.conda_prefix = context.conda_prefix
