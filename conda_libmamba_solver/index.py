@@ -82,6 +82,7 @@ from typing import TYPE_CHECKING
 
 from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
+from conda.common.compat import on_win
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
@@ -382,6 +383,10 @@ class LibMambaIndexHelper:
     def _load_repo_info_from_json_path(
         self, json_path: str, channel_url: str, state: RepodataState, try_solv: bool = True
     ) -> RepoInfo | None:
+        if try_solv and on_win:
+            # .solv loading is so slow on Windows is not even worth it. Use JSON instead.
+            log.debug("Overriding truthy 'try_solv' as False on Windows for performance reasons.")
+            try_solv = False
         json_path = Path(json_path)
         solv_path = json_path.with_suffix(".solv")
         if state:
@@ -430,7 +435,12 @@ class LibMambaIndexHelper:
                 return None
             raise exc
         if try_solv and repodata_origin:
-            self.db.native_serialize_repo(repo=repo, path=str(solv_path), metadata=repodata_origin)
+            try:
+                self.db.native_serialize_repo(
+                    repo=repo, path=str(solv_path), metadata=repodata_origin
+                )
+            except MambaNativeException as exc:
+                log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
 
     def _load_installed(self, records: Iterable[PackageRecord]) -> Iterable[RepoInfo]:
