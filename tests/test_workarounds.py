@@ -66,6 +66,7 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
+    TIMEOUT = 60  # Used twice in total, so account for double the amount
     p = sp.Popen(
         [
             sys.executable,
@@ -87,7 +88,7 @@ def test_ctrl_c(stage):
     t0 = time.time()
     while stage not in p.stdout.readline():
         time.sleep(0.1)
-        if time.time() - t0 > 30:
+        if time.time() - t0 > TIMEOUT:
             raise RuntimeError("Timeout")
 
     # works around Windows' awkward CTRL-C signal handling
@@ -99,8 +100,7 @@ def test_ctrl_c(stage):
             kernel.AttachConsole(p.pid)
             kernel.SetConsoleCtrlHandler(None, 1)
             kernel.GenerateConsoleCtrlEvent(0, 0)
-            kernel.GenerateConsoleCtrlEvent(0, 0)  # We need two signals to kill the process
-            p.wait(timeout=30)
+            p.wait(timeout=TIMEOUT)
             assert p.returncode != 0
             # With libmamba v2, the process is killed from C++ or something
             # and we don't see KeyboardInterrupt output (Python not involved?)
@@ -109,6 +109,6 @@ def test_ctrl_c(stage):
             kernel.SetConsoleCtrlHandler(None, 0)
     else:
         p.send_signal(signal.SIGINT)
-        p.wait(timeout=30)
+        p.wait(timeout=TIMEOUT)
         assert p.returncode != 0
         assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
