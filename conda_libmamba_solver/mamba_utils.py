@@ -123,7 +123,7 @@ def init_libmamba_context() -> libmambapy.Context:
     return libmamba_context
 
 
-def _debug_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str):
+def _debug_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger=_db_log):
     # from libmambapy.solver.libsolv import LogLevel
     # levels = {
     #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
@@ -133,12 +133,12 @@ def _debug_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str):
     # }
     if level.value == 0:
         # This incurs a large performance hit!
-        _db_log.debug(msg)
+        logger.debug(msg)
     else:
-        _db_log.log((level.value + 2) * 10, msg)
+        logger.log((level.value + 2) * 10, msg)
 
 
-def _verbose_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str):
+def _verbose_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger=_db_log):
     # from libmambapy.solver.libsolv import LogLevel
     # levels = {
     #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
@@ -147,7 +147,7 @@ def _verbose_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str
     #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
     # }
     if level.value:
-        _db_log.log((level.value + 2) * 10, msg)
+        logger.log((level.value + 2) * 10, msg)
 
 
 def database_logging(db: libmambapy.solver.libsolv.Database):   
