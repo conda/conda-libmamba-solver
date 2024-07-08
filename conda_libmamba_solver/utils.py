@@ -7,18 +7,13 @@ Miscellaneous utilities
 
 from __future__ import annotations
 
-from functools import lru_cache
 from logging import getLogger
-from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
-from conda.base.context import context
 from conda.common.compat import on_win
-from conda.common.path import url_to_path
 from conda.common.url import urlparse
 from conda.exceptions import PackagesNotFoundError
-from conda.gateways.connection import session as gateway_session
 
 if TYPE_CHECKING:
     from enum import Enum
@@ -52,25 +47,6 @@ def escape_channel_url(channel: str) -> str:
         parts = parts.replace(path=path)
         return str(parts)
     return channel
-
-
-@lru_cache(maxsize=None)
-def is_channel_available(channel_url: str) -> bool:
-    if context.offline:
-        # We don't know where the channel might be (even file:// might be a network share)
-        # so we play it safe and assume it's not available
-        return False
-    try:
-        if channel_url.startswith("file://"):
-            return Path(url_to_path(channel_url)).is_dir()
-        if hasattr(gateway_session, "get_session"):
-            session = gateway_session.get_session(channel_url)
-        else:
-            session = gateway_session.CondaSession()
-        return session.head(f"{channel_url}/noarch/repodata.json").ok
-    except Exception as exc:
-        log.debug("Failed to check if channel %s is available", channel_url, exc_info=exc)
-        return False
 
 
 def compatible_specs(

@@ -29,7 +29,7 @@ from conda.base.constants import (
 )
 from conda.base.context import context
 from conda.common.constants import NULL
-from conda.common.io import Spinner, time_recorder, timeout
+from conda.common.io import Spinner, time_recorder
 from conda.common.path import paths_equal
 from conda.core.solve import Solver
 from conda.exceptions import (
@@ -56,7 +56,6 @@ from .mamba_utils import (
     problems_format_nocolor,
 )
 from .state import SolverInputState, SolverOutputState
-from .utils import is_channel_available
 
 if TYPE_CHECKING:
     from typing import Iterable, Mapping, Sequence
