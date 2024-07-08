@@ -19,7 +19,9 @@ import libmambapy
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
 
+
 log = logging.getLogger(f"conda.{__name__}")
+_db_log = logging.getLogger("conda.libmamba.db")
 
 
 @lru_cache(maxsize=1)
@@ -174,7 +176,41 @@ def init_libmamba_context() -> libmambapy.Context:
     return libmamba_context
 
 
-def palettes_and_formats():
+def _debug_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str):
+    # from libmambapy.solver.libsolv import LogLevel
+    # levels = {
+    #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
+    #     LogLevel.Warning: logging.WARNING, # 1 -> 30
+    #     LogLevel.Error: logging.ERROR, # 2 -> 40
+    #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
+    # }
+    if level.value == 0:
+        # This incurs a large performance hit!
+        _db_log.debug(msg)
+    else:
+        _db_log.log((level.value + 2) * 10, msg)
+
+
+def _verbose_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str):
+    # from libmambapy.solver.libsolv import LogLevel
+    # levels = {
+    #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
+    #     LogLevel.Warning: logging.WARNING, # 1 -> 30
+    #     LogLevel.Error: logging.ERROR, # 2 -> 40
+    #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
+    # }
+    if level.value:
+        _db_log.log((level.value + 2) * 10, msg)
+
+
+def database_logging(db: libmambapy.solver.libsolv.Database):   
+    # The logging callback can slow things down; only enable with env var
+    if context.verbosity >= 3:
+        db.set_logger(_debug_logger_callback)
+    elif context.verbosity in (1, 2):
+        db.set_logger(_verbose_logger_callback)
+
+
     # _indents = ["│  ", "   ", "├─ ", "└─ "]
     if os.getenv("NO_COLOR"):
         use_color = False

@@ -108,6 +108,8 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
+from .mamba_utils import database_logging
+
 if TYPE_CHECKING:
     from typing import Iterable, Literal
 
@@ -239,43 +241,9 @@ class LibMambaIndexHelper:
             current_working_dir=os.getcwd(),
         )
         db = Database(params)
-        self._set_logging(db)
-        return db
-
-    def _set_logging(self, db):
         if os.getenv("CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV"):
-            # The logging callback can slow things down; only enable with env var
-            if context.verbosity >= 3:
-                db.set_logger(self._debug_logger_callback)
-            elif context.verbosity in (1, 2):
-                db.set_logger(self._verbose_logger_callback)
-
-    @staticmethod
-    def _debug_logger_callback(level, msg):
-        # from libmambapy.solver.libsolv import LogLevel
-        # levels = {
-        #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
-        #     LogLevel.Warning: logging.WARNING, # 1 -> 30
-        #     LogLevel.Error: logging.ERROR, # 2 -> 40
-        #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
-        # }
-        if level.value == 0:
-            # This incurs a large performance hit!
-            _db_log.debug(msg)
-        else:
-            _db_log.log((level.value + 2) * 10, msg)
-
-    @staticmethod
-    def _verbose_logger_callback(level, msg):
-        # from libmambapy.solver.libsolv import LogLevel
-        # levels = {
-        #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
-        #     LogLevel.Warning: logging.WARNING, # 1 -> 30
-        #     LogLevel.Error: logging.ERROR, # 2 -> 40
-        #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
-        # }
-        if level.value:
-            _db_log.log((level.value + 2) * 10, msg)
+            database_logging(db)
+        return db
 
     def _load_channels(
         self,
