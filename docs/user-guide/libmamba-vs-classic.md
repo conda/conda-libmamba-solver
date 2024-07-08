@@ -210,7 +210,7 @@ We don't need a separate attempt to disable `--freeze-installed` because our
 retry logic handles conflicts and frozen packages in the same way.
 
 Additionally, this retry logic can also be disabled or reduced with an
-environment variable for extreme cases (very large environments). 
+environment variable for extreme cases (very large environments).
 This makes the overall logic simpler and faster, which compounds
 on top of the lightning-fast `libmamba` implementation.
 
