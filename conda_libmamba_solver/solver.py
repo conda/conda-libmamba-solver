@@ -481,8 +481,6 @@ class LibMambaSolver(Solver):
         LOCK = "LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK
 
         for name in out_state.specs:
-            if name.startswith("__"):
-                continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
                 installed_spec_str = self._spec_to_str(
