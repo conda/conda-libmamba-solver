@@ -431,8 +431,6 @@ class LibMambaSolver(Solver):
             python_version_might_change = not to_be_installed_python.match(installed_python)
 
         for name in out_state.specs:
-            if name.startswith("__"):
-                continue  # ignore virtual packages
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
                 installed_spec = self._check_spec_compat(installed.to_match_spec())
