@@ -219,7 +219,7 @@ def test_too_aggressive_update_to_conda_forge_packages():
     conda classic would just change a few (<5) packages, but libmamba seemed to upgrade
     EVERYTHING it can to conda-forge.
 
-    In June 2024 this test was updated so it updates ca-certificates instead of libzlib to account
+    In July 2024 this test was updated so it updates ca-certificates instead of libzlib to account
     for differences in how conda-forge and defaults package this library.
     """
     with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
