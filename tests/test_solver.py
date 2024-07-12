@@ -12,9 +12,10 @@ from uuid import uuid4
 
 import pytest
 from conda.base.context import context
-from conda.common.compat import on_linux, on_win
+from conda.common.compat import on_linux, on_mac, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
+from conda.exceptions import DryRunExit, PackagesNotFoundError, UnsatisfiableError
 from conda.testing.integration import (
     Commands,
     make_temp_env,
@@ -474,3 +475,25 @@ def test_python_downgrade_with_pins_removes_truststore():
                 # shouldn't have changed!
                 assert "zstd" not in link_dict
                 assert "zstd" not in unlink_dict
+
+
+@pytest.mark.parametrize("spec", ("__glibc", "__unix", "__linux", "__osx", "__win"))
+def test_install_virtual_packages(conda_cli, spec):
+    """
+    Ensures a solver knows how to deal with virtual specs in the CLI.
+    This mean succeeding only if the virtual package is available.
+    https://github.com/conda/conda-libmamba-solver/issues/480
+
+    TODO: Remove once https://github.com/conda/conda/pull/13784 is merged
+    """
+    if any(
+        [
+            on_linux and spec in ("__glibc", "__unix", "__linux"),
+            on_mac and spec in ("__unix", "__osx"),
+            on_win and spec == "__win",
+        ]
+    ):
+        raises = DryRunExit  # success
+    else:
+        raises = (UnsatisfiableError, PackagesNotFoundError)
+    conda_cli("create", "--dry-run", "--offline", spec, raises=raises)
