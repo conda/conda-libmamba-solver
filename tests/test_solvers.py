@@ -219,6 +219,9 @@ def test_too_aggressive_update_to_conda_forge_packages():
     We expect a minimum change to the 'base' environment if we only ask for a single package.
     conda classic would just change a few (<5) packages, but libmamba seemed to upgrade
     EVERYTHING it can to conda-forge.
+
+    In July 2024 this test was updated so it updates ca-certificates instead of libzlib to account
+    for differences in how conda-forge and defaults package this library.
     """
     with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
         cmd = (
@@ -227,7 +230,7 @@ def test_too_aggressive_update_to_conda_forge_packages():
             prefix,
             "-c",
             "conda-forge",
-            "libzlib",
+            "ca-certificates",
             "--json",
             "--dry-run",
             "-y",
@@ -235,12 +238,19 @@ def test_too_aggressive_update_to_conda_forge_packages():
         )
         env = os.environ.copy()
         env.pop("CONDA_SOLVER", None)
+        # libmamba seems to take these more seriously than conda... by default the aggressive
+        # update list is ca-certificates, openssl and certifi. We clear it in this test so we
+        # can only test the CLI specs _we_ pass.
+        env["CONDA_AGGRESSIVE_UPDATE_PACKAGES"] = ""
         p_classic = conda_subprocess(*cmd, "--solver=classic", explain=True, env=env)
         p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True, env=env)
         data_classic = json.loads(p_classic.stdout)
         data_libmamba = json.loads(p_libmamba.stdout)
-        assert len(data_classic["actions"]["LINK"]) < 15
-        assert len(data_libmamba["actions"]["LINK"]) <= len(data_classic["actions"]["LINK"])
+        assert (
+            len(data_libmamba.get("actions", {}).get("LINK", ()))
+            <= len(data_classic.get("actions", {}).get("LINK", ()))
+            <= 1
+        )
 
 
 @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux-64 only")
