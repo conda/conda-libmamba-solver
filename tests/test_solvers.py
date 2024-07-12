@@ -219,10 +219,8 @@ def test_too_aggressive_update_to_conda_forge_packages():
     conda classic would just change a few (<5) packages, but libmamba seemed to upgrade
     EVERYTHING it can to conda-forge.
 
-    In June 2024 this test was updated so it updates zstd instead of libzlib. The latter
-    was probably part of a migration at some point in the 2nd quarter of 2024, which forced
-    a larger reinstallation. libzlib is in conda-forge, but only as zlib in defaults, so it was
-    not a good test case to begin with. zstd is in both
+    In June 2024 this test was updated so it updates ca-certificates instead of libzlib to account
+    for differences in how conda-forge and defaults package this library.
     """
     with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
         cmd = (
@@ -231,7 +229,7 @@ def test_too_aggressive_update_to_conda_forge_packages():
             prefix,
             "-c",
             "conda-forge",
-            "zstd",
+            "ca-certificates",
             "--json",
             "--dry-run",
             "-y",
@@ -239,12 +237,16 @@ def test_too_aggressive_update_to_conda_forge_packages():
         )
         env = os.environ.copy()
         env.pop("CONDA_SOLVER", None)
+        env["CONDA_AGGRESSIVE_UPDATE_PACKAGES"] = ""
         p_classic = conda_subprocess(*cmd, "--solver=classic", explain=True, env=env)
         p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True, env=env)
         data_classic = json.loads(p_classic.stdout)
         data_libmamba = json.loads(p_libmamba.stdout)
-        assert len(data_classic["actions"]["LINK"]) < 15
-        assert len(data_libmamba["actions"]["LINK"]) <= len(data_classic["actions"]["LINK"])
+        assert (
+            len(data_libmamba.get("actions", {}).get("LINK", ()))
+            <= len(data_classic.get("actions", {}).get("LINK", ()))
+            <= 1
+        )
 
 
 @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux-64 only")
