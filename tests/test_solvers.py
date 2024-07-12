@@ -237,6 +237,9 @@ def test_too_aggressive_update_to_conda_forge_packages():
         )
         env = os.environ.copy()
         env.pop("CONDA_SOLVER", None)
+        # libmamba seems to take these more seriously than conda... by default the aggressive
+        # update list is ca-certificates, openssl and certifi. We clear it in this test so we
+        # can only test the CLI specs _we_ pass.
         env["CONDA_AGGRESSIVE_UPDATE_PACKAGES"] = ""
         p_classic = conda_subprocess(*cmd, "--solver=classic", explain=True, env=env)
         p_libmamba = conda_subprocess(*cmd, "--solver=libmamba", explain=True, env=env)
