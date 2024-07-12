@@ -15,7 +15,7 @@ from conda.base.context import context
 from conda.common.compat import on_linux, on_mac, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.exceptions import DryRunExit, UnsatisfiableError, PackagesNotFoundError
+from conda.exceptions import DryRunExit, PackagesNotFoundError, UnsatisfiableError
 from conda.testing.integration import (
     Commands,
     make_temp_env,
