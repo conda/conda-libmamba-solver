@@ -13,6 +13,26 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.7.0 (2024-07-17)
+
+### Bug fixes
+
+* Allow wildcards in package names for `conda remove` (e.g. `conda remove "python-*"`). (#434 via #435)
+* Avoid duplicate channel listing when using channel-pinned specs like `channel::package`. (#449)
+* Fix a performance regression where `.solv` repodata cache files were not being loaded when available. (#481 via #482)
+* Do not ignore virtual packages as input specs. (#480 via #485)
+* Pin `libmambapy <2` to defend against upcoming API changes. (#492)
+
+### Docs
+
+* Document development workflows with devcontainers. (#451)
+
+### Other
+
+* Add DevContainer configurations for local development workflows. (#451)
+
+
+
 ## 24.1.0 (2024-01-29)
 
 ### Enhancements
