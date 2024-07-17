@@ -31,6 +31,12 @@ Remember to update the hyperlinks at the bottom.
 
 * Add DevContainer configurations for local development workflows. (#451)
 
+### Contributors
+
+* @jaimergp
+* @tl-hbk made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/449
+* @zklaus made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/476
+
 
 
 ## 24.1.0 (2024-01-29)
