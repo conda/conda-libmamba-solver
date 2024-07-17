@@ -11,7 +11,7 @@ source:
 build:
   noarch: python
   number: 0
-  script: "{{ PYTHON }} -m pip install src/ -vv"
+  script: "{{ PYTHON }} -m pip install src/ -vv --no-deps --no-build-isolation"
 
 requirements:
   host:
@@ -22,14 +22,14 @@ requirements:
   run:
     - python >=3.8
     - conda >=23.7.3
-    - libmambapy >=1.5.6,<2.0.0dev0
+    - libmambapy >=2
     - boltons >=23.0.0
 
 test:
   imports:
     - conda_libmamba_solver
   commands:
-    - CONDA_SOLVER=libmamba conda create -n test --dry-run scipy
+    - conda create -n test --dry-run scipy --solver=libmamba
     - >-
       python -c
       "import conda_libmamba_solver as cls;
