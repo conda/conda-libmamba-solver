@@ -141,9 +141,12 @@ jobs:
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
+        # NOTE: jaimergp/label/conda-libmamba-solver-for-libmamba-v2 is a temporary hack
+        # to allow upgrades to libmamba v2
         run: >
           conda install
           --yes
+          -c jaimergp/label/conda-libmamba-solver-for-libmamba-v2
           --file tests\requirements.txt
           --file tests\requirements-${{ runner.os }}.txt
           --file tests\requirements-ci.txt
@@ -289,8 +292,12 @@ jobs:
 
       - name: Conda Install
         working-directory: conda
-        run: conda install
+        # NOTE: jaimergp/label/conda-libmamba-solver-for-libmamba-v2 is a temporary hack
+        # to allow upgrades to libmamba v2
+        run: >
+          conda install
           --yes
+          -c jaimergp/label/conda-libmamba-solver-for-libmamba-v2
           --file tests/requirements.txt
           --file tests/requirements-${{ runner.os }}.txt
           --file tests/requirements-ci.txt
@@ -573,8 +580,12 @@ jobs:
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
-        run: conda install
+        # NOTE: jaimergp/label/conda-libmamba-solver-for-libmamba-v2 is a temporary hack
+        # to allow upgrades to libmamba v2
+        run: >
+          conda install
           --yes
+          -c jaimergp/label/conda-libmamba-solver-for-libmamba-v2
           --file tests/requirements.txt
           --file tests/requirements-ci.txt
           --file tests/requirements-s3.txt
