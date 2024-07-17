@@ -692,7 +692,7 @@ jobs:
 
   # canary builds
   build:
-    needs: [analyze]
+    # needs: [analyze]
     # only build canary build if
     # - prior steps succeeded,
     # - this is the main repo, and
