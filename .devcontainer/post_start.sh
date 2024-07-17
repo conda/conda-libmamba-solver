@@ -43,8 +43,10 @@ function develop-mamba() (
     sed '/sel(.*)/d' "\$environment_yaml" > /tmp/mamba-environment-dev.yml
     # Environment.yml is missing make
     echo "  - make" >> /tmp/mamba-environment-dev.yml
-    CONDA_QUIET=1 "$BASE_CONDA/condabin/conda" env update -p "$BASE_CONDA" \
-        --file /tmp/mamba-environment-dev.yml
+    "$BASE_CONDA/condabin/conda" env update \
+      --quiet \
+      --prefix "$BASE_CONDA" \
+      --file /tmp/mamba-environment-dev.yml
     # Clean build directory to avoid issues with stale build files
     test -f "$SRC_MAMBA/build/CMakeCache.txt" && rm -rf "$SRC_MAMBA/build"
   fi

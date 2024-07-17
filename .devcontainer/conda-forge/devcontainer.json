@@ -3,6 +3,9 @@
     "name": "Miniforge (default-channel=conda-forge)",
     "image": "condaforge/miniforge3:latest",
 
+    // Uncomment to force x64 instead of native (slower!)
+    // "runArgs": ["--platform=linux/amd64"],
+
     // Features to add to the dev container. More info: https://containers.dev/features.
     // "features": {},
 
