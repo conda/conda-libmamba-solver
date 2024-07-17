@@ -649,7 +649,16 @@ class LibMambaSolver(Solver):
         """
         conflicts = []
         not_found = []
-        problems = unsolvable.problems(db)
+        problems = []
+        has_unsupported = False
+        for problem in unsolvable.problems(db):
+            if problem == "unsupported request":
+                has_unsupported = True
+            else:
+                problems.append(problem)
+        if has_unsupported:  # we put it at the end to prioritize other more meaningful problems
+            problems.append("unsupported request")
+
         try:
             explained_problems = unsolvable.explain_problems(db, problems_format_nocolor)
         except Exception as exc:
@@ -663,11 +672,15 @@ class LibMambaSolver(Solver):
                 conflicts.append(cls._matchspec_from_error_str(words[1]))
                 end = words.index("but")
                 conflicts.append(cls._matchspec_from_error_str(words[3:end]))
-            elif "- nothing provides" in line:
-                marker = next((i for (i, w) in enumerate(words) if w == "needed"), None)
-                if marker:
+            elif "nothing provides" in line:
+                start, marker = None, None
+                for i, word in enumerate(words):
+                    if word == "needed":
+                        marker = i
+                    elif word == "provides":
+                        start = i + 1
+                if marker is not None:
                     conflicts.append(cls._matchspec_from_error_str(words[-1]))
-                start = 3 if marker == 4 else 4
                 not_found.append(cls._matchspec_from_error_str(words[start:marker]))
             elif "has constraint" in line and "conflicting with" in line:
                 # package libzlib-1.2.11-h4e544f5_1014 has constraint zlib 1.2.11 *_1014
@@ -685,13 +698,12 @@ class LibMambaSolver(Solver):
             elif line == "unsupported request":
                 # libmamba v2 has this message for package not found errors
                 # we need to double check with the explained problem
-                # if "does not exist" in explained_problems:
                 for explained_line in explained_problems.splitlines():
-                    explained_line = explained_line.strip()
+                    explained_line = explained_line.lstrip("│├└─ ").strip()
                     explained_words = explained_line.split()
-                    if "does not exist" in explained_line:
+                    if "does not exist" in explained_line and "which" not in explained_line:
                         end = explained_words.index("does")
-                        not_found.append(cls._matchspec_from_error_str(explained_words[1:end]))
+                        not_found.append(cls._matchspec_from_error_str(explained_words[:end]))
                         break
             else:
                 log.debug("! Problem line not recognized: %s", line)
