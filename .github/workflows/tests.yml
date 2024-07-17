@@ -692,19 +692,20 @@ jobs:
 
   # canary builds
   build:
-    # needs: [analyze]
+    name: Build canary
+    needs: [analyze]
     # only build canary build if
     # - prior steps succeeded,
     # - this is the main repo, and
     # - we are on the main, feature, or release branch
-    # if: >-
-    #   !cancelled()
-    #   && !github.event.repository.fork
-    #   && (
-    #     github.ref_name == 'main'
-    #     || startsWith(github.ref_name, 'feature/')
-    #     || endsWith(github.ref_name, '.x')
-    #   )
+    if: >-
+      !cancelled()
+      && !github.event.repository.fork
+      && (
+        github.ref_name == 'main'
+        || startsWith(github.ref_name, 'feature/')
+        || endsWith(github.ref_name, '.x')
+      )
     runs-on: ubuntu-latest
     steps:
       # Clean checkout of specific git ref needed for package metadata version
@@ -753,4 +754,4 @@ jobs:
           subdir: noarch
           anaconda-org-channel: conda-canary
           anaconda-org-label: ${{ env.ANACONDA_ORG_LABEL }}
-          anaconda-org-token: ${{ secrets.ANACONDA_ORG_CONDA_CANARY_TOKEN }}+prevent-uploads-tmp
+          anaconda-org-token: ${{ secrets.ANACONDA_ORG_CONDA_CANARY_TOKEN }}
