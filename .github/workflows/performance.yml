@@ -38,13 +38,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
           repository: conda/conda
@@ -86,20 +86,20 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
           repository: conda/conda
           ref: libmamba
           path: conda
 
-      - uses: conda-incubator/setup-miniconda@v2
+      - uses: conda-incubator/setup-miniconda@a4260408e20b96e80095f42ff7f1a15b27dd94ca # v3.0.4
         with:
           activate-environment: conda-test-env
           use-only-tar-bz2: true # IMPORTANT: This needs to be set for caching to work properly!
@@ -153,13 +153,13 @@ jobs:
 
     steps:
       - name: Checkout our source
-        uses: actions/checkout@v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           path: conda-libmamba-solver
           fetch-depth: 0
 
       - name: Checkout conda
-        uses: actions/checkout@v3
+        uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
           repository: conda/conda

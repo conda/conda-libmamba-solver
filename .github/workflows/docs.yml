@@ -22,9 +22,9 @@ jobs:
       run:
         shell: bash -el {0}
     steps:
-      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
 
-      - uses: conda-incubator/setup-miniconda@9f54435e0e72c53962ee863144e47a4b094bfd35 # v2.3.0
+      - uses: conda-incubator/setup-miniconda@a4260408e20b96e80095f42ff7f1a15b27dd94ca # v3.0.4
         with:
           activate-environment: conda-libmamba-solver
           environment-file: docs/environment.yml
