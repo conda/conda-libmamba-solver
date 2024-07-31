@@ -405,6 +405,9 @@ def test_ca_certificates_pins():
                 raise AssertionError("ca-certificates not found in LINK actions")
 
 
+@pytest.mark.skipif(
+    context.subdir == "osx-arm64", reason="python=2.7 not available in this platform"
+)
 def test_python_update_should_not_uninstall_history():
     """
     https://github.com/conda/conda-libmamba-solver/issues/341
