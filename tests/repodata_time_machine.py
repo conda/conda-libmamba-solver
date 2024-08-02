@@ -11,6 +11,7 @@ Given a date and a channel, this script will:
 - Apply the patches
 - Generate a ready-to-use local channel
 """
+
 import bz2
 import json
 import os

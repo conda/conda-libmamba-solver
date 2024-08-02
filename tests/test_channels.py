@@ -22,11 +22,13 @@ from conda.testing.integration import (
 )
 from conda.testing.integration import run_command as conda_inprocess
 
-from .channel_testing.helpers import http_server_auth_basic  # noqa: F401
-from .channel_testing.helpers import http_server_auth_basic_email  # noqa: F401
-from .channel_testing.helpers import http_server_auth_none  # noqa: F401
-from .channel_testing.helpers import http_server_auth_token  # noqa: F401
-from .channel_testing.helpers import create_with_channel
+from .channel_testing.helpers import (
+    create_with_channel,
+    http_server_auth_basic,  # noqa: F401
+    http_server_auth_basic_email,  # noqa: F401
+    http_server_auth_none,  # noqa: F401
+    http_server_auth_token,  # noqa: F401
+)
 from .utils import conda_subprocess, write_env_config
 
 DATA = Path(__file__).parent / "data"
@@ -125,7 +127,7 @@ def _setup_channels_custom(prefix, force=False):
     write_env_config(
         prefix,
         force=force,
-        channels=["conda-forge", "defaults"],
+        channels=["conda-forge"],
         custom_channels={
             "conda-forge": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
         },
@@ -139,7 +141,7 @@ def _setup_channels_custom(prefix, force=False):
         _setup_channels_custom,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env):
+def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env):
     """
     https://github.com/conda/conda-libmamba-solver/issues/108
 
@@ -151,7 +153,7 @@ def test_mirrors_do_not_leak_channels(config_env):
     is undesirable.
     """
 
-    with env_vars({"CONDA_PKGS_DIRS": _get_temp_prefix()}), make_temp_env() as prefix:
+    with env_vars({"CONDA_PKGS_DIRS": tmp_path}), tmp_env() as prefix:
         assert (Path(prefix) / "conda-meta" / "history").exists()
 
         # Setup conda configuration
@@ -159,10 +161,10 @@ def test_mirrors_do_not_leak_channels(config_env):
         common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
 
         env = os.environ.copy()
-        env["CONDA_PREFIX"] = prefix  # fake activation so config is loaded
+        env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
 
         # Create an environment using mirrored channels only
-        p = conda_subprocess("install", *common, "python", "pip", env=env)
+        p = conda_subprocess("install", *common, "ca-certificates", env=env)
         result = json.loads(p.stdout)
         if p.stderr:
             assert "conda.anaconda.org" not in p.stderr
@@ -175,7 +177,7 @@ def test_mirrors_do_not_leak_channels(config_env):
             ), pkg
 
         # Make a change to that channel
-        p = conda_subprocess("install", *common, "pytest", env=env)
+        p = conda_subprocess("install", *common, "zlib", env=env)
 
         # Ensure that the loaded channels are ONLY the mirrored ones
         result = json.loads(p.stdout)
@@ -264,23 +266,23 @@ def test_conda_build_with_aliased_channels(tmp_path):
             condarc.unlink()
 
 
-def test_http_server_auth_none(http_server_auth_none):
+def test_http_server_auth_none(http_server_auth_none):  # noqa: F811
     create_with_channel(http_server_auth_none)
 
 
-def test_http_server_auth_basic(http_server_auth_basic):
+def test_http_server_auth_basic(http_server_auth_basic):  # noqa: F811
     create_with_channel(http_server_auth_basic)
 
 
-def test_http_server_auth_basic_email(http_server_auth_basic_email):
+def test_http_server_auth_basic_email(http_server_auth_basic_email):  # noqa: F811
     create_with_channel(http_server_auth_basic_email)
 
 
-def test_http_server_auth_token(http_server_auth_token):
+def test_http_server_auth_token(http_server_auth_token):  # noqa: F811
     create_with_channel(http_server_auth_token)
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):
+def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F811
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
