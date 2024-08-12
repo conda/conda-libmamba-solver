@@ -342,7 +342,7 @@ If you want to read (even more) about this, please check the following resources
 [minisat]: http://minisat.se/
 [jlap]: https://github.com/conda/conda/issues/11640
 [powerloader]: https://github.com/mamba-org/powerloader
-[deep-dive]: https://docs.conda.io/projects/conda/en/stable/dev-guide/deep-dive-solvers.html
+[deep-dive]: https://docs.conda.io/projects/conda/en/stable/dev-guide/deep-dives/solvers.html
 [mamba-pkg-resolution]: https://mamba.readthedocs.io/en/latest/advanced_usage/package_resolution.html
 [libsolv-docs]: https://github.com/openSUSE/libsolv/tree/master/doc
 [libsolv-issue]: https://github.com/openSUSE/libsolv/issues/284
