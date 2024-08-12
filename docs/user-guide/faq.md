@@ -58,3 +58,20 @@ Before version 22.12, the CLI flag was `--experimental-solver`.
 We recommend you upgrade to `conda` 22.11 or above, and then `conda-libmamba-solver` 22.12 or above.
 
 See the [22.12.0 announcement post](https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0) for more details on how to upgrade.
+
+## I have an older `conda` and I can't install `conda-libmamba-solver`
+
+Since older `conda` versions only supported the `classic` solver, you might run into solver conflicts or too long installations if your `base` environment is too constrained. This becomes a "chicken-and-egg" problem where you'd need `conda-libmamba-solver` to update to a more recent `conda` with `conda-libmamba-solver`.
+
+Fortunately, there's a workaround thanks to the `conda-standalone` project. This is a single binary that bundles recent `conda` versions, with `conda-libmamba-solver` included. It's not a substitute for the full `conda` UX but it can help bootstrap and rescue conda installations.
+
+1. Download the most recent `conda-standalone` from its [Github Releases page](https://github.com/conda/conda-libmamba-solver/releases/latest). Make sure to pick the one for your operating system and platform. Once downloaded, rename it as `conda.exe`.
+2. Write down the location of your `base` environment: `conda info --root`.
+3. Write down the main preconfigured channel in your installation: `conda config --show channels`. This is usually `defaults` or `conda-forge`.
+4. Go to the Downloads directory and run this command from your terminal.
+
+```console
+conda.exe install -p "[path given by step 2]" -c [channel from step 3] "conda>=23.10" conda-libmamba-solver
+```
+
+Once ready, you'll have `conda-libmamba-solver` installed in your base environment and will be ready to use it as normal.
