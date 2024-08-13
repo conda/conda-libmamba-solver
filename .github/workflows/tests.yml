@@ -173,7 +173,7 @@ jobs:
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
           --cov=conda
-          --durations-path=tools\durations\${{ runner.os }}.json
+          --durations-path=durations\${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
           --reruns=${{ env.PYTEST_RERUN_FAILURES }}
@@ -209,7 +209,7 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
           path: |
             conda\.coverage
-            conda\tools\durations\${{ runner.os }}.json
+            conda\durations\${{ runner.os }}.json
             conda\test-report.xml
           retention-days: 1  # temporary, combined in aggregate below
 
@@ -321,7 +321,7 @@ jobs:
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
           --cov=conda
-          --durations-path=tools/durations/${{ runner.os }}.json
+          --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
           --reruns=${{ env.PYTEST_RERUN_FAILURES }}
@@ -351,7 +351,7 @@ jobs:
           name: test-results-${{ env.HASH }}
           path: |
             conda/.coverage
-            conda/tools/durations/${{ runner.os }}.json
+            conda/durations/${{ runner.os }}.json
             conda/test-report.xml
           retention-days: 1  # temporary, combined in aggregate below
 
@@ -605,7 +605,7 @@ jobs:
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
           --cov=conda
-          --durations-path=tools/durations/${{ runner.os }}.json
+          --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
           --reruns=${{ env.PYTEST_RERUN_FAILURES }}
@@ -636,7 +636,7 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
           path: |
             conda/.coverage
-            conda/tools/durations/${{ runner.os }}.json
+            conda/durations/${{ runner.os }}.json
             conda/test-report.xml
           retention-days: 1  # temporary, combined in aggregate below
 
