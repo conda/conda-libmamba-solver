@@ -3,8 +3,8 @@ pip
 # run-time
 boltons>=23.0.0
 conda>=23.7.3
-conda-forge/label/mamba_dev::libmamba>=2.0.0rc1
-conda-forge/label/mamba_dev::libmambapy>=2.0.0rc1
+conda-forge/label/mamba_dev::libmamba>=2.0.0rc2
+conda-forge/label/mamba_dev::libmambapy>=2.0.0rc2
 # NOTE: jaimergp/label/conda-libmamba-solver-for-libmamba-v2 is a temporary hack
 # to allow upgrades to libmamba v2. Remove once CLS with v2 compat is released.
 jaimergp/label/conda-libmamba-solver-for-libmamba-v2::conda-libmamba-solver
