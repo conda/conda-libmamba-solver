@@ -65,13 +65,21 @@ Since older `conda` versions only supported the `classic` solver, you might run 
 
 Fortunately, there's a workaround thanks to the `conda-standalone` project. This is a single binary that bundles recent `conda` versions, with `conda-libmamba-solver` included. It's not a substitute for the full `conda` user experience but it can help bootstrap and rescue conda installations.
 
-1. Download the most recent `conda-standalone` from its [Github Releases page](https://github.com/conda/conda-standalone/releases/latest). Make sure to pick the one for your operating system and platform. Once downloaded, rename it as `conda.exe`.
+1. Download the most recent `conda-standalone` from its [Github Releases page](https://github.com/conda/conda-standalone/releases/latest). Make sure to pick the one for your operating system and platform. Once downloaded, rename it as `conda.exe` on Windows and `conda` on Linux / macOS.
 2. Write down the location of your `base` environment: `conda info --root`.
 3. Write down the main preconfigured channel in your installation: `conda config --show channels`. This is usually `defaults` or `conda-forge`.
-4. Go to the Downloads directory and run this command from your terminal.
+4. Go to the Downloads directory and run this command from your terminal:
+
+On Windows:
 
 ```console
-conda.exe install -p "[path given by step 2]" -c [channel from step 3] "conda>=23.10" conda-libmamba-solver
+.\conda.exe install -p "[path given by step 2]" -c [channel from step 3] "conda>=23.10" conda-libmamba-solver
 ```
 
-Once ready, you'll have `conda-libmamba-solver` installed in your base environment and will be ready to use it as normal.
+On Linux or macOS:
+
+```console
+./conda install -p "[path given by step 2]" -c [channel from step 3] "conda>=23.10" conda-libmamba-solver
+```
+
+Once the command succeeds, you'll have `conda-libmamba-solver` installed in your base environment and will be ready to use it as normal. You can delete the conda-standalone binaries.
