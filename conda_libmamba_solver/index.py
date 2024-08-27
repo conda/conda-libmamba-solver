@@ -470,16 +470,10 @@ class LibMambaIndexHelper:
         )
 
     def _set_repo_priorities(self):
-        # channels = list(reversed(dict.fromkeys(repo.name.rsplit("/", 1)[0] for repo in self.repos)))
-        # for repo in self.repos:
-        #     priority = channels.index(repo.name.rsplit("/", 1)[0])
-        #     subpriority = 0 if repo.name.endswith("/noarch") else 1
-        #     logging.debug("Priorities for %s: %d, %d", repo.name, priority, subpriority)
-        #     self.db.set_repo_priority(repo, Priorities(priority, subpriority))
-        has_priority = context.channel_priority in [
+        has_priority = context.channel_priority in (
             ChannelPriority.STRICT,
             ChannelPriority.FLEXIBLE,
-        ]
+        )
 
         subprio_index = len(self.repos)
         if has_priority:
