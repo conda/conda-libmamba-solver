@@ -59,6 +59,8 @@ We recommend you upgrade to `conda` 22.11 or above, and then `conda-libmamba-sol
 
 See the [22.12.0 announcement post](https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0) for more details on how to upgrade.
 
+(install-older-conda)=
+
 ## I have an older `conda` and I can't install `conda-libmamba-solver`
 
 Since older `conda` versions only supported the `classic` solver, you might run into solver conflicts or too long installations if your `base` environment is too constrained. This becomes a "chicken-and-egg" problem where you'd need `conda-libmamba-solver` to update to a more recent `conda` with `conda-libmamba-solver`.

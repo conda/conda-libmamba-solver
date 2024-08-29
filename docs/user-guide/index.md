@@ -4,22 +4,33 @@ The `conda-libmamba-solver` plugin allows you to use `libmamba`, the same `libso
 
 ## How to install
 
-`conda-libmamba-solver` is distributed as a separate package, available on both conda-forge and defaults. The plugin needs to be present in the same environment you use `conda` from; most of the time, this is your `base` environment. Run this command:
+If you have a recent `conda` (23.10 or later), you don't have to do anything. `conda-libmamba-solver` is already preconfigured as default. 
+For older versions `conda`, we simply recommend updating `conda` to a more recent version:
 
-```bash
-$ conda install -n base conda-libmamba-solver
+```console
+$ conda update -n base conda
 ```
 
-### Update from the experimental versions (22.9 and below)
+If this command fails, check this entry in the FAQ section: {ref}`install-older-conda`.
 
-The instructions in this page assume you are using conda-libmamba-solver 22.12 or above.
-Please refer to the [v22.12.0 release notes](https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0) for more details on how to update from a previous version if you were already using the experimental builds.
+```{admonition} Update from the experimental versions
+:class: note
+
+Please refer to the [v22.12.0 release notes](https://github.com/conda/conda-libmamba-solver/releases/tag/22.12.0) for more details on how to update from a previous version if you were already using the experimental builds (conda-libmamba-solver 22.9 and below).
+```
 
 ## Usage
 
-Even if installed, `conda` won't use `conda-libmamba-solver` by default. It will still rely on the `classic` solver.
+From `conda` 23.10, `conda-libmamba-solver` is the default solver. You don't have to do anything else. It will just work.
 
-### Try it once
+
+````{admonition} Usage with conda 23.9 and below
+`conda <23.10` won't use `conda-libmamba-solver` by default.
+It will still rely on the `classic` solver.
+
+<details>
+
+<summary>Sporadic use</summary>
 
 To enable it for one operation, you can use the `--solver` flag, available for `conda create|install|remove|update` commands.
 
@@ -27,12 +38,14 @@ To enable it for one operation, you can use the `--solver` flag, available for `
 $ conda install tensorflow --solver=libmamba
 ```
 
-```{note}
-The `--solver` flag is also exposed as an environment variable, `CONDA_SOLVER`,
+Note: The `--solver` flag is also exposed as an environment variable, `CONDA_SOLVER`,
 in case you need that.
-```
 
-### Set as default
+</details>
+
+<details>
+
+<summary>Set as default</summary>
 
 To enable it permanently, you can add `solver: libmamba` to your `.condarc` file, either manually, or with this command:
 
@@ -40,9 +53,12 @@ To enable it permanently, you can add `solver: libmamba` to your `.condarc` file
 $ conda config --set solver libmamba
 ```
 
-### Revert to `classic`
+</details>
+````
 
-If you ever need to use the classic solver temporarily, you can again rely on the `--solver` flag:
+## Revert to `classic`
+
+If you ever need to use the classic solver temporarily, use `--solver` flag:
 
 ```
 $ conda install numpy --solver=classic
@@ -50,8 +66,7 @@ $ conda install numpy --solver=classic
 
 Finally, if you need to revert the default configuration back to `classic`, you can:
 
-* Run `conda config --set solver classic` (to do your choice explicit).
-* Run `conda config --remove-key solver` to delete the `solver: libmamba` line from your `.condarc` file.
+* Run `conda config --set solver classic` (to make your choice explicit).
 
 ```{admonition} Tip
 If you are unsure what configuration is being used by conda, you can inspect
