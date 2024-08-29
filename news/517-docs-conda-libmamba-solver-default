@@ -1,0 +1,19 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* Update user guide to reflect conda-libmamba-solver being the default solver in conda. (#516 via #517)
+
+### Other
+
+* <news item>
