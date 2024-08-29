@@ -123,7 +123,7 @@ def init_libmamba_context() -> libmambapy.Context:
     return libmamba_context
 
 
-def _debug_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger=_db_log):
+def logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger=_db_log):
     # from libmambapy.solver.libsolv import LogLevel
     # levels = {
     #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
@@ -136,26 +136,6 @@ def _debug_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, 
         logger.debug(msg)
     else:
         logger.log((level.value + 2) * 10, msg)
-
-
-def _verbose_logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger=_db_log):
-    # from libmambapy.solver.libsolv import LogLevel
-    # levels = {
-    #     LogLevel.Debug: logging.DEBUG, # 0 -> 10
-    #     LogLevel.Warning: logging.WARNING, # 1 -> 30
-    #     LogLevel.Error: logging.ERROR, # 2 -> 40
-    #     LogLevel.Fatal: logging.FATAL, # 3 -> 50
-    # }
-    if level.value:
-        logger.log((level.value + 2) * 10, msg)
-
-
-def database_logging(db: libmambapy.solver.libsolv.Database):   
-    # The logging callback can slow things down; only enable with env var
-    if context.verbosity >= 3:
-        db.set_logger(_debug_logger_callback)
-    elif context.verbosity in (1, 2):
-        db.set_logger(_verbose_logger_callback)
 
 
 def palettes_and_formats() -> tuple[libmambapy.solver.ProblemsMessageFormat, libmambapy.solver.ProblemsMessageFormat]:

@@ -108,7 +108,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from .mamba_utils import database_logging
+from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
     from typing import Iterable, Literal
@@ -240,8 +240,7 @@ class LibMambaIndexHelper:
             current_working_dir=os.getcwd(),
         )
         db = Database(params)
-        if os.getenv("CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV"):
-            database_logging(db)
+        db.set_logger(logger_callback)
         return db
 
     def _load_channels(
