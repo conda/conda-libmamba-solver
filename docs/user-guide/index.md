@@ -4,7 +4,7 @@ The `conda-libmamba-solver` plugin allows you to use `libmamba`, the same `libso
 
 ## How to install
 
-If you have a recent `conda` (23.10 or later), you don't have to do anything. `conda-libmamba-solver` is already preconfigured as default. 
+If you have a recent `conda` (23.10 or later), you don't have to do anything. `conda-libmamba-solver` is already preconfigured as default.
 For older versions `conda`, we simply recommend updating `conda` to a more recent version:
 
 ```console
