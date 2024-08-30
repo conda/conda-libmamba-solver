@@ -81,13 +81,13 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.8', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
+        python-version: ['3.9', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
-            python-version: '3.8'
+            python-version: '3.9'
           - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
             python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
           - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -228,13 +228,11 @@ jobs:
       fail-fast: false
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
-          - python-version: '3.8'
-            default-channel: conda-forge
           - python-version: '3.9'
             default-channel: conda-forge
           - python-version: '3.10'
@@ -504,19 +502,19 @@ jobs:
       matrix:
         # test lower version (w/ osx-64 & defaults & unit tests) and upper version (w/ osx-arm64 & conda-forge & integration tests)
         arch: [osx-64, osx-arm64]
-        python-version: ['3.8', '3.11']
+        python-version: ['3.9', '3.12']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - arch: osx-64
-            python-version: '3.11'
+            python-version: '3.12'
           - arch: osx-64
             default-channel: conda-forge
           - arch: osx-64
             test-type: integration
           - arch: osx-arm64
-            python-version: '3.8'
+            python-version: '3.9'
           - arch: osx-arm64
             default-channel: defaults
           - arch: osx-arm64
