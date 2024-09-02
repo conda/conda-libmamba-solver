@@ -55,9 +55,7 @@ minversion = "6.0"
 addopts = [
   "--color=yes",
   "--tb=native",
-  "--strict-markers",
-  "--xdoctest-modules",
-  "--xdoctest-style=google",
+  "--strict-markers"
 ]
 
 markers = [
