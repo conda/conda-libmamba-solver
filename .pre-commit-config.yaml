@@ -47,7 +47,7 @@ repos:
     hooks:
       - id: flake8
   - repo: https://github.com/PyCQA/pylint
-    rev: v3.2.6
+    rev: v3.2.7
     hooks:
       - id: pylint
         args: [--exit-zero]
