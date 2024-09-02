@@ -68,6 +68,7 @@ jobs:
               - '.github/workflows/tests.yml'
               - 'tests/**'
               - 'dev/requirements.txt'
+              - 'pyproject.toml'
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
   # windows test suite
