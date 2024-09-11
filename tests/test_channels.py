@@ -17,6 +17,7 @@ from conda.base.context import reset_context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
+from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
 from conda.testing.integration import (
     _get_temp_prefix,
@@ -81,24 +82,26 @@ def test_channels_prefixdata(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture)
         )
 
 
-def test_channels_installed_unavailable():
-    "Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"
-    with make_temp_env("xz", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+def test_channels_installed_unavailable(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    """Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"""
+    with tmp_env("xz", "--solver=libmamba") as prefix:
         pd = PrefixData(prefix)
         pd.load()
         record = pd.get("xz")
         assert record
         record.channel = Channel.from_url("file:///nonexistent")
 
-        _, _, retcode = conda_inprocess(
-            "install",
-            prefix,
-            "zlib",
-            "--solver=libmamba",
-            "--dry-run",
-            use_exception_handler=True,
-        )
-        assert retcode == 0
+        with pytest.raises(DryRunExit):
+            conda_cli(
+                "install",
+                f"--prefix={prefix}",
+                "zlib",
+                "--solver=libmamba",
+                "--dry-run",
+            )
 
 
 def _setup_conda_forge_as_defaults(prefix, force=False):
