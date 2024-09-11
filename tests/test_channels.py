@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
-from conda.base.context import reset_context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
@@ -206,27 +206,25 @@ def test_mirrors_do_not_leak_channels(
         # Ensure that other end points were never loaded
 
 
-@pytest.mark.skipif(not on_linux, reason="Only run on Linux")
-def test_jax_and_jaxlib():
-    "https://github.com/conda/conda-libmamba-solver/issues/221"
-    env = os.environ.copy()
-    env["CONDA_SUBDIR"] = "linux-64"
+def test_jax_and_jaxlib(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/221
+    monkeypatch.setenv("CONDA_SUBDIR", "linux-64")
+    reset_context()
+    assert context.subdir == "linux-64"
+
     for specs in (("jax", "jaxlib"), ("jaxlib", "jax")):
-        process = conda_subprocess(
+        stdout, _, _ = conda_cli(
             "create",
-            "--name=unused",
             "--solver=libmamba",
             "--json",
             "--dry-run",
             "--override-channels",
-            "-c",
-            "defaults",
+            "--channel=defaults",
             f"conda-forge::{specs[0]}",
             f"conda-forge::{specs[1]}",
-            explain=True,
-            env=env,
+            raises=DryRunExit,
         )
-        result = json.loads(process.stdout)
+        result = json.loads(stdout)
         assert result["success"] is True
         pkgs = {pkg["name"] for pkg in result["actions"]["LINK"]}
         assert specs[0] in pkgs
