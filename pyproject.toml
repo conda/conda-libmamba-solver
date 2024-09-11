@@ -57,7 +57,14 @@ addopts = [
   "--tb=native",
   "--strict-markers"
 ]
-
+filterwarnings = [
+  # elevate conda's deprecated warning to an error
+  "error::PendingDeprecationWarning:conda",
+  "error::DeprecationWarning:conda",
+  # elevate conda-libmamba-solver's deprecated warning to an error
+  "error::PendingDeprecationWarning:conda_libmamba_solver",
+  "error::DeprecationWarning:conda_libmamba_solver",
+]
 markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",
