@@ -351,18 +351,20 @@ def test_local_spec(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) -> Non
         )
 
 
-def test_unknown_channels_do_not_crash(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/418"
+def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/418
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
-    with make_temp_env("ca-certificates") as prefix:
+    with tmp_env("ca-certificates") as prefix:
         # copy pkg to a new non-channel-like location without repodata around to obtain
         # '<unknown>' channel and reproduce the issue
-        temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
+        temp_pkg = prefix / "test-package-0.1-0.tar.bz2"
         shutil.copy(test_pkg, temp_pkg)
-        conda_inprocess("install", prefix, str(temp_pkg))
+
+        conda_cli("install", f"--prefix={prefix}", "--yes", temp_pkg)
         assert package_is_installed(prefix, "test-package")
-        conda_inprocess("install", prefix, "zlib")
+
+        conda_cli("install", f"--prefix={prefix}", "--yes", "zlib")
         assert package_is_installed(prefix, "zlib")
 
 
