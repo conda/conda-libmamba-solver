@@ -231,22 +231,21 @@ def test_jax_and_jaxlib(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) ->
         assert specs[1] in pkgs
 
 
-def test_encoding_file_paths(tmp_path: Path):
+def test_encoding_file_paths(tmp_path: Path, conda_cli: CondaCLIFixture) -> None:
     tmp_channel = tmp_path / "channel+some+encodable+bits"
-    repo = Path(__file__).parent / "data/mamba_repo"
+    repo = Path(__file__).parent / "data" / "mamba_repo"
     shutil.copytree(repo, tmp_channel)
-    process = conda_subprocess(
+    stdout, stderr, err = conda_cli(
         "create",
-        "-p",
-        tmp_path / "env",
-        "-c",
-        tmp_channel,
-        "test-package",
+        f"--prefix={tmp_path / 'env'}",
+        f"--channel={tmp_channel}",
         "--solver=libmamba",
+        "--yes",
+        "test-package",
     )
-    print(process.stdout)
-    print(process.stderr, file=sys.stderr)
-    assert process.returncode == 0
+    print(stdout)
+    print(stderr, file=sys.stderr)
+    assert not err
     assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
 
 
