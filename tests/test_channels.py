@@ -34,7 +34,8 @@ from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
-    from conda.testing import CondaCLIFixture, TmpEnvFixture
+    from conda.testing import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
+    from pytest import MonkeyPatch
 
 DATA = Path(__file__).parent / "data"
 
@@ -146,7 +147,13 @@ def _setup_channels_custom(prefix, force=False):
         _setup_channels_custom,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env):
+def test_mirrors_do_not_leak_channels(
+    config_env,
+    path_factory: PathFactoryFixture,
+    tmp_env: TmpEnvFixture,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/108
 
@@ -158,21 +165,21 @@ def test_mirrors_do_not_leak_channels(config_env):
     is undesirable.
     """
 
-    with env_vars({"CONDA_PKGS_DIRS": _get_temp_prefix()}), make_temp_env() as prefix:
-        assert (Path(prefix) / "conda-meta" / "history").exists()
+    with env_vars({"CONDA_PKGS_DIRS": path_factory()}), tmp_env() as prefix:
+        assert (prefix / "conda-meta" / "history").exists()
 
         # Setup conda configuration
         config_env(prefix)
-        common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
+        common = [f"--prefix={prefix}", "--solver=libmamba", "--json", "--yes", "-vv"]
 
-        env = os.environ.copy()
-        env["CONDA_PREFIX"] = prefix  # fake activation so config is loaded
+        # fake activation so config is loaded
+        monkeypatch.setenv("CONDA_PREFIX", str(prefix))
 
         # Create an environment using mirrored channels only
-        p = conda_subprocess("install", *common, "python", "pip", env=env)
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
+        stdout, stderr, _ = conda_cli("install", *common, "python", "pip")
+        result = json.loads(stdout)
+        if stderr:
+            assert "conda.anaconda.org" not in stderr
 
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
@@ -182,12 +189,12 @@ def test_mirrors_do_not_leak_channels(config_env):
             ), pkg
 
         # Make a change to that channel
-        p = conda_subprocess("install", *common, "pytest", env=env)
+        stdout, stderr, _ = conda_cli("install", *common, "pytest")
 
         # Ensure that the loaded channels are ONLY the mirrored ones
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
+        result = json.loads(stdout)
+        if stderr:
+            assert "conda.anaconda.org" not in stderr
 
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
