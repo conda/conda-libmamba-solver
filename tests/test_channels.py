@@ -1,12 +1,15 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import sys
 from pathlib import Path
 from subprocess import check_call
+from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
@@ -29,18 +32,21 @@ from .channel_testing.helpers import http_server_auth_token  # noqa: F401
 from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
 
+if TYPE_CHECKING:
+    from conda.testing import CondaCLIFixture
+
 DATA = Path(__file__).parent / "data"
 
 
-def test_channel_matchspec():
-    stdout, *_ = conda_inprocess(
+def test_channel_matchspec(conda_cli: CondaCLIFixture, tmp_path: Path) -> None:
+    stdout, *_ = conda_cli(
         "create",
-        _get_temp_prefix(),
+        f"--prefix={tmp_path}",
         "--solver=libmamba",
         "--json",
         "--override-channels",
-        "-c",
-        "defaults",
+        "--channel=defaults",
+        "--yes",
         "conda-forge::libblas=*=*openblas",
         "python=3.9",
     )
