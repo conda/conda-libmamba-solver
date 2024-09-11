@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import sys
+from contextlib import suppress
 from pathlib import Path
 from subprocess import check_call
 from typing import TYPE_CHECKING
@@ -369,7 +370,11 @@ def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaC
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")
-def test_use_cache_works_offline_fresh_install_keep(tmp_path):
+def test_use_cache_works_offline_fresh_install_keep(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/396
 
@@ -383,22 +388,26 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     )
     urlretrieve(miniforge_url, tmp_path / "miniforge.sh")
     # bkfp: batch, keep, force, prefix
-    check_call(["bash", str(tmp_path / "miniforge.sh"), "-bkfp", tmp_path / "miniforge"])
-    env = os.environ.copy()
-    env["CONDA_ROOT_PREFIX"] = str(tmp_path / "miniforge")
-    env["CONDA_PKGS_DIRS"] = str(tmp_path / "miniforge" / "pkgs")
-    env["CONDA_ENVS_DIRS"] = str(tmp_path / "miniforge" / "envs")
-    env["HOME"] = str(tmp_path)  # ignore ~/.condarc
+    check_call(["bash", tmp_path / "miniforge.sh", "-bkfp", prefix := tmp_path / "miniforge"])
+
+    monkeypatch.setenv("CONDA_ROOT_PREFIX", str(prefix))
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(prefix / "pkgs"))
+    monkeypatch.setenv("CONDA_ENVS_DIRS", str(prefix / "envs"))
+    monkeypatch.setenv("HOME", str(tmp_path))  # ignore ~/.condarc
+
     args = (
         "update",
-        "-p",
-        tmp_path / "miniforge",
+        f"--prefix={prefix}",
         "--all",
         "--dry-run",
         "--override-channels",
         "--channel=conda-forge",
     )
-    kwargs = {"capture_output": False, "check": True, "env": env}
-    conda_subprocess(*args, "--offline", **kwargs)
-    conda_subprocess(*args, "--use-index-cache", **kwargs)
-    conda_subprocess(*args, "--offline", "--use-index-cache", **kwargs)
+
+    # use contextlib.suppress instead of pytest.raises since the DryRunExit doesn't occur if there's nothing to update
+    with suppress(DryRunExit):
+        conda_cli(*args, "--offline")
+    with suppress(DryRunExit):
+        conda_cli(*args, "--use-index-cache")
+    with suppress(DryRunExit):
+        conda_cli(*args, "--offline", "--use-index-cache")
