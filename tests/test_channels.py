@@ -295,7 +295,11 @@ def test_http_server_auth_token(http_server_auth_token):
     create_with_channel(http_server_auth_token)
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):
+def test_http_server_auth_token_in_defaults(
+    http_server_auth_token,
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+) -> None:
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
@@ -306,12 +310,16 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
             default_channels=[http_server_auth_token],
         )
         reset_context()
-        conda_subprocess("info", capture_output=False)
-        conda_subprocess(
+
+        stdout, stderr, _ = conda_cli("info")
+        print(stdout)
+        assert not stderr
+
+        conda_cli(
             "create",
-            "-p",
-            _get_temp_prefix(use_restricted_unicode=on_win),
+            f"--prefix={path_factory()}",
             "--solver=libmamba",
+            "--yes",
             "test-package",
         )
     finally:
