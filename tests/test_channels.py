@@ -33,7 +33,7 @@ from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
-    from conda.testing import CondaCLIFixture
+    from conda.testing import CondaCLIFixture, TmpEnvFixture
 
 DATA = Path(__file__).parent / "data"
 
@@ -59,27 +59,25 @@ def test_channel_matchspec(conda_cli: CondaCLIFixture, tmp_path: Path) -> None:
             assert record["channel"] == "pkgs/main"
 
 
-def test_channels_prefixdata():
+def test_channels_prefixdata(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     """
     Make sure libmamba does not complain about missing channels
     used in previous commands.
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env(
-        "conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True
-    ) as prefix:
-        p = conda_subprocess(
+    with tmp_env("conda-forge::xz", "python", "--solver=libmamba") as prefix:
+        stdout, stderr, _ = conda_cli(
             "install",
-            "-yp",
-            prefix,
-            "pytest",
+            f"--prefix={prefix}",
             "--solver=libmamba",
+            "--yes",
+            "pytest",
         )
         assert (
             "Selected channel specific (or force-reinstall) job, "
             "but package is not available from channel. "
-            "Solve job will fail." not in (p.stdout + p.stderr)
+            "Solve job will fail." not in (stdout + stderr)
         )
 
 
