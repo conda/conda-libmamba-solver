@@ -249,24 +249,28 @@ def test_encoding_file_paths(tmp_path: Path, conda_cli: CondaCLIFixture) -> None
     assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
 
 
-def test_conda_build_with_aliased_channels(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/363"
+def test_conda_build_with_aliased_channels(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/363
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
-    env = os.environ.copy()
+
     if on_win:
-        env["CONDA_BLD_PATH"] = str(Path(os.environ.get("RUNNER_TEMP", tmp_path), "bld"))
+        bld_path = str(Path(os.getenv("RUNNER_TEMP", tmp_path), "bld"))
     else:
-        env["CONDA_BLD_PATH"] = str(tmp_path / "conda-bld")
+        bld_path = str(tmp_path / "conda-bld")
+    monkeypatch.setenv("CONDA_BLD_PATH", bld_path)
+
     try:
         _setup_conda_forge_as_defaults(Path.home(), force=True)
-        conda_subprocess(
+        conda_cli(
             "build",
-            DATA / "conda_build_recipes" / "jedi",
             "--override-channels",
             "--channel=defaults",
-            capture_output=False,
-            env=env,
+            DATA / "conda_build_recipes" / "jedi",
         )
     finally:
         if condarc_contents:
