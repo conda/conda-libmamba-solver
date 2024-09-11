@@ -329,32 +329,26 @@ def test_http_server_auth_token_in_defaults(
             condarc.unlink()
 
 
-def test_local_spec():
-    "https://github.com/conda/conda-libmamba-solver/issues/398"
-    env = os.environ.copy()
-    env["CONDA_BLD_PATH"] = str(DATA / "mamba_repo")
-    process = conda_subprocess(
-        "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
-        "--dry-run",
-        "--solver=libmamba",
-        "--channel=local",
-        "test-package",
-        env=env,
-    )
-    assert process.returncode == 0
+def test_local_spec(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/398
+    monkeypatch.setenv("CONDA_BLD_PATH", str(DATA / "mamba_repo"))
 
-    process = conda_subprocess(
-        "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
-        "--dry-run",
-        "--solver=libmamba",
-        "local::test-package",
-        env=env,
-    )
-    assert process.returncode == 0
+    with pytest.raises(DryRunExit):
+        conda_cli(
+            "create",
+            "--dry-run",
+            "--solver=libmamba",
+            "--channel=local",
+            "test-package",
+        )
+
+    with pytest.raises(DryRunExit):
+        conda_cli(
+            "create",
+            "--dry-run",
+            "--solver=libmamba",
+            "local::test-package",
+        )
 
 
 def test_unknown_channels_do_not_crash(tmp_path):
