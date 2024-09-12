@@ -11,7 +11,7 @@
 import logging
 from functools import lru_cache
 from importlib.metadata import version
-from typing import Dict
+from typing import Dict, Iterable
 
 import libmambapy as api
 from conda.base.constants import ChannelPriority
@@ -84,7 +84,11 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
     return index
 
 
-def init_api_context() -> api.Context:
+def init_api_context(
+    channels: Iterable[str] = None,
+    platform: str = None,
+    target_prefix: str = None,
+) -> api.Context:
     # This function has to be called BEFORE 1st initialization of the context
     api.Context.use_default_signal_handler(False)
     api_ctx = api.Context()
@@ -100,7 +104,9 @@ def init_api_context() -> api.Context:
     # Prefix params
     api_ctx.prefix_params.conda_prefix = context.conda_prefix
     api_ctx.prefix_params.root_prefix = context.root_prefix
-    api_ctx.prefix_params.target_prefix = context.target_prefix
+    api_ctx.prefix_params.target_prefix = (
+        target_prefix if target_prefix is not None else context.target_prefix
+    )
 
     # Networking params -- we always operate offline from libmamba's perspective
     api_ctx.remote_fetch_params.user_agent = context.user_agent
@@ -118,8 +124,8 @@ def init_api_context() -> api.Context:
     api_ctx.use_only_tar_bz2 = context.use_only_tar_bz2
 
     # Channels and platforms
-    api_ctx.platform = context.subdir
-    api_ctx.channels = context.channels
+    api_ctx.platform = platform if platform is not None else context.subdir
+    api_ctx.channels = channels if channels is not None else context.channels
     api_ctx.channel_alias = str(_get_base_url(context.channel_alias.url(with_credentials=True)))
 
     RESERVED_NAMES = {"local", "defaults"}

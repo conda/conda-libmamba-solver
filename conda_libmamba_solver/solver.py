@@ -160,7 +160,11 @@ class LibMambaSolver(Solver):
             return none_or_final_state
 
         # From now on we _do_ require a solver and the index
-        init_api_context()
+        init_api_context(
+            channels=[c.canonical_name for c in self.channels],
+            platform=next(s for s in self.subdirs if s != "noarch"),
+            target_prefix=str(self.prefix),
+        )
         subdirs = self.subdirs
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
