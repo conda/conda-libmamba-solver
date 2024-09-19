@@ -232,10 +232,10 @@ class LibMambaSolver(Solver):
 
     def _spinner_msg_metadata(self, channels: Iterable[Channel], conda_bld_channels=()):
         if self._called_from_conda_build():
-            msg = "Reloading output folder"
+            msg = "[DEV] Reloading output folder"
             if conda_bld_channels:
-                names = [Channel(c).canonical_name for c in conda_bld_channels]
-                msg += f" ({', '.join(names)})"
+                urls = [url for c in conda_bld_channels for url in Channel(c).urls(with_credentials=False, subdirs=self.subdirs)]
+                msg += f" ({', '.join(urls)})"
             return msg
         canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
         canonical_names_dashed = "\n - ".join(canonical_names)
