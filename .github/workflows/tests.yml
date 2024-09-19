@@ -188,7 +188,9 @@ jobs:
           if errorlevel 1 exit 1
           CALL python -m conda init --all
           if errorlevel 1 exit 1
-          CALL %CONDA_PREFIX%\Scripts\activate.bat
+          CALL C:\Miniconda\envs\test\Scripts\activate.bat
+          if errorlevel 1 exit 1
+          CALL conda info
           if errorlevel 1 exit 1
           python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
           exit 0
