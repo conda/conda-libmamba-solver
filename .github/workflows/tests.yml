@@ -183,9 +183,8 @@ jobs:
         working-directory: conda-libmamba-solver
         run: |
           python -m pip install -e ../conda/ --no-deps
-          conda_root=$(conda info --root)
           python -m conda init --all
-          source ${conda_root}/etc/profile.d/conda.sh
+          source C:/Miniconda/envs/test/etc/profile.d/conda.sh
           conda info
           python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
