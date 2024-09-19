@@ -184,8 +184,7 @@ jobs:
         run: |
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
-          python -m conda run --live-stream \
-            pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
+          pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
