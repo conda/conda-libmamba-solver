@@ -160,11 +160,7 @@ class LibMambaSolver(Solver):
             return none_or_final_state
 
         # From now on we _do_ require a solver and the index
-        init_api_context(
-            channels=[c.canonical_name for c in self.channels],
-            platform=next(s for s in self.subdirs if s != "noarch"),
-            target_prefix=str(self.prefix),
-        )
+        init_api_context()
         subdirs = self.subdirs
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
@@ -202,7 +198,7 @@ class LibMambaSolver(Solver):
                     all_channels.append(channel)
         all_channels.extend(in_state.maybe_free_channel())
 
-        all_channels = tuple(dict.fromkeys(all_channels))
+        all_channels = tuple(all_channels)
         with Spinner(
             self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
@@ -236,10 +232,10 @@ class LibMambaSolver(Solver):
 
     def _spinner_msg_metadata(self, channels: Iterable[Channel], conda_bld_channels=()):
         if self._called_from_conda_build():
-            msg = "Reloading output folder"
+            msg = "[DEV] Reloading output folder"
             if conda_bld_channels:
-                names = [Channel(c).canonical_name for c in conda_bld_channels]
-                msg += f" ({', '.join(names)})"
+                urls = [url for c in conda_bld_channels for url in Channel(c).urls(with_credentials=False, subdirs=self.subdirs)]
+                msg += f" ({', '.join(urls)})"
             return msg
         canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
         canonical_names_dashed = "\n - ".join(canonical_names)
@@ -485,6 +481,10 @@ class LibMambaSolver(Solver):
         LOCK = "LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK
 
         for name in out_state.specs:
+            # TMP REVERT
+            if name.startswith("__"):
+                continue  # ignore virtual packages
+            #/ TMP REVERT
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
                 installed_spec_str = self._spec_to_str(
