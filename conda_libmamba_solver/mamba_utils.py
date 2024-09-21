@@ -52,6 +52,7 @@ def init_libmamba_context() -> libmambapy.Context:
     if libmamba_context.output_params.json:
         libmambapy.cancel_json_output(libmamba_context)
     libmamba_context.output_params.quiet = context.quiet
+    libmamba_context.output_params.verbosity = context.verbosity
     libmamba_context.set_log_level(
         {
             4: libmambapy.LogLevel.TRACE,
