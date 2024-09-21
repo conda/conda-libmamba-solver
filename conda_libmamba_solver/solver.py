@@ -210,13 +210,13 @@ class LibMambaSolver(Solver):
             for url in c.urls(with_credentials=False, subdirs=subdirs):
                 print(" >", url)
         with Spinner(
-            self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
+            self._spinner_msg_metadata(deduped, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
             index = IndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
-                channels=all_channels,
+                channels=deduped,
                 subdirs=subdirs,
                 repodata_fn=self._repodata_fn,
                 load_pkgs_cache=context.offline,
