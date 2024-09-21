@@ -180,8 +180,8 @@ jobs:
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Run conda-libmamba-solver Tests
-        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         working-directory: conda-libmamba-solver
+        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
