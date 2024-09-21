@@ -6,6 +6,7 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
 """
+
 import json
 import logging
 import os
@@ -198,25 +199,41 @@ class LibMambaSolver(Solver):
                     all_channels.append(channel)
         all_channels.extend(in_state.maybe_free_channel())
 
-        all_channels = tuple(all_channels)
+        # Aggregate channels and subdirs
+        deduped_channels = {}
+        for channel in all_channels:
+            if (
+                channel_platform := getattr(channel, "platform", None)
+            ):  
+                if channel_platform not in subdirs:
+                    log.warning(
+                        "Channel %s defines subdir %s which is not part of subdirs=%s. Ignoring...",
+                        channel,
+                        channel_platform,
+                        subdirs,
+                    )
+                # Remove 'Channel.platform' to avoid missing subdirs. Channel.urls() will ignore
+                # our explicitly passed subdirs if .platform is defined!
+                channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+            deduped_channels[channel] = None
         for c in all_channels:
             print(c)
             for url in c.urls(with_credentials=False, subdirs=subdirs):
                 print(" >", url)
         print("---")
-        deduped = tuple(dict.fromkeys(all_channels))
-        for c in deduped:
+        deduped_channels = tuple(dict.fromkeys(all_channels))
+        for c in deduped_channels:
             print(c)
             for url in c.urls(with_credentials=False, subdirs=subdirs):
                 print(" >", url)
         with Spinner(
-            self._spinner_msg_metadata(deduped, conda_bld_channels=conda_bld_channels),
+            self._spinner_msg_metadata(deduped_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
             index = IndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
-                channels=deduped,
+                channels=deduped_channels,
                 subdirs=subdirs,
                 repodata_fn=self._repodata_fn,
                 load_pkgs_cache=context.offline,
@@ -245,7 +262,11 @@ class LibMambaSolver(Solver):
         if self._called_from_conda_build():
             msg = "[DEV] Reloading output folder"
             if conda_bld_channels:
-                urls = [url for c in conda_bld_channels for url in Channel(c).urls(with_credentials=False, subdirs=self.subdirs)]
+                urls = [
+                    url
+                    for c in conda_bld_channels
+                    for url in Channel(c).urls(with_credentials=False, subdirs=self.subdirs)
+                ]
                 msg += f" ({', '.join(urls)})"
             return msg
         canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
