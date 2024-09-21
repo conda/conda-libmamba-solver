@@ -221,7 +221,8 @@ class LibMambaSolver(Solver):
                 repodata_fn=self._repodata_fn,
                 load_pkgs_cache=context.offline,
             )
-            index.reload_local_channels()
+            if conda_bld_channels:
+                index.reload_local_channels()
 
         with Spinner(
             self._spinner_msg_solving(),
