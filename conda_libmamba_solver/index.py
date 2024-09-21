@@ -309,7 +309,8 @@ class LibMambaIndexHelper(IndexHelper):
         urls = []
         seen_noauth = set()
         for _c in self._channels:
-            c = Channel(_c)
+            # When .platform is defined, .urls() will ignore subdirs kw. Remove!
+            c = Channel(**{k: v for k, v in Channel(_c).dump().items() if k != "platform"})
             noauth_urls = c.urls(with_credentials=False, subdirs=self._subdirs)
             if seen_noauth.issuperset(noauth_urls):
                 continue
