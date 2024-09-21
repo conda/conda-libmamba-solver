@@ -1,12 +1,15 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import sys
 from pathlib import Path
 from subprocess import check_call
+from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
@@ -15,11 +18,7 @@ from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.models.channel import Channel
-from conda.testing.integration import (
-    _get_temp_prefix,
-    make_temp_env,
-    package_is_installed,
-)
+from conda.testing.integration import make_temp_env, package_is_installed
 from conda.testing.integration import run_command as conda_inprocess
 
 from .channel_testing.helpers import http_server_auth_basic  # noqa: F401
@@ -29,13 +28,16 @@ from .channel_testing.helpers import http_server_auth_token  # noqa: F401
 from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
 
+if TYPE_CHECKING:
+    from conda.testing.fixtures import PathFactoryFixture
+
 DATA = Path(__file__).parent / "data"
 
 
-def test_channel_matchspec():
+def test_channel_matchspec(path_factory: PathFactoryFixture) -> None:
     stdout, *_ = conda_inprocess(
         "create",
-        _get_temp_prefix(),
+        str(path_factory()),
         "--solver=libmamba",
         "--json",
         "--override-channels",
@@ -139,7 +141,7 @@ def _setup_channels_custom(prefix, force=False):
         _setup_channels_custom,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env):
+def test_mirrors_do_not_leak_channels(config_env, path_factory: PathFactoryFixture) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/108
 
@@ -151,7 +153,7 @@ def test_mirrors_do_not_leak_channels(config_env):
     is undesirable.
     """
 
-    with env_vars({"CONDA_PKGS_DIRS": _get_temp_prefix()}), make_temp_env() as prefix:
+    with env_vars({"CONDA_PKGS_DIRS": path_factory()}), make_temp_env() as prefix:
         assert (Path(prefix) / "conda-meta" / "history").exists()
 
         # Setup conda configuration
@@ -264,23 +266,27 @@ def test_conda_build_with_aliased_channels(tmp_path):
             condarc.unlink()
 
 
-def test_http_server_auth_none(http_server_auth_none):
-    create_with_channel(http_server_auth_none)
+def test_http_server_auth_none(http_server_auth_none, path_factory: PathFactoryFixture) -> None:
+    create_with_channel(http_server_auth_none, path_factory)
 
 
-def test_http_server_auth_basic(http_server_auth_basic):
-    create_with_channel(http_server_auth_basic)
+def test_http_server_auth_basic(http_server_auth_basic, path_factory: PathFactoryFixture) -> None:
+    create_with_channel(http_server_auth_basic, path_factory)
 
 
-def test_http_server_auth_basic_email(http_server_auth_basic_email):
-    create_with_channel(http_server_auth_basic_email)
+def test_http_server_auth_basic_email(
+    http_server_auth_basic_email, path_factory: PathFactoryFixture
+) -> None:
+    create_with_channel(http_server_auth_basic_email, path_factory)
 
 
-def test_http_server_auth_token(http_server_auth_token):
-    create_with_channel(http_server_auth_token)
+def test_http_server_auth_token(http_server_auth_token, path_factory: PathFactoryFixture) -> None:
+    create_with_channel(http_server_auth_token, path_factory)
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):
+def test_http_server_auth_token_in_defaults(
+    http_server_auth_token, path_factory: PathFactoryFixture
+) -> None:
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
@@ -295,7 +301,7 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
         conda_subprocess(
             "create",
             "-p",
-            _get_temp_prefix(use_restricted_unicode=on_win),
+            path_factory(),
             "--solver=libmamba",
             "test-package",
         )
@@ -306,14 +312,14 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
             condarc.unlink()
 
 
-def test_local_spec():
-    "https://github.com/conda/conda-libmamba-solver/issues/398"
+def test_local_spec(path_factory: PathFactoryFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/398
     env = os.environ.copy()
     env["CONDA_BLD_PATH"] = str(DATA / "mamba_repo")
     process = conda_subprocess(
         "create",
         "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
+        path_factory(),
         "--dry-run",
         "--solver=libmamba",
         "--channel=local",
@@ -325,7 +331,7 @@ def test_local_spec():
     process = conda_subprocess(
         "create",
         "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
+        path_factory(),
         "--dry-run",
         "--solver=libmamba",
         "local::test-package",
@@ -335,7 +341,7 @@ def test_local_spec():
 
 
 def test_unknown_channels_do_not_crash(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/418"
+    # https://github.com/conda/conda-libmamba-solver/issues/418"
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
     with make_temp_env("ca-certificates") as prefix:
