@@ -54,9 +54,8 @@ exclude = '''
 minversion = "6.0"
 addopts = [
   "--color=yes",
-  "--strict-markers",
-  "--xdoctest-modules",
-  "--xdoctest-style=google",
+  "--tb=native",
+  "--strict-markers"
 ]
 
 markers = [
