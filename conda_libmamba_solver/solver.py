@@ -736,7 +736,7 @@ class LibMambaSolver(Solver):
             )
             # This is not a conflict, but a missing package in the channel
             exc = PackagesNotFoundError(
-                tuple(not_found.values()), tuple(channels or self.channels)
+                tuple(not_found.values()), tuple(dict.fromkeys(channels or self.channels))
             )
             exc.allow_retry = False
             raise exc
