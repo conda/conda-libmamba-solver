@@ -266,7 +266,7 @@ class LibMambaIndexHelper(IndexHelper):
         except OSError as exc:
             log.debug("Failed to stat %s", json_path, exc_info=exc)
             json_stat = None
-        if False: # try_solv:
+        if try_solv:
             try:
                 solv_path = json_path.parent / f"{json_path.stem}.solv"
                 solv_stat = solv_path.stat()
