@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import logging
 import sys
+from collections.abc import Iterable
 from functools import lru_cache
 from importlib.metadata import version
 
@@ -38,7 +39,11 @@ def _get_base_url(url: str, name: str | None = None):
 
 
 @lru_cache(maxsize=1)
-def init_libmamba_context() -> libmambapy.Context:
+def init_libmamba_contextinit_api_context(
+    channels: Iterable[str] = None,
+    platform: str = None,
+    target_prefix: str = None,
+) -> libmambapy.Context:
     # This function has to be called BEFORE 1st initialization of the context
     libmamba_context = libmambapy.Context(
         libmambapy.ContextOptions(
@@ -66,7 +71,9 @@ def init_libmamba_context() -> libmambapy.Context:
     # Prefix params
     libmamba_context.prefix_params.conda_prefix = context.conda_prefix
     libmamba_context.prefix_params.root_prefix = context.root_prefix
-    libmamba_context.prefix_params.target_prefix = context.target_prefix
+    libmamba_context.prefix_params.target_prefix = str(
+        target_prefix if target_prefix is not None else context.target_prefix
+    )
 
     # Networking params -- we always operate offline from libmamba's perspective
     libmamba_context.remote_fetch_params.user_agent = context.user_agent
@@ -84,8 +91,8 @@ def init_libmamba_context() -> libmambapy.Context:
     libmamba_context.use_only_tar_bz2 = context.use_only_tar_bz2
 
     # Channels and platforms
-    libmamba_context.platform = context.subdir
-    libmamba_context.channels = context.channels
+    libmamba_context.platform = platform if platform is not None else context.subdir
+    libmamba_context.channels = channels if channels is not None else context.channels
     libmamba_context.channel_alias = str(_get_base_url(context.channel_alias.url(with_credentials=True)))
 
     RESERVED_NAMES = {"local", "defaults"}
