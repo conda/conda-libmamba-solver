@@ -82,8 +82,9 @@ from conda.models.match_spec import MatchSpec
 from conda.models.prefix_graph import PrefixGraph
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from os import PathLike
-    from typing import Any, Iterable
+    from typing import Any
 
     from conda.core.solve import Solver
     from conda.models.records import PackageRecord

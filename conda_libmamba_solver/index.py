@@ -111,7 +111,8 @@ from libmambapy.specs import (
 from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
-    from typing import Iterable, Literal
+    from collections.abc import Iterable
+    from typing import Literal
 
     from conda.gateways.repodata import RepodataState
     from libmambapy import QueryResult

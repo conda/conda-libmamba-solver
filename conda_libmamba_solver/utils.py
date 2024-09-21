@@ -16,8 +16,8 @@ from conda.common.url import urlparse
 from conda.exceptions import PackagesNotFoundError
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from enum import Enum
-    from typing import Iterable
 
     from conda.models.match_spec import MatchSpec
 

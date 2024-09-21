@@ -16,7 +16,7 @@ import re
 import sys
 from collections import defaultdict
 from contextlib import suppress
-from functools import lru_cache
+from functools import cache
 from inspect import stack
 from textwrap import dedent
 from typing import TYPE_CHECKING
@@ -58,7 +58,7 @@ from .mamba_utils import (
 from .state import SolverInputState, SolverOutputState
 
 if TYPE_CHECKING:
-    from typing import Iterable, Mapping, Sequence
+    from collections.abc import Iterable, Mapping, Sequence
 
     from boltons.setutils import IndexedSet
     from conda.auxlib import _Null
@@ -77,7 +77,7 @@ class LibMambaSolver(Solver):
     _uses_ssc = False
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @cache
     def user_agent() -> str:
         """
         Expose this identifier to allow conda to extend its user agent if required
