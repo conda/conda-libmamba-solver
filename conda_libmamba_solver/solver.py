@@ -198,7 +198,7 @@ class LibMambaSolver(Solver):
                     all_channels.append(channel)
         all_channels.extend(in_state.maybe_free_channel())
 
-        all_channels = tuple(all_channels)
+        all_channels = tuple(dict.fromkeys(all_channels))
         with Spinner(
             self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
@@ -232,10 +232,10 @@ class LibMambaSolver(Solver):
 
     def _spinner_msg_metadata(self, channels: Iterable[Channel], conda_bld_channels=()):
         if self._called_from_conda_build():
-            msg = "[DEV] Reloading output folder"
+            msg = "Reloading output folder"
             if conda_bld_channels:
-                urls = [url for c in conda_bld_channels for url in Channel(c).urls(with_credentials=False, subdirs=self.subdirs)]
-                msg += f" ({', '.join(urls)})"
+                names = [Channel(c).canonical_name for c in conda_bld_channels]
+                msg += f" ({', '.join(names)})"
             return msg
         canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
         canonical_names_dashed = "\n - ".join(canonical_names)
@@ -481,10 +481,6 @@ class LibMambaSolver(Solver):
         LOCK = "LOCK", api.SOLVER_LOCK | api.SOLVER_WEAK
 
         for name in out_state.specs:
-            # TMP REVERT
-            if name.startswith("__"):
-                continue  # ignore virtual packages
-            #/ TMP REVERT
             installed: PackageRecord = in_state.installed.get(name)
             if installed:
                 installed_spec_str = self._spec_to_str(
