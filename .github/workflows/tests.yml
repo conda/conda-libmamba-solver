@@ -184,13 +184,13 @@ jobs:
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         shell: cmd /C CALL {0}
         run: |
-          CALL python -m pip install -e ../conda/ --no-deps
+          CALL %CONDA%\envs\test\python -m pip install -e ../conda/ --no-deps
           if errorlevel 1 exit 1
-          CALL python -m conda init --all
+          CALL %CONDA%\envs\test\python -m conda init --all
           if errorlevel 1 exit 1
           CALL %CONDA%\envs\test\Scripts\activate.bat
           if errorlevel 1 exit 1
-          %CONDA%\envs\test\python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
+          CALL %CONDA%\envs\test\python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
           exit 0
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
