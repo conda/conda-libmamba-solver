@@ -190,7 +190,7 @@ jobs:
           if errorlevel 1 exit 1
           CALL %CONDA%\envs\test\Scripts\activate.bat
           if errorlevel 1 exit 1
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
+          %CONDA%\envs\test\python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
           exit 0
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
