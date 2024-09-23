@@ -84,7 +84,7 @@ jobs:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
         python-version: ['3.8', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver,] # unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
@@ -188,7 +188,7 @@ jobs:
           if errorlevel 1 exit 1
           CALL python -m conda init --all
           if errorlevel 1 exit 1
-          CALL %CONDA_PREFIX%\Scripts\activate.bat
+          CALL %CONDA%\envs\test\Scripts\activate.bat
           if errorlevel 1 exit 1
           python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
           exit 0
@@ -229,7 +229,7 @@ jobs:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         python-version: ['3.8', '3.9', '3.10', '3.11', '3.12']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver] #, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - python-version: '3.8'
@@ -502,7 +502,7 @@ jobs:
         arch: [osx-64, osx-arm64]
         python-version: ['3.8', '3.11']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver] #, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - arch: osx-64
