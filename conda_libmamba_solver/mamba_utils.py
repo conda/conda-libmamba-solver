@@ -23,7 +23,7 @@ from conda.base.context import context
 
 log = logging.getLogger(f"conda.{__name__}")
 _db_log = logging.getLogger("conda.libmamba.db")
-
+_libmamba_context = None
 
 @lru_cache(maxsize=1)
 def mamba_version() -> str:
@@ -38,19 +38,21 @@ def _get_base_url(url: str, name: str | None = None):
     return tmp
 
 
-@lru_cache(maxsize=1)
 def init_libmamba_context(
     channels: Iterable[str] = None,
     platform: str = None,
     target_prefix: str = None,
 ) -> libmambapy.Context:
-    # This function has to be called BEFORE 1st initialization of the context
-    libmamba_context = libmambapy.Context(
-        libmambapy.ContextOptions(
-            enable_signal_handling=False,
-            enable_logging=True,
+    global _libmamba_context
+    if _libmamba_context is None:
+        # This function has to be called BEFORE 1st initialization of the context
+        _libmamba_context = libmambapy.Context(
+            libmambapy.ContextOptions(
+                enable_signal_handling=False,
+                enable_logging=True,
+            )
         )
-    )
+    libmamba_context = _libmamba_context
 
     # Output params
     libmamba_context.output_params.json = context.json
