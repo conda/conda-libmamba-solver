@@ -179,14 +179,18 @@ jobs:
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run conda-libmamba-solver Tests
+      - name: Initialize conda for conda-libmamba-solver tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
-          exit 0
+
+      - name: conda-libmamba-solver tests
+        working-directory: conda-libmamba-solver
+        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
+        run: |
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
