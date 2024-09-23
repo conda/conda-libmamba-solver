@@ -115,7 +115,7 @@ class LibMambaSolver(Solver):
 
         self._repodata_fn = self._maybe_ignore_current_repodata()
         self._libmamba_context = init_libmamba_context(
-            channels=[c.canonical_name for c in self.channels],
+            channels=tuple(c.canonical_name for c in self.channels),
             platform=next(s for s in self.subdirs if s != "noarch"),
             target_prefix=str(self.prefix),
         )
