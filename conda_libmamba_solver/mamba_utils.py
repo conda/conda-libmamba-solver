@@ -39,7 +39,7 @@ def _get_base_url(url: str, name: str | None = None):
 
 
 @lru_cache(maxsize=1)
-def init_libmamba_contextinit_api_context(
+def init_libmamba_context(
     channels: Iterable[str] = None,
     platform: str = None,
     target_prefix: str = None,
