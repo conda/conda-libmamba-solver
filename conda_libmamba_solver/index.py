@@ -166,14 +166,12 @@ class LibMambaIndexHelper(IndexHelper):
         """
         for noauth_url, info in self._index.items():
             if noauth_url.startswith("file://") or info.channel.scheme == "file":
-                print("Reloading", noauth_url)
                 url, json_path = self._fetch_channel(info.full_url)
                 repo_position = self._repos.index(info.repo)
                 info.repo.clear(True)
                 new = self._json_path_to_repo_info(url, json_path, try_solv=False)
                 self._repos[repo_position] = new.repo
                 self._index[noauth_url] = new
-                print("Reloaded")
                 time.sleep(1)
         set_channel_priorities(self._index)
 

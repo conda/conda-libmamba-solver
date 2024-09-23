@@ -202,12 +202,11 @@ class LibMambaSolver(Solver):
         # Aggregate channels and subdirs
         deduped_channels = {}
         for channel in all_channels:
-            if (
-                channel_platform := getattr(channel, "platform", None)
-            ):  
+            if channel_platform := getattr(channel, "platform", None):
                 if channel_platform not in subdirs:
-                    log.warning(
-                        "Channel %s defines subdir %s which is not part of subdirs=%s. Ignoring...",
+                    log.info(
+                        "Channel %s defines platform %s which is not part of subdirs=%s. "
+                        "Ignoring platform attribute...",
                         channel,
                         channel_platform,
                         subdirs,
@@ -216,24 +215,15 @@ class LibMambaSolver(Solver):
                 # our explicitly passed subdirs if .platform is defined!
                 channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
             deduped_channels[channel] = None
-        for c in all_channels:
-            print(c)
-            for url in c.urls(with_credentials=False, subdirs=subdirs):
-                print(" >", url)
-        print("---")
-        deduped_channels = tuple(dict.fromkeys(all_channels))
-        for c in deduped_channels:
-            print(c)
-            for url in c.urls(with_credentials=False, subdirs=subdirs):
-                print(" >", url)
+        all_channels = tuple(deduped_channels)
         with Spinner(
-            self._spinner_msg_metadata(deduped_channels, conda_bld_channels=conda_bld_channels),
+            self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
             json=context.json,
         ):
             index = IndexHelper(
                 installed_records=(*in_state.installed.values(), *in_state.virtual.values()),
-                channels=deduped_channels,
+                channels=all_channels,
                 subdirs=subdirs,
                 repodata_fn=self._repodata_fn,
                 load_pkgs_cache=context.offline,
@@ -260,14 +250,10 @@ class LibMambaSolver(Solver):
 
     def _spinner_msg_metadata(self, channels: Iterable[Channel], conda_bld_channels=()):
         if self._called_from_conda_build():
-            msg = "[DEV] Reloading output folder"
+            msg = "Reloading output folder"
             if conda_bld_channels:
-                urls = [
-                    url
-                    for c in conda_bld_channels
-                    for url in Channel(c).urls(with_credentials=False, subdirs=self.subdirs)
-                ]
-                msg += f" ({', '.join(urls)})"
+                names = [Channel(c).canonical_name for c in conda_bld_channels]
+                msg += f" ({', '.join(names)})"
             return msg
         canonical_names = list(dict.fromkeys([c.canonical_name for c in channels]))
         canonical_names_dashed = "\n - ".join(canonical_names)
