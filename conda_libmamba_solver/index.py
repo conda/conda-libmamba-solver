@@ -74,7 +74,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from pathlib import Path
@@ -172,7 +171,6 @@ class LibMambaIndexHelper(IndexHelper):
                 new = self._json_path_to_repo_info(url, json_path, try_solv=False)
                 self._repos[repo_position] = new.repo
                 self._index[noauth_url] = new
-                time.sleep(1)
         set_channel_priorities(self._index)
 
     def _repo_from_records(
