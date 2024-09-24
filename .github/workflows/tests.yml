@@ -166,8 +166,7 @@ jobs:
 
       - name: Conda List
         run: conda list --show-channel-urls
-      - uses: fawazahmed0/action-debug-vscode@main
-      - run: exit 1
+
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -213,7 +212,7 @@ jobs:
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: false # needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -485,7 +484,7 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: false # needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:

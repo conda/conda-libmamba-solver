@@ -6,6 +6,7 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 We can import from conda and libmambapy. `mamba` itself should NOT be imported here.
 """
+
 import json
 import logging
 import os
@@ -160,11 +161,6 @@ class LibMambaSolver(Solver):
             return none_or_final_state
 
         # From now on we _do_ require a solver and the index
-        init_api_context(
-            channels=[c.canonical_name for c in self.channels],
-            platform=next(s for s in self.subdirs if s != "noarch"),
-            target_prefix=str(self.prefix),
-        )
         subdirs = self.subdirs
         if self._called_from_conda_build():
             log.info("Using solver via 'conda.plan.install_actions' (probably conda build)")
@@ -203,6 +199,14 @@ class LibMambaSolver(Solver):
         all_channels.extend(in_state.maybe_free_channel())
 
         all_channels = tuple(dict.fromkeys(all_channels))
+
+        # Now have all the info we need to initialize the libmamba context
+        init_api_context(
+            channels=[c.canonical_name for c in all_channels],
+            platform=next(s for s in self.subdirs if s != "noarch"),
+            target_prefix=str(self.prefix),
+        )
+
         with Spinner(
             self._spinner_msg_metadata(all_channels, conda_bld_channels=conda_bld_channels),
             enabled=not context.verbosity and not context.quiet,
