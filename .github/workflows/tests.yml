@@ -179,17 +179,14 @@ jobs:
           -m "${{ env.PYTEST_MARKER }}"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Initialize conda for conda-libmamba-solver tests
+      - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
+        shell: bash -el {0}
         run: |
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
-
-      - name: conda-libmamba-solver tests
-        working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        run: |
+          . $CONDA_PREFIX/etc/profile.d/conda.sh
           python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
