@@ -198,8 +198,24 @@ class LibMambaSolver(Solver):
                     all_channels.append(channel)
         all_channels.extend(in_state.maybe_free_channel())
 
-        all_channels = tuple(dict.fromkeys(all_channels))
-
+        # Aggregate channels and subdirs
+        deduped_channels = {}
+        for channel in all_channels:
+            if channel_platform := getattr(channel, "platform", None):
+                if channel_platform not in subdirs:
+                    log.info(
+                        "Channel %s defines platform %s which is not part of subdirs=%s. "
+                        "Ignoring platform attribute...",
+                        channel,
+                        channel_platform,
+                        subdirs,
+                    )
+                # Remove 'Channel.platform' to avoid missing subdirs. Channel.urls() will ignore
+                # our explicitly passed subdirs if .platform is defined!
+                channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+            deduped_channels[channel] = None
+        all_channels = tuple(deduped_channels)
+        
         # Now have all the info we need to initialize the libmamba context
         init_api_context(
             channels=[c.canonical_name for c in all_channels],
@@ -219,7 +235,8 @@ class LibMambaSolver(Solver):
                 repodata_fn=self._repodata_fn,
                 load_pkgs_cache=context.offline,
             )
-            index.reload_local_channels()
+            if conda_bld_channels:
+                index.reload_local_channels()
 
         with Spinner(
             self._spinner_msg_solving(),
@@ -730,7 +747,7 @@ class LibMambaSolver(Solver):
             )
             # This is not a conflict, but a missing package in the channel
             exc = PackagesNotFoundError(
-                tuple(not_found.values()), tuple(channels or self.channels)
+                tuple(not_found.values()), tuple(dict.fromkeys(channels or self.channels))
             )
             exc.allow_retry = False
             raise exc
