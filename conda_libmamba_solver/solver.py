@@ -215,7 +215,7 @@ class LibMambaSolver(Solver):
                 channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
             deduped_channels[channel] = None
         all_channels = tuple(deduped_channels)
-        
+
         # Now have all the info we need to initialize the libmamba context
         init_api_context(
             channels=[c.canonical_name for c in all_channels],
