@@ -166,9 +166,7 @@ jobs:
 
       - name: Conda List
         run: conda list --show-channel-urls
-      - name: Setup tmate session
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 60
+      - uses: fawazahmed0/action-debug-vscode@main
       - run: exit 1
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
