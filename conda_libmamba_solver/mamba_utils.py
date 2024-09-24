@@ -15,12 +15,16 @@ import logging
 from functools import lru_cache
 from importlib.metadata import version
 from pathlib import Path
-from typing import Dict, Iterable
+from typing import TYPE_CHECKING, Iterable
 
 import libmambapy as api
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
 from conda.common.compat import on_win
+
+if TYPE_CHECKING:
+    from .index import _ChannelRepoInfo
+
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -38,7 +42,7 @@ def _get_base_url(url, name=None):
     return tmp
 
 
-def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: bool = None):
+def set_channel_priorities(index: dict[str, _ChannelRepoInfo], has_priority: bool = None):
     """
     This function was part of mamba.utils.load_channels originally.
     We just split it to reuse it a bit better.
