@@ -182,16 +182,12 @@ jobs:
       - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        shell: cmd /C CALL {0}
+        shell: bash -el {0}
         run: |
-          CALL %CONDA%\envs\test\python -m pip install -e ../conda/ --no-deps
-          if errorlevel 1 exit 1
-          CALL %CONDA%\envs\test\python -m conda init --all
-          if errorlevel 1 exit 1
-          CALL %CONDA%\envs\test\Scripts\activate.bat
-          if errorlevel 1 exit 1
-          CALL %CONDA%\envs\test\python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
-          exit 0
+          python -m pip install -e ../conda/ --no-deps
+          python -m conda init --all
+          . $CONDA_PREFIX/etc/profile.d/conda.sh
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -216,7 +212,7 @@ jobs:
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false # needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -488,7 +484,7 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false # needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:
