@@ -5,9 +5,9 @@
 The development workflow is streamlined for Linux thanks to the `devcontainer` configuration
 bundled in this repository. You'll need Docker and VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers):
 
-1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
-   (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
-   The location does not matter as long as both repositories have the same parent directory.
+1. Clone `conda/conda`, `mamba-org/mamba` and `conda/conda-libmamba-solver` to your preferred locations
+   (e.g. `~/devel/conda`, `~/devel/mamba` and `~/devel/conda-libmamba-solver`, respectively).
+   The location does not matter as long as all repositories have the same parent directory.
 2. Open your `conda-libmamba-solver` clone with VS Code.
 3. Connect to the DevContainer image via the bottom-left menu (<kbd>❱❰</kbd>) and
    click on "Reopen in Container". Pick one of the suggested configurations:
@@ -31,9 +31,8 @@ If you are modifying C++ sources, re-run `develop-mamba` to rebuild the librarie
 
 You can reuse the devcontainer scripts with regular Docker too.
 
-1. Clone `conda/conda` and `conda/conda-libmamba-solver` to your preferred locations
-   (e.g. `~/devel/conda` and `~/devel/conda-libmamba-solver`, respectively).
-   You should also clone `mamba-org/mamba` if you need to develop `libmamba`.
+1. Clone `conda/conda`, `mamba-org/mamba` and `conda/conda-libmamba-solver` to your preferred locations
+   (e.g. `~/devel/conda`, `~/devel/mamba` and `~/devel/conda-libmamba-solver`, respectively).
    The location does not matter as long as all repositories have the same parent directory.
 2. Start a new Docker instance with this command. Adjust the local mounts as necessary.
 
