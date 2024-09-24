@@ -7,6 +7,9 @@
 # Decide what to do with it when we split into a plugin
 # 2022.02.15: updated vendored parts to v0.21.2
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
+# 2024.09.24: parameterize init_api_context
+
+from __future__ import annotations
 
 import logging
 from functools import lru_cache
