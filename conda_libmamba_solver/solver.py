@@ -18,6 +18,7 @@ from collections import defaultdict
 from contextlib import suppress
 from functools import cache
 from inspect import stack
+from itertools import chain
 from textwrap import dedent
 from typing import TYPE_CHECKING
 
@@ -112,6 +113,13 @@ class LibMambaSolver(Solver):
         )
         if self.subdirs is NULL or not self.subdirs:
             self.subdirs = context.subdirs
+        if "noarch" not in self.subdirs:
+            # Problem: Conda build generates a custom index which happens to "forget" about
+            # noarch on purpose when creating the build/host environments, since it merges
+            # both as if they were all in the native subdir. This causes package-not-found
+            # errors because we are not using the patched index.
+            # Fix: just add noarch to subdirs because it should always be there anyway.
+            self.subdirs = (*self.subdirs, "noarch")
 
         self._repodata_fn = self._maybe_ignore_current_repodata()
         self._libmamba_context = init_libmamba_context(
@@ -148,7 +156,7 @@ class LibMambaSolver(Solver):
             return maybe_final_state
 
         channels = self._collect_channel_list(in_state)
-        conda_build_channels, subdirs = self._collect_channels_subdirs_from_conda_build()
+        conda_build_channels = self._collect_channels_subdirs_from_conda_build(seen=set(channels))
         with Spinner(
             self._collect_all_metadata_spinner_message(channels, conda_build_channels),
             enabled=not context.verbosity and not context.quiet,
@@ -157,7 +165,7 @@ class LibMambaSolver(Solver):
             index = self._collect_all_metadata(
                 channels=channels,
                 conda_build_channels=conda_build_channels,
-                subdirs=subdirs,
+                subdirs=self.subdirs,
                 in_state=in_state,
             )
             out_state.check_for_pin_conflicts(index)
@@ -206,37 +214,46 @@ class LibMambaSolver(Solver):
         )
 
     def _collect_channel_list(self, in_state: SolverInputState) -> list[Channel]:
-        channels = [*self.channels]
-        channels_by_name = {}
-        for channel in channels:
-            channels_by_name.setdefault(channel.name or channel.canonical_name, []).append(channel)
-        for spec_channel in in_state.channels_from_specs():
-            same_name = channels_by_name.get(spec_channel.name or spec_channel.canonical_name)
-            if same_name:
-                # do not add spec channel if there's already one with the same name
-                continue
-            channels.append(spec_channel)
+        # Aggregate channels and subdirs
+        deduped_channels = {}
+        for channel in chain(
+            self.channels, in_state.channels_from_specs(), in_state.maybe_free_channel()
+        ):
+            if channel_platform := getattr(channel, "platform", None):
+                if channel_platform not in self.subdirs:
+                    log.info(
+                        "Channel %s defines platform %s which is not part of subdirs=%s. "
+                        "Ignoring platform attribute...",
+                        channel,
+                        channel_platform,
+                        self.subdirs,
+                    )
+                # Remove 'Channel.platform' to avoid missing subdirs. Channel.urls() will ignore
+                # our explicitly passed subdirs if .platform is defined!
+                channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+            deduped_channels[channel] = None
+        return list(deduped_channels)
 
-        channels.extend(in_state.maybe_free_channel())
-        return channels
-
-    def _collect_channels_subdirs_from_conda_build(self) -> tuple[list[Channel], list[str]]:
+    def _collect_channels_subdirs_from_conda_build(
+        self,
+        seen: set[Channel] | None = None,
+    ) -> list[Channel]:
         if self._called_from_conda_build():
+            seen = seen or set()
             # We need to recover the local dirs (conda-build's local, output_folder, etc)
             # from the index. This is a bit of a hack, but it works.
-            conda_build_channels = {
-                rec.channel: None for rec in (self._index or {}) if rec.channel.scheme == "file"
-            }
-            # Problem: Conda build generates a custom index which happens to "forget" about
-            # noarch on purpose when creating the build/host environments, since it merges
-            # both as if they were all in the native subdir. this causes package-not-found
-            # errors because we are not using the patched index.
-            # Fix: just add noarch to subdirs.
-            subdirs = self.subdirs
-            if "noarch" not in subdirs:
-                subdirs = *subdirs, "noarch"
-            return list(conda_build_channels), subdirs
-        return [], self.subdirs
+            conda_build_channels = {}
+            for record in self._index or {}:
+                if record.channel.scheme == "file":
+                    # Remove 'Channel.platform' to avoid missing subdirs. Channel.urls()
+                    # will ignore our explicitly passed subdirs if .platform is defined!
+                    channel = Channel(
+                        **{k: v for k, v in record.channel.dump().items() if k != "platform"}
+                    )
+                    if channel not in seen:
+                        conda_build_channels.setdefault(channel)
+            return list(conda_build_channels)
+        return []
 
     @time_recorder(module_name=__name__)
     def _collect_all_metadata(

@@ -278,9 +278,8 @@ class LibMambaIndexHelper:
         seen_noauth = set()
         channels_with_subdirs = []
         for channel in self.channels:
-            if channel.subdir:
-                channels_with_subdirs.append(channel)
-                continue
+            # When .platform is defined, .urls() will ignore subdirs kw. Remove!
+            channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
             for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:

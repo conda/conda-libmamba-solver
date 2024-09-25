@@ -7,6 +7,9 @@
 # Decide what to do with it when we split into a plugin
 # 2022.02.15: updated vendored parts to v0.21.2
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
+# 2024.09.24: parameterize init_api_context
+
+from __future__ import annotations
 
 from __future__ import annotations
 import os
@@ -15,10 +18,17 @@ import sys
 from collections.abc import Iterable
 from functools import lru_cache
 from importlib.metadata import version
+from pathlib import Path
+from typing import TYPE_CHECKING, Iterable
 
 import libmambapy
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
+from conda.common.compat import on_win
+
+if TYPE_CHECKING:
+    from .index import _ChannelRepoInfo
+
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -39,7 +49,7 @@ def _get_base_url(url: str, name: str | None = None):
 
 
 def init_libmamba_context(
-    channels: Iterable[str] = None,
+    channels: Iterable[str] | None = None,
     platform: str = None,
     target_prefix: str = None,
 ) -> libmambapy.Context:
@@ -94,8 +104,10 @@ def init_libmamba_context(
 
     # Channels and platforms
     libmamba_context.platform = platform if platform is not None else context.subdir
-    libmamba_context.channels = channels if channels is not None else context.channels
-    libmamba_context.channel_alias = str(_get_base_url(context.channel_alias.url(with_credentials=True)))
+    libmamba_context.channels = list(channels) if channels is not None else context.channels
+    libmamba_context.channel_alias = str(
+        _get_base_url(context.channel_alias.url(with_credentials=True))
+    )
 
     RESERVED_NAMES = {"local", "defaults"}
     additional_custom_channels = {}
