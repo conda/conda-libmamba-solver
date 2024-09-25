@@ -7,15 +7,24 @@
 # Decide what to do with it when we split into a plugin
 # 2022.02.15: updated vendored parts to v0.21.2
 # 2022.11.14: only keeping channel prioritization and context initialization logic now
+# 2024.09.24: parameterize init_api_context
+
+from __future__ import annotations
 
 import logging
 from functools import lru_cache
 from importlib.metadata import version
-from typing import Dict
+from pathlib import Path
+from typing import TYPE_CHECKING, Iterable
 
 import libmambapy as api
 from conda.base.constants import ChannelPriority
 from conda.base.context import context
+from conda.common.compat import on_win
+
+if TYPE_CHECKING:
+    from .index import _ChannelRepoInfo
+
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -33,7 +42,7 @@ def _get_base_url(url, name=None):
     return tmp
 
 
-def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: bool = None):
+def set_channel_priorities(index: dict[str, _ChannelRepoInfo], has_priority: bool = None):
     """
     This function was part of mamba.utils.load_channels originally.
     We just split it to reuse it a bit better.
@@ -84,7 +93,11 @@ def set_channel_priorities(index: Dict[str, "_ChannelRepoInfo"], has_priority: b
     return index
 
 
-def init_api_context() -> api.Context:
+def init_api_context(
+    channels: Iterable[str] | None = None,
+    platform: str = None,
+    target_prefix: str = None,
+) -> api.Context:
     # This function has to be called BEFORE 1st initialization of the context
     api.Context.use_default_signal_handler(False)
     api_ctx = api.Context()
@@ -100,7 +113,11 @@ def init_api_context() -> api.Context:
     # Prefix params
     api_ctx.prefix_params.conda_prefix = context.conda_prefix
     api_ctx.prefix_params.root_prefix = context.root_prefix
-    api_ctx.prefix_params.target_prefix = context.target_prefix
+    if on_win and target_prefix == "/":
+        # workaround for strange bug in libmamba transforming "/"" into "\\conda-bld" :shrug:
+        target_prefix = Path.cwd().parts[0]
+    target_prefix = target_prefix if target_prefix is not None else context.target_prefix
+    api_ctx.prefix_params.target_prefix = target_prefix
 
     # Networking params -- we always operate offline from libmamba's perspective
     api_ctx.remote_fetch_params.user_agent = context.user_agent
@@ -118,8 +135,8 @@ def init_api_context() -> api.Context:
     api_ctx.use_only_tar_bz2 = context.use_only_tar_bz2
 
     # Channels and platforms
-    api_ctx.platform = context.subdir
-    api_ctx.channels = context.channels
+    api_ctx.platform = platform if platform is not None else context.subdir
+    api_ctx.channels = list(channels) if channels is not None else context.channels
     api_ctx.channel_alias = str(_get_base_url(context.channel_alias.url(with_credentials=True)))
 
     RESERVED_NAMES = {"local", "defaults"}
