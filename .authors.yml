@@ -65,15 +65,19 @@
   email: 79589038+tl-hbk@users.noreply.github.com
   num_commits: 1
   first_commit: 2024-03-19 14:05:09
+  github: tl-hbk
 - name: dependabot[bot]
   email: 49699333+dependabot[bot]@users.noreply.github.com
   num_commits: 3
   first_commit: 2024-07-22 19:11:59
+  github: dependabot[bot]
 - name: Jonathan J. Helmus
   email: jjhelmus@gmail.com
   num_commits: 1
   first_commit: 2024-09-20 12:11:32
+  github: jjhelmus
 - name: Kevin Markham
   email: justmarkham@users.noreply.github.com
   num_commits: 1
   first_commit: 2024-08-12 11:49:20
+  github: justmarkham
