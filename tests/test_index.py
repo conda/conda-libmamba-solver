@@ -23,8 +23,8 @@ DATA = Path(__file__).parent / "data"
 def test_given_channels(monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike):
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
     reset_context()
-    libmamba_index = LibMambaIndexHelper(
-        channels=[Channel("conda-test/noarch")],
+    libmamba_index = LibMambaIndexHelper.from_platform_aware_channel(
+        channel=Channel("conda-test/noarch")
     )
     assert libmamba_index.db.repo_count() == 1
 

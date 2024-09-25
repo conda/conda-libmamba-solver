@@ -155,12 +155,25 @@ class LibMambaIndexHelper:
     def __init__(
         self,
         channels: Iterable[Channel],
-        subdirs: Iterable[str] = None,
+        subdirs: Iterable[str] = (),
         repodata_fn: str = REPODATA_FN,
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: Iterable[os.PathLike] = (),
     ):
-        self.channels = channels
+        platform_less_channels = []
+        for channel in channels:
+            if channel.platform:
+                # When .platform is defined, .urls() will ignore subdirs kw. Remove!
+                log.info(
+                    "Platform-aware channels are not supported. "
+                    "Ignoring platform %s from channel %s. "
+                    "Use subdirs keyword if necessary.",
+                    channel.platform,
+                    channel,
+                )
+                channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+            platform_less_channels.append(channel)
+        self.channels = platform_less_channels
         self.subdirs = subdirs or context.subdirs
         self.repodata_fn = repodata_fn
         self.db = self._init_db()
@@ -170,6 +183,14 @@ class LibMambaIndexHelper:
         if installed_records:
             self.repos.append(self._load_installed(installed_records))
         self._set_repo_priorities()
+
+    @classmethod
+    def from_platform_aware_channel(cls, channel: Channel):
+        if not channel.platform:
+            raise ValueError(f"Channel {channel} must define 'platform' attribute.")
+        subdir = channel.platform
+        channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+        return cls(channels=(channel,), subdirs=(subdir,))
 
     def n_packages(
         self,
@@ -278,8 +299,6 @@ class LibMambaIndexHelper:
         seen_noauth = set()
         channels_with_subdirs = []
         for channel in self.channels:
-            # When .platform is defined, .urls() will ignore subdirs kw. Remove!
-            channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
             for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
