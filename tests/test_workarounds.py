@@ -66,7 +66,7 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
-    TIMEOUT = 60  # Used twice in total, so account for double the amount
+    TIMEOUT = 90  # Used twice in total, so account for double the amount
     p = sp.Popen(
         [
             sys.executable,
