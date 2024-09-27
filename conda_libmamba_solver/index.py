@@ -380,7 +380,7 @@ class LibMambaIndexHelper:
         else:
             repodata_origin = None
         channel = Channel(channel_url)
-        channel_id = channel.name or channel.canonical_name
+        channel_id = channel.canonical_name
         if try_solv and repodata_origin:
             try:
                 log.debug(
