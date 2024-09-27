@@ -381,6 +381,12 @@ class LibMambaIndexHelper:
             repodata_origin = None
         channel = Channel(channel_url)
         channel_id = channel.canonical_name
+        if channel_id in context.custom_multichannels:
+            # In multichannels, the canonical name of a "subchannel" is the multichannel name
+            # which makes it ambiguous for `channel::specs`. In those cases, take the channel
+            # regular name; e.g. for repo.anaconda.com/pkgs/main, do not take defaults, but
+            # pkgs/main instead.
+            channel_id = channel.name
         if try_solv and repodata_origin:
             try:
                 log.debug(
