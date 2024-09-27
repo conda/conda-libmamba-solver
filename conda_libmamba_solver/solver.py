@@ -590,6 +590,11 @@ class LibMambaSolver(Solver):
 
         return dict(tasks)
 
+    # endregion
+
+    # region Export to conda
+    ########################
+
     def _export_solution(
         self,
         index: LibMambaIndexHelper,
