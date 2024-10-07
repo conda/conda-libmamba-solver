@@ -149,7 +149,7 @@ jobs:
           --file tests\requirements-ci.txt
           --file tests\requirements-s3.txt
           --file ..\conda-libmamba-solver\dev\requirements.txt
-          --file ..\conda-libmamba-solver\tests\requirements.txt
+          ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ..\\conda-libmamba-solver\\tests\\requirements.txt' || '' }}
           ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
@@ -182,16 +182,12 @@ jobs:
       - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        shell: cmd /C CALL {0}
+        shell: bash -el {0}
         run: |
-          CALL python -m pip install -e ../conda/ --no-deps
-          if errorlevel 1 exit 1
-          CALL python -m conda init --all
-          if errorlevel 1 exit 1
-          CALL %CONDA_PREFIX%\Scripts\activate.bat
-          if errorlevel 1 exit 1
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 || exit 1
-          exit 0
+          python -m pip install -e ../conda/ --no-deps
+          python -m conda init --all
+          . $CONDA_PREFIX/etc/profile.d/conda.sh
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -294,7 +290,7 @@ jobs:
           --file tests/requirements-ci.txt
           --file tests/requirements-s3.txt
           --file ../conda-libmamba-solver/dev/requirements.txt
-          --file ../conda-libmamba-solver/tests/requirements.txt
+          ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
           ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
@@ -575,7 +571,7 @@ jobs:
           --file tests/requirements-ci.txt
           --file tests/requirements-s3.txt
           --file ../conda-libmamba-solver/dev/requirements.txt
-          --file ../conda-libmamba-solver/tests/requirements.txt
+          ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
           ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
