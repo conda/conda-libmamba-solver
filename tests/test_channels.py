@@ -1,19 +1,24 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import sys
+from contextlib import suppress
 from pathlib import Path
 from subprocess import check_call
+from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
-from conda.base.context import reset_context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
+from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
 from conda.testing.integration import (
     _get_temp_prefix,
@@ -29,18 +34,22 @@ from .channel_testing.helpers import http_server_auth_token  # noqa: F401
 from .channel_testing.helpers import create_with_channel
 from .utils import conda_subprocess, write_env_config
 
+if TYPE_CHECKING:
+    from conda.testing import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
+    from pytest import MonkeyPatch
+
 DATA = Path(__file__).parent / "data"
 
 
-def test_channel_matchspec():
-    stdout, *_ = conda_inprocess(
+def test_channel_matchspec(conda_cli: CondaCLIFixture, tmp_path: Path) -> None:
+    stdout, *_ = conda_cli(
         "create",
-        _get_temp_prefix(),
+        f"--prefix={tmp_path}",
         "--solver=libmamba",
         "--json",
         "--override-channels",
-        "-c",
-        "defaults",
+        "--channel=defaults",
+        "--yes",
         "conda-forge::libblas=*=*openblas",
         "python=3.9",
     )
@@ -53,48 +62,48 @@ def test_channel_matchspec():
             assert record["channel"] == "pkgs/main"
 
 
-def test_channels_prefixdata():
+def test_channels_prefixdata(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     """
     Make sure libmamba does not complain about missing channels
     used in previous commands.
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env(
-        "conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True
-    ) as prefix:
-        p = conda_subprocess(
+    with tmp_env("conda-forge::xz", "python", "--solver=libmamba") as prefix:
+        stdout, stderr, _ = conda_cli(
             "install",
-            "-yp",
-            prefix,
-            "pytest",
+            f"--prefix={prefix}",
             "--solver=libmamba",
+            "--yes",
+            "pytest",
         )
         assert (
             "Selected channel specific (or force-reinstall) job, "
             "but package is not available from channel. "
-            "Solve job will fail." not in (p.stdout + p.stderr)
+            "Solve job will fail." not in (stdout + stderr)
         )
 
 
-def test_channels_installed_unavailable():
-    "Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"
-    with make_temp_env("xz", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+def test_channels_installed_unavailable(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    """Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"""
+    with tmp_env("xz", "--solver=libmamba") as prefix:
         pd = PrefixData(prefix)
         pd.load()
         record = pd.get("xz")
         assert record
         record.channel = Channel.from_url("file:///nonexistent")
 
-        _, _, retcode = conda_inprocess(
-            "install",
-            prefix,
-            "zlib",
-            "--solver=libmamba",
-            "--dry-run",
-            use_exception_handler=True,
-        )
-        assert retcode == 0
+        with pytest.raises(DryRunExit):
+            conda_cli(
+                "install",
+                f"--prefix={prefix}",
+                "zlib",
+                "--solver=libmamba",
+                "--dry-run",
+            )
 
 
 def _setup_conda_forge_as_defaults(prefix, force=False):
@@ -139,7 +148,13 @@ def _setup_channels_custom(prefix, force=False):
         _setup_channels_custom,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env):
+def test_mirrors_do_not_leak_channels(
+    config_env,
+    path_factory: PathFactoryFixture,
+    tmp_env: TmpEnvFixture,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/108
 
@@ -151,21 +166,21 @@ def test_mirrors_do_not_leak_channels(config_env):
     is undesirable.
     """
 
-    with env_vars({"CONDA_PKGS_DIRS": _get_temp_prefix()}), make_temp_env() as prefix:
-        assert (Path(prefix) / "conda-meta" / "history").exists()
+    with env_vars({"CONDA_PKGS_DIRS": path_factory()}), tmp_env() as prefix:
+        assert (prefix / "conda-meta" / "history").exists()
 
         # Setup conda configuration
         config_env(prefix)
-        common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
+        common = [f"--prefix={prefix}", "--solver=libmamba", "--json", "--yes", "-vv"]
 
-        env = os.environ.copy()
-        env["CONDA_PREFIX"] = prefix  # fake activation so config is loaded
+        # fake activation so config is loaded
+        monkeypatch.setenv("CONDA_PREFIX", str(prefix))
 
         # Create an environment using mirrored channels only
-        p = conda_subprocess("install", *common, "python", "pip", env=env)
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
+        stdout, stderr, _ = conda_cli("install", *common, "python", "pip")
+        result = json.loads(stdout)
+        if stderr:
+            assert "conda.anaconda.org" not in stderr
 
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
@@ -175,12 +190,12 @@ def test_mirrors_do_not_leak_channels(config_env):
             ), pkg
 
         # Make a change to that channel
-        p = conda_subprocess("install", *common, "pytest", env=env)
+        stdout, stderr, _ = conda_cli("install", *common, "pytest")
 
         # Ensure that the loaded channels are ONLY the mirrored ones
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
+        result = json.loads(stdout)
+        if stderr:
+            assert "conda.anaconda.org" not in stderr
 
         for pkg in result["actions"]["LINK"]:
             assert pkg["channel"] == "conda-forge", pkg
@@ -192,70 +207,71 @@ def test_mirrors_do_not_leak_channels(config_env):
         # Ensure that other end points were never loaded
 
 
-@pytest.mark.skipif(not on_linux, reason="Only run on Linux")
-def test_jax_and_jaxlib():
-    "https://github.com/conda/conda-libmamba-solver/issues/221"
-    env = os.environ.copy()
-    env["CONDA_SUBDIR"] = "linux-64"
+def test_jax_and_jaxlib(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/221
+    monkeypatch.setenv("CONDA_SUBDIR", "linux-64")
+    reset_context()
+    assert context.subdir == "linux-64"
+
     for specs in (("jax", "jaxlib"), ("jaxlib", "jax")):
-        process = conda_subprocess(
+        stdout, _, _ = conda_cli(
             "create",
-            "--name=unused",
             "--solver=libmamba",
             "--json",
             "--dry-run",
             "--override-channels",
-            "-c",
-            "defaults",
+            "--channel=defaults",
             f"conda-forge::{specs[0]}",
             f"conda-forge::{specs[1]}",
-            explain=True,
-            env=env,
+            raises=DryRunExit,
         )
-        result = json.loads(process.stdout)
+        result = json.loads(stdout)
         assert result["success"] is True
         pkgs = {pkg["name"] for pkg in result["actions"]["LINK"]}
         assert specs[0] in pkgs
         assert specs[1] in pkgs
 
 
-def test_encoding_file_paths(tmp_path: Path):
+def test_encoding_file_paths(tmp_path: Path, conda_cli: CondaCLIFixture) -> None:
     tmp_channel = tmp_path / "channel+some+encodable+bits"
-    repo = Path(__file__).parent / "data/mamba_repo"
+    repo = Path(__file__).parent / "data" / "mamba_repo"
     shutil.copytree(repo, tmp_channel)
-    process = conda_subprocess(
+    stdout, stderr, err = conda_cli(
         "create",
-        "-p",
-        tmp_path / "env",
-        "-c",
-        tmp_channel,
-        "test-package",
+        f"--prefix={tmp_path / 'env'}",
+        f"--channel={tmp_channel}",
         "--solver=libmamba",
+        "--yes",
+        "test-package",
     )
-    print(process.stdout)
-    print(process.stderr, file=sys.stderr)
-    assert process.returncode == 0
+    print(stdout)
+    print(stderr, file=sys.stderr)
+    assert not err
     assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
 
 
-def test_conda_build_with_aliased_channels(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/363"
+def test_conda_build_with_aliased_channels(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/363
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
-    env = os.environ.copy()
+
     if on_win:
-        env["CONDA_BLD_PATH"] = str(Path(os.environ.get("RUNNER_TEMP", tmp_path), "bld"))
+        bld_path = str(Path(os.getenv("RUNNER_TEMP", tmp_path), "bld"))
     else:
-        env["CONDA_BLD_PATH"] = str(tmp_path / "conda-bld")
+        bld_path = str(tmp_path / "conda-bld")
+    monkeypatch.setenv("CONDA_BLD_PATH", bld_path)
+
     try:
         _setup_conda_forge_as_defaults(Path.home(), force=True)
-        conda_subprocess(
+        conda_cli(
             "build",
-            DATA / "conda_build_recipes" / "jedi",
             "--override-channels",
             "--channel=defaults",
-            capture_output=False,
-            env=env,
+            DATA / "conda_build_recipes" / "jedi",
         )
     finally:
         if condarc_contents:
@@ -280,7 +296,11 @@ def test_http_server_auth_token(http_server_auth_token):
     create_with_channel(http_server_auth_token)
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):
+def test_http_server_auth_token_in_defaults(
+    http_server_auth_token,
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+) -> None:
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
@@ -291,12 +311,16 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
             default_channels=[http_server_auth_token],
         )
         reset_context()
-        conda_subprocess("info", capture_output=False)
-        conda_subprocess(
+
+        stdout, stderr, _ = conda_cli("info")
+        print(stdout)
+        assert not stderr
+
+        conda_cli(
             "create",
-            "-p",
-            _get_temp_prefix(use_restricted_unicode=on_win),
+            f"--prefix={path_factory()}",
             "--solver=libmamba",
+            "--yes",
             "test-package",
         )
     finally:
@@ -306,51 +330,51 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):
             condarc.unlink()
 
 
-def test_local_spec():
-    "https://github.com/conda/conda-libmamba-solver/issues/398"
-    env = os.environ.copy()
-    env["CONDA_BLD_PATH"] = str(DATA / "mamba_repo")
-    process = conda_subprocess(
-        "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
-        "--dry-run",
-        "--solver=libmamba",
-        "--channel=local",
-        "test-package",
-        env=env,
-    )
-    assert process.returncode == 0
+def test_local_spec(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/398
+    monkeypatch.setenv("CONDA_BLD_PATH", str(DATA / "mamba_repo"))
 
-    process = conda_subprocess(
-        "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
-        "--dry-run",
-        "--solver=libmamba",
-        "local::test-package",
-        env=env,
-    )
-    assert process.returncode == 0
+    with pytest.raises(DryRunExit):
+        conda_cli(
+            "create",
+            "--dry-run",
+            "--solver=libmamba",
+            "--channel=local",
+            "test-package",
+        )
+
+    with pytest.raises(DryRunExit):
+        conda_cli(
+            "create",
+            "--dry-run",
+            "--solver=libmamba",
+            "local::test-package",
+        )
 
 
-def test_unknown_channels_do_not_crash(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/418"
+def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
+    # https://github.com/conda/conda-libmamba-solver/issues/418
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
-    with make_temp_env("ca-certificates") as prefix:
+    with tmp_env("ca-certificates") as prefix:
         # copy pkg to a new non-channel-like location without repodata around to obtain
         # '<unknown>' channel and reproduce the issue
-        temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
+        temp_pkg = prefix / "test-package-0.1-0.tar.bz2"
         shutil.copy(test_pkg, temp_pkg)
-        conda_inprocess("install", prefix, str(temp_pkg))
+
+        conda_cli("install", f"--prefix={prefix}", "--yes", temp_pkg)
         assert package_is_installed(prefix, "test-package")
-        conda_inprocess("install", prefix, "zlib")
+
+        conda_cli("install", f"--prefix={prefix}", "--yes", "zlib")
         assert package_is_installed(prefix, "zlib")
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")
-def test_use_cache_works_offline_fresh_install_keep(tmp_path):
+def test_use_cache_works_offline_fresh_install_keep(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/396
 
@@ -364,22 +388,26 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     )
     urlretrieve(miniforge_url, tmp_path / "miniforge.sh")
     # bkfp: batch, keep, force, prefix
-    check_call(["bash", str(tmp_path / "miniforge.sh"), "-bkfp", tmp_path / "miniforge"])
-    env = os.environ.copy()
-    env["CONDA_ROOT_PREFIX"] = str(tmp_path / "miniforge")
-    env["CONDA_PKGS_DIRS"] = str(tmp_path / "miniforge" / "pkgs")
-    env["CONDA_ENVS_DIRS"] = str(tmp_path / "miniforge" / "envs")
-    env["HOME"] = str(tmp_path)  # ignore ~/.condarc
+    check_call(["bash", tmp_path / "miniforge.sh", "-bkfp", prefix := tmp_path / "miniforge"])
+
+    monkeypatch.setenv("CONDA_ROOT_PREFIX", str(prefix))
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(prefix / "pkgs"))
+    monkeypatch.setenv("CONDA_ENVS_DIRS", str(prefix / "envs"))
+    monkeypatch.setenv("HOME", str(tmp_path))  # ignore ~/.condarc
+
     args = (
         "update",
-        "-p",
-        tmp_path / "miniforge",
+        f"--prefix={prefix}",
         "--all",
         "--dry-run",
         "--override-channels",
         "--channel=conda-forge",
     )
-    kwargs = {"capture_output": False, "check": True, "env": env}
-    conda_subprocess(*args, "--offline", **kwargs)
-    conda_subprocess(*args, "--use-index-cache", **kwargs)
-    conda_subprocess(*args, "--offline", "--use-index-cache", **kwargs)
+
+    # use contextlib.suppress instead of pytest.raises since the DryRunExit doesn't occur if there's nothing to update
+    with suppress(DryRunExit):
+        conda_cli(*args, "--offline")
+    with suppress(DryRunExit):
+        conda_cli(*args, "--use-index-cache")
+    with suppress(DryRunExit):
+        conda_cli(*args, "--offline", "--use-index-cache")
