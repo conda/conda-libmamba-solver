@@ -66,7 +66,7 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
-    TIMEOUT = 90  # Used twice in total, so account for double the amount
+    TIMEOUT = 10  # Used twice in total, so account for double the amount
     p = sp.Popen(
         [
             sys.executable,
@@ -99,7 +99,6 @@ def test_ctrl_c(stage):
             kernel.FreeConsole()
             kernel.AttachConsole(p.pid)
             kernel.SetConsoleCtrlHandler(None, 1)
-            kernel.GenerateConsoleCtrlEvent(0, 0)
             kernel.GenerateConsoleCtrlEvent(0, 0)
             p.wait(timeout=TIMEOUT)
         finally:
