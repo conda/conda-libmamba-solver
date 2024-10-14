@@ -6,14 +6,12 @@ ci:
 exclude: |
   (?x)^(
     tests/data/.* |
-    conda_libmamba_solver/_index_v1\.py |
-    conda_libmamba_solver/_solver_v1\.py |
     conda_libmamba_solver/mamba_utils\.py
   )$
 repos:
   # generic verification and formatting
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v5.0.0
     hooks:
       # standard end of line/end of file cleanup
       - id: mixed-line-ending
@@ -34,7 +32,7 @@ repos:
       # auto format Python codes within docstrings
       - id: blacken-docs
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.7
+    rev: v0.6.9
     hooks:
       # lint & attempt to correct failures (e.g. pyupgrade)
       - id: ruff
@@ -46,6 +44,8 @@ repos:
     hooks:
       - id: check-hooks-apply
       - id: check-useless-excludes
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.10
   - repo: local
     hooks:
       - id: git-diff

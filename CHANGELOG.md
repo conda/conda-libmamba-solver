@@ -13,6 +13,27 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.9.0 (2024-09-25)
+
+### Bug fixes
+
+* Use `Solver` instance configuration to initialize the `libmamba` context without implicitly relying on the `conda` context settings. (#525)
+* Fix conda-build compatibility regression where arch-specific outputs can't be found in the test phase if a `noarch` output was built first. (#531)
+
+### Docs
+
+* Add installation workarounds FAQ with conda-standalone. (#505 via #511)
+* Update user guide to reflect conda-libmamba-solver being the default solver in conda. (#516 via #517)
+* Include `mamba-org/mamba` as a required cloned repository for setting up a dev environment. (#528)
+
+### Contributors
+
+* @jaimergp
+* @jjhelmus made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/528
+* @justmarkham made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/510
+
+
+
 ## 24.7.0 (2024-07-17)
 
 ### Bug fixes
