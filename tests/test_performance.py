@@ -4,19 +4,24 @@
 """
 Measure the speed and memory usage of the different backend solvers
 """
+from __future__ import annotations
+
 import os
 import shutil
+from typing import TYPE_CHECKING
 
 import pytest
 from conda.base.context import context
 from conda.common.io import env_var
 from conda.exceptions import DryRunExit
-from conda.testing.integration import (
-    Commands,
-    _get_temp_prefix,
-    make_temp_env,
-    run_command,
-)
+from conda.testing.integration import Commands, make_temp_env, run_command
+
+if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Iterable
+
+    from conda.testing.fixtures import PathFactoryFixture
+    from pytest import FixtureRequest
 
 platform = context.subdir
 
@@ -40,18 +45,16 @@ def _channels_as_args(channels):
     return tuple(args)
 
 
-def _tmp_prefix_safe():
-    return _get_temp_prefix(use_restricted_unicode=True).replace(" ", "")
-
-
 @pytest.fixture(scope="module", params=os.listdir(TEST_DATA_DIR))
-def prefix_and_channels(request):
+def prefix_and_channels(
+    request: FixtureRequest, session_path_factory: PathFactoryFixture
+) -> Iterable[tuple[Path, list[str]]]:
     lockfile = os.path.join(TEST_DATA_DIR, request.param)
     lock_platform = lockfile.split(".")[-2]
     if lock_platform != platform:
         pytest.skip(f"Running platform {platform} does not match file platform {lock_platform}")
     with env_var("CONDA_TEST_SAVE_TEMPS", "1"):
-        prefix = _tmp_prefix_safe()
+        prefix = session_path_factory()
         with make_temp_env("--file", lockfile, prefix=prefix) as prefix:
             channels = _get_channels_from_lockfile(lockfile)
             yield prefix, channels
@@ -128,11 +131,13 @@ def test_update_all(prefix_and_channels, solver_args):
 
 
 @pytest.mark.slow
-def test_install_vaex_from_conda_forge_and_defaults(solver_args):
+def test_install_vaex_from_conda_forge_and_defaults(
+    solver_args: tuple[str, ...], path_factory: PathFactoryFixture
+) -> None:
     try:
         run_command(
             Commands.CREATE,
-            _tmp_prefix_safe(),
+            str(path_factory()),
             *solver_args,
             "--override-channels",
             "-c",
