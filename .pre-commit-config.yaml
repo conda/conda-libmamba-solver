@@ -48,6 +48,7 @@ repos:
     rev: 1.7.10
     hooks:
       - id: bandit
+        exclude: ^(tests/)
   - repo: local
     hooks:
       - id: git-diff
