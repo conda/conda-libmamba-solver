@@ -100,6 +100,7 @@ def test_ctrl_c(stage):
             kernel.AttachConsole(p.pid)
             kernel.SetConsoleCtrlHandler(None, 1)
             kernel.GenerateConsoleCtrlEvent(0, 0)
+            kernel.GenerateConsoleCtrlEvent(0, 0)
             p.wait(timeout=TIMEOUT)
         finally:
             kernel.SetConsoleCtrlHandler(None, 0)
