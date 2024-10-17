@@ -110,9 +110,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMPORARY
-          ref: libmamba-v2-fixes  # TEMPORARY
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -254,9 +252,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMPORARY
-          ref: libmamba-v2-fixes  # TEMPORARY
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -534,9 +530,7 @@ jobs:
         uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
         with:
           fetch-depth: 0
-          # repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          repository: jaimergp/conda  # TEMPORARY
-          ref: libmamba-v2-fixes  # TEMPORARY
+          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
