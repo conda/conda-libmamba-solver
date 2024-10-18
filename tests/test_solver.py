@@ -22,40 +22,10 @@ from conda.testing.integration import (
     package_is_installed,
     run_command,
 )
-from conda.testing.solver_helpers import SolverTests
 
-from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 
 from .utils import conda_subprocess
-
-
-class TestLibMambaSolver(SolverTests):
-    @property
-    def solver_class(self):
-        return LibMambaSolver
-
-    @property
-    def tests_to_skip(self):
-        return {
-            "LibMambaSolver does not support track-features/features": [
-                "test_iopro_mkl",
-                "test_iopro_nomkl",
-                "test_mkl",
-                "test_accelerate",
-                "test_scipy_mkl",
-                "test_pseudo_boolean",
-                "test_no_features",
-                "test_surplus_features_1",
-                "test_surplus_features_2",
-                # this one below only fails reliably on windows;
-                # it passes Linux on CI, but not locally?
-                "test_unintentional_feature_downgrade",
-            ],
-            "LibMambaSolver installs numpy with mkl while we were expecting no-mkl numpy": [
-                "test_remove",
-            ],
-        }
 
 
 def test_python_downgrade_reinstalls_noarch_packages():
@@ -435,6 +405,9 @@ def test_ca_certificates_pins():
                 raise AssertionError("ca-certificates not found in LINK actions")
 
 
+@pytest.mark.skipif(
+    context.subdir == "osx-arm64", reason="python=2.7 not available in this platform"
+)
 def test_python_update_should_not_uninstall_history():
     """
     https://github.com/conda/conda-libmamba-solver/issues/341
@@ -491,12 +464,12 @@ def test_python_downgrade_with_pins_removes_truststore():
                 "--json",
                 "python=3.9",
                 env=env,
+                check=False,
             )
-            assert p.returncode == 0
             data = json.loads(p.stdout)
+            assert p.returncode == 0
             assert data.get("success")
             assert data.get("dry_run")
-            assertions = 0
             link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}
             unlink_dict = {pkg["name"]: pkg for pkg in data["actions"]["UNLINK"]}
             assert link_dict["python"]["version"].startswith("3.9.")

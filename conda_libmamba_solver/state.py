@@ -59,13 +59,13 @@ The mappings stored in ``SolverOutputState`` are backed by ``TrackedMap`` object
 which allow to keep the reasons _why_ those specs or records were added to the mappings,
 as well as richer logging for each action.
 """
-
 # TODO: This module could be part of conda-core once if we refactor the classic logic
 
+from __future__ import annotations
+
 import logging
-from os import PathLike
 from types import MappingProxyType
-from typing import Dict, Iterable, Optional, Tuple, Type, Union
+from typing import TYPE_CHECKING
 
 from boltons.setutils import IndexedSet
 from conda.auxlib import NULL
@@ -80,24 +80,18 @@ from conda.history import History
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.prefix_graph import PrefixGraph
-from conda.models.records import PackageRecord
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from os import PathLike
+    from typing import Any
+
+    from conda.core.solve import Solver
+    from conda.models.records import PackageRecord
 
 from .utils import EnumAsBools, compatible_specs
 
 log = logging.getLogger(f"conda.{__name__}")
-
-
-class IndexHelper:
-    """
-    The _index_ refers to the combination of all configured channels and their
-    platform-corresponding subdirectories. It provides the sources for available
-    packages that can become part of a prefix state, eventually.
-
-    Subclass this helper to add custom repodata fetching if needed.
-    """
-
-    def explicit_pool(self, specs: Iterable[MatchSpec]) -> Iterable[str]:
-        raise NotImplementedError
 
 
 class SolverInputState:
@@ -164,16 +158,16 @@ class SolverInputState:
 
     def __init__(
         self,
-        prefix: Union[str, bytes, PathLike],
-        requested: Optional[Iterable[Union[str, MatchSpec]]] = (),
-        update_modifier: Optional[UpdateModifier] = UpdateModifier.UPDATE_SPECS,
-        deps_modifier: Optional[DepsModifier] = DepsModifier.NOT_SET,
-        ignore_pinned: Optional[bool] = None,
-        force_remove: Optional[bool] = False,
-        force_reinstall: Optional[bool] = False,
-        prune: Optional[bool] = False,
-        command: Optional[str] = None,
-        _pip_interop_enabled: Optional[bool] = None,
+        prefix: str | bytes | PathLike,
+        requested: Iterable[str | MatchSpec] | None = (),
+        update_modifier: UpdateModifier | None = UpdateModifier.UPDATE_SPECS,
+        deps_modifier: DepsModifier | None = DepsModifier.NOT_SET,
+        ignore_pinned: bool | None = None,
+        force_remove: bool | None = False,
+        force_reinstall: bool | None = False,
+        prune: bool | None = False,
+        command: str | None = None,
+        _pip_interop_enabled: bool | None = None,
     ):
         self.prefix = prefix
         self._prefix_data = PrefixData(prefix, pip_interop_enabled=_pip_interop_enabled)
@@ -208,7 +202,7 @@ class SolverInputState:
         # special cases
         self._do_not_remove = {p: MatchSpec(p) for p in self._DO_NOT_REMOVE_NAMES}
 
-    def _default_to_context_if_null(self, name, value, context=context):
+    def _default_to_context_if_null(self, name, value, context=context) -> Any:
         "Obtain default value from the context if value is set to NULL; otherwise leave as is"
         return getattr(context, name) if value is NULL else self._ENUM_STR_MAP.get(value, value)
 
@@ -223,7 +217,7 @@ class SolverInputState:
     # Prefix state pools
 
     @property
-    def installed(self) -> Dict[str, PackageRecord]:
+    def installed(self) -> dict[str, PackageRecord]:
         """
         This exposes the installed packages in the prefix. Note that a ``PackageRecord``
         can generate an equivalent ``MatchSpec`` object with ``.to_match_spec()``.
@@ -232,7 +226,7 @@ class SolverInputState:
         return MappingProxyType(dict(sorted(self.prefix_data._prefix_records.items())))
 
     @property
-    def history(self) -> Dict[str, MatchSpec]:
+    def history(self) -> dict[str, MatchSpec]:
         """
         These are the specs that the user explicitly asked for in previous operations
         on the prefix. See :class:`History` for more details.
@@ -240,7 +234,7 @@ class SolverInputState:
         return MappingProxyType(self._history)
 
     @property
-    def pinned(self) -> Dict[str, MatchSpec]:
+    def pinned(self) -> dict[str, MatchSpec]:
         """
         These specs represent hard constrains on what package versions can be installed
         on the environment. The packages here returned don't need to be already installed.
@@ -252,7 +246,7 @@ class SolverInputState:
         return MappingProxyType(self._pinned)
 
     @property
-    def virtual(self) -> Dict[str, MatchSpec]:
+    def virtual(self) -> dict[str, MatchSpec]:
         """
         System properties exposed as virtual packages (e.g. ``__glibc=2.17``). These packages
         cannot be (un)installed, they only represent constrains for other packages. By convention,
@@ -261,7 +255,7 @@ class SolverInputState:
         return MappingProxyType(dict(sorted(self._virtual.items())))
 
     @property
-    def aggressive_updates(self) -> Dict[str, MatchSpec]:
+    def aggressive_updates(self) -> dict[str, MatchSpec]:
         """
         Packages that the solver will always try to update. As such, they will never have an
         associated version or build constrain. Note that the packages here returned do not need to
@@ -270,7 +264,7 @@ class SolverInputState:
         return MappingProxyType(self._aggressive_updates)
 
     @property
-    def always_update(self) -> Dict[str, MatchSpec]:
+    def always_update(self) -> dict[str, MatchSpec]:
         """
         Merged lists of packages that should always be updated, depending on the flags, including:
         - aggressive_updates
@@ -290,7 +284,7 @@ class SolverInputState:
         return MappingProxyType(pkgs)
 
     @property
-    def do_not_remove(self) -> Dict[str, MatchSpec]:
+    def do_not_remove(self) -> dict[str, MatchSpec]:
         """
         Packages that are protected by the solver so they are not accidentally removed. This list
         is not configurable, but hardcoded for legacy reasons.
@@ -298,7 +292,7 @@ class SolverInputState:
         return MappingProxyType(self._do_not_remove)
 
     @property
-    def requested(self) -> Dict[str, MatchSpec]:
+    def requested(self) -> dict[str, MatchSpec]:
         """
         Packages that the user has explicitly asked for in this operation.
         """
@@ -397,25 +391,6 @@ class SolverInputState:
                     channel = Channel(spec.original_spec_str.split("::")[0])
                 yield channel
 
-    def channels_from_installed(self, seen=None) -> Iterable[Channel]:
-        seen_urls = set(seen or [])
-        # See https://github.com/conda/conda/issues/11790
-        for record in self.installed.values():
-            if record.channel.auth or record.channel.token:
-                # skip if the channel has authentication info, because
-                # it might cause issues with expired tokens and what not
-                continue
-            if record.channel.name in ("@", "<develop>", "pypi"):
-                # These "channels" are not really channels, more like
-                # metadata placeholders
-                continue
-            if record.channel.base_url is None:
-                continue
-            if record.channel.subdir_url in seen_urls:
-                continue
-            seen_urls.add(record.channel.subdir_url)
-            yield record.channel
-
     def maybe_free_channel(self) -> Iterable[Channel]:
         if context.restore_free_channel:
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
@@ -447,7 +422,7 @@ class SolverOutputState:
         relaxation of the version and build constrains. If not provided, their default value is a
         blank mapping.
     pins
-        Packages that ended up being pinned. Mostly used for reporting and debugging.
+        Packages that ended up being pinned. Mostly used for reporting and debugging. Deprecated.
 
     Notes
     -----
@@ -476,21 +451,21 @@ class SolverOutputState:
         self,
         *,
         solver_input_state: SolverInputState,
-        records: Optional[Dict[str, PackageRecord]] = None,
-        for_history: Optional[Dict[str, MatchSpec]] = None,
-        neutered: Optional[Dict[str, MatchSpec]] = None,
-        conflicts: Optional[Dict[str, MatchSpec]] = None,
-        pins: Optional[Dict[str, MatchSpec]] = None,
+        records: dict[str, PackageRecord] | None = None,
+        for_history: dict[str, MatchSpec] | None = None,
+        neutered: dict[str, MatchSpec] | None = None,
+        conflicts: dict[str, MatchSpec] | None = None,
+        pins: dict[str, MatchSpec] | None = None,
     ):
         self.solver_input_state: SolverInputState = solver_input_state
-        self.records: Dict[str, PackageRecord] = records or dict(solver_input_state.installed)
-        self.for_history: Dict[str, MatchSpec] = for_history or dict(solver_input_state.requested)
-        self.neutered: Dict[str, MatchSpec] = neutered or {}
-        self.conflicts: Dict[str, MatchSpec] = conflicts or {}
-        self.pins: Dict[str, MatchSpec] = pins or {}
+        self.records: dict[str, PackageRecord] = records or dict(solver_input_state.installed)
+        self.for_history: dict[str, MatchSpec] = for_history or dict(solver_input_state.requested)
+        self.neutered: dict[str, MatchSpec] = neutered or {}
+        self.conflicts: dict[str, MatchSpec] = conflicts or {}
+        self.pins: dict[str, MatchSpec] = pins or {}
 
     @property
-    def current_solution(self):
+    def current_solution(self) -> IndexedSet[PackageRecord]:
         """
         Massage currently stored records so they can be returned as the type expected by the
         solver API. This is what you should return in ``Solver.solve_final_state()``.
@@ -498,7 +473,7 @@ class SolverOutputState:
         return IndexedSet(PrefixGraph(self.records.values()).graph)
 
     @property
-    def specs(self):
+    def specs(self) -> dict[str, MatchSpec]:
         """
         Merge all possible sources of input package specs, sorted by their input category and
         strictness. It's just meant to be an enumeration of all possible inputs, not a ready-to-use
@@ -524,20 +499,20 @@ class SolverOutputState:
         return specs_by_strictness
 
     @property
-    def real_specs(self):
+    def real_specs(self) -> dict[str, MatchSpec]:
         """
         Specs that are _not_ virtual.
         """
         return {name: spec for name, spec in self.specs.items() if not name.startswith("__")}
 
     @property
-    def virtual_specs(self):
+    def virtual_specs(self) -> dict[str, MatchSpec]:
         """
         Specs that are virtual.
         """
         return {name: spec for name, spec in self.specs.items() if name.startswith("__")}
 
-    def early_exit(self) -> Dict[str, PackageRecord]:
+    def early_exit(self) -> IndexedSet[PackageRecord]:
         """
         Operations that do not need a solver and might result in returning
         early are collected here.
@@ -614,7 +589,7 @@ class SolverOutputState:
                 exc.allow_retry = False
                 raise exc
 
-    def post_solve(self, solver: Type["Solver"]):
+    def post_solve(self, solver: type[Solver]):
         """
         These tasks are performed _after_ the solver has done its work. It essentially
         post-processes the ``records`` mapping.
@@ -791,7 +766,7 @@ class SolverOutputState:
             self.records.update({record.name: record for record in graph.graph})
 
 
-def sort_by_spec_strictness(key_value_tuple: Tuple[str, MatchSpec]):
+def sort_by_spec_strictness(key_value_tuple: tuple[str, MatchSpec]) -> tuple[int, str]:
     """
     Helper function to sort a list of (key, value) tuples by spec strictness
     """

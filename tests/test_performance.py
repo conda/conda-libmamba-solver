@@ -4,6 +4,7 @@
 """
 Measure the speed and memory usage of the different backend solvers
 """
+
 import os
 import shutil
 
@@ -44,7 +45,10 @@ def _tmp_prefix_safe():
     return _get_temp_prefix(use_restricted_unicode=True).replace(" ", "")
 
 
-@pytest.fixture(scope="module", params=os.listdir(TEST_DATA_DIR))
+@pytest.fixture(
+    scope="module",
+    params=[f for f in os.listdir(TEST_DATA_DIR) if f.endswith(".lock")],
+)
 def prefix_and_channels(request):
     lockfile = os.path.join(TEST_DATA_DIR, request.param)
     lock_platform = lockfile.split(".")[-2]
