@@ -1,6 +1,10 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+"""
+Entry points for the conda plugin system
+"""
+
 from conda import plugins
 
 from .repoquery import configure_parser, repoquery
