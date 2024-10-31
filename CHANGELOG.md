@@ -13,7 +13,7 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
-## 24.11rc (2024-10-31)
+## 24.11.0rc (2024-10-31)
 
 ### Enhancements
 
@@ -25,6 +25,10 @@ Remember to update the hyperlinks at the bottom.
 * Removed `conda_libmamba_solver.state.BaseIndexHelper`. The base class is now `conda_libmamba_solver.index.IndexHelper`. (#457)
 * Verbose logging in `libsolv` has a big overhead in `libmamba` v2, so we have disabled it by default (even if the user adds `-vvv` flags to the CLI). To opt-in, please set `CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV` to a truthy value. (#457)
 * Python 3.8 is no longer supported. The minimum version is now 3.9. (#457)
+
+### Contributors
+
+* @jaimergp
 
 
 
