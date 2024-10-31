@@ -17,7 +17,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### Enhancements
 
-* Require `libmambapy` v2. This is a big refactor in `libmamba` internals, which allowed us to remove a lot of code in `conda-libmamba-solver` too. (#457)
+* Require `libmambapy` v2. This is a big refactor in `libmamba` internals, which also allowed us to remove a lot of code in `conda-libmamba-solver`. (#457)
 
 ### Deprecations
 
