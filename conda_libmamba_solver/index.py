@@ -396,7 +396,9 @@ class LibMambaIndexHelper:
                     path=str(solv_path),
                     expected=repodata_origin,
                     channel_id=channel_id,
-                    add_pip_as_python_dependency=context.add_pip_as_python_dependency,
+                    add_pip_as_python_dependency=PipAsPythonDependency(
+                        context.add_pip_as_python_dependency
+                    ),
                 )
             except Exception as exc:
                 log.debug("Failed to load from SOLV. Trying JSON.", exc_info=exc)
