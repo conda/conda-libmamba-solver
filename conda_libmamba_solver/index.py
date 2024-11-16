@@ -359,7 +359,7 @@ class LibMambaIndexHelper:
             # This might not exist (yet, anymore), but that's ok because we'll check
             # for existence later and safely ignore if needed
             json_path = subdir_data.cache_path_json
-            state = None
+            state = subdir_data.repo_cache.load_state()
         else:
             # TODO: This method loads reads the whole JSON file (does not parse)
             json_path, state = subdir_data.repo_fetch.fetch_latest_path()
@@ -399,8 +399,11 @@ class LibMambaIndexHelper:
                     add_pip_as_python_dependency=context.add_pip_as_python_dependency,
                 )
             except Exception as exc:
-                log.debug("Failed to load from SOLV. Trying JSON at %s", json_path, exc_info=exc)
+                log.debug("Failed to load from SOLV. Trying JSON.", exc_info=exc)
         try:
+            log.debug(
+                "Loading %s (%s) from JSON repodata at %s", channel_id, channel_url, json_path
+            )
             repo = self.db.add_repo_from_repodata_json(
                 path=str(json_path),
                 url=channel_url,
