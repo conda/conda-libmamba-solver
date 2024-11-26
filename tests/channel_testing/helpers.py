@@ -53,7 +53,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
             try:
                 s.connect((address, port))
             except Exception as e:
-                print("something's wrong with %s:%d. Exception is %s" % (address, port, e))
+                print(f"something's wrong with {address}:{port}. Exception is {e}")
                 error = True
             finally:
                 s.close()
