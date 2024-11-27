@@ -13,6 +13,14 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.11.0 (2024-11-27)
+
+### Bug fixes
+
+* Load SOLV repodata cache in offline mode too. (#570)
+
+
+
 ## 24.11.0rc (2024-10-31)
 
 ### Enhancements
