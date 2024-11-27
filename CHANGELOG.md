@@ -13,6 +13,20 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.11.0 (2024-11-27)
+
+🚀 This release ships compatibility for `libmamba 2.x`. It's a major rewrite! Make sure to check the changelog entry for `24.11.0rc` for more details.
+
+### Bug fixes
+
+* Load SOLV repodata cache in offline mode too. (#570)
+
+### Contributors
+
+* @jaimergp
+
+
+
 ## 24.11.0rc (2024-10-31)
 
 ### Enhancements
