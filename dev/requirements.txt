@@ -5,6 +5,3 @@ boltons>=23.0.0
 conda>=23.7.3
 conda-forge::libmamba>=2.0.0
 conda-forge::libmambapy>=2.0.0
-# NOTE: jaimergp/label/conda-libmamba-solver-for-libmamba-v2 is a temporary hack
-# to allow upgrades to libmamba v2. Remove once CLS with v2 compat is released.
-jaimergp/label/conda-libmamba-solver-for-libmamba-v2::conda-libmamba-solver
