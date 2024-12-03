@@ -104,7 +104,7 @@ class LibMambaSolver(Solver):
             command = "remove"
 
         super().__init__(
-            prefix,
+            os.fspath(prefix),
             channels,
             subdirs=subdirs,
             specs_to_add=specs_to_add,
