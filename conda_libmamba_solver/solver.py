@@ -88,7 +88,7 @@ class LibMambaSolver(Solver):
 
     def __init__(
         self,
-        prefix: os.PathLike,
+        prefix: os.PathLike | str,
         channels: Iterable[Channel | str],
         subdirs: Iterable[str] = (),
         specs_to_add: Iterable[MatchSpec | str] = (),
