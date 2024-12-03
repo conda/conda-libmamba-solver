@@ -24,6 +24,7 @@ from conda.testing.integration import (
 )
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
+from conda_libmamba_solver.solver import LibMambaSolver as Solver
 
 from .utils import conda_subprocess
 
@@ -500,3 +501,18 @@ def test_install_virtual_packages(conda_cli, spec):
     else:
         raises = (UnsatisfiableError, PackagesNotFoundError)
     conda_cli("create", "--dry-run", "--offline", spec, raises=raises)
+
+
+def test_urls_are_percent_decoded(tmp_path):
+    solver = Solver(
+        prefix=tmp_path, channels=["conda-forge"], specs_to_add=["x264"], command="create"
+    )
+    records = solver.solve_final_state()
+    for record in records:
+        if record.name == "x264":
+            print(record.url)
+            assert "!" in record.url
+            assert "%" not in record.url
+            break
+    else:
+        pytest.fail("Solution didn't include x264")

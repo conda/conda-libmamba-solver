@@ -32,6 +32,7 @@ from conda.base.context import context
 from conda.common.constants import NULL
 from conda.common.io import Spinner, time_recorder
 from conda.common.path import paths_equal
+from conda.common.url import percent_decode
 from conda.core.solve import Solver
 from conda.exceptions import (
     CondaValueError,
@@ -634,6 +635,7 @@ class LibMambaSolver(Solver):
                 break
         else:
             url = pkg.package_url
+        url = percent_decode(url)
         return PackageRecord(
             name=pkg.name,
             version=pkg.version,
