@@ -13,6 +13,18 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.11.1 (2024-12-04)
+
+### Bug fixes
+
+* Ensure `PackageRecord` URLs are percent-decoded before passing them back to `conda`. (#583)
+
+### Contributors
+
+* @jaimergp
+
+
+
 ## 24.11.0 (2024-11-27)
 
 🚀 This release ships compatibility for `libmamba 2.x`. It's a major rewrite! Make sure to check the changelog entry for `24.11.0rc` for more details.
