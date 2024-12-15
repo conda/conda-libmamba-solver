@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Accept `Path()` for `LibMambaSolver()` prefix, not just str.
+* Accept both `pathlib.Path()` and `str` for `LibMambaSolver()` prefix. (#586)
 
 ### Deprecations
 
