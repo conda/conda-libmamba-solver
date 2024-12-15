@@ -18,8 +18,8 @@ from conda.exceptions import DryRunExit
 from conda.testing.integration import Commands, make_temp_env, run_command
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from pathlib import Path
-    from typing import Iterable
 
     from conda.testing.fixtures import PathFactoryFixture
     from pytest import FixtureRequest
