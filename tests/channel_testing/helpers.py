@@ -9,10 +9,13 @@ import pathlib
 import socket
 import subprocess
 import sys
+from typing import TYPE_CHECKING
 
 import pytest
-from conda.testing.integration import _get_temp_prefix, run_command
 from xprocess import ProcessStarter
+
+if TYPE_CHECKING:
+    from conda.testing.fixtures import PathFactoryFixture
 
 
 def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=None, token=None):
@@ -134,7 +137,7 @@ def http_server_auth_token(xprocess):
 
 
 def create_with_channel(
-    channel, solver="libmamba", check=True, **kwargs
+    channel, path_factory: PathFactoryFixture, solver="libmamba", check=True, **kwargs
 ) -> subprocess.CompletedProcess:
     return subprocess.run(
         [
@@ -142,8 +145,7 @@ def create_with_channel(
             "-m",
             "conda",
             "create",
-            "-p",
-            _get_temp_prefix(),
+            f"--prefix={path_factory()}",
             f"--solver={solver}",
             "--json",
             "--override-channels",
@@ -154,18 +156,3 @@ def create_with_channel(
         check=check,
         **kwargs,
     )
-
-
-def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> tuple[str, str, int]:
-    stdout, stderr, returncode = run_command(
-        "create",
-        _get_temp_prefix(),
-        f"--solver={solver}",
-        "--json",
-        "--override-channels",
-        "-c",
-        channel,
-        "test-package",
-        **kwargs,
-    )
-    return stdout, stderr, returncode
