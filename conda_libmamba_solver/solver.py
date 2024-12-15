@@ -88,7 +88,7 @@ class LibMambaSolver(Solver):
 
     def __init__(
         self,
-        prefix: os.PathLike,
+        prefix: os.PathLike | str,
         channels: Iterable[Channel | str],
         subdirs: Iterable[str] = (),
         specs_to_add: Iterable[MatchSpec | str] = (),
@@ -104,7 +104,7 @@ class LibMambaSolver(Solver):
             command = "remove"
 
         super().__init__(
-            prefix,
+            os.fspath(prefix),
             channels,
             subdirs=subdirs,
             specs_to_add=specs_to_add,
