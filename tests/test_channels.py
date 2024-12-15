@@ -354,7 +354,7 @@ def test_local_spec(path_factory: PathFactoryFixture) -> None:
 
 
 def test_unknown_channels_do_not_crash(tmp_path):
-    # https://github.com/conda/conda-libmamba-solver/issues/418"
+    "https://github.com/conda/conda-libmamba-solver/issues/418"
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
     with make_temp_env("ca-certificates") as prefix:
