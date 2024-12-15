@@ -4,6 +4,7 @@
 """
 Measure the speed and memory usage of the different backend solvers
 """
+
 from __future__ import annotations
 
 import os
@@ -45,7 +46,10 @@ def _channels_as_args(channels):
     return tuple(args)
 
 
-@pytest.fixture(scope="module", params=os.listdir(TEST_DATA_DIR))
+@pytest.fixture(
+    scope="module",
+    params=[f for f in os.listdir(TEST_DATA_DIR) if f.endswith(".lock")],
+)
 def prefix_and_channels(
     request: FixtureRequest, session_path_factory: PathFactoryFixture
 ) -> Iterable[tuple[Path, list[str]]]:

@@ -13,6 +13,51 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 24.11.1 (2024-12-04)
+
+### Bug fixes
+
+* Ensure `PackageRecord` URLs are percent-decoded before passing them back to `conda`. (#583)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 24.11.0 (2024-11-27)
+
+🚀 This release ships compatibility for `libmamba 2.x`. It's a major rewrite! Make sure to check the changelog entry for `24.11.0rc` for more details.
+
+### Bug fixes
+
+* Load SOLV repodata cache in offline mode too. (#570)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 24.11.0rc (2024-10-31)
+
+### Enhancements
+
+* Require `libmambapy` v2. This is a big refactor in `libmamba` internals, which also allowed us to remove a lot of code in `conda-libmamba-solver`. (#457)
+
+### Deprecations
+
+* `CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED` has no effect anymore. Channels coming from installed packages are no longer added to the channel list. (#411 via #457)
+* Removed `conda_libmamba_solver.state.BaseIndexHelper`. The base class is now `conda_libmamba_solver.index.IndexHelper`. (#457)
+* Verbose logging in `libsolv` has a big overhead in `libmamba` v2, so we have disabled it by default (even if the user adds `-vvv` flags to the CLI). To opt-in, please set `CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV` to a truthy value. (#457)
+* Python 3.8 is no longer supported. The minimum version is now 3.9. (#457)
+
+### Contributors
+
+* @jaimergp
+
+
+
 ## 24.9.0 (2024-09-25)
 
 ### Bug fixes

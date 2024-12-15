@@ -10,4 +10,4 @@ Additionally, conda-libmamba-solver can be further configured via special enviro
 We do not recomment using these options in production environments. Their behavior might change in the future, or they can be entirely removed without prior notice.
 
 * `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS`: Maximum number of attempts to find a solution. By default, this is set to the number of installed packages in the environment. In commands that involve a large number of changes in a large environment, it can take a bit to relax the constraints enough to find a solution. This option can be used to reduce the number of attempts and "give up" earlier.
-* `CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED`: Do not inject the channels defined in the installed packages in the configured index.
+* `CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV`: Enable verbose logging from `libsolv`. Only has an effect if combined with `-vvv` in the CLI. Note that this will incur a big performance overhead. Only use when debugging solver issues.

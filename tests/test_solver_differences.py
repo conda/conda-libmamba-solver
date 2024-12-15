@@ -5,6 +5,7 @@
 This module collects examples of environments that were hard to solve, required
 workarounds or didn't meet users' expectations... specially if compared to conda classic.
 """
+
 import json
 import os
 
