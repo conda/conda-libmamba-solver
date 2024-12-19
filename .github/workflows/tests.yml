@@ -136,11 +136,11 @@ jobs:
         shell: bash  # use bash to run date command
         run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
 
-      - name: Cache Conda
-        uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
-        with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
+      # - name: Cache Conda
+      #   uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
+      #   with:
+      #     path: ~/conda_pkgs_dir
+      #     key: cache-${{ env.HASH }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@d2e6a045a86077fb6cad6f5adf368e9076ddaa8d # v3.1.0
