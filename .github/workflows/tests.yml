@@ -218,17 +218,17 @@ jobs:
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
-      - name: Upload Test Results
-        if: '!cancelled()'
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
-        with:
-          name: test-results-${{ env.HASH }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
-          path: |
-            conda\.coverage
-            conda\durations\${{ runner.os }}.json
-            conda\test-report.xml
-          retention-days: 1  # temporary, combined in aggregate below
+      # - name: Upload Test Results
+      #   if: '!cancelled()'
+      #   uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+      #   with:
+      #     name: test-results-${{ env.HASH }}
+      #     # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
+      #     path: |
+      #       conda\.coverage
+      #       conda\durations\${{ runner.os }}.json
+      #       conda\test-report.xml
+      #     retention-days: 1  # temporary, combined in aggregate below
 
   # linux test suite
   linux:
