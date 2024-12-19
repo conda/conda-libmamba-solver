@@ -82,23 +82,34 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.9', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
-        default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
-        test-group: [1, 2, 3]
+        # python-version: ['3.9', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # default-channel: [defaults, conda-forge]
+        # test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # test-group: [1, 2, 3]
+        # exclude:
+        #   - default-channel: conda-forge
+        #     python-version: '3.9'
+        #   - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #   - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     python-version: '3.12'  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #   - test-type: unit
+        #     test-group: 3
+        #   - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #   - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        python-version: ['3.11']
+        default-channel: [conda-forge]
+        test-type: [conda-libmamba-solver, unit, integration]
+        test-group: [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
         exclude:
-          - default-channel: conda-forge
-            python-version: '3.9'
-          - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
-            python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
-            python-version: '3.12'  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
+            test-group: 3
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
@@ -157,7 +168,14 @@ jobs:
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
+      
+      - name: Patch libmamba(py)
+        shell: bash -el {0}
+        run: |
+          curl -sL -o libmamba.zip https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-19/mamba-custom-debug-build-202412191833.zip
+          tar xvf libmamba.zip -C "$CONDA_PREFIX" --strip-components=1
+          ls -alh "$CONDA_PREFIX/Library/bin"
+          
       - name: Conda Info
         run: python -m conda info --verbose
 
@@ -212,7 +230,8 @@ jobs:
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false 
+    # needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -481,7 +500,8 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:
