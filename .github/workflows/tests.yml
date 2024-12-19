@@ -170,10 +170,12 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
       
       - name: Patch libmamba(py)
-        shell: bash -el {0}
+        shell: bash -exl {0}
         run: |
           curl -sL -o libmamba.zip https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-19/mamba-custom-debug-build-202412191833.zip
-          tar xvf libmamba.zip -C "$CONDA_PREFIX" --strip-components=1
+          7z x libmamba.zip
+          cd mamba-custom-debug-build/
+          mv Library Lib "$CONDA_PREFIX/"
           ls -alh "$CONDA_PREFIX/Library/bin"
           
       - name: Conda Info
