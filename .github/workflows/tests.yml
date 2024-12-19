@@ -175,7 +175,7 @@ jobs:
           curl -sL -o libmamba.zip https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-19/mamba-custom-debug-build-202412191833.zip
           7z x libmamba.zip
           cd mamba-custom-debug-build/
-          mv Library Lib "$CONDA_PREFIX/"
+          cp -r Library Lib "$CONDA_PREFIX/"
           ls -alh "$CONDA_PREFIX/Library/bin"
           
       - name: Conda Info
