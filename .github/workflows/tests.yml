@@ -99,10 +99,11 @@ jobs:
         #     test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
         #   - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
         #     test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver, unit, integration]
+        test-group: [1, 2, 3, 1, 2, 3]
+        patch: ['true', 'false']
         python-version: ['3.11']
         default-channel: [conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]
-        test-group: [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3]
         exclude:
           - test-type: unit
             test-group: 3
@@ -134,7 +135,7 @@ jobs:
 
       - name: Hash + Timestamp
         shell: bash  # use bash to run date command
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
+        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date +%s)" >> $GITHUB_ENV
 
       # - name: Cache Conda
       #   uses: actions/cache@6849a6489940f00c2f30c0fb92c6274307ccb58a # v4.1.2
@@ -171,6 +172,7 @@ jobs:
       
       - name: Patch libmamba(py)
         shell: bash -exl {0}
+        if: matrix.patch == 'true'
         run: |
           curl -sL -o libmamba.zip https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-19/mamba-custom-debug-build-202412191833.zip
           7z x libmamba.zip
