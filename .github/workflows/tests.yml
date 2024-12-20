@@ -195,6 +195,7 @@ jobs:
         run: |
           python -c "import libmambapy, pytest; pytest.main(
             [
+              '-s',
               '--cov=conda',
               '--durations-path=durations\${{ runner.os }}.json',
               '--group=${{ matrix.test-group }}',
@@ -217,6 +218,7 @@ jobs:
           python -c "import libmambapy, pytest; pytest.main(
             [
               '-vv',
+              '-s',
               '-m',
               'not slow',
               '--reruns=${{ env.PYTEST_RERUN_FAILURES }}',
