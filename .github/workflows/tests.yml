@@ -193,6 +193,7 @@ jobs:
       
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+        timeout-minutes: 50
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: |
           python -c "import libmambapy, pytest; pytest.main(
@@ -213,6 +214,7 @@ jobs:
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         shell: bash -el {0}
+        timeout-minutes: 50
         run: |
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
