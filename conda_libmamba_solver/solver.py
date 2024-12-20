@@ -350,8 +350,8 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         attempt: int = 1,
     ) -> tuple[bool, Solution | UnSolvable]:
-        print("Solver attempt: #", attempt)
-        print("Current conflicts (including learnt ones):", out_state.conflicts)
+        print("Solver attempt: #", attempt, file=sys.stderr)
+        print("Current conflicts (including learnt ones):", out_state.conflicts, file=sys.stderr)
         flags = self._solver_flags(in_state)
         jobs = self._specs_to_request_jobs(in_state, out_state)
         request = Request(jobs=jobs, flags=flags)
@@ -386,7 +386,7 @@ class LibMambaSolver(Solver):
             "order_request": False,  # we do this ourselves
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
-        print("Using solver flags:\n", json.dumps(flags, indent=2))
+        print("Using solver flags:\n", json.dumps(flags, indent=2), file=sys.stderr)
         return Request.Flags(**flags)
 
     def _specs_to_request_jobs(
@@ -413,7 +413,7 @@ class LibMambaSolver(Solver):
                     conda_spec = MatchSpec(conda_spec)
                     out_state.pins[f"pin-{idx}"] = conda_spec
         json_str = json.dumps(json_friendly, indent=2)
-        print("The solver will handle these requests:\n", json_str)
+        print("The solver will handle these requests:\n", json_str, file=sys.stderr)
         return request_jobs
 
     def _specs_to_request_jobs_add(
