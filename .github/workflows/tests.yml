@@ -173,8 +173,10 @@ jobs:
       - name: Patch libmamba(py)
         shell: bash -exl {0}
         if: matrix.patch == 'true'
+        env:
+          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-20/mamba-custom-debug-build-202412201638.zip"
         run: |
-          curl -sL -o libmamba.zip https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-19/mamba-custom-debug-build-202412191833.zip
+          curl -sL -o libmamba.zip "$PATCHED_URL"
           7z x libmamba.zip
           cd mamba-custom-debug-build/
           cp -r Library Lib "$CONDA_PREFIX/"
