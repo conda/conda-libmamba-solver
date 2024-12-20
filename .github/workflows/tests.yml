@@ -101,7 +101,7 @@ jobs:
         #     test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
-        patch: ['true', 'true', 'true', 'false']
+        patch: ['true', 'true', 'true', 'true', 'true', 'false']
         python-version: ['3.11']
         default-channel: [conda-forge]
         exclude:
