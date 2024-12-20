@@ -200,7 +200,8 @@ jobs:
               '--group=${{ matrix.test-group }}',
               '--splits=${{ env.PYTEST_SPLITS }}',
               '--reruns=${{ env.PYTEST_RERUN_FAILURES }}',
-              '-m "${{ env.PYTEST_MARKER }}',
+              '-m',
+              '${{ env.PYTEST_MARKER }}',
             ]
           )"
 
