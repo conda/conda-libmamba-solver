@@ -176,7 +176,8 @@ jobs:
         if: matrix.patch == 'true'
         env:
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-20/mamba-custom-debug-build-202412201638.zip"
-          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-23/mamba-custom-debug-build-202412231240-no_transaction_order.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-23/mamba-custom-debug-build-202412231240-no_transaction_order.zip"
+          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-24/mamba-custom-debug-build-202412241126.zip"
         run: |
           curl -sL -o libmamba.zip "$PATCHED_URL"
           7z x libmamba.zip
