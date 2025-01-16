@@ -168,7 +168,7 @@ jobs:
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/git -vv --no-deps
+        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Patch libmamba(py)
