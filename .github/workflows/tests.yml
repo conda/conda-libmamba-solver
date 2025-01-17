@@ -117,6 +117,7 @@ jobs:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
+      PYTHONUNBUFFERED: "1"
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -204,8 +205,8 @@ jobs:
         run: |
           python -c "import libmambapy, pytest; pytest.main(
             [
+              '-vvv',
               '-s',
-              '--cov=conda',
               '--durations-path=durations\${{ runner.os }}.json',
               '--group=${{ matrix.test-group }}',
               '--splits=${{ env.PYTEST_SPLITS }}',
@@ -227,7 +228,7 @@ jobs:
           . $CONDA_PREFIX/etc/profile.d/conda.sh
           python -c "import libmambapy, pytest; pytest.main(
             [
-              '-vv',
+              '-vvv',
               '-s',
               '-m',
               'not slow',
@@ -237,11 +238,11 @@ jobs:
           )"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
-      - name: Upload Coverage
-        uses: codecov/codecov-action@1e68e06f1dbfde0e4cefc87efeba9e4643565303 # v5.1.2
-        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
-        with:
-          flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
+      # - name: Upload Coverage
+      #   uses: codecov/codecov-action@1e68e06f1dbfde0e4cefc87efeba9e4643565303 # v5.1.2
+      #   if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
+      #   with:
+      #     flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       # - name: Upload Test Results
       #   if: '!cancelled()'
