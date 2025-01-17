@@ -173,7 +173,7 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Patch libmamba(py)
-        shell: bash -exl {0}
+        shell: bash -el {0}
         if: matrix.patch == 'true'
         env:
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-20/mamba-custom-debug-build-202412201638.zip"
@@ -184,11 +184,14 @@ jobs:
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-16/mamba-custom-debug-build-20250106-preview_143_crt.zip"
           PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-17/mamba-custom-debug-build-20250117.zip"
         run: |
+          set -x
           curl -sL -o libmamba.zip "$PATCHED_URL"
           7z x libmamba.zip
           cd mamba-custom-debug-build/
+          ls -alhR
           cp -r Library Lib "$CONDA_PREFIX/"
           ls -alh "$CONDA_PREFIX/Library/bin"
+          ls -alhR "$CONDA_PREFIX/Lib"
 
       - name: Conda Info
         run: python -m conda info --verbose
