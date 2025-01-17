@@ -387,7 +387,7 @@ class LibMambaSolver(Solver):
             # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
             "allow_uninstall": True,
             "force_reinstall": in_state.force_reinstall,
-            "keep_dependencies": not in_state.prune,
+            "keep_dependencies": True,
             "keep_user_specs": True,
             "order_request": False,  # we do this ourselves
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,

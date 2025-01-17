@@ -516,3 +516,67 @@ def test_urls_are_percent_decoded(tmp_path):
             break
     else:
         pytest.fail("Solution didn't include x264")
+
+
+def test_prune_existing_env(conda_cli, tmp_path):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/595
+    """
+    (tmp_path / "env.yml").write_text(
+        dedent(
+            """
+        channels:
+        - defaults
+        dependencies:
+        - ca-certificates
+        """
+        )
+    )
+    with make_temp_env("zstd") as prefix:
+        out, err, rc = conda_cli(
+            "env",
+            "update",
+            f"--prefix={prefix}",
+            f"--file={tmp_path / 'env.yml'}",
+            "--prune",
+        )
+        assert rc == 0
+        PrefixData._cache_.clear()
+        assert not PrefixData(prefix).get("zstd", None)
+        assert PrefixData(prefix).get("ca-certificates")
+
+
+def test_prune_existing_env_dependencies_are_solved(conda_cli, tmp_path):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/595
+    """
+    (tmp_path / "env.yml").write_text(
+        dedent(
+            """
+            channels:
+            - conda-forge
+            dependencies:
+            - python=3.12
+            - numpy=2.1.2
+            """
+        )
+    )
+    with make_temp_env("python=3.12") as prefix:
+        out, err, rc = conda_cli(
+            "env",
+            "update",
+            f"--prefix={prefix}",
+            f"--file={tmp_path / 'env.yml'}",
+            "--prune",
+            "-vv",
+        )
+        print(out)
+        print(err, file=sys.stderr)
+        assert rc == 0
+        PrefixData._cache_.clear()
+        assert PrefixData(prefix).get("python").version.startswith("3.12")
+        assert PrefixData(prefix).get("numpy")
+        out, err, rc = conda_cli("run", f"--prefix={prefix}", "python", "-c", "import numpy")
+        print(out)
+        print(err, file=sys.stderr)
+        assert rc == 0
