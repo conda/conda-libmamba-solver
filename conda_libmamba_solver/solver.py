@@ -351,7 +351,12 @@ class LibMambaSolver(Solver):
         attempt: int = 1,
     ) -> tuple[bool, Solution | UnSolvable]:
         print("Solver attempt: #", attempt, file=sys.stderr, flush=True)
-        print("Current conflicts (including learnt ones):", out_state.conflicts, file=sys.stderr, flush=True)
+        print(
+            "Current conflicts (including learnt ones):",
+            out_state.conflicts,
+            file=sys.stderr,
+            flush=True,
+        )
         flags = self._solver_flags(in_state)
         jobs = self._specs_to_request_jobs(in_state, out_state)
         request = Request(jobs=jobs, flags=flags)
