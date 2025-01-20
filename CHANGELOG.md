@@ -13,6 +13,15 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 25.1.0 (2025-01-20)
+
+### Bug fixes
+
+* Fix dependency handling in `conda env update --prune`. (#595 via #596)
+* Accept both `pathlib.Path()` and `str` for `LibMambaSolver()` prefix. (#586)
+
+
+
 ## 24.11.1 (2024-12-04)
 
 ### Bug fixes
