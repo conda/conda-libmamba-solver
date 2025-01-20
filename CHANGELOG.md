@@ -13,7 +13,7 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
-## 25.1.0 (2025-01-20)
+## 25.1.0 (2025-01-21)
 
 ### Bug fixes
 
