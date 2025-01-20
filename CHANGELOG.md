@@ -20,6 +20,11 @@ Remember to update the hyperlinks at the bottom.
 * Fix dependency handling in `conda env update --prune`. (#595 via #596)
 * Accept both `pathlib.Path()` and `str` for `LibMambaSolver()` prefix. (#586)
 
+### Contributors
+
+* @dholth
+* @jaimergp
+
 
 
 ## 24.11.1 (2024-12-04)
