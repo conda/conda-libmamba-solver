@@ -121,7 +121,7 @@ def repodata_time_machine(channels, timestamp_str, subdirs=None):
     timestamp = horizon.timestamp() * 1000
     original_dir = os.getcwd()
     try:
-        workdir = f"repodata-{timestamp_str.replace(' ', '-').replace(':','-').replace('.', '-')}"
+        workdir = f"repodata-{timestamp_str.replace(' ', '-').replace(':', '-').replace('.', '-')}"
         os.makedirs(workdir, exist_ok=True)
         os.chdir(workdir)
         # Download repodata
