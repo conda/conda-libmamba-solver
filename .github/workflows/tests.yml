@@ -20,14 +20,14 @@ on:
     - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
   # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-concurrency:
-  # Concurrency group that uses the workflow name and PR number if available
-  # or commit SHA as a fallback. If a new build is triggered under that
-  # concurrency group while a previous build is running it will be canceled.
-  # Repeated pushes to a PR will cancel all previous builds, while multiple
-  # merges to main will not cancel.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  # cancel-in-progress: true
+# concurrency:
+#   # Concurrency group that uses the workflow name and PR number if available
+#   # or commit SHA as a fallback. If a new build is triggered under that
+#   # concurrency group while a previous build is running it will be canceled.
+#   # Repeated pushes to a PR will cancel all previous builds, while multiple
+#   # merges to main will not cancel.
+#   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+#   # cancel-in-progress: true
 
 env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
@@ -182,7 +182,8 @@ jobs:
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-02/mamba-custom-debug-build-202501021424.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-06/mamba-custom-debug-build-202501061632.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-16/mamba-custom-debug-build-20250106-preview_143_crt.zip"
-          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-17/mamba-custom-debug-build-202501171658.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-17/mamba-custom-debug-build-202501171658.zip"
+          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-21/mamba-custom-debug-build-202501211738.zip"
         run: |
           set -x
           curl -sL -o libmamba.zip "$PATCHED_URL"
