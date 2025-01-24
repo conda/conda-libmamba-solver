@@ -13,6 +13,14 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 25.1.1 (2025-01-24)
+
+### Bug fixes
+
+* Consider whether the full spec matches anything installed (not just name) when `--satisfied-skip-solve` is in use. (#605 via #606)
+
+
+
 ## 25.1.0 (2025-01-21)
 
 ### Bug fixes
