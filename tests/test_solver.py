@@ -580,3 +580,10 @@ def test_prune_existing_env_dependencies_are_solved(conda_cli, tmp_path):
         print(out)
         print(err, file=sys.stderr)
         assert rc == 0
+
+
+def test_satisfied_skip_solve_matchspec(conda_cli, tmp_env):
+    with tmp_env("ca-certificates") as prefix:
+        conda_cli(
+            "install", "-p", prefix, "-S", "ca-certificates>10000", raises=PackagesNotFoundError
+        )
