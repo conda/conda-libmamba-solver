@@ -19,6 +19,10 @@ Remember to update the hyperlinks at the bottom.
 
 * Consider whether the full spec matches anything installed (not just name) when `--satisfied-skip-solve` is in use. (#605 via #606)
 
+### Contributors
+
+* @jaimergp
+
 
 
 ## 25.1.0 (2025-01-21)
