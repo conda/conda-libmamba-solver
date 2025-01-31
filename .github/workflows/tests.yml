@@ -37,7 +37,6 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
-  MAMBA_ROOT_PREFIX: ${{ runner.os == 'Windows' && 'C:\Miniconda' || '/usr/share/miniconda/' }}
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -105,6 +104,7 @@ jobs:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
+      MAMBA_ROOT_PREFIX: 'C:\Miniconda'
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -247,6 +247,7 @@ jobs:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
+      MAMBA_ROOT_PREFIX: '/usr/share/miniconda/'
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -367,6 +368,7 @@ jobs:
         python-version: ['3.12']
     env:
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
+      MAMBA_ROOT_PREFIX: '/usr/share/miniconda/'
 
     steps:
       - name: Checkout Source
@@ -445,6 +447,8 @@ jobs:
             platform: ppc64le
           - image: 'condaforge/miniforge3:latest'
             platform: s390x
+    env:
+      MAMBA_ROOT_PREFIX: '/usr/share/miniconda/'
 
     steps:
       - name: Checkout Source
@@ -523,6 +527,7 @@ jobs:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
+      MAMBA_ROOT_PREFIX: '/usr/share/miniconda/'
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
