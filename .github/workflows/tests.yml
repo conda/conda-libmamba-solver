@@ -176,6 +176,7 @@ jobs:
         shell: bash -el {0}
         if: matrix.patch == 'true'
         env:
+          # These are logging builds with different workarounds
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-20/mamba-custom-debug-build-202412201638.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-23/mamba-custom-debug-build-202412231240-no_transaction_order.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-24/mamba-custom-debug-build-202412241126.zip"
@@ -184,7 +185,9 @@ jobs:
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-16/mamba-custom-debug-build-20250106-preview_143_crt.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-17/mamba-custom-debug-build-202501171658.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-21/mamba-custom-debug-build-202501211738.zip"
-          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-22/mamba-custom-debug-build-202501221640.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-22/mamba-custom-debug-build-202501221640.zip"  # this one never segfaulted
+          # End of logging builds
+          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301200.zip"  # should segfault
         run: |
           set -x
           curl -sL -o libmamba.zip "$PATCHED_URL"
