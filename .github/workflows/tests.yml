@@ -37,6 +37,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
+  MAMBA_ROOT_PREFIX: ${{ runner.os == 'Windows' && 'C:\Miniconda' || '/usr/share/miniconda/' }}
 
 jobs:
   # detect whether any code changes are included in this PR
