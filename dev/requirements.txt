@@ -3,5 +3,5 @@ pip
 # run-time
 boltons>=23.0.0
 conda>=23.7.3
-conda-forge/label/mamba_prerelease::libmamba==2.0.6.rc2
-conda-forge/label/mamba_prerelease::libmambapy==2.0.6.rc2
+conda-forge/label/mamba_prerelease::libmamba==2.0.6.rc3
+conda-forge/label/mamba_prerelease::libmambapy==2.0.6.rc3
