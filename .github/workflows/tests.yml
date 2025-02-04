@@ -187,7 +187,8 @@ jobs:
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-21/mamba-custom-debug-build-202501211738.zip"
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-22/mamba-custom-debug-build-202501221640.zip"  # this one never segfaulted
           # End of logging builds
-          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301200.zip"  # should segfault
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301200.zip"  # should segfault
+          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301300-workaround_memorytrap.zip"  # should not segfault
         run: |
           set -x
           curl -sL -o libmamba.zip "$PATCHED_URL"
