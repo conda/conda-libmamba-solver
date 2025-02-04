@@ -541,10 +541,11 @@ class SolverOutputState:
 
             if sis.force_remove:
                 return force_remove_solution
-
-        if sis.update_modifier.SPECS_SATISFIED_SKIP_SOLVE and not sis.is_removing:
+        elif sis.update_modifier.SPECS_SATISFIED_SKIP_SOLVE:
             for name, spec in sis.requested.items():
                 if name not in sis.installed:
+                    break
+                if not any(spec.match(record) for record in sis.installed.values()):
                     break
             else:
                 # All specs match a package in the current environment.
