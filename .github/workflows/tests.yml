@@ -198,7 +198,9 @@ jobs:
           7z x libmamba.zip
           cd $BASEDIR/
           ls -alhR
-          cp -r Library Lib "$CONDA_PREFIX/"
+          mkdir -p "$CONDA_PREFIX/Library"
+          cp -r bin "$CONDA_PREFIX/Library/"
+          cp -r Library "$CONDA_PREFIX/" 
           ls -alh "$CONDA_PREFIX/Library/bin"
           ls -alhR "$CONDA_PREFIX/Lib"
 
