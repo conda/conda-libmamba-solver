@@ -200,7 +200,7 @@ jobs:
           ls -alhR
           mkdir -p "$CONDA_PREFIX/Library"
           cp -r bin "$CONDA_PREFIX/Library/"
-          cp -r Lib "$CONDA_PREFIX/" 
+          cp -r Lib "$CONDA_PREFIX/"
           ls -alh "$CONDA_PREFIX/Library/bin"
           ls -alhR "$CONDA_PREFIX/Lib"
 
