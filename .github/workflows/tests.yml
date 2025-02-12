@@ -189,12 +189,14 @@ jobs:
           # End of logging builds
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301200.zip"  # should segfault, but it never did!
           # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301300-workaround_memorytrap.zip"  # should not segfault
+          # BASEDIR: mamba-custom-debug-build
+          BASEDIR: mamba-custom-origin-build
           PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-02-11/mamba-custom-main-build-89abba3df07ce7ff4b01a2ab3252da37947f54d4-202502111740.zip"  # should segfault
         run: |
           set -x
           curl -sL -o libmamba.zip "$PATCHED_URL"
           7z x libmamba.zip
-          cd mamba-custom-debug-build/
+          cd $BASEDIR/
           ls -alhR
           cp -r Library Lib "$CONDA_PREFIX/"
           ls -alh "$CONDA_PREFIX/Library/bin"
