@@ -692,7 +692,8 @@ class SolverOutputState:
                 if installed:
                     self.records[name] = installed
                 else:
-                    self.records.pop(record.name)
+                    # Record might not be included with flags like --only-deps; ignore in that case
+                    self.records.pop(record.name, None)
 
         elif sis.update_modifier.UPDATE_DEPS:
             # Here we have to SAT solve again :(  It's only now that we know the dependency
