@@ -64,7 +64,6 @@ as well as richer logging for each action.
 from __future__ import annotations
 
 import logging
-import sys
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
