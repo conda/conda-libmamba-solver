@@ -590,8 +590,21 @@ def test_satisfied_skip_solve_matchspec(conda_cli, tmp_env):
 
 
 def test_deps_only_exclude_multiple_requested(conda_cli):
-    specs = ("sardana-core", "sardana-config", "taurus-qt",)
-    out, err, _ = conda_cli("create", "--dry-run", "--json", "--only-deps", *specs, raises=DryRunExit)
+    specs = (
+        "sardana-core",
+        "sardana-config",
+        "taurus-qt",
+    )
+    out, err, _ = conda_cli(
+        "create",
+        "--dry-run",
+        "--json",
+        "--only-deps",
+        "--override-channels",
+        "--channel=conda-forge",
+        *specs,
+        raises=DryRunExit,
+    )
     print(out)
     print(err, file=sys.stderr)
     result = json.loads(out)
