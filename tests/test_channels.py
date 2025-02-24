@@ -1,12 +1,15 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import sys
 from pathlib import Path
 from subprocess import check_call
+from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
@@ -15,11 +18,7 @@ from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.models.channel import Channel
-from conda.testing.integration import (
-    _get_temp_prefix,
-    make_temp_env,
-    package_is_installed,
-)
+from conda.testing.integration import _get_temp_prefix, package_is_installed
 from conda.testing.integration import run_command as conda_inprocess
 
 from .channel_testing.helpers import (
@@ -30,6 +29,9 @@ from .channel_testing.helpers import (
     http_server_auth_token,  # noqa: F401
 )
 from .utils import conda_subprocess, write_env_config
+
+if TYPE_CHECKING:
+    from conda.testing.fixtures import TmpEnvFixture
 
 DATA = Path(__file__).parent / "data"
 
@@ -55,16 +57,14 @@ def test_channel_matchspec():
             assert record["channel"] == "pkgs/main"
 
 
-def test_channels_prefixdata():
+def test_channels_prefixdata(tmp_env: TmpEnvFixture) -> None:
     """
     Make sure libmamba does not complain about missing channels
     used in previous commands.
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env(
-        "conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True
-    ) as prefix:
+    with tmp_env("conda-forge::xz", "python", "--solver=libmamba") as prefix:
         p = conda_subprocess(
             "install",
             "-yp",
@@ -79,9 +79,9 @@ def test_channels_prefixdata():
         )
 
 
-def test_channels_installed_unavailable():
-    "Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"
-    with make_temp_env("xz", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+def test_channels_installed_unavailable(tmp_env: TmpEnvFixture) -> None:
+    """Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"""
+    with tmp_env("xz", "--solver=libmamba") as prefix:
         pd = PrefixData(prefix)
         pd.load()
         record = pd.get("xz")
@@ -336,11 +336,11 @@ def test_local_spec():
     assert process.returncode == 0
 
 
-def test_unknown_channels_do_not_crash(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/418"
+def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture) -> None:
+    """https://github.com/conda/conda-libmamba-solver/issues/418"""
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
-    with make_temp_env("ca-certificates") as prefix:
+    with tmp_env("ca-certificates") as prefix:
         # copy pkg to a new non-channel-like location without repodata around to obtain
         # '<unknown>' channel and reproduce the issue
         temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")

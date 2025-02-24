@@ -5,19 +5,19 @@
 Measure the speed and memory usage of the different backend solvers
 """
 
+from __future__ import annotations
+
 import os
-import shutil
+from typing import TYPE_CHECKING
 
 import pytest
 from conda.base.context import context
 from conda.common.io import env_var
 from conda.exceptions import DryRunExit
-from conda.testing.integration import (
-    Commands,
-    _get_temp_prefix,
-    make_temp_env,
-    run_command,
-)
+from conda.testing.integration import Commands, _get_temp_prefix, run_command
+
+if TYPE_CHECKING:
+    from conda.testing.fixtures import TmpEnvFixture
 
 platform = context.subdir
 
@@ -49,17 +49,15 @@ def _tmp_prefix_safe():
     scope="module",
     params=[f for f in os.listdir(TEST_DATA_DIR) if f.endswith(".lock")],
 )
-def prefix_and_channels(request):
+def prefix_and_channels(request, session_tmp_env: TmpEnvFixture) -> None:
     lockfile = os.path.join(TEST_DATA_DIR, request.param)
     lock_platform = lockfile.split(".")[-2]
     if lock_platform != platform:
         pytest.skip(f"Running platform {platform} does not match file platform {lock_platform}")
     with env_var("CONDA_TEST_SAVE_TEMPS", "1"):
-        prefix = _tmp_prefix_safe()
-        with make_temp_env("--file", lockfile, prefix=prefix) as prefix:
+        with session_tmp_env("--file", lockfile) as prefix:
             channels = _get_channels_from_lockfile(lockfile)
             yield prefix, channels
-    shutil.rmtree(prefix)
 
 
 @pytest.fixture(scope="function", params=["libmamba", "classic"])
