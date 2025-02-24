@@ -11,7 +11,7 @@ import subprocess
 import sys
 
 import pytest
-from conda.testing.integration import _get_temp_prefix, run_command
+from conda.testing.integration import _get_temp_prefix
 from xprocess import ProcessStarter
 
 
@@ -154,18 +154,3 @@ def create_with_channel(
         check=check,
         **kwargs,
     )
-
-
-def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> tuple[str, str, int]:
-    stdout, stderr, returncode = run_command(
-        "create",
-        _get_temp_prefix(),
-        f"--solver={solver}",
-        "--json",
-        "--override-channels",
-        "-c",
-        channel,
-        "test-package",
-        **kwargs,
-    )
-    return stdout, stderr, returncode

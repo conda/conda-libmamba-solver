@@ -18,11 +18,7 @@ from conda.common.compat import on_linux, on_mac, on_win
 from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.exceptions import DryRunExit, PackagesNotFoundError, UnsatisfiableError
-from conda.testing.integration import (
-    Commands,
-    package_is_installed,
-    run_command,
-)
+from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.solver import LibMambaSolver as Solver
@@ -33,7 +29,10 @@ if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
 
 
-def test_python_downgrade_reinstalls_noarch_packages(tmp_env: TmpEnvFixture) -> None:
+def test_python_downgrade_reinstalls_noarch_packages(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     Reported in https://github.com/conda/conda/issues/11346
 
@@ -59,20 +58,18 @@ def test_python_downgrade_reinstalls_noarch_packages(tmp_env: TmpEnvFixture) -> 
             pip = str(prefix / "bin" / "pip")
         check_call([pip, "--version"])
 
-        run_command(
-            Commands.INSTALL,
-            prefix,
+        conda_cli(
+            "install",
+            f"--prefix={prefix}",
             "--solver=libmamba",
             "--override-channels",
-            "-c",
-            "conda-forge",
+            "--channel=conda-forge",
             "python=3.9",
-            no_capture=True,
         )
         check_call([pip, "--version"])
 
 
-def test_defaults_specs_work():
+def test_defaults_specs_work(conda_cli: CondaCLIFixture) -> None:
     """
     See https://github.com/conda/conda-libmamba-solver/issues/173
 
@@ -84,18 +81,15 @@ def test_defaults_specs_work():
     We are testing our workaround (https://github.com/conda/conda-libmamba-solver/issues/173)
     works for now, but we should probably help fix this in libmamba.
     """
-    out, err, rc = run_command(
+    out, err, rc = conda_cli(
         "create",
-        "unused",
         "--dry-run",
         "--json",
         "--solver=libmamba",
         "--override-channels",
-        "-c",
-        "conda-forge",
+        "--channel=conda-forge",
         "python=3.10",
         "defaults::libarchive",
-        use_exception_handler=True,
     )
     data = json.loads(out)
     assert data.get("success") is True
@@ -148,7 +142,10 @@ def test_determinism(tmpdir):
     assert len(set(installed_bokeh_versions)) == 1
 
 
-def test_update_from_latest_not_downgrade(tmp_env: TmpEnvFixture) -> None:
+def test_update_from_latest_not_downgrade(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """Based on two issues where an upgrade caused a downgrade in a given package
 
     Suppose we have two python versions 3.11.2 and 3.11.3. The bug is when:
@@ -168,15 +165,13 @@ def test_update_from_latest_not_downgrade(tmp_env: TmpEnvFixture) -> None:
         "python",
     ) as prefix:
         original_python = PrefixData(prefix).get("python")
-        run_command(
-            Commands.UPDATE,
-            prefix,
+        conda_cli(
+            "update",
+            f"--prefix={prefix}",
             "--solver=libmamba",
             "--override-channels",
-            "-c",
-            "conda-forge",
+            "--channel=conda-forge",
             "python",
-            no_capture=True,
         )
         update_python = PrefixData(prefix).get("python")
         assert original_python.version == update_python.version
@@ -337,20 +332,19 @@ def test_constraining_pin_and_requested():
     assert data.get("dry_run")
 
 
-def test_locking_pins(tmp_env: TmpEnvFixture) -> None:
+def test_locking_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     with env_var("CONDA_PINNED_PACKAGES", "zlib"), tmp_env("zlib") as prefix:
         # Should install just fine
         zlib = PrefixData(prefix).get("zlib")
         assert zlib
 
         # This should fail because it contradicts the lock packages
-        out, err, retcode = run_command(
+        out, err, retcode = conda_cli(
             "install",
-            prefix,
+            f"--prefix={prefix}",
             "zlib=1.2.11",
             "--dry-run",
             "--json",
-            use_exception_handler=True,
         )
         data = json.loads(out)
         assert retcode
@@ -358,8 +352,12 @@ def test_locking_pins(tmp_env: TmpEnvFixture) -> None:
         assert str(zlib) in data["error"]
 
         # This is a no-op and ok. It won't involve changes.
-        out, err, retcode = run_command(
-            "install", prefix, "zlib", "--dry-run", "--json", use_exception_handler=True
+        out, err, retcode = conda_cli(
+            "install",
+            f"--prefix={prefix}",
+            "zlib",
+            "--dry-run",
+            "--json",
         )
         data = json.loads(out)
         assert not retcode
@@ -367,7 +365,7 @@ def test_locking_pins(tmp_env: TmpEnvFixture) -> None:
         assert data["message"] == "All requested packages already installed."
 
 
-def test_ca_certificates_pins(tmp_env: TmpEnvFixture) -> None:
+def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     ca_certificates_pin = "ca-certificates=2023"
     with tmp_env() as prefix:
         Path(prefix, "conda-meta").mkdir(exist_ok=True)
@@ -380,16 +378,14 @@ def test_ca_certificates_pins(tmp_env: TmpEnvFixture) -> None:
             "ca-certificates<2024",
             "ca-certificates!=2022",
         ):
-            out, err, retcode = run_command(
+            out, err, retcode = conda_cli(
                 "install",
-                prefix,
+                f"--prefix={prefix}",
                 cli_spec,
                 "--dry-run",
                 "--json",
                 "--override-channels",
-                "-c",
-                "conda-forge",
-                use_exception_handler=True,
+                "--channel=conda-forge",
             )
             data = json.loads(out)
             assert not retcode
@@ -407,7 +403,10 @@ def test_ca_certificates_pins(tmp_env: TmpEnvFixture) -> None:
 @pytest.mark.skipif(
     context.subdir == "osx-arm64", reason="python=2.7 not available in this platform"
 )
-def test_python_update_should_not_uninstall_history(tmp_env: TmpEnvFixture) -> None:
+def test_python_update_should_not_uninstall_history(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/341
 
@@ -430,14 +429,13 @@ def test_python_update_should_not_uninstall_history(tmp_env: TmpEnvFixture) -> N
             LibMambaUnsatisfiableError,
             match=r"python 2\.7.|\n*typing_extensions",
         ):
-            run_command(
-                Commands.INSTALL,
-                prefix,
+            conda_cli(
+                "install",
+                f"--prefix={prefix}",
                 "python=2.7",
                 *channels,
                 *solver,
                 "--dry-run",
-                no_capture=True,
             )
 
 
@@ -454,9 +452,8 @@ def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -
             if pin:
                 env["CONDA_PINNED_PACKAGES"] = pin
             p = conda_subprocess(
-                Commands.INSTALL,
-                "-p",
-                prefix,
+                "install",
+                f"--prefix={prefix}",
                 *channels,
                 *solver,
                 "--dry-run",
@@ -480,7 +477,7 @@ def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -
 
 
 @pytest.mark.parametrize("spec", ("__glibc", "__unix", "__linux", "__osx", "__win"))
-def test_install_virtual_packages(conda_cli, spec):
+def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None:
     """
     Ensures a solver knows how to deal with virtual specs in the CLI.
     This mean succeeding only if the virtual package is available.
@@ -501,7 +498,7 @@ def test_install_virtual_packages(conda_cli, spec):
     conda_cli("create", "--dry-run", "--offline", spec, raises=raises)
 
 
-def test_urls_are_percent_decoded(tmp_path):
+def test_urls_are_percent_decoded(tmp_path: Path) -> None:
     solver = Solver(
         prefix=tmp_path, channels=["conda-forge"], specs_to_add=["x264"], command="create"
     )
@@ -517,7 +514,9 @@ def test_urls_are_percent_decoded(tmp_path):
 
 
 def test_prune_existing_env(
-    conda_cli: CondaCLIFixture, tmp_path: Path, tmp_env: TmpEnvFixture
+    conda_cli: CondaCLIFixture,
+    tmp_path: Path,
+    tmp_env: TmpEnvFixture,
 ) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/595
@@ -547,7 +546,9 @@ def test_prune_existing_env(
 
 
 def test_prune_existing_env_dependencies_are_solved(
-    conda_cli: CondaCLIFixture, tmp_path: Path, tmp_env: TmpEnvFixture
+    conda_cli: CondaCLIFixture,
+    tmp_path: Path,
+    tmp_env: TmpEnvFixture,
 ) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/595
@@ -584,8 +585,14 @@ def test_prune_existing_env_dependencies_are_solved(
         assert rc == 0
 
 
-def test_satisfied_skip_solve_matchspec(conda_cli, tmp_env):
+def test_satisfied_skip_solve_matchspec(
+    conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture
+) -> None:
     with tmp_env("ca-certificates") as prefix:
         conda_cli(
-            "install", "-p", prefix, "-S", "ca-certificates>10000", raises=PackagesNotFoundError
+            "install",
+            f"--prefix={prefix}",
+            "--satisfied-skip-solve",
+            "ca-certificates>10000",
+            raises=PackagesNotFoundError,
         )

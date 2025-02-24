@@ -5,14 +5,21 @@
 Ensure experimental features work accordingly.
 """
 
+from __future__ import annotations
+
 import os
 import sys
 from subprocess import run
+from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import context, fresh_context
+from conda.base.context import fresh_context
 from conda.exceptions import CondaEnvironmentError
-from conda.testing.integration import Commands, _get_temp_prefix, run_command
+from conda.testing.integration import _get_temp_prefix
+
+if TYPE_CHECKING:
+    from conda.testing.fixtures import CondaCLIFixture
+    from pytest import MonkeyPatch
 
 
 def _get_temp_prefix_safe():
@@ -29,21 +36,15 @@ def print_and_check_output(*args, **kwargs):
 
 
 @pytest.mark.xfail(reason="base protections not enabled anymore")
-def test_protection_for_base_env():
+def test_protection_for_base_env(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFixture) -> None:
     with pytest.raises(CondaEnvironmentError), fresh_context(CONDA_SOLVER="libmamba"):
-        current_test = os.environ.pop("PYTEST_CURRENT_TEST", None)
-        try:
-            run_command(
-                Commands.INSTALL,
-                context.root_prefix,
-                "--dry-run",
-                "scipy",
-                "--solver=libmamba",
-                no_capture=True,
-            )
-        finally:
-            if current_test is not None:
-                os.environ["PYTEST_CURRENT_TEST"] = current_test
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+        conda_cli(
+            "install",
+            "--dry-run",
+            "scipy",
+            "--solver=libmamba",
+        )
 
 
 def test_cli_flag_in_help():

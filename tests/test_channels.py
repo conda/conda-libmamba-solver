@@ -19,7 +19,6 @@ from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.models.channel import Channel
 from conda.testing.integration import _get_temp_prefix, package_is_installed
-from conda.testing.integration import run_command as conda_inprocess
 
 from .channel_testing.helpers import (
     create_with_channel,
@@ -31,20 +30,19 @@ from .channel_testing.helpers import (
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
-    from conda.testing.fixtures import TmpEnvFixture
+    from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
 
 DATA = Path(__file__).parent / "data"
 
 
-def test_channel_matchspec():
-    stdout, *_ = conda_inprocess(
+def test_channel_matchspec(conda_cli: CondaCLIFixture, path_factory: PathFactoryFixture) -> None:
+    stdout, _, _ = conda_cli(
         "create",
-        _get_temp_prefix(),
+        f"--prefix={path_factory()}",
         "--solver=libmamba",
         "--json",
         "--override-channels",
-        "-c",
-        "defaults",
+        "--channel=defaults",
         "conda-forge::libblas=*=*openblas",
         "python=3.9",
     )
@@ -79,7 +77,10 @@ def test_channels_prefixdata(tmp_env: TmpEnvFixture) -> None:
         )
 
 
-def test_channels_installed_unavailable(tmp_env: TmpEnvFixture) -> None:
+def test_channels_installed_unavailable(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"""
     with tmp_env("xz", "--solver=libmamba") as prefix:
         pd = PrefixData(prefix)
@@ -88,13 +89,12 @@ def test_channels_installed_unavailable(tmp_env: TmpEnvFixture) -> None:
         assert record
         record.channel = Channel.from_url("file:///nonexistent")
 
-        _, _, retcode = conda_inprocess(
+        _, _, retcode = conda_cli(
             "install",
-            prefix,
+            f"--prefix={prefix}",
             "zlib",
             "--solver=libmamba",
             "--dry-run",
-            use_exception_handler=True,
         )
         assert retcode == 0
 
@@ -336,7 +336,7 @@ def test_local_spec():
     assert process.returncode == 0
 
 
-def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture) -> None:
+def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     """https://github.com/conda/conda-libmamba-solver/issues/418"""
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
@@ -345,9 +345,9 @@ def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture) -> None:
         # '<unknown>' channel and reproduce the issue
         temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
         shutil.copy(test_pkg, temp_pkg)
-        conda_inprocess("install", prefix, str(temp_pkg))
+        conda_cli("install", f"--prefix={prefix}", temp_pkg)
         assert package_is_installed(prefix, "test-package")
-        conda_inprocess("install", prefix, "zlib")
+        conda_cli("install", f"--prefix={prefix}", "zlib")
         assert package_is_installed(prefix, "zlib")
 
 
