@@ -41,6 +41,7 @@ def test_protection_for_base_env(monkeypatch: MonkeyPatch, conda_cli: CondaCLIFi
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
         conda_cli(
             "install",
+            f"--prefix={context.root_prefix}",
             "--dry-run",
             "scipy",
             "--solver=libmamba",

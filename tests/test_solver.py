@@ -364,8 +364,8 @@ def test_locking_pins(
         out, err, retcode = conda_cli(
             "install",
             f"--prefix={prefix}",
-            "--dry-run",
             "zlib",
+            "--dry-run",
             "--json",
             raises=DryRunExit,
         )
@@ -390,8 +390,8 @@ def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture
             out, err, retcode = conda_cli(
                 "install",
                 f"--prefix={prefix}",
-                "--dry-run",
                 cli_spec,
+                "--dry-run",
                 "--json",
                 "--override-channels",
                 "--channel=conda-forge",

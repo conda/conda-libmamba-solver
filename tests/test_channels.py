@@ -93,9 +93,9 @@ def test_channels_installed_unavailable(
         conda_cli(
             "install",
             f"--prefix={prefix}",
-            "--dry-run",
             "zlib",
             "--solver=libmamba",
+            "--dry-run",
             raises=DryRunExit,
         )
 
