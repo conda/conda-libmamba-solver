@@ -34,7 +34,7 @@ def _get_channels_from_lockfile(path: Path) -> tuple[str, ...]:
     return ()
 
 
-def _get_channel_args(channels: Iterable[str]) -> tuple[str, ...]:
+def _channels_as_args(channels: Iterable[str]) -> tuple[str, ...]:
     return (
         ("--override-channels", *(f"--channel={channel}" for channel in channels))
         if channels
@@ -73,7 +73,7 @@ def test_update_python(
             "update",
             f"--prefix={prefix}",
             "--dry-run",
-            *_get_channel_args(channels),
+            *_channels_as_args(channels),
             "python",
         )
     except DryRunExit:
@@ -92,7 +92,7 @@ def test_install_python_update_deps(
         "install",
         f"--prefix={prefix}",
         "--dry-run",
-        *_get_channel_args(channels),
+        *_channels_as_args(channels),
         "python",
         "--update-deps",
         raises=DryRunExit,
@@ -108,7 +108,7 @@ def test_update_all(
         "update",
         f"--prefix={prefix}",
         "--dry-run",
-        *_get_channel_args(channels),
+        *_channels_as_args(channels),
         "--all",
         raises=DryRunExit,
     )
@@ -118,7 +118,7 @@ def test_install_vaex_from_conda_forge_and_defaults(conda_cli: CondaCLIFixture) 
     conda_cli(
         "create",
         "--dry-run",
-        *_get_channel_args(["conda-forge", "defaults"]),
+        *_channels_as_args(["conda-forge", "defaults"]),
         "python=3.9",
         "vaex",
         raises=DryRunExit,
