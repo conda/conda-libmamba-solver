@@ -19,7 +19,7 @@ from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
-from conda.testing.integration import _get_temp_prefix, package_is_installed
+from conda.testing.integration import package_is_installed
 
 from .channel_testing.helpers import (
     create_with_channel,
@@ -283,7 +283,10 @@ def test_http_server_auth_token(http_server_auth_token):  # noqa: F811
     create_with_channel(http_server_auth_token)
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F811
+def test_http_server_auth_token_in_defaults(
+    http_server_auth_token,  # noqa: F811
+    path_factory: PathFactoryFixture,
+) -> None:
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
@@ -297,8 +300,7 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F8
         conda_subprocess("info", capture_output=False)
         conda_subprocess(
             "create",
-            "-p",
-            _get_temp_prefix(use_restricted_unicode=on_win),
+            f"--prefix={path_factory()}",
             "--solver=libmamba",
             "test-package",
         )
@@ -309,14 +311,12 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F8
             condarc.unlink()
 
 
-def test_local_spec():
-    "https://github.com/conda/conda-libmamba-solver/issues/398"
+def test_local_spec() -> None:
+    """https://github.com/conda/conda-libmamba-solver/issues/398"""
     env = os.environ.copy()
     env["CONDA_BLD_PATH"] = str(DATA / "mamba_repo")
     process = conda_subprocess(
         "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
         "--dry-run",
         "--solver=libmamba",
         "--channel=local",
@@ -327,8 +327,6 @@ def test_local_spec():
 
     process = conda_subprocess(
         "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
         "--dry-run",
         "--solver=libmamba",
         "local::test-package",
