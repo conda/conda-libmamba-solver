@@ -13,7 +13,7 @@ from subprocess import run
 from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import fresh_context
+from conda.base.context import context, fresh_context
 from conda.exceptions import CondaEnvironmentError
 from conda.testing.integration import _get_temp_prefix
 
