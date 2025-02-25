@@ -90,7 +90,7 @@ def test_channels_installed_unavailable(
         assert record
         record.channel = Channel.from_url("file:///nonexistent")
 
-        conda_cli(
+        _, _, retcode = conda_cli(
             "install",
             f"--prefix={prefix}",
             "zlib",
