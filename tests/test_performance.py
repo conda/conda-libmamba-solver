@@ -35,11 +35,9 @@ def _get_channels_from_lockfile(path: Path) -> tuple[str, ...]:
 
 
 def _channels_as_args(channels: Iterable[str]) -> tuple[str, ...]:
-    return (
-        ("--override-channels", *(f"--channel={channel}" for channel in channels))
-        if channels
-        else ()
-    )
+    if not channels:
+        return ()
+    return ("--override-channels", *(f"--channel={channel}" for channel in channels))
 
 
 @pytest.fixture(
