@@ -15,9 +15,13 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context
 from conda.common.compat import on_linux, on_mac, on_win
-from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.exceptions import DryRunExit, PackagesNotFoundError, UnsatisfiableError
+from conda.exceptions import (
+    DryRunExit,
+    PackagesNotFoundError,
+    SpecsConfigurationConflictError,
+    UnsatisfiableError,
+)
 from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
@@ -27,6 +31,7 @@ from .utils import conda_subprocess
 
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
+    from pytest import MonkeyPatch
 
 
 def test_python_downgrade_reinstalls_noarch_packages(
@@ -90,6 +95,7 @@ def test_defaults_specs_work(conda_cli: CondaCLIFixture) -> None:
         "--channel=conda-forge",
         "python=3.10",
         "defaults::libarchive",
+        raises=DryRunExit,
     )
     data = json.loads(out)
     assert data.get("success") is True
@@ -332,8 +338,13 @@ def test_constraining_pin_and_requested():
     assert data.get("dry_run")
 
 
-def test_locking_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
-    with env_var("CONDA_PINNED_PACKAGES", "zlib"), tmp_env("zlib") as prefix:
+def test_locking_pins(
+    monkeypatch: MonkeyPatch,
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    monkeypatch.setenv("CONDA_PINNED_PACKAGES", "zlib")
+    with tmp_env("zlib") as prefix:
         # Should install just fine
         zlib = PrefixData(prefix).get("zlib")
         assert zlib
@@ -342,25 +353,23 @@ def test_locking_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> Non
         out, err, retcode = conda_cli(
             "install",
             f"--prefix={prefix}",
-            "zlib=1.2.11",
             "--dry-run",
+            "zlib=1.2.11",
             "--json",
+            raises=SpecsConfigurationConflictError,
         )
-        data = json.loads(out)
-        assert retcode
-        assert data["exception_name"] == "SpecsConfigurationConflictError"
-        assert str(zlib) in data["error"]
+        assert str(zlib) in retcode.dump_map()["error"]
 
         # This is a no-op and ok. It won't involve changes.
         out, err, retcode = conda_cli(
             "install",
             f"--prefix={prefix}",
-            "zlib",
             "--dry-run",
+            "zlib",
             "--json",
+            raises=DryRunExit,
         )
         data = json.loads(out)
-        assert not retcode
         assert data.get("success")
         assert data["message"] == "All requested packages already installed."
 
@@ -381,14 +390,14 @@ def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture
             out, err, retcode = conda_cli(
                 "install",
                 f"--prefix={prefix}",
-                cli_spec,
                 "--dry-run",
+                cli_spec,
                 "--json",
                 "--override-channels",
                 "--channel=conda-forge",
+                raises=DryRunExit,
             )
             data = json.loads(out)
-            assert not retcode
             assert data.get("success")
             assert data.get("dry_run")
 

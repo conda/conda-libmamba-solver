@@ -17,6 +17,7 @@ from conda.base.context import reset_context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
+from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
 from conda.testing.integration import _get_temp_prefix, package_is_installed
 
@@ -89,14 +90,14 @@ def test_channels_installed_unavailable(
         assert record
         record.channel = Channel.from_url("file:///nonexistent")
 
-        _, _, retcode = conda_cli(
+        conda_cli(
             "install",
             f"--prefix={prefix}",
+            "--dry-run",
             "zlib",
             "--solver=libmamba",
-            "--dry-run",
+            raises=DryRunExit,
         )
-        assert retcode == 0
 
 
 def _setup_conda_forge_as_defaults(prefix, force=False):
