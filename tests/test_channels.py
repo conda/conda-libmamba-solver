@@ -22,7 +22,6 @@ from conda.models.channel import Channel
 from conda.testing.integration import package_is_installed
 
 from .channel_testing.helpers import (
-    create_with_channel,
     http_server_auth_basic,  # noqa: F401
     http_server_auth_basic_email,  # noqa: F401
     http_server_auth_none,  # noqa: F401
@@ -267,20 +266,68 @@ def test_conda_build_with_aliased_channels(tmp_path):
             condarc.unlink()
 
 
-def test_http_server_auth_none(http_server_auth_none):  # noqa: F811
-    create_with_channel(http_server_auth_none)
+def test_http_server_auth_none(
+    http_server_auth_none: str,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_none}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_basic(http_server_auth_basic):  # noqa: F811
-    create_with_channel(http_server_auth_basic)
+def test_http_server_auth_basic(
+    http_server_auth_basic,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_basic}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_basic_email(http_server_auth_basic_email):  # noqa: F811
-    create_with_channel(http_server_auth_basic_email)
+def test_http_server_auth_basic_email(
+    http_server_auth_basic_email,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_basic_email}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_token(http_server_auth_token):  # noqa: F811
-    create_with_channel(http_server_auth_token)
+def test_http_server_auth_token(
+    http_server_auth_token,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_token}",
+        "test-package",
+    )
 
 
 def test_http_server_auth_token_in_defaults(
