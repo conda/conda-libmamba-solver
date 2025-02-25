@@ -358,7 +358,7 @@ def test_locking_pins(
             "--json",
             raises=SpecsConfigurationConflictError,
         )
-        assert str(zlib) in retcode.dump_map()["error"]
+        assert str(zlib) in retcode.value.dump_map()["error"]
 
         # This is a no-op and ok. It won't involve changes.
         out, err, retcode = conda_cli(
