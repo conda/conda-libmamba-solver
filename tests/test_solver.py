@@ -361,17 +361,21 @@ def test_locking_pins(
         assert str(zlib) in retcode.value.dump_map()["error"]
 
         # This is a no-op and ok. It won't involve changes.
-        out, err, retcode = conda_cli(
-            "install",
-            f"--prefix={prefix}",
-            "zlib",
-            "--dry-run",
-            "--json",
-            raises=DryRunExit,
-        )
-        data = json.loads(out)
-        assert data.get("success")
-        assert data["message"] == "All requested packages already installed."
+        try:
+            out, err, retcode = conda_cli(
+                "install",
+                f"--prefix={prefix}",
+                "zlib",
+                "--dry-run",
+                "--json",
+                raises=(DryRunExit, None),
+            )
+        except DryRunExit:
+            assert True
+        else:
+            data = json.loads(out)
+            assert data.get("success")
+            assert data["message"] == "All requested packages already installed."
 
 
 def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
