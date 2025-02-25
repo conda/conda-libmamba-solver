@@ -350,16 +350,26 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         attempt: int = 1,
     ) -> tuple[bool, Solution | UnSolvable]:
-        log.info("Solver attempt: #%d", attempt)
-        log.debug("Current conflicts (including learnt ones): %r", out_state.conflicts)
+        print("Solver attempt: #", attempt, file=sys.stderr, flush=True)
+        print(
+            "Current conflicts (including learnt ones):",
+            out_state.conflicts,
+            file=sys.stderr,
+            flush=True,
+        )
         flags = self._solver_flags(in_state)
         jobs = self._specs_to_request_jobs(in_state, out_state)
         request = Request(jobs=jobs, flags=flags)
+        print("Constructing LibsolvSolver()...", file=sys.stderr, flush=True)
         solver = LibsolvSolver()
+        print("Constructing LibsolvSolver()... done.", file=sys.stderr, flush=True)
+        print("Calling .solve()...", file=sys.stderr, flush=True)
         outcome = solver.solve(index.db, request)
+        print("Calling .solve()... done.", file=sys.stderr, flush=True)
         if isinstance(outcome, Solution):
             out_state.conflicts.clear()
             return True, outcome
+        print("Analyzing conflicts...", file=sys.stderr, flush=True)
         old_conflicts = out_state.conflicts.copy()
         new_conflicts = self._maybe_raise_for_problems(outcome, index, out_state, old_conflicts)
         if log.isEnabledFor(logging.DEBUG):
@@ -371,6 +381,7 @@ class LibMambaSolver(Solver):
                 problems_as_str,
             )
         out_state.conflicts.update(new_conflicts)
+        print("Analyzing conflicts... done.", file=sys.stderr, flush=True)
         return False, outcome
 
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
@@ -386,8 +397,7 @@ class LibMambaSolver(Solver):
             "order_request": False,  # we do this ourselves
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug("Using solver flags:\n%s", json.dumps(flags, indent=2))
+        print("Using solver flags:\n", json.dumps(flags, indent=2), file=sys.stderr, flush=True)
         return Request.Flags(**flags)
 
     def _specs_to_request_jobs(
@@ -413,9 +423,8 @@ class LibMambaSolver(Solver):
                 if JobType == Request.Pin:
                     conda_spec = MatchSpec(conda_spec)
                     out_state.pins[f"pin-{idx}"] = conda_spec
-        if log.isEnabledFor(logging.INFO):
-            json_str = json.dumps(json_friendly, indent=2)
-            log.info("The solver will handle these requests:\n%s", json_str)
+        json_str = json.dumps(json_friendly, indent=2)
+        print("The solver will handle these requests:\n", json_str, file=sys.stderr, flush=True)
         return request_jobs
 
     def _specs_to_request_jobs_add(
