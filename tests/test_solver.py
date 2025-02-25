@@ -368,7 +368,6 @@ def test_locking_pins(
                 "zlib",
                 "--dry-run",
                 "--json",
-                raises=(DryRunExit, None),
             )
         except DryRunExit:
             assert True
