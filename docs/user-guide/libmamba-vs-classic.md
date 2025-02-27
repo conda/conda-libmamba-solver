@@ -140,7 +140,7 @@ We ended up with an implementation a bit higher up in the abstraction tree:
 
 * `libsolv`:
 
-  `libmamba` relies on this C project directly to handle the solving steps. Note that [the version of `libsolv` which is used and distributed by `conda-forge`](libsolv-feedstock) comes with a set of patches, including [one to handle the conda packages' variants' prioretization (which is not present in the upstream `libsolv`)](libsolv-feedstock-conda_variant_priorization.patch).
+  `libmamba` relies on this C project directly to handle the solving steps. Note that [the version of `libsolv` which is used and distributed by `conda-forge`][libsolv-feedstock] comes with a set of patches, including [one to handle the conda packages' variants' prioretization (which is not present in the upstream `libsolv`)][libsolv-feedstock-conda_variant_priorization.patch].
 
 The implementation details reveal some of the reasons for the performance differences:
 
