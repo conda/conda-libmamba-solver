@@ -12,7 +12,7 @@
 
 ### Docs
 
-* Mention conda-forge's adaptation of `libsolv`
+* Mention conda-forge's adaptation of `libsolv`. (#624)
 
 ### Other
 
