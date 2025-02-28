@@ -20,14 +20,14 @@ on:
     - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
   # /CONDA-LIBMAMBA-SOLVER CHANGE
 
-concurrency:
-  # Concurrency group that uses the workflow name and PR number if available
-  # or commit SHA as a fallback. If a new build is triggered under that
-  # concurrency group while a previous build is running it will be canceled.
-  # Repeated pushes to a PR will cancel all previous builds, while multiple
-  # merges to main will not cancel.
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: true
+# concurrency:
+#   # Concurrency group that uses the workflow name and PR number if available
+#   # or commit SHA as a fallback. If a new build is triggered under that
+#   # concurrency group while a previous build is running it will be canceled.
+#   # Repeated pushes to a PR will cancel all previous builds, while multiple
+#   # merges to main will not cancel.
+#   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+#   # cancel-in-progress: true
 
 env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
@@ -82,28 +82,42 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.9', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
-        default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # python-version: ['3.9', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # default-channel: [defaults, conda-forge]
+        # test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # test-group: [1, 2, 3]
+        # exclude:
+        #   - default-channel: conda-forge
+        #     python-version: '3.9'
+        #   - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #   - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     python-version: '3.12'  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #   - test-type: unit
+        #     test-group: 3
+        #   - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #   - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+        #     test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # test-type: [conda-libmamba-solver, unit, integration]
+        test-type: [unit, integration]
         test-group: [1, 2, 3]
+        patch: ['true', 'true', 'true', 'true', 'true', 'false']
+        python-version: ['3.11']
+        default-channel: [conda-forge]
         exclude:
-          - default-channel: conda-forge
-            python-version: '3.9'
-          - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
-            python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
-            python-version: '3.12'  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
+            test-group: 3
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
+      PYTHONUNBUFFERED: "1"
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -123,13 +137,13 @@ jobs:
 
       - name: Hash + Timestamp
         shell: bash  # use bash to run date command
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
+        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date +%s)" >> $GITHUB_ENV
 
-      - name: Cache Conda
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
-        with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
+      # - name: Cache Conda
+      #   uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
+      #   with:
+      #     path: ~/conda_pkgs_dir
+      #     key: cache-${{ env.HASH }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@505e6394dae86d6a5c7fbb6e3fb8938e3e863830 # v3.1.1
@@ -158,6 +172,39 @@ jobs:
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
+      - name: Patch libmamba(py)
+        shell: bash -el {0}
+        if: matrix.patch == 'true'
+        env:
+          # These are logging builds with different workarounds
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-20/mamba-custom-debug-build-202412201638.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-23/mamba-custom-debug-build-202412231240-no_transaction_order.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2024-12-24/mamba-custom-debug-build-202412241126.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-02/mamba-custom-debug-build-202501021424.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-06/mamba-custom-debug-build-202501061632.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-16/mamba-custom-debug-build-20250106-preview_143_crt.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-17/mamba-custom-debug-build-202501171658.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-21/mamba-custom-debug-build-202501211738.zip"
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-22/mamba-custom-debug-build-202501221640.zip"  # this one never segfaulted
+          # End of logging builds
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301200.zip"  # should segfault, but it never did!
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-01-30/mamba-custom-debug-build-202501301300-workaround_memorytrap.zip"  # should not segfault
+          # BASEDIR: mamba-custom-debug-build
+          BASEDIR: mamba-custom-origin-build
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-02-11/mamba-custom-main-build-89abba3df07ce7ff4b01a2ab3252da37947f54d4-202502111740.zip"  # should segfault
+          # PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-02-11/mamba-workaround-build-2e916e4e56bb63bf561091b25171856ed32db6e5-202502111731.zip"  # should NOT segfault, but it did
+          # PATCHED_URL: https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-02-17/mamba-workaround-build-202502171530.zip
+          PATCHED_URL: "https://github.com/jaimergp/libmambapy-windows-segfaults/releases/download/2025-02-18/mamba-workaround-build-202502181547.zip"
+        run: |
+          set -x
+          curl -sL -o libmamba.zip "$PATCHED_URL"
+          7z x libmamba.zip
+          cd $BASEDIR/
+          ls -alhR
+          cp -r Library Lib "$CONDA_PREFIX/"
+          ls -alh "$CONDA_PREFIX/Library/bin"
+          ls -alhR "$CONDA_PREFIX/Lib"
+
       - name: Conda Info
         run: python -m conda info --verbose
 
@@ -183,50 +230,68 @@ jobs:
 
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+        timeout-minutes: 100
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
-        run: python -m pytest
-          --cov=conda
-          --durations-path=durations\${{ runner.os }}.json
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
-          -m "${{ env.PYTEST_MARKER }}"
+        run: |
+          python -c "import libmambapy, pytest; pytest.main(
+            [
+              '-vvv',
+              '-s',
+              '--durations-path=durations\${{ runner.os }}.json',
+              '--group=${{ matrix.test-group }}',
+              '--splits=${{ env.PYTEST_SPLITS }}',
+              '--reruns=${{ env.PYTEST_RERUN_FAILURES }}',
+              '-m',
+              '${{ env.PYTEST_MARKER }}',
+            ]
+          )"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Run conda-libmamba-solver Tests
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         shell: bash -el {0}
+        timeout-minutes: 100
         run: |
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
+          python -c "import libmambapy, pytest; pytest.main(
+            [
+              '-vvv',
+              '-s',
+              '-m',
+              'not slow',
+              '--reruns=${{ env.PYTEST_RERUN_FAILURES }}',
+              '--durations=16',
+            ]
+          )"
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
-      - name: Upload Coverage
-        uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
-        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
-        with:
-          flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
+      # - name: Upload Coverage
+      #   uses: codecov/codecov-action@13ce06bfc6bbe3ecf90edbbf1bc32fe5978ca1d3 # v5.3.1
+      #   if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
+      #   with:
+      #     flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
-      - name: Upload Test Results
-        if: '!cancelled()'
-        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
-        with:
-          name: test-results-${{ env.HASH }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
-          path: |
-            conda\.coverage
-            conda\durations\${{ runner.os }}.json
-            conda\test-report.xml
-          retention-days: 1  # temporary, combined in aggregate below
+      # - name: Upload Test Results
+      #   if: '!cancelled()'
+      # uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+      #   with:
+      #     name: test-results-${{ env.HASH }}
+      #     # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
+      #     path: |
+      #       conda\.coverage
+      #       conda\durations\${{ runner.os }}.json
+      #       conda\test-report.xml
+      #     retention-days: 1  # temporary, combined in aggregate below
 
   # linux test suite
   linux:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -500,7 +565,8 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:
