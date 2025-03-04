@@ -636,12 +636,18 @@ class LibMambaSolver(Solver):
         else:
             url = pkg.package_url
         url = percent_decode(url)
+
+        # Signature verification requires channel information _with_ subdir data
+        channel = Channel(pkg.channel)
+        if not channel.subdir:
+            channel.platform = pkg.platform
+
         return PackageRecord(
             name=pkg.name,
             version=pkg.version,
             build=pkg.build_string,  # NOTE: Different attribute name
             build_number=pkg.build_number,
-            channel=pkg.channel,
+            channel=channel,
             url=url,
             subdir=pkg.platform,  # NOTE: Different attribute name
             fn=pkg.filename,  # NOTE: Different attribute name
