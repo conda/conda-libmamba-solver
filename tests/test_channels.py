@@ -1,12 +1,15 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
 import os
 import shutil
 import sys
 from pathlib import Path
 from subprocess import check_call
+from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
@@ -14,16 +17,11 @@ from conda.base.context import reset_context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
+from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
-from conda.testing.integration import (
-    _get_temp_prefix,
-    make_temp_env,
-    package_is_installed,
-)
-from conda.testing.integration import run_command as conda_inprocess
+from conda.testing.integration import package_is_installed
 
 from .channel_testing.helpers import (
-    create_with_channel,
     http_server_auth_basic,  # noqa: F401
     http_server_auth_basic_email,  # noqa: F401
     http_server_auth_none,  # noqa: F401
@@ -31,18 +29,20 @@ from .channel_testing.helpers import (
 )
 from .utils import conda_subprocess, write_env_config
 
+if TYPE_CHECKING:
+    from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
+
 DATA = Path(__file__).parent / "data"
 
 
-def test_channel_matchspec():
-    stdout, *_ = conda_inprocess(
+def test_channel_matchspec(conda_cli: CondaCLIFixture, path_factory: PathFactoryFixture) -> None:
+    stdout, _, _ = conda_cli(
         "create",
-        _get_temp_prefix(),
+        f"--prefix={path_factory()}",
         "--solver=libmamba",
         "--json",
         "--override-channels",
-        "-c",
-        "defaults",
+        "--channel=defaults",
         "conda-forge::libblas=*=*openblas",
         "python=3.9",
     )
@@ -55,16 +55,14 @@ def test_channel_matchspec():
             assert record["channel"] == "pkgs/main"
 
 
-def test_channels_prefixdata():
+def test_channels_prefixdata(tmp_env: TmpEnvFixture) -> None:
     """
     Make sure libmamba does not complain about missing channels
     used in previous commands.
 
     See https://github.com/conda/conda/issues/11790
     """
-    with make_temp_env(
-        "conda-forge::xz", "python", "--solver=libmamba", use_restricted_unicode=True
-    ) as prefix:
+    with tmp_env("conda-forge::xz", "python", "--solver=libmamba") as prefix:
         p = conda_subprocess(
             "install",
             "-yp",
@@ -79,24 +77,26 @@ def test_channels_prefixdata():
         )
 
 
-def test_channels_installed_unavailable():
-    "Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"
-    with make_temp_env("xz", "--solver=libmamba", use_restricted_unicode=True) as prefix:
+def test_channels_installed_unavailable(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    """Ensure we don't fail if a channel coming ONLY from an installed pkg is unavailable"""
+    with tmp_env("xz", "--solver=libmamba") as prefix:
         pd = PrefixData(prefix)
         pd.load()
         record = pd.get("xz")
         assert record
         record.channel = Channel.from_url("file:///nonexistent")
 
-        _, _, retcode = conda_inprocess(
+        _, _, retcode = conda_cli(
             "install",
-            prefix,
+            f"--prefix={prefix}",
             "zlib",
             "--solver=libmamba",
             "--dry-run",
-            use_exception_handler=True,
+            raises=DryRunExit,
         )
-        assert retcode == 0
 
 
 def _setup_conda_forge_as_defaults(prefix, force=False):
@@ -266,23 +266,74 @@ def test_conda_build_with_aliased_channels(tmp_path):
             condarc.unlink()
 
 
-def test_http_server_auth_none(http_server_auth_none):  # noqa: F811
-    create_with_channel(http_server_auth_none)
+def test_http_server_auth_none(
+    http_server_auth_none: str,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_none}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_basic(http_server_auth_basic):  # noqa: F811
-    create_with_channel(http_server_auth_basic)
+def test_http_server_auth_basic(
+    http_server_auth_basic,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_basic}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_basic_email(http_server_auth_basic_email):  # noqa: F811
-    create_with_channel(http_server_auth_basic_email)
+def test_http_server_auth_basic_email(
+    http_server_auth_basic_email,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_basic_email}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_token(http_server_auth_token):  # noqa: F811
-    create_with_channel(http_server_auth_token)
+def test_http_server_auth_token(
+    http_server_auth_token,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_token}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F811
+def test_http_server_auth_token_in_defaults(
+    http_server_auth_token,  # noqa: F811
+    path_factory: PathFactoryFixture,
+) -> None:
     condarc = Path.home() / ".condarc"
     condarc_contents = condarc.read_text() if condarc.is_file() else None
     try:
@@ -296,8 +347,7 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F8
         conda_subprocess("info", capture_output=False)
         conda_subprocess(
             "create",
-            "-p",
-            _get_temp_prefix(use_restricted_unicode=on_win),
+            f"--prefix={path_factory()}",
             "--solver=libmamba",
             "test-package",
         )
@@ -308,14 +358,12 @@ def test_http_server_auth_token_in_defaults(http_server_auth_token):  # noqa: F8
             condarc.unlink()
 
 
-def test_local_spec():
-    "https://github.com/conda/conda-libmamba-solver/issues/398"
+def test_local_spec() -> None:
+    """https://github.com/conda/conda-libmamba-solver/issues/398"""
     env = os.environ.copy()
     env["CONDA_BLD_PATH"] = str(DATA / "mamba_repo")
     process = conda_subprocess(
         "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
         "--dry-run",
         "--solver=libmamba",
         "--channel=local",
@@ -326,8 +374,6 @@ def test_local_spec():
 
     process = conda_subprocess(
         "create",
-        "-p",
-        _get_temp_prefix(use_restricted_unicode=on_win),
         "--dry-run",
         "--solver=libmamba",
         "local::test-package",
@@ -336,18 +382,18 @@ def test_local_spec():
     assert process.returncode == 0
 
 
-def test_unknown_channels_do_not_crash(tmp_path):
-    "https://github.com/conda/conda-libmamba-solver/issues/418"
+def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
+    """https://github.com/conda/conda-libmamba-solver/issues/418"""
     DATA = Path(__file__).parent / "data"
     test_pkg = DATA / "mamba_repo" / "noarch" / "test-package-0.1-0.tar.bz2"
-    with make_temp_env("ca-certificates") as prefix:
+    with tmp_env("ca-certificates") as prefix:
         # copy pkg to a new non-channel-like location without repodata around to obtain
         # '<unknown>' channel and reproduce the issue
         temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
         shutil.copy(test_pkg, temp_pkg)
-        conda_inprocess("install", prefix, str(temp_pkg))
+        conda_cli("install", f"--prefix={prefix}", temp_pkg)
         assert package_is_installed(prefix, "test-package")
-        conda_inprocess("install", prefix, "zlib")
+        conda_cli("install", f"--prefix={prefix}", "zlib")
         assert package_is_installed(prefix, "zlib")
 
 
