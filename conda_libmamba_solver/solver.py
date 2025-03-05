@@ -636,11 +636,6 @@ class LibMambaSolver(Solver):
         else:
             url = pkg.package_url
         url = percent_decode(url)
-        # not all versions of libmambapy support this attribute, note that getattr cannot be used
-        if hasattr(pkg, "python_site_packages_path"):
-            python_site_packages_path = pkg.python_site_packages_path
-        else:
-            python_site_packages_path = None
         return PackageRecord(
             name=pkg.name,
             version=pkg.version,
@@ -651,7 +646,7 @@ class LibMambaSolver(Solver):
             subdir=pkg.platform,  # NOTE: Different attribute name
             fn=pkg.filename,  # NOTE: Different attribute name
             license=pkg.license,
-            python_site_packages_path=python_site_packages_path,
+            python_site_packages_path=getattr(pkg, "python_site_packages_path", "") or None,
             md5=pkg.md5,
             sha256=pkg.sha256,
             signatures=pkg.signatures,
