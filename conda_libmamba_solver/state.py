@@ -392,7 +392,8 @@ class SolverInputState:
                 yield channel
 
     def maybe_free_channel(self) -> Iterable[Channel]:
-        if context.restore_free_channel:
+        # conda 25.3 removed context.restore_free_channel
+        if getattr(context, "restore_free_channel", False):
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
 
 
