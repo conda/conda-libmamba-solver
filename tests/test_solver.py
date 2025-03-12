@@ -608,3 +608,27 @@ def test_satisfied_skip_solve_matchspec(
             "ca-certificates>10000",
             raises=PackagesNotFoundError,
         )
+
+
+def test_deps_only_exclude_multiple_requested(conda_cli):
+    specs = (
+        "sardana-core",
+        "sardana-config",
+        "taurus-qt",
+    )
+    out, err, _ = conda_cli(
+        "create",
+        "--dry-run",
+        "--json",
+        "--only-deps",
+        "--override-channels",
+        "--channel=conda-forge",
+        *specs,
+        raises=DryRunExit,
+    )
+    print(out)
+    print(err, file=sys.stderr)
+    result = json.loads(out)
+    names = {pkg["name"] for pkg in result["actions"]["LINK"]}
+    for spec in specs:
+        assert spec not in names

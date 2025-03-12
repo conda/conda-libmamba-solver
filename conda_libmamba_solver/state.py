@@ -687,13 +687,19 @@ class SolverOutputState:
                             # following https://github.com/conda/conda/pull/8766
                             self.for_history[spec.name] = spec
                     to_remove.append(record.name)
+                for requested in self.solver_input_state.requested:
+                    if requested == "python":
+                        continue
+                    if requested not in to_remove:
+                        to_remove.append(requested)
 
             for name in to_remove:
                 installed = sis.installed.get(name)
                 if installed:
                     self.records[name] = installed
                 else:
-                    self.records.pop(record.name)
+                    # Record might not be included with flags like --only-deps; ignore in that case
+                    self.records.pop(name, None)
 
         elif sis.update_modifier.UPDATE_DEPS:
             # Here we have to SAT solve again :(  It's only now that we know the dependency
