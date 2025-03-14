@@ -8,6 +8,7 @@ Authors are sorted alphabetically.
 * Jannis Leidel
 * John Kirkham
 * Jonathan J. Helmus
+* Julien Jerphanion
 * Ken Odegard
 * Kevin Markham
 * Klaus Zimmermann
