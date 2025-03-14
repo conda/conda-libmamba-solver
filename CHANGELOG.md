@@ -13,6 +13,20 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 25.3.0 (2025-03-14)
+
+### Bug fixes
+
+* Fix issue with content trust post-solve hooks that prevented signatures from being verified when the solved package records didn't include subdir information in their channel metadata. (#616 via #617)
+* Protect against `conda.base.context.context.restore_free_chanenl` deprecation by using `getattr`. (#629)
+* Remove all packages with `--no-deps`, not just the last one to be analyzed. (#632)
+
+### Docs
+
+* Mention conda-forge's adaptation of `libsolv`. (#624)
+
+
+
 ## 25.1.1 (2025-01-24)
 
 ### Bug fixes
