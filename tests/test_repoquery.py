@@ -7,7 +7,7 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
-from .utils import conda_subprocess
+from .utils import conda_subprocess, python_site_packages_path_support
 
 
 def test_repoquery():
@@ -48,3 +48,16 @@ def test_query_search():
     assert index.search("ca-certificates >=2022.9.24") == index.search(
         "ca-certificates[version='>=2022.9.24']"
     )
+
+
+def test_query_search_includes_python_site_packages_path():
+    index = LibMambaIndexHelper(channels=[Channel("conda-forge")], subdirs=("linux-64", "noarch"))
+    results = index.search("python=3.13.2=h4724d56_1_cp313t")
+    assert len(results) == 1
+    prec = results[0]
+    assert prec.name == "python"
+    assert prec.version == "3.13.2"
+    if python_site_packages_path_support:
+        assert prec.python_site_packages_path == "lib/python3.13t/site-packages"
+    else:
+        assert prec.python_site_packages_path is None
