@@ -23,8 +23,8 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-  "conda >=23.7.3",
-  "libmambapy >=2",
+  "conda >=24.11",
+  # "libmambapy >=2",
   "boltons >=23.0.0",
 ]
 dynamic = [
