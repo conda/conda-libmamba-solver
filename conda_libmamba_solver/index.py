@@ -284,7 +284,6 @@ class LibMambaIndexHelper:
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         channel_repo_infos = []
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
-            print(url_w_cred)
             url_no_token, _ = split_anaconda_token(url_w_cred)
             url_no_cred = remove_auth(url_no_token)
             repo = self._load_repo_info_from_json_path(
