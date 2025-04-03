@@ -465,7 +465,8 @@ class LibMambaIndexHelper:
                 for record in package_cache_data.values()
             ]
             repo = self.db.add_repo_from_packages(packages=packages, name=path)
-            path_as_url = path_to_url(path)
+            # path_to_url does not %-encode spaces
+            path_as_url = path_to_url(path).replace(" ", "%20")
             repos.append(
                 _ChannelRepoInfo(
                     channel=None, repo=repo, url_w_cred=path_as_url, url_no_cred=path_as_url
