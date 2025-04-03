@@ -231,7 +231,7 @@ class LibMambaIndexHelper:
         }
         custom_channels = {
             name: LibmambaChannel(
-                url=CondaURL.parse(channel.base_url),
+                url=CondaURL.parse(channel.base_url.replace(" ", "%20")),
                 display_name=name,
                 platforms=set(self.subdirs),
             )
@@ -243,7 +243,7 @@ class LibMambaIndexHelper:
                 custom_channels.get(
                     channel.name,
                     LibmambaChannel(
-                        url=CondaURL.parse(channel.base_url),
+                        url=CondaURL.parse(channel.base_url.replace(" ", "%20")),
                         display_name=channel.name,
                         platforms=set(self.subdirs),
                     ),
@@ -272,9 +272,19 @@ class LibMambaIndexHelper:
     ) -> list[_ChannelRepoInfo]:
         if urls_to_channel is None:
             urls_to_channel = self._channel_urls()
+
+        # conda.common.url.path_to_url does not %-encode spaces
+        encoded_urls_to_channel = {}
+        for url, channel in urls_to_channel.items():
+            if url.startswith("file://"):
+                url = url.replace(" ", "%20")
+            encoded_urls_to_channel[url] = channel
+        urls_to_channel = encoded_urls_to_channel
+
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         channel_repo_infos = []
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
+            print(url_w_cred)
             url_no_token, _ = split_anaconda_token(url_w_cred)
             url_no_cred = remove_auth(url_no_token)
             repo = self._load_repo_info_from_json_path(
@@ -300,9 +310,6 @@ class LibMambaIndexHelper:
         channels_with_subdirs = []
         for channel in self.channels:
             for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
-                # conda.common.url.path_to_url does not %-encode spaces
-                if url.startswith("file://"):
-                    url = url.replace(" ", "%20")
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
             noauth_urls = [
@@ -313,7 +320,7 @@ class LibMambaIndexHelper:
             if seen_noauth.issuperset(noauth_urls):
                 continue
             auth_urls = [
-                url
+                url.replace(" ", "%20")
                 for url in channel.urls(with_credentials=True)
                 if url.endswith(tuple(self.subdirs))
             ]
