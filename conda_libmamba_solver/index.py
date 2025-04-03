@@ -300,6 +300,9 @@ class LibMambaIndexHelper:
         channels_with_subdirs = []
         for channel in self.channels:
             for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
+                # conda.common.url.path_to_url does not %-encode spaces
+                if url.startswith("file://"):
+                    url = url.replace(" ", "%20")
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
             noauth_urls = [
