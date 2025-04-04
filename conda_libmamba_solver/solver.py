@@ -30,7 +30,7 @@ from conda.base.constants import (
 )
 from conda.base.context import context
 from conda.common.constants import NULL
-from conda.common.io import Spinner, time_recorder
+from conda.common.io import time_recorder
 from conda.common.path import paths_equal
 from conda.common.url import percent_decode
 from conda.core.solve import Solver
@@ -43,6 +43,7 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
+from conda.reporters import get_spinner
 from libmambapy.solver import Request, Solution
 from libmambapy.solver.libsolv import Solver as LibsolvSolver
 from libmambapy.specs import MatchSpec as LibmambaMatchSpec
@@ -158,10 +159,8 @@ class LibMambaSolver(Solver):
 
         channels = self._collect_channel_list(in_state)
         conda_build_channels = self._collect_channels_subdirs_from_conda_build(seen=set(channels))
-        with Spinner(
+        with get_spinner(
             self._collect_all_metadata_spinner_message(channels, conda_build_channels),
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
         ):
             index = self._collect_all_metadata(
                 channels=channels,
@@ -171,10 +170,8 @@ class LibMambaSolver(Solver):
             )
             out_state.check_for_pin_conflicts(index)
 
-        with Spinner(
+        with get_spinner(
             self._solving_loop_spinner_message(),
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
         ):
             # This function will copy and mutate `out_state`
             # Make sure we get the latest copy to return the correct solution below
