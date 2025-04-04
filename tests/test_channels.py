@@ -21,6 +21,8 @@ from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
 from conda.testing.integration import package_is_installed
 
+from conda_libmamba_solver.index import LibMambaIndexHelper
+
 from .channel_testing.helpers import (
     http_server_auth_basic,  # noqa: F401
     http_server_auth_basic_email,  # noqa: F401
@@ -431,3 +433,22 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     conda_subprocess(*args, "--offline", **kwargs)
     conda_subprocess(*args, "--use-index-cache", **kwargs)
     conda_subprocess(*args, "--offline", "--use-index-cache", **kwargs)
+
+
+def test_channels_are_percent_encoded(tmp_path):
+    channel = tmp_path / "channel with spaces"
+    noarch = channel / "noarch"
+    noarch.mkdir(parents=True, exist_ok=True)
+    (noarch / "repodata.json").write_text("{}")
+
+    index = LibMambaIndexHelper(channels=[Channel(str(channel))])
+    assert index.repos
+    for repo in index.repos:
+        assert "%20" in repo.url_no_cred
+        assert "%20" in repo.url_w_cred
+
+    index = LibMambaIndexHelper(channels=[], pkgs_dirs=[str(channel)])
+    assert index.repos
+    for repo in index.repos:
+        assert "%20" in repo.url_no_cred
+        assert "%20" in repo.url_w_cred

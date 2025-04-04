@@ -231,7 +231,7 @@ class LibMambaIndexHelper:
         }
         custom_channels = {
             name: LibmambaChannel(
-                url=CondaURL.parse(channel.base_url),
+                url=CondaURL.parse(channel.base_url.replace(" ", "%20")),
                 display_name=name,
                 platforms=set(self.subdirs),
             )
@@ -243,7 +243,7 @@ class LibMambaIndexHelper:
                 custom_channels.get(
                     channel.name,
                     LibmambaChannel(
-                        url=CondaURL.parse(channel.base_url),
+                        url=CondaURL.parse(channel.base_url.replace(" ", "%20")),
                         display_name=channel.name,
                         platforms=set(self.subdirs),
                     ),
@@ -272,6 +272,15 @@ class LibMambaIndexHelper:
     ) -> list[_ChannelRepoInfo]:
         if urls_to_channel is None:
             urls_to_channel = self._channel_urls()
+
+        # conda.common.url.path_to_url does not %-encode spaces
+        encoded_urls_to_channel = {}
+        for url, channel in urls_to_channel.items():
+            if url.startswith("file://"):
+                url = url.replace(" ", "%20")
+            encoded_urls_to_channel[url] = channel
+        urls_to_channel = encoded_urls_to_channel
+
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         channel_repo_infos = []
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
@@ -310,7 +319,7 @@ class LibMambaIndexHelper:
             if seen_noauth.issuperset(noauth_urls):
                 continue
             auth_urls = [
-                url
+                url.replace(" ", "%20")
                 for url in channel.urls(with_credentials=True)
                 if url.endswith(tuple(self.subdirs))
             ]
@@ -462,7 +471,8 @@ class LibMambaIndexHelper:
                 for record in package_cache_data.values()
             ]
             repo = self.db.add_repo_from_packages(packages=packages, name=path)
-            path_as_url = path_to_url(path)
+            # path_to_url does not %-encode spaces
+            path_as_url = path_to_url(path).replace(" ", "%20")
             repos.append(
                 _ChannelRepoInfo(
                     channel=None, repo=repo, url_w_cred=path_as_url, url_no_cred=path_as_url
