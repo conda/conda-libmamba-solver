@@ -79,6 +79,7 @@ def test_ctrl_c(stage):
             "--solver=libmamba",
             "--override-channels",
             "--channel=conda-forge",
+            "--quiet",
             "vaex",
         ],
         text=True,
