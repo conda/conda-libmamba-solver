@@ -15,11 +15,11 @@ from itertools import chain
 
 from conda.base.context import context
 from conda.cli import conda_argparse
-from conda.common.io import Spinner
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import CondaError
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
+from conda.reporters import get_spinner
 from libmambapy import Context as LibmambaContext
 
 from .index import LibMambaIndexHelper
@@ -145,11 +145,7 @@ def repoquery(args: argparse.Namespace):
         installed_records = ()
 
     if args.use_cache_only:
-        with Spinner(
-            "Collecting package metadata from pkgs_dirs",
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
-        ):
+        with get_spinner("Collecting package metadata from pkgs_dirs"):
             index = LibMambaIndexHelper(
                 installed_records=(),
                 channels=(),
@@ -164,11 +160,7 @@ def repoquery(args: argparse.Namespace):
             channel = ms.get_exact_value("channel")
             if channel:
                 channels_from_specs.append(channel)
-        with Spinner(
-            "Collecting package metadata",
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
-        ):
+        with get_spinner("Collecting package metadata"):
             index = LibMambaIndexHelper(
                 installed_records=installed_records,
                 channels=[
