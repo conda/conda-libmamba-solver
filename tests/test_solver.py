@@ -616,13 +616,14 @@ def test_satisfied_skip_solve_matchspec(
     (
         pytest.param(("pytorch", "torchvision"), id="pytorch"),
         pytest.param(("pytorch>0", "torchvision"), id="pytorch>0"),
-        pytest.param(("pytorch>2", "torchvision"), id="pytorch>2"),
+        pytest.param(("pytorch=2", "torchvision"), id="pytorch=2"),
     ),
 )
 def test_pytorch_gpu(conda_cli, monkeypatch, specs):
     monkeypatch.setenv("CONDA_OVERRIDE_CUDA", "12.6")
     monkeypatch.setenv("CONDA_OVERRIDE_GLIBC", "2.30")
-    reset_context()
+    monkeypatch.setenv("CONDA_OVERRIDE_LINUX", "5.15.167.4")
+    monkeypatch.setenv("CONDA_OVERRIDE_ARCHSPEC", "skylake")
     out, _, _ = conda_cli(
         "create",
         "--dry-run",

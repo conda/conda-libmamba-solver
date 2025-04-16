@@ -346,7 +346,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 -k test_pytorch_gpu
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 # -k test_pytorch_gpu
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
