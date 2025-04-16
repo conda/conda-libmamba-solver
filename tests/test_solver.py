@@ -13,7 +13,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_mac, on_win
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.exceptions import (
@@ -608,3 +608,37 @@ def test_satisfied_skip_solve_matchspec(
             "ca-certificates>10000",
             raises=PackagesNotFoundError,
         )
+
+
+# @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
+@pytest.mark.parametrize(
+    "specs",
+    (
+        pytest.param(("pytorch", "torchvision"), id="pytorch"),
+        pytest.param(("pytorch>0", "torchvision"), id="pytorch>0"),
+        pytest.param(("pytorch>2", "torchvision"), id="pytorch>2"),
+    ),
+)
+def test_pytorch_gpu(conda_cli, monkeypatch, specs):
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA", "12.6")
+    monkeypatch.setenv("CONDA_OVERRIDE_GLIBC", "2.30")
+    reset_context()
+    out, _, _ = conda_cli(
+        "create",
+        "--dry-run",
+        "--override-channels",
+        "--channel=conda-forge",
+        "--platform=linux-64",
+        "--json",
+        *specs,
+        raises=DryRunExit,
+    )
+    print(out)
+    result = json.loads(out)
+    assert result["success"]
+    for record in result["actions"]["LINK"]:
+        if record["name"] == "pytorch":
+            assert "cuda" in record["build_string"]
+            break
+    else:
+        raise AssertionError("No pytorch found")
