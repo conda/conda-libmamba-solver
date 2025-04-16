@@ -501,8 +501,8 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: false #
-    needs.changes.outputs.code == 'true'
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:
