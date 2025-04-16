@@ -380,7 +380,7 @@ class LibMambaSolver(Solver):
             "force_reinstall": in_state.force_reinstall,
             "keep_dependencies": True,
             "keep_user_specs": True,
-            "order_request": False,  # we do this ourselves
+            "order_request": True,  # we do this ourselves
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
         if log.isEnabledFor(logging.DEBUG):
