@@ -75,8 +75,7 @@ jobs:
   windows:
     # only run test suite if there are code changes
     needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: windows-latest
     strategy:
@@ -239,8 +238,8 @@ jobs:
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         python-version: ['3.9', '3.10', '3.11', '3.12']
-        default-channel: [conda-forge] # defaults, conda-forge]
-        test-type: [conda-libmamba-solver] #, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        default-channel: [defaults, conda-forge]
+        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - python-version: '3.9'
@@ -346,7 +345,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16 tests/test_solver.py
+          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -501,8 +500,7 @@ jobs:
   macos:
     # only run test suite if there are code changes
     needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
     defaults:
