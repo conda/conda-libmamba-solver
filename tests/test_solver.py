@@ -621,6 +621,8 @@ def test_satisfied_skip_solve_matchspec(
 )
 def test_pytorch_gpu(specs):
     """
+    https://github.com/conda/conda-libmamba-solver/issues/646
+
     This test must run in a subprocess because it's sensitive to side effects
     from other tests. There must be some global state in the libmamba Database / Pool
     objects. When run in isolation, it always passed.
