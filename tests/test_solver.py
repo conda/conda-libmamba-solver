@@ -619,12 +619,18 @@ def test_satisfied_skip_solve_matchspec(
         pytest.param(("pytorch=2", "torchvision"), id="pytorch=2"),
     ),
 )
-def test_pytorch_gpu(conda_cli, monkeypatch, specs):
-    monkeypatch.setenv("CONDA_OVERRIDE_CUDA", "12.6")
-    monkeypatch.setenv("CONDA_OVERRIDE_GLIBC", "2.30")
-    monkeypatch.setenv("CONDA_OVERRIDE_LINUX", "5.15.167.4")
-    monkeypatch.setenv("CONDA_OVERRIDE_ARCHSPEC", "skylake")
-    out, _, _ = conda_cli(
+def test_pytorch_gpu(specs):
+    """
+    This test must run in a subprocess because it's sensitive to side effects
+    from other tests. There must be some global state in the libmamba Database / Pool
+    objects. When run in isolation, it always passed.
+    """
+    env = os.environ.copy()
+    env["CONDA_OVERRIDE_CUDA"] = "12.6"
+    env["CONDA_OVERRIDE_GLIBC"] = "2.30"
+    env["CONDA_OVERRIDE_LINUX"] = "5.15.167.4"
+    env["CONDA_OVERRIDE_ARCHSPEC"] = "skylake"
+    p = conda_subprocess(
         "create",
         "--dry-run",
         "--override-channels",
@@ -632,13 +638,13 @@ def test_pytorch_gpu(conda_cli, monkeypatch, specs):
         "--platform=linux-64",
         "--json",
         *specs,
-        raises=DryRunExit,
+        env=env,
     )
-    print(out)
-    result = json.loads(out)
+    result = json.loads(p.stdout)
     assert result["success"]
     for record in result["actions"]["LINK"]:
         if record["name"] == "pytorch":
+            print(record)
             assert "cuda" in record["build_string"]
             break
     else:
