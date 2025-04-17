@@ -13,7 +13,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import context, reset_context
+from conda.base.context import context
 from conda.common.compat import on_linux, on_mac, on_win
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
 from conda.exceptions import (
