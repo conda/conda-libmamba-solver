@@ -1,0 +1,19 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* Avoid `libmamba` `MatchSpec` parsing errors by skipping nameless channel information in passed specs. (#645 via #648)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
