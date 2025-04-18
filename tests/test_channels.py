@@ -384,6 +384,36 @@ def test_local_spec() -> None:
     assert process.returncode == 0
 
 
+def test_nameless_channel(
+    http_server_auth_none: str,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    tmp_path: Path,
+):
+    out, err, rc = conda_cli(
+        "create",
+        f"--prefix={tmp_path}",
+        "--solver=libmamba",
+        "--yes",
+        "--override-channels",
+        f"--channel={http_server_auth_none}",
+        "test-package",
+    )
+    print(out)
+    print(err, file=sys.stderr)
+    assert not rc
+    out, err, rc = conda_cli(
+        "install",
+        f"--prefix={tmp_path}",
+        "--solver=libmamba",
+        "--yes",
+        f"--channel={http_server_auth_none}",
+        "zlib",
+    )
+    print(out)
+    print(err, file=sys.stderr)
+    assert not rc
+
+
 def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     """https://github.com/conda/conda-libmamba-solver/issues/418"""
     DATA = Path(__file__).parent / "data"

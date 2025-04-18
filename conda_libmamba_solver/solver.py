@@ -884,8 +884,16 @@ class LibMambaSolver(Solver):
         for field in spec.FIELD_NAMES:
             value = spec.get_raw_value(field)
             if value:
-                if field == "channel" and str(value) == "<unknown>":
-                    continue
+                if field == "channel":
+                    if str(value) == "<unknown>":
+                        continue
+                    if not value.name:
+                        # channels like http://localhost:8000 don't have a name
+                        # this makes mamba choke so we should skip it
+                        # however the subdir is still useful information; keep it!
+                        if value.platform:
+                            spec_fields["subdir"] = value.platform
+                        continue
                 spec_fields[field] = value
         return MatchSpec(**spec_fields)
 
