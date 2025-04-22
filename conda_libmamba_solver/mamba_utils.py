@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-from __future__ import annotations
 import os
 import logging
 import sys
@@ -40,7 +39,7 @@ def mamba_version() -> str:
     return version("libmambapy")
 
 
-def _get_base_url(url: str, name: str | None = None):
+def _get_base_url(url: str, name: str | None = None) -> str:
     tmp = url.rsplit("/", 1)[0]
     if name:
         if tmp.endswith(name):

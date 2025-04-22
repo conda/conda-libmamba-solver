@@ -185,7 +185,7 @@ class LibMambaIndexHelper:
         self._set_repo_priorities()
 
     @classmethod
-    def from_platform_aware_channel(cls, channel: Channel):
+    def from_platform_aware_channel(cls, channel: Channel) -> LibMambaIndexHelper:
         if not channel.platform:
             raise ValueError(f"Channel {channel} must define 'platform' attribute.")
         subdir = channel.platform
@@ -449,7 +449,7 @@ class LibMambaIndexHelper:
                 log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
 
-    def _load_installed(self, records: Iterable[PackageRecord]) -> RepoInfo:
+    def _load_installed(self, records: Iterable[PackageRecord]) -> _ChannelRepoInfo:
         packages = [self._package_info_from_package_record(record) for record in records]
         repo = self.db.add_repo_from_packages(
             packages=packages,

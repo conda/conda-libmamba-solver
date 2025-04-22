@@ -50,8 +50,8 @@ def escape_channel_url(channel: str) -> str:
 
 
 def compatible_specs(
-    index: type[LibMambaIndexHelper], specs: Iterable[MatchSpec], raise_not_found: bool = True
-):
+    index: LibMambaIndexHelper, specs: Iterable[MatchSpec], raise_not_found: bool = True
+) -> bool:
     """
     Assess whether the given specs are compatible with each other.
     This is done by querying the index for each spec and taking the

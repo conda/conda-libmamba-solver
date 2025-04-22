@@ -89,6 +89,8 @@ if TYPE_CHECKING:
     from conda.core.solve import Solver
     from conda.models.records import PackageRecord
 
+    from .index import LibMambaIndexHelper
+
 from .utils import EnumAsBools, compatible_specs
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -554,7 +556,7 @@ class SolverOutputState:
                 # to the map of installed packages)
                 return self.current_solution
 
-    def check_for_pin_conflicts(self, index):
+    def check_for_pin_conflicts(self, index: LibMambaIndexHelper):
         """
         Last part of the logic, common to addition and removal of packages. Originally,
         the legacy logic will also minimize the conflicts here by doing a pre-solve
@@ -591,7 +593,7 @@ class SolverOutputState:
                 exc.allow_retry = False
                 raise exc
 
-    def post_solve(self, solver: type[Solver]):
+    def post_solve(self, solver: Solver):
         """
         These tasks are performed _after_ the solver has done its work. It essentially
         post-processes the ``records`` mapping.
