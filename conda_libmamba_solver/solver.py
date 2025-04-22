@@ -887,11 +887,11 @@ class LibMambaSolver(Solver):
                 if field == "channel":
                     if str(value) == "<unknown>":
                         continue
-                    if not value.name:
+                    if not getattr(value, "name", ""):
                         # channels like http://localhost:8000 don't have a name
                         # this makes mamba choke so we should skip it
                         # however the subdir is still useful information; keep it!
-                        if value.platform:
+                        if getattr(value, "platform", ""):
                             spec_fields["subdir"] = value.platform
                         continue
                 spec_fields[field] = value
