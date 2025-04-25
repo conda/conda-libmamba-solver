@@ -179,10 +179,10 @@ def test_old_panel(tmp_path):
         )
     )
     with open(f"{old_repodata}/conda-forge/osx-64/repodata.json") as f:
-        data = json.load(f)
-        # Make sure we have patched the repodata correctly
-        # Python 3.11 only appeared in October 2022
-        assert "python-3.11.0" not in data
+        for line in f:
+            # Make sure we have patched the repodata correctly
+            # Python 3.11 only appeared in October 2022
+            assert '"python-3.11.0-' not in line
 
     channel_prefix = f"file://{old_repodata}/"
     env = os.environ.copy()
@@ -212,7 +212,6 @@ def test_old_panel(tmp_path):
         "lumen",
     )
 
-    # conda-libmamba-solver gets an older version of panel
     for solver in ("classic", "libmamba"):
         print("Solving with", solver)
         p = conda_subprocess(
@@ -224,7 +223,4 @@ def test_old_panel(tmp_path):
         )
         data = json.loads(p.stdout)
         panel = next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "panel")
-        if solver == "classic":
-            assert panel["version"] == "0.14.0a2"
-        else:
-            assert panel["version"] == "0.1.0a14"
+        assert panel["version"] == "0.14.0a2"

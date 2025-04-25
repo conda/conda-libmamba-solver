@@ -608,3 +608,46 @@ def test_satisfied_skip_solve_matchspec(
             "ca-certificates>10000",
             raises=PackagesNotFoundError,
         )
+
+
+# @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
+@pytest.mark.parametrize(
+    "specs",
+    (
+        pytest.param(("pytorch", "torchvision"), id="pytorch"),
+        pytest.param(("pytorch>0", "torchvision"), id="pytorch>0"),
+        pytest.param(("pytorch=2", "torchvision"), id="pytorch=2"),
+    ),
+)
+def test_pytorch_gpu(specs):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/646
+
+    This test must run in a subprocess because it's sensitive to side effects
+    from other tests. There must be some global state in the libmamba Database / Pool
+    objects. When run in isolation, it always passed.
+    """
+    env = os.environ.copy()
+    env["CONDA_OVERRIDE_CUDA"] = "12.6"
+    env["CONDA_OVERRIDE_GLIBC"] = "2.30"
+    env["CONDA_OVERRIDE_LINUX"] = "5.15.167.4"
+    env["CONDA_OVERRIDE_ARCHSPEC"] = "skylake"
+    p = conda_subprocess(
+        "create",
+        "--dry-run",
+        "--override-channels",
+        "--channel=conda-forge",
+        "--platform=linux-64",
+        "--json",
+        *specs,
+        env=env,
+    )
+    result = json.loads(p.stdout)
+    assert result["success"]
+    for record in result["actions"]["LINK"]:
+        if record["name"] == "pytorch":
+            print(record)
+            assert "cuda" in record["build_string"]
+            break
+    else:
+        raise AssertionError("No pytorch found")
