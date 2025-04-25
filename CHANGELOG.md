@@ -13,6 +13,20 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 25.4.0 (2025-04-25)
+
+### Enhancements
+
+* Use `conda.reporters.get_spinner()` to support conda reporter plugins. (#641)
+
+### Bug fixes
+
+* Always percent-encode spaces in `file://` channel URLs. (#640)
+* Fix a bug where auto-selection of GPU variants of `pytorch` and `torchvision` didn't work as expected. (#646 via #647)
+* Avoid `libmamba` `MatchSpec` parsing errors by skipping nameless channel information in passed specs. (#645 via #648)
+
+
+
 ## 25.3.0 (2025-03-14)
 
 ### Bug fixes
