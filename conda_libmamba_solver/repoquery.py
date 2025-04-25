@@ -212,3 +212,5 @@ def repoquery(args: argparse.Namespace) -> int:
             print(result.sort("name").table())
     else:
         raise CondaError(f"Unrecognized subcommand: {args.subcmd}")
+
+    return 0

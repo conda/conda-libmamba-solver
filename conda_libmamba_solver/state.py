@@ -515,7 +515,7 @@ class SolverOutputState:
         """
         return {name: spec for name, spec in self.specs.items() if name.startswith("__")}
 
-    def early_exit(self) -> IndexedSet[PackageRecord]:
+    def early_exit(self) -> IndexedSet[PackageRecord] | None:
         """
         Operations that do not need a solver and might result in returning
         early are collected here.
@@ -527,7 +527,7 @@ class SolverOutputState:
             # When 'remove --force' is set, remove the package without solving.
             if sis.force_remove:
                 force_remove_solution = self.current_solution
-            not_installed = []
+            not_installed: list[MatchSpec] = []
             for name, spec in sis.requested.items():
                 for record in sis.installed.values():
                     if spec.match(record):
@@ -556,7 +556,7 @@ class SolverOutputState:
                 # to the map of installed packages)
                 return self.current_solution
 
-    def check_for_pin_conflicts(self, index: LibMambaIndexHelper):
+    def check_for_pin_conflicts(self, index: LibMambaIndexHelper) -> None:
         """
         Last part of the logic, common to addition and removal of packages. Originally,
         the legacy logic will also minimize the conflicts here by doing a pre-solve
@@ -593,7 +593,7 @@ class SolverOutputState:
                 exc.allow_retry = False
                 raise exc
 
-    def post_solve(self, solver: Solver):
+    def post_solve(self, solver: Solver) -> None:
         """
         These tasks are performed _after_ the solver has done its work. It essentially
         post-processes the ``records`` mapping.

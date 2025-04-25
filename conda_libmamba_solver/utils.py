@@ -104,15 +104,15 @@ class EnumAsBools:
         self._enum = enum
         self._names = {v.name for v in self._enum.__class__.__members__.values()}
 
-    def __getattr__(self, name: str):
+    def __getattr__(self, name: str) -> bool:
         if name in ("name", "value"):
             return getattr(self._enum, name)
         if name in self._names:
             return self._enum.name == name
         raise AttributeError(f"'{name}' is not a valid name for {self._enum.__class__.__name__}")
 
-    def __eq__(self, obj: object):
+    def __eq__(self, obj: object) -> bool:
         return self._enum.__eq__(obj)
 
-    def _dict(self):
+    def _dict(self) -> dict[str, bool]:
         return {name: self._enum.name == name for name in self._names}

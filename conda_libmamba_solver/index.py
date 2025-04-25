@@ -112,8 +112,9 @@ from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import Literal
+    from typing import Any, Literal
 
+    from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
@@ -132,7 +133,7 @@ class _ChannelRepoInfo:
     url_no_cred: str
 
     @property
-    def canonical_name(self):
+    def canonical_name(self) -> str:
         if self.channel:
             return self.channel.canonical_name
         url_parts = self.url_no_cred.split("/")
@@ -158,7 +159,7 @@ class LibMambaIndexHelper:
         subdirs: Iterable[str] = (),
         repodata_fn: str = REPODATA_FN,
         installed_records: Iterable[PackageRecord] = (),
-        pkgs_dirs: Iterable[os.PathLike] = (),
+        pkgs_dirs: PathsType = (),
     ):
         platform_less_channels = []
         for channel in channels:
@@ -208,7 +209,7 @@ class LibMambaIndexHelper:
                 count += len(self.db.packages_in_repo(repo))
         return count
 
-    def reload_channel(self, channel: Channel):
+    def reload_channel(self, channel: Channel) -> None:
         urls = {}
         for url in channel.urls(with_credentials=False, subdirs=self.subdirs):
             for repo_info in self.repos:
@@ -461,7 +462,7 @@ class LibMambaIndexHelper:
             channel=None, repo=repo, url_w_cred="installed", url_no_cred="installed"
         )
 
-    def _load_pkgs_cache(self, pkgs_dirs: Iterable[os.PathLike]) -> list[RepoInfo]:
+    def _load_pkgs_cache(self, pkgs_dirs: PathsType) -> list[RepoInfo]:
         repos = []
         for path in pkgs_dirs:
             package_cache_data = PackageCacheData(path)
@@ -508,7 +509,7 @@ class LibMambaIndexHelper:
             timestamp=int((record.get("timestamp") or 0) * 1000),
         )
 
-    def _set_repo_priorities(self):
+    def _set_repo_priorities(self) -> None:
         has_priority = context.channel_priority in (
             ChannelPriority.STRICT,
             ChannelPriority.FLEXIBLE,
@@ -553,7 +554,7 @@ class LibMambaIndexHelper:
         self,
         queries: Iterable[str | MatchSpec] | str | MatchSpec,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> list[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
         if isinstance(queries, (str, MatchSpec)):
             queries = [queries]
         queries = list(map(str, queries))
@@ -565,7 +566,7 @@ class LibMambaIndexHelper:
         query: str | MatchSpec,
         tree: bool = False,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> list[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
         query = str(query)
         result = Query.depends(self.db, query, tree)
         return self._process_query_result(result, return_type)
@@ -575,7 +576,7 @@ class LibMambaIndexHelper:
         query: str | MatchSpec,
         tree: bool = False,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> list[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
         query = str(query)
         result = Query.whoneeds(self.db, query, tree)
         return self._process_query_result(result, return_type)
@@ -584,7 +585,7 @@ class LibMambaIndexHelper:
         """
         Returns all the package names that (might) depend on the passed specs
         """
-        explicit_pool = set()
+        explicit_pool: set[str] = set()
         for spec in specs:
             pkg_records = self.depends(spec.dist_str())
             for record in pkg_records:
@@ -595,7 +596,7 @@ class LibMambaIndexHelper:
         self,
         result: QueryResult,
         return_type: Literal["records", "dict", "raw"] = "records",
-    ) -> list[PackageRecord] | dict | QueryResult:
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
         if return_type == "raw":
             return result
         result = result.to_dict()

@@ -69,6 +69,7 @@ if TYPE_CHECKING:
         DepsModifier,
         UpdateModifier,
     )
+    from conda.common.path import PathType
     from libmambapy.solver.libsolv import Database, UnSolvable
     from libmambapy.specs import PackageInfo
 
@@ -89,7 +90,7 @@ class LibMambaSolver(Solver):
 
     def __init__(
         self,
-        prefix: os.PathLike | str,
+        prefix: PathType,
         channels: Iterable[Channel | str],
         subdirs: Iterable[str] = (),
         specs_to_add: Iterable[MatchSpec | str] = (),
@@ -750,7 +751,7 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         out_state: SolverOutputState,
         previous_conflicts: Mapping[str, MatchSpec] = None,
-    ):
+    ) -> None:
         parsed_problems = self._parse_problems(unsolvable, index.db)
         # We allow conda-build (if present) to process the exception early
         self._maybe_raise_for_conda_build(
@@ -822,7 +823,7 @@ class LibMambaSolver(Solver):
         self,
         conflicting_specs: Mapping[str, MatchSpec],
         message: str = None,
-    ):
+    ) -> None:
         # TODO: Remove this hack for conda-build compatibility >_<
         # conda-build expects a slightly different exception format
         # good news is that we don't need to retry much, because all
@@ -850,7 +851,7 @@ class LibMambaSolver(Solver):
     # region General helpers
     ########################
 
-    def _log_info(self):
+    def _log_info(self) -> None:
         log.info("conda version: %s", _conda_version)
         log.info("conda-libmamba-solver version: %s", __version__)
         log.info("libmambapy version: %s", mamba_version())
@@ -978,7 +979,7 @@ class LibMambaSolver(Solver):
         link_precs: Iterable[PackageRecord],
         index: LibMambaIndexHelper | None = None,
         final_state: Iterable[PackageRecord] | None = None,
-    ):
+    ) -> None:
         """
         We are overriding the base class implementation, which gets called in
         Solver.solve_for_diff() once 'link_precs' is available. However, we
