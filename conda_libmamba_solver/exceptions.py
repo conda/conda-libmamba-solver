@@ -13,5 +13,5 @@ class LibMambaUnsatisfiableError(UnsatisfiableError):
     The error message is passed directly as a str.
     """
 
-    def __init__(self, message, **kwargs):
+    def __init__(self, message: str, **kwargs):
         super(UnsatisfiableError, self).__init__(str(message))

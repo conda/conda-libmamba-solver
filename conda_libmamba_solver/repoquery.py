@@ -97,7 +97,7 @@ def configure_parser(parser: argparse.ArgumentParser):
         conda_argparse.add_parser_json(cmd)
 
 
-def repoquery(args: argparse.Namespace):
+def repoquery(args: argparse.Namespace) -> int:
     if not args.subcmd:
         print("repoquery needs a subcommand (search, depends or whoneeds), e.g.:", file=sys.stderr)
         print("    conda repoquery search python\n", file=sys.stderr)
@@ -212,3 +212,5 @@ def repoquery(args: argparse.Namespace):
             print(result.sort("name").table())
     else:
         raise CondaError(f"Unrecognized subcommand: {args.subcmd}")
+
+    return 0
