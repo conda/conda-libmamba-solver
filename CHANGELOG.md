@@ -25,6 +25,10 @@ Remember to update the hyperlinks at the bottom.
 * Fix a bug where auto-selection of GPU variants of `pytorch` and `torchvision` didn't work as expected. (#646 via #647)
 * Avoid `libmamba` `MatchSpec` parsing errors by skipping nameless channel information in passed specs. (#645 via #648)
 
+### Contributors
+
+* @jaimergp
+
 
 
 ## 25.3.0 (2025-03-14)
