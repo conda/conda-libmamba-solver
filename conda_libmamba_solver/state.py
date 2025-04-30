@@ -72,7 +72,7 @@ from conda.auxlib import NULL
 from conda.base.constants import DepsModifier, UpdateModifier
 from conda.base.context import context
 from conda.common.path import paths_equal
-from conda.core.index import _supplement_index_with_system
+from conda.core.index import Index
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import get_pinned_specs
 from conda.exceptions import PackagesNotFoundError, SpecsConfigurationConflictError
@@ -178,8 +178,7 @@ class SolverInputState:
         self._pinned = {spec.name: spec for spec in get_pinned_specs(prefix)}
         self._aggressive_updates = {spec.name: spec for spec in context.aggressive_update_packages}
 
-        virtual = {}
-        _supplement_index_with_system(virtual)
+        virtual = Index().system_packages
         self._virtual = {record.name: record for record in virtual}
 
         self._requested = {}
