@@ -70,248 +70,262 @@ Once the cache has been populated, we can instantiate 'libmamba.Repo' objects di
 We maintain a map of subdir-specific URLs to `conda.model.channel.Channel`
 and `libmamba.Repo` objects.
 """
+
 from __future__ import annotations
 
 import logging
 import os
 from dataclasses import dataclass
-from functools import lru_cache, partial
+from functools import partial
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Iterable
+from typing import TYPE_CHECKING
 
-import libmambapy as api
-from conda import __version__ as conda_version
-from conda.base.constants import REPODATA_FN
-from conda.base.context import context, reset_context
-from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, env_var
-from conda.common.serialize import json_dump, json_load
-from conda.common.url import percent_decode, remove_auth, split_anaconda_token
+from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
+from conda.base.context import context
+from conda.common.compat import on_win
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
+from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
-from conda.models.version import VersionOrder
+from libmambapy import MambaNativeException, Query
+from libmambapy.solver.libsolv import (
+    Database,
+    PackageTypes,
+    PipAsPythonDependency,
+    Priorities,
+    RepodataOrigin,
+)
+from libmambapy.specs import (
+    Channel as LibmambaChannel,
+)
+from libmambapy.specs import (
+    ChannelResolveParams,
+    CondaURL,
+    NoArchType,
+    PackageInfo,
+)
 
-from .mamba_utils import set_channel_priorities
-from .state import IndexHelper
-from .utils import escape_channel_url
+from .mamba_utils import logger_callback
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+    from typing import Any, Literal
+
+    from conda.common.path import PathsType
+    from conda.gateways.repodata import RepodataState
+    from libmambapy import QueryResult
+    from libmambapy.solver.libsolv import RepoInfo
+
 
 log = logging.getLogger(f"conda.{__name__}")
 
 
-@dataclass(frozen=True)
+@dataclass
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
-    channel: Channel
-    repo: api.Repo
-    full_url: str
-    noauth_url: str
+
+    channel: Channel | None
+    repo: RepoInfo
+    url_w_cred: str
+    url_no_cred: str
+
+    @property
+    def canonical_name(self) -> str:
+        if self.channel:
+            return self.channel.canonical_name
+        url_parts = self.url_no_cred.split("/")
+        if url_parts[-1] in KNOWN_SUBDIRS:
+            return url_parts[-2]
+        return url_parts[-1]
 
 
-class LibMambaIndexHelper(IndexHelper):
+class LibMambaIndexHelper:
+    """
+    Interface between conda and libmamba for the purpose of building the "index".
+    The index is the collection of package records that can be part of a solution.
+    It is built by collecting all the repodata.json files from channels and their
+    subdirs. For existing environments, the installed packages are also added to
+    the index (this helps with simplifying solutions and outputs). The local cache
+    can also be added as a "channel", which is useful in offline mode or with no
+    channels configured.
+    """
+
     def __init__(
         self,
-        installed_records: Iterable[PackageRecord] = (),
-        channels: Iterable[Channel | str] | None = None,
-        subdirs: Iterable[str] | None = None,
+        channels: Iterable[Channel],
+        subdirs: Iterable[str] = (),
         repodata_fn: str = REPODATA_FN,
-        query_format=api.QueryFormat.JSON,
-        load_pkgs_cache: bool = False,
+        installed_records: Iterable[PackageRecord] = (),
+        pkgs_dirs: PathsType = (),
     ):
-        self._channels = context.channels if channels is None else channels
-        self._subdirs = context.subdirs if subdirs is None else subdirs
-        self._repodata_fn = repodata_fn
+        platform_less_channels = []
+        for channel in channels:
+            if channel.platform:
+                # When .platform is defined, .urls() will ignore subdirs kw. Remove!
+                log.info(
+                    "Platform-aware channels are not supported. "
+                    "Ignoring platform %s from channel %s. "
+                    "Use subdirs keyword if necessary.",
+                    channel.platform,
+                    channel,
+                )
+                channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+            platform_less_channels.append(channel)
+        self.channels = platform_less_channels
+        self.subdirs = subdirs or context.subdirs
+        self.repodata_fn = repodata_fn
+        self.db = self._init_db()
+        self.repos: list[_ChannelRepoInfo] = self._load_channels()
+        if pkgs_dirs:
+            self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
+        if installed_records:
+            self.repos.append(self._load_installed(installed_records))
+        self._set_repo_priorities()
 
-        self._repos = []
-        self._pool = api.Pool()
+    @classmethod
+    def from_platform_aware_channel(cls, channel: Channel) -> LibMambaIndexHelper:
+        if not channel.platform:
+            raise ValueError(f"Channel {channel} must define 'platform' attribute.")
+        subdir = channel.platform
+        channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
+        return cls(channels=(channel,), subdirs=(subdir,))
 
-        installed_repo = self._load_installed(installed_records)
-        self._repos.append(installed_repo)
-
-        if load_pkgs_cache:
-            self._repos.extend(self._load_pkgs_cache())
-
-        self._index = self._load_channels()
-        self._repos += [info.repo for info in self._index.values()]
-
-        self._query = api.Query(self._pool)
-        self._format = query_format
-
-    def get_info(self, key: str) -> _ChannelRepoInfo:
-        orig_key = key
-        if not key.startswith("file://"):
-            # The conda functions (specifically remove_auth) assume the input
-            # is a url; a file uri on windows with a drive letter messes them up.
-            # For the rest, we remove all forms of authentication
-            key = split_anaconda_token(remove_auth(key))[0]
-        try:
-            return self._index[key]
-        except KeyError as exc:
-            # some libmamba versions return encoded URLs
-            try:
-                return self._index[percent_decode(key)]
-            except KeyError:
-                pass  # raise original error below
-            raise KeyError(
-                f"Channel info for {orig_key} ({key}) not found. "
-                f"Available keys: {list(self._index)}"
-            ) from exc
-
-    def reload_local_channels(self):
-        """
-        Reload a channel that was previously loaded from a local directory.
-        """
-        for noauth_url, info in self._index.items():
-            if noauth_url.startswith("file://") or info.channel.scheme == "file":
-                url, json_path = self._fetch_channel(info.full_url)
-                repo_position = self._repos.index(info.repo)
-                info.repo.clear(True)
-                new = self._json_path_to_repo_info(url, json_path, try_solv=False)
-                self._repos[repo_position] = new.repo
-                self._index[noauth_url] = new
-        set_channel_priorities(self._index)
-
-    def _repo_from_records(
-        self, pool: api.Pool, repo_name: str, records: Iterable[PackageRecord] = ()
-    ) -> api.Repo:
-        """
-        Build a libmamba 'Repo' object from conda 'PackageRecord' objects.
-
-        This is done by rebuilding a repodata.json-like dictionary, which is
-        then exported to a temporary file that will be loaded with 'libmambapy.Repo'.
-        """
-        exported = {"packages": {}, "packages.conda": {}}
-        additional_infos = {}
-        for record in records:
-            record_data = dict(record.dump())
-            # These fields are expected by libmamba, but they don't always appear
-            # in the record.dump() dict (e.g. exporting from S3 channels)
-            # ref: https://github.com/mamba-org/mamba/blob/ad46f318b/libmamba/src/core/package_info.cpp#L276-L318  # noqa
-            for field in (
-                "sha256",
-                "track_features",
-                "license",
-                "size",
-                "url",
-                "noarch",
-                "platform",
-                "timestamp",
-            ):
-                if field in record_data:
-                    continue  # do not overwrite
-                value = getattr(record, field, None)
-                if value is not None:
-                    if field == "timestamp" and value:
-                        value = int(value * 1000)  # from s to ms
-                    record_data[field] = value
-            if record.fn.endswith(".conda"):
-                exported["packages.conda"][record.fn] = record_data
+    def n_packages(
+        self,
+        repos: Iterable[RepoInfo] | None = None,
+        filter_: callable | None = None,
+    ) -> int:
+        repos = repos or [repo_info.repo for repo_info in self.repos]
+        count = 0
+        for repo in repos:
+            if filter_:
+                for pkg in self.db.packages_in_repo(repo):
+                    if filter_(pkg):
+                        count += 1
             else:
-                exported["packages"][record.fn] = record_data
+                count += len(self.db.packages_in_repo(repo))
+        return count
 
-            # extra info for libmamba
-            info = api.ExtraPkgInfo()
-            if record.noarch:
-                info.noarch = record.noarch.value
-            if record.channel and record.channel.subdir_url:
-                info.repo_url = record.channel.subdir_url
-            additional_infos[record.fn] = info
+    def reload_channel(self, channel: Channel) -> None:
+        urls = {}
+        for url in channel.urls(with_credentials=False, subdirs=self.subdirs):
+            for repo_info in self.repos:
+                if repo_info.url_no_cred == url:
+                    log.debug("Reloading repo %s", repo_info.url_no_cred)
+                    urls[repo_info.url_w_cred] = channel
+                    self.db.remove_repo(repo_info.repo)
+        for new_repo_info in self._load_channels(urls, try_solv=False):
+            for repo_info in self.repos:
+                if repo_info.url_no_cred == new_repo_info.url_no_cred:
+                    repo_info.repo = new_repo_info.repo
+        self._set_repo_priorities()
 
-        with NamedTemporaryFile(suffix=".json", delete=False, mode="w") as f:
-            f.write(json_dump(exported))
-
-        try:
-            repo = api.Repo(pool, repo_name, f.name, "")
-            repo.add_extra_pkg_info(additional_infos)
-            return repo
-        finally:
-            os.unlink(f.name)
-
-    def _fetch_channel(self, url: str) -> tuple[str, os.PathLike]:
-        channel = Channel.from_url(url)
-        if not channel.subdir:
-            raise ValueError(f"Channel URLs must specify a subdir! Provided: {url}")
-
-        if "PYTEST_CURRENT_TEST" in os.environ:
-            # Workaround some testing issues - TODO: REMOVE
-            # Fix conda.testing.helpers._patch_for_local_exports by removing last line
-            for key, cached in list(SubdirData._cache_.items()):
-                if not isinstance(key, tuple):
-                    continue  # should not happen, but avoid IndexError just in case
-                if key[:2] == (url, self._repodata_fn) and cached._mtime == float("inf"):
-                    del SubdirData._cache_[key]
-            # /Workaround
-
-        log.debug("Fetching %s with SubdirData.repo_fetch", channel)
-        subdir_data = SubdirData(channel, repodata_fn=self._repodata_fn)
-        if context.offline or context.use_index_cache:
-            # This might not exist (yet, anymore), but that's ok because we'll check
-            # for existence later and safely ignore if needed
-            json_path = subdir_data.cache_path_json
-        else:
-            json_path, _ = subdir_data.repo_fetch.fetch_latest_path()
-
-        return url, json_path
-
-    def _json_path_to_repo_info(
-        self, url: str, json_path: str, try_solv: bool = True
-    ) -> _ChannelRepoInfo | None:
-        channel = Channel.from_url(url)
-        noauth_url = channel.urls(with_credentials=False, subdirs=(channel.subdir,))[0]
-        json_path = Path(json_path)
-        try:
-            json_stat = json_path.stat()
-        except OSError as exc:
-            log.debug("Failed to stat %s", json_path, exc_info=exc)
-            json_stat = None
-        if try_solv:
-            try:
-                solv_path = json_path.parent / f"{json_path.stem}.solv"
-                solv_stat = solv_path.stat()
-            except OSError as exc:
-                log.debug("Failed to stat %s", solv_path, exc_info=exc)
-                solv_stat = None
-        else:
-            solv_path = None
-            solv_stat = None
-
-        if solv_stat is None and json_stat is None:
-            log.warning(
-                "No repodata found for channel %s. Solve will fail.", channel.canonical_name
+    def _init_db(self) -> Database:
+        custom_channels = {
+            # Add custom channels as a workaround for this weird conda behavior
+            # See https://github.com/conda/conda/issues/13501
+            **{c.name: c for c in self.channels if c.location != context.channel_alias.location},
+            **context.custom_channels,
+        }
+        custom_channels = {
+            name: LibmambaChannel(
+                url=CondaURL.parse(channel.base_url.replace(" ", "%20")),
+                display_name=name,
+                platforms=set(self.subdirs),
             )
-            return
-        if solv_stat is None:
-            path_to_use = json_path
-        elif json_stat is None:
-            path_to_use = solv_path  # better than nothing
-        elif json_stat.st_mtime <= solv_stat.st_mtime:
-            # use solv file if it's newer than the json file
-            path_to_use = solv_path
-        else:
-            path_to_use = json_path
-
-        repo = api.Repo(self._pool, noauth_url, str(path_to_use), escape_channel_url(noauth_url))
-        return _ChannelRepoInfo(
-            repo=repo,
-            channel=channel,
-            full_url=url,
-            noauth_url=noauth_url,
+            for (name, channel) in custom_channels.items()
+            if channel.base_url
+        }
+        custom_multichannels = {
+            channel_name: [
+                custom_channels.get(
+                    channel.name,
+                    LibmambaChannel(
+                        url=CondaURL.parse(channel.base_url.replace(" ", "%20")),
+                        display_name=channel.name,
+                        platforms=set(self.subdirs),
+                    ),
+                )
+                for channel in channels
+                if channel.base_url
+            ]
+            for channel_name, channels in context.custom_multichannels.items()
+        }
+        params = ChannelResolveParams(
+            platforms=set(self.subdirs),
+            channel_alias=CondaURL.parse(str(context.channel_alias)),
+            custom_channels=ChannelResolveParams.ChannelMap(custom_channels),
+            custom_multichannels=ChannelResolveParams.MultiChannelMap(custom_multichannels),
+            home_dir=str(Path.home()),
+            current_working_dir=os.getcwd(),
         )
+        db = Database(params)
+        db.set_logger(logger_callback)
+        return db
 
-    def _load_channels(self) -> dict[str, _ChannelRepoInfo]:
-        # 1. Obtain and deduplicate URLs from channels
-        urls = []
+    def _load_channels(
+        self,
+        urls_to_channel: dict[str, Channel] | None = None,
+        try_solv: bool = True,
+    ) -> list[_ChannelRepoInfo]:
+        if urls_to_channel is None:
+            urls_to_channel = self._channel_urls()
+
+        # conda.common.url.path_to_url does not %-encode spaces
+        encoded_urls_to_channel = {}
+        for url, channel in urls_to_channel.items():
+            if url.startswith("file://"):
+                url = url.replace(" ", "%20")
+            encoded_urls_to_channel[url] = channel
+        urls_to_channel = encoded_urls_to_channel
+
+        urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
+        channel_repo_infos = []
+        for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
+            url_no_token, _ = split_anaconda_token(url_w_cred)
+            url_no_cred = remove_auth(url_no_token)
+            repo = self._load_repo_info_from_json_path(
+                json_path,
+                url_no_cred,
+                state,
+                try_solv=try_solv,
+            )
+            channel_repo_infos.append(
+                _ChannelRepoInfo(
+                    channel=urls_to_channel[url_w_cred],
+                    repo=repo,
+                    url_w_cred=url_w_cred,
+                    url_no_cred=url_no_cred,
+                )
+            )
+        return channel_repo_infos
+
+    def _channel_urls(self) -> dict[str, Channel]:
+        "Maps authenticated URLs to channel objects"
+        urls = {}
         seen_noauth = set()
-        for _c in self._channels:
-            c = Channel(_c)
-            noauth_urls = c.urls(with_credentials=False, subdirs=self._subdirs)
+        channels_with_subdirs = []
+        for channel in self.channels:
+            for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
+                channels_with_subdirs.append(Channel(url))
+        for channel in channels_with_subdirs:
+            noauth_urls = [
+                url
+                for url in channel.urls(with_credentials=False)
+                if url.endswith(tuple(self.subdirs))
+            ]
             if seen_noauth.issuperset(noauth_urls):
                 continue
-            auth_urls = c.urls(with_credentials=True, subdirs=self._subdirs)
+            auth_urls = [
+                url.replace(" ", "%20")
+                for url in channel.urls(with_credentials=True)
+                if url.endswith(tuple(self.subdirs))
+            ]
             if noauth_urls != auth_urls:  # authed channel always takes precedence
-                urls += auth_urls
+                urls.update({url: channel for url in auth_urls})
                 seen_noauth.update(noauth_urls)
                 continue
             # at this point, we are handling an unauthed channel; in some edge cases,
@@ -319,145 +333,285 @@ class LibMambaIndexHelper(IndexHelper):
             # we only add them if we haven't seen them yet
             for url in noauth_urls:
                 if url not in seen_noauth:
-                    urls.append(url)
+                    urls[url] = channel
                     seen_noauth.add(url)
+        return urls
 
-        urls = tuple(dict.fromkeys(urls))  # de-duplicate
-
-        # 2. Fetch URLs (if needed)
+    def _fetch_repodata_jsons(self, urls: dict[str, str]) -> dict[str, tuple[str, RepodataState]]:
         Executor = (
             DummyExecutor
             if context.debug or context.repodata_threads == 1
             else partial(ThreadLimitedThreadPoolExecutor, max_workers=context.repodata_threads)
         )
         with Executor() as executor:
-            jsons = {url: str(path) for (url, path) in executor.map(self._fetch_channel, urls)}
+            return {
+                url: (str(path), state)
+                for (url, path, state) in executor.map(self._fetch_one_repodata_json, urls)
+            }
 
-        # 3. Create repos in same order as `urls`
-        index = {}
-        for url in urls:
-            info = self._json_path_to_repo_info(url, jsons[url])
-            if info is not None:
-                index[info.noauth_url] = info
+    def _fetch_one_repodata_json(self, url: str) -> tuple[str, os.PathLike, RepodataState]:
+        channel = Channel.from_url(url)
+        if not channel.subdir:
+            raise ValueError("Channel URLs must specify a subdir!")
 
-        # 4. Configure priorities
-        set_channel_priorities(index)
+        if "PYTEST_CURRENT_TEST" in os.environ:
+            # Workaround some testing issues - TODO: REMOVE
+            # Fix conda.testing.helpers._patch_for_local_exports by removing last line
+            for key, cached in list(SubdirData._cache_.items()):
+                if not isinstance(key, tuple):
+                    continue  # should not happen, but avoid IndexError just in case
+                if key[:2] == (url, self.repodata_fn) and cached._mtime == float("inf"):
+                    del SubdirData._cache_[key]
+            # /Workaround
 
-        return index
+        subdir_data = SubdirData(channel, repodata_fn=self.repodata_fn)
+        if context.offline or context.use_index_cache:
+            # This might not exist (yet, anymore), but that's ok because we'll check
+            # for existence later and safely ignore if needed
+            json_path = subdir_data.cache_path_json
+            state = subdir_data.repo_cache.load_state()
+        else:
+            # TODO: This method loads reads the whole JSON file (does not parse)
+            json_path, state = subdir_data.repo_fetch.fetch_latest_path()
+        return url, json_path, state
 
-    def _load_pkgs_cache(self, pkgs_dirs=None) -> Iterable[api.Repo]:
-        if pkgs_dirs is None:
-            pkgs_dirs = context.pkgs_dirs
+    def _load_repo_info_from_json_path(
+        self, json_path: str, channel_url: str, state: RepodataState, try_solv: bool = True
+    ) -> RepoInfo | None:
+        if try_solv and on_win:
+            # .solv loading is so slow on Windows is not even worth it. Use JSON instead.
+            # https://github.com/mamba-org/mamba/pull/2753#issuecomment-1739122830
+            log.debug("Overriding truthy 'try_solv' as False on Windows for performance reasons.")
+            try_solv = False
+        json_path = Path(json_path)
+        solv_path = json_path.with_suffix(".solv")
+        if state:
+            repodata_origin = RepodataOrigin(url=channel_url, etag=state.etag, mod=state.mod)
+        else:
+            repodata_origin = None
+        channel = Channel(channel_url)
+        channel_id = channel.canonical_name
+        if channel_id in context.custom_multichannels:
+            # In multichannels, the canonical name of a "subchannel" is the multichannel name
+            # which makes it ambiguous for `channel::specs`. In those cases, take the channel
+            # regular name; e.g. for repo.anaconda.com/pkgs/main, do not take defaults, but
+            # pkgs/main instead.
+            channel_id = channel.name
+        if try_solv and repodata_origin:
+            try:
+                log.debug(
+                    "Loading %s (%s) from SOLV repodata at %s", channel_id, channel_url, solv_path
+                )
+                return self.db.add_repo_from_native_serialization(
+                    path=str(solv_path),
+                    expected=repodata_origin,
+                    channel_id=channel_id,
+                    add_pip_as_python_dependency=PipAsPythonDependency(
+                        context.add_pip_as_python_dependency
+                    ),
+                )
+            except Exception as exc:
+                log.debug("Failed to load from SOLV. Trying JSON.", exc_info=exc)
+        try:
+            log.debug(
+                "Loading %s (%s) from JSON repodata at %s", channel_id, channel_url, json_path
+            )
+            repo = self.db.add_repo_from_repodata_json(
+                path=str(json_path),
+                url=channel_url,
+                channel_id=channel_id,
+                add_pip_as_python_dependency=PipAsPythonDependency(
+                    context.add_pip_as_python_dependency
+                ),
+                package_types=(
+                    PackageTypes.TarBz2Only
+                    if context.use_only_tar_bz2
+                    else PackageTypes.CondaOrElseTarBz2
+                ),
+            )
+        except MambaNativeException as exc:
+            if "does not exist" in str(exc) and context.offline:
+                # Ignore errors in offline mode. This is needed to pass
+                # tests/test_create.py::test_offline_with_empty_index_cache.
+                # In offline mode, with no repodata cache available, conda can still
+                # create a channel from the pkgs/ content. For that to work, we must
+                # not error out this early. If the package is still not found, the solver
+                # will complain that the package cannot be found.
+                log.warning("Could not load repodata for %s.", channel_id)
+                log.debug("Ignored MambaNativeException in offline mode: %s", exc, exc_info=exc)
+                return None
+            raise exc
+        if try_solv and repodata_origin:
+            try:
+                self.db.native_serialize_repo(
+                    repo=repo, path=str(solv_path), metadata=repodata_origin
+                )
+            except MambaNativeException as exc:
+                log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
+        return repo
+
+    def _load_installed(self, records: Iterable[PackageRecord]) -> _ChannelRepoInfo:
+        packages = [self._package_info_from_package_record(record) for record in records]
+        repo = self.db.add_repo_from_packages(
+            packages=packages,
+            name="installed",
+            add_pip_as_python_dependency=PipAsPythonDependency.No,
+        )
+        self.db.set_installed_repo(repo)
+        return _ChannelRepoInfo(
+            channel=None, repo=repo, url_w_cred="installed", url_no_cred="installed"
+        )
+
+    def _load_pkgs_cache(self, pkgs_dirs: PathsType) -> list[RepoInfo]:
         repos = []
         for path in pkgs_dirs:
             package_cache_data = PackageCacheData(path)
             package_cache_data.load()
-            repo = self._repo_from_records(self._pool, path, package_cache_data.values())
-            repos.append(repo)
+            packages = [
+                self._package_info_from_package_record(record)
+                for record in package_cache_data.values()
+            ]
+            repo = self.db.add_repo_from_packages(packages=packages, name=path)
+            # path_to_url does not %-encode spaces
+            path_as_url = path_to_url(path).replace(" ", "%20")
+            repos.append(
+                _ChannelRepoInfo(
+                    channel=None, repo=repo, url_w_cred=path_as_url, url_no_cred=path_as_url
+                )
+            )
         return repos
 
-    def _load_installed(self, records: Iterable[PackageRecord]) -> api.Repo:
-        repo = self._repo_from_records(self._pool, "installed", records)
-        repo.set_installed()
-        return repo
+    def _package_info_from_package_record(self, record: PackageRecord) -> PackageInfo:
+        if record.get("noarch", None) and record.noarch.value in ("python", "generic"):
+            noarch = NoArchType(record.noarch.value.title())
+        else:
+            noarch = NoArchType("No")
+        return PackageInfo(
+            name=record.name,
+            version=record.version,
+            build_string=record.build or "",
+            build_number=record.build_number or 0,
+            channel=str(record.channel),
+            package_url=record.get("url") or "",
+            platform=record.subdir,
+            filename=record.fn or f"{record.name}-{record.version}-{record.build or ''}",
+            license=record.get("license") or "",
+            md5=record.get("md5") or "",
+            sha256=record.get("sha256") or "",
+            signatures=record.get("signatures") or "",
+            # conda can have list or tuple, but libmamba only accepts lists
+            track_features=list(record.get("track_features") or []),
+            depends=list(record.get("depends") or []),
+            constrains=list(record.get("constrains") or []),
+            defaulted_keys=list(record.get("defaulted_keys") or []),
+            noarch=noarch,
+            size=record.get("size") or 0,
+            timestamp=int((record.get("timestamp") or 0) * 1000),
+        )
 
-    def whoneeds(
-        self, query: str | MatchSpec, records=True
-    ) -> Iterable[PackageRecord] | dict | str:
-        result_str = self._query.whoneeds(self._prepare_query(query), self._format)
-        if self._format == api.QueryFormat.JSON:
-            return self._process_query_result(result_str, records=records)
-        return result_str
+    def _set_repo_priorities(self) -> None:
+        has_priority = context.channel_priority in (
+            ChannelPriority.STRICT,
+            ChannelPriority.FLEXIBLE,
+        )
+
+        subprio_index = len(self.repos)
+        if has_priority:
+            # max channel priority value is the number of unique channels
+            channel_prio = len({repo.canonical_name for repo in self.repos})
+            current_channel_name = self.repos[0].canonical_name
+
+        for repo_info in self.repos:
+            if repo_info.repo is None:
+                continue
+            if has_priority:
+                if repo_info.canonical_name != current_channel_name:
+                    channel_prio -= 1
+                    current_channel_name = repo_info.canonical_name
+                priority = channel_prio
+            else:
+                priority = 0
+            if has_priority:
+                # NOTE: -- This was originally 0, but we need 1.
+                # Otherwise, conda/conda @ test_create::test_force_remove fails :shrug:
+                subpriority = 1
+            else:
+                subpriority = subprio_index
+                subprio_index -= 1
+
+            log.debug(
+                "Channel: %s, prio: %s : %s",
+                repo_info.url_no_cred,
+                priority,
+                subpriority,
+            )
+            self.db.set_repo_priority(repo_info.repo, Priorities(priority, subpriority))
+
+    # region Repoquery
+    #################
+
+    def search(
+        self,
+        queries: Iterable[str | MatchSpec] | str | MatchSpec,
+        return_type: Literal["records", "dict", "raw"] = "records",
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
+        if isinstance(queries, (str, MatchSpec)):
+            queries = [queries]
+        queries = list(map(str, queries))
+        result = Query.find(self.db, queries)
+        return self._process_query_result(result, return_type)
 
     def depends(
-        self, query: str | MatchSpec, records=True
-    ) -> Iterable[PackageRecord] | dict | str:
-        result_str = self._query.depends(self._prepare_query(query), self._format)
-        if self._format == api.QueryFormat.JSON:
-            return self._process_query_result(result_str, records=records)
-        return result_str
+        self,
+        query: str | MatchSpec,
+        tree: bool = False,
+        return_type: Literal["records", "dict", "raw"] = "records",
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
+        query = str(query)
+        result = Query.depends(self.db, query, tree)
+        return self._process_query_result(result, return_type)
 
-    def search(self, query: str | MatchSpec, records=True) -> Iterable[PackageRecord] | dict | str:
-        result_str = self._query.find(self._prepare_query(query), self._format)
-        if self._format == api.QueryFormat.JSON:
-            return self._process_query_result(result_str, records=records)
-        return result_str
+    def whoneeds(
+        self,
+        query: str | MatchSpec,
+        tree: bool = False,
+        return_type: Literal["records", "dict", "raw"] = "records",
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
+        query = str(query)
+        result = Query.whoneeds(self.db, query, tree)
+        return self._process_query_result(result, return_type)
 
-    def explicit_pool(self, specs: Iterable[MatchSpec]) -> Iterable[str]:
+    def explicit_pool(self, specs: Iterable[MatchSpec]) -> tuple[str]:
         """
         Returns all the package names that (might) depend on the passed specs
         """
-        explicit_pool = set()
+        explicit_pool: set[str] = set()
         for spec in specs:
             pkg_records = self.depends(spec.dist_str())
             for record in pkg_records:
                 explicit_pool.add(record.name)
         return tuple(explicit_pool)
 
-    def _prepare_query(self, query: str | MatchSpec) -> str:
-        if isinstance(query, str):
-            if "[" not in query:
-                return query
-            query = MatchSpec(query)
-        # libmambapy.Query only supports some matchspec syntax
-        # https://github.com/conda/conda-libmamba-solver/issues/327
-        # NOTE: Channel specs are currently ignored by libmambapy.Query searches
-        # if query.get_raw_value("channel"):
-        #     result = f"{query.get_raw_value('channel')}::{query.name}"
-        #     if query.version and query.get_raw_value("version").startswith((">", "<", "!", "=")):
-        #         result += query.get_raw_value("version")
-        #     elif query.version:
-        #         result += f"={query.get_raw_value('version')}"
-        #     else:
-        #         result += "=*"
-        #     if query.get_raw_value("build"):
-        #         result += f"={query.get_raw_value('build')}"
-        #     return result
-        if not query.get_raw_value("version"):
-            query = MatchSpec(query, version="*")
-        return query.conda_build_form()
-
     def _process_query_result(
         self,
-        result_str,
-        records=True,
-    ) -> Iterable[PackageRecord] | dict:
-        result = json_load(result_str)
+        result: QueryResult,
+        return_type: Literal["records", "dict", "raw"] = "records",
+    ) -> list[PackageRecord] | dict[str, Any] | QueryResult:
+        if return_type == "raw":
+            return result
+        result = result.to_dict()
         if result.get("result", {}).get("status") != "OK":
             query_type = result.get("query", {}).get("type", "<Unknown>")
             query = result.get("query", {}).get("query", "<Unknown>")
-            error_msg = result.get("result", {}).get("msg", f"Faulty response: {result_str}")
+            error_msg = result.get("result", {}).get("msg", f"Faulty response: {result.json()}")
             raise ValueError(f"{query_type} query '{query}' failed: {error_msg}")
-        if records:
+        if return_type == "records":
             pkg_records = []
             for pkg in result["result"]["pkgs"]:
                 record = PackageRecord(**pkg)
                 pkg_records.append(record)
             return pkg_records
+        # return_type == "dict"
         return result
 
-
-@lru_cache(maxsize=None)
-class _LibMambaIndexForCondaBuild(LibMambaIndexHelper):
-    """
-    See https://github.com/conda/conda-libmamba-solver/issues/386
-
-    conda-build needs to operate offline so the index doesn't get updated
-    accidentally during long build phases. However, this is only guaranteed
-    to work if https://github.com/conda/conda/pull/13357 is applied. Otherwise
-    the condarc configuration might be ignored, resulting in bad index configuration
-    and missing packages anyway.
-    """
-
-    def __init__(self, *args, **kwargs):
-        if VersionOrder(conda_version) <= VersionOrder("23.10.0"):
-            log.warning(
-                "conda-build requires conda >=23.11.0 for offline index support. "
-                "Falling back to online index. This might result in KeyError messages, "
-                "specially if the remote repodata is updated during the build phase. "
-                "See https://github.com/conda/conda-libmamba-solver/issues/386."
-            )
-            super().__init__(*args, **kwargs)
-        else:
-            with env_var("CONDA_OFFLINE", "true", callback=reset_context):
-                super().__init__(*args, **kwargs)
+    # endregion

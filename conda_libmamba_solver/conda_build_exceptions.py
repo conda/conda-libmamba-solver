@@ -8,6 +8,16 @@ This exception is only used in conda-build, so we can't import it directly.
 conda_build is not a dependency, but we only import this when conda-build is calling the
 solver, so it's fine to import it here.
 """
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from conda.models.match_spec import MatchSpec
+
 from conda_build.exceptions import DependencyNeedsBuildingError
 
 
@@ -17,7 +27,13 @@ class ExplainedDependencyNeedsBuildingError(DependencyNeedsBuildingError):
     We also add a couple of attributes to make it easier to set up.
     """
 
-    def __init__(self, matchspecs=None, explanation=None, *args, **kwargs):
+    def __init__(
+        self,
+        matchspecs: Iterable[MatchSpec] | None = None,
+        explanation: str | None = None,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self.matchspecs = self.matchspecs or matchspecs or []
         self.explanation = explanation

@@ -11,6 +11,7 @@ Given a date and a channel, this script will:
 - Apply the patches
 - Generate a ready-to-use local channel
 """
+
 import bz2
 import json
 import os
@@ -120,7 +121,7 @@ def repodata_time_machine(channels, timestamp_str, subdirs=None):
     timestamp = horizon.timestamp() * 1000
     original_dir = os.getcwd()
     try:
-        workdir = f"repodata-{timestamp_str.replace(' ', '-').replace(':','-').replace('.', '-')}"
+        workdir = f"repodata-{timestamp_str.replace(' ', '-').replace(':', '-').replace('.', '-')}"
         os.makedirs(workdir, exist_ok=True)
         os.chdir(workdir)
         # Download repodata

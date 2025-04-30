@@ -1,6 +1,8 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
 import os
 import sys
@@ -8,57 +10,34 @@ from itertools import chain, permutations, repeat
 from pathlib import Path
 from subprocess import check_call, run
 from textwrap import dedent
-from uuid import uuid4
+from typing import TYPE_CHECKING
 
 import pytest
 from conda.base.context import context
 from conda.common.compat import on_linux, on_mac, on_win
-from conda.common.io import env_var
 from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
-from conda.exceptions import DryRunExit, PackagesNotFoundError, UnsatisfiableError
-from conda.testing.integration import (
-    Commands,
-    make_temp_env,
-    package_is_installed,
-    run_command,
+from conda.exceptions import (
+    DryRunExit,
+    PackagesNotFoundError,
+    SpecsConfigurationConflictError,
+    UnsatisfiableError,
 )
-from conda.testing.solver_helpers import SolverTests
+from conda.testing.integration import package_is_installed
 
-from conda_libmamba_solver import LibMambaSolver
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
+from conda_libmamba_solver.solver import LibMambaSolver as Solver
 
 from .utils import conda_subprocess
 
-
-class TestLibMambaSolver(SolverTests):
-    @property
-    def solver_class(self):
-        return LibMambaSolver
-
-    @property
-    def tests_to_skip(self):
-        return {
-            "LibMambaSolver does not support track-features/features": [
-                "test_iopro_mkl",
-                "test_iopro_nomkl",
-                "test_mkl",
-                "test_accelerate",
-                "test_scipy_mkl",
-                "test_pseudo_boolean",
-                "test_no_features",
-                "test_surplus_features_1",
-                "test_surplus_features_2",
-                # this one below only fails reliably on windows;
-                # it passes Linux on CI, but not locally?
-                "test_unintentional_feature_downgrade",
-            ],
-            "LibMambaSolver installs numpy with mkl while we were expecting no-mkl numpy": [
-                "test_remove",
-            ],
-        }
+if TYPE_CHECKING:
+    from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
+    from pytest import MonkeyPatch
 
 
-def test_python_downgrade_reinstalls_noarch_packages():
+def test_python_downgrade_reinstalls_noarch_packages(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     Reported in https://github.com/conda/conda/issues/11346
 
@@ -69,38 +48,33 @@ def test_python_downgrade_reinstalls_noarch_packages():
     uses noarch here, so the package is the same across Python versions. Probably
     why upstream didn't catch this error before.
     """
-    with make_temp_env(
+    with tmp_env(
         "--override-channels",
-        "-c",
-        "conda-forge",
+        "--channel=conda-forge",
         "--solver=libmamba",
         "pip",
         "python=3.10",
-        name=f"conda_libmamba_solver-{uuid4()}",  # shebangs cannot contain spaces - override!
-        no_capture=True,
     ) as prefix:
         py_ver = get_python_version_for_prefix(prefix)
         assert py_ver.startswith("3.10")
         if on_win:
-            pip = str(Path(prefix) / "Scripts" / "pip.exe")
+            pip = str(prefix / "Scripts" / "pip.exe")
         else:
-            pip = str(Path(prefix) / "bin" / "pip")
+            pip = str(prefix / "bin" / "pip")
         check_call([pip, "--version"])
 
-        run_command(
-            Commands.INSTALL,
-            prefix,
+        conda_cli(
+            "install",
+            f"--prefix={prefix}",
             "--solver=libmamba",
             "--override-channels",
-            "-c",
-            "conda-forge",
+            "--channel=conda-forge",
             "python=3.9",
-            no_capture=True,
         )
         check_call([pip, "--version"])
 
 
-def test_defaults_specs_work():
+def test_defaults_specs_work(conda_cli: CondaCLIFixture) -> None:
     """
     See https://github.com/conda/conda-libmamba-solver/issues/173
 
@@ -112,18 +86,16 @@ def test_defaults_specs_work():
     We are testing our workaround (https://github.com/conda/conda-libmamba-solver/issues/173)
     works for now, but we should probably help fix this in libmamba.
     """
-    out, err, rc = run_command(
+    out, err, rc = conda_cli(
         "create",
-        "unused",
         "--dry-run",
         "--json",
         "--solver=libmamba",
         "--override-channels",
-        "-c",
-        "conda-forge",
+        "--channel=conda-forge",
         "python=3.10",
         "defaults::libarchive",
-        use_exception_handler=True,
+        raises=DryRunExit,
     )
     data = json.loads(out)
     assert data.get("success") is True
@@ -176,7 +148,10 @@ def test_determinism(tmpdir):
     assert len(set(installed_bokeh_versions)) == 1
 
 
-def test_update_from_latest_not_downgrade(tmpdir):
+def test_update_from_latest_not_downgrade(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """Based on two issues where an upgrade caused a downgrade in a given package
 
     Suppose we have two python versions 3.11.2 and 3.11.3. The bug is when:
@@ -189,31 +164,27 @@ def test_update_from_latest_not_downgrade(tmpdir):
      - https://github.com/conda/conda-libmamba-solver/issues/71
      - https://github.com/conda/conda-libmamba-solver/issues/156
     """
-    with make_temp_env(
+    with tmp_env(
         "--override-channels",
-        "-c",
-        "conda-forge",
+        "--channel=conda-forge",
         "--solver=libmamba",
         "python",
-        no_capture=True,
     ) as prefix:
         original_python = PrefixData(prefix).get("python")
-        run_command(
-            Commands.UPDATE,
-            prefix,
+        conda_cli(
+            "update",
+            f"--prefix={prefix}",
             "--solver=libmamba",
             "--override-channels",
-            "-c",
-            "conda-forge",
+            "--channel=conda-forge",
             "python",
-            no_capture=True,
         )
         update_python = PrefixData(prefix).get("python")
         assert original_python.version == update_python.version
 
 
 @pytest.mark.skipif(not on_linux, reason="Linux only")
-def test_too_aggressive_update_to_conda_forge_packages():
+def test_too_aggressive_update_to_conda_forge_packages(tmp_env: TmpEnvFixture) -> None:
     """
     Comes from report in https://github.com/conda/conda-libmamba-solver/issues/240
     We expect a minimum change to the 'base' environment if we only ask for a single package.
@@ -223,7 +194,7 @@ def test_too_aggressive_update_to_conda_forge_packages():
     In July 2024 this test was updated so it updates ca-certificates instead of libzlib to account
     for differences in how conda-forge and defaults package this library.
     """
-    with make_temp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
+    with tmp_env("conda", "python", "--override-channels", "--channel=defaults") as prefix:
         cmd = (
             "install",
             "-p",
@@ -254,8 +225,7 @@ def test_too_aggressive_update_to_conda_forge_packages():
 
 
 @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux-64 only")
-def test_pinned_with_cli_build_string():
-    """ """
+def test_pinned_with_cli_build_string(tmp_env: TmpEnvFixture) -> None:
     specs = (
         "scipy=1.7.3=py37hf2a6cf1_0",
         "python=3.7.3",
@@ -266,7 +236,7 @@ def test_pinned_with_cli_build_string():
         "--channel=conda-forge",
         "--channel=defaults",
     )
-    with make_temp_env(*specs, *channels) as prefix:
+    with tmp_env(*specs, *channels) as prefix:
         Path(prefix, "conda-meta").mkdir(exist_ok=True)
         Path(prefix, "conda-meta", "pinned").write_text(
             dedent(
@@ -368,39 +338,48 @@ def test_constraining_pin_and_requested():
     assert data.get("dry_run")
 
 
-def test_locking_pins():
-    with env_var("CONDA_PINNED_PACKAGES", "zlib"), make_temp_env("zlib") as prefix:
+def test_locking_pins(
+    monkeypatch: MonkeyPatch,
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
+    monkeypatch.setenv("CONDA_PINNED_PACKAGES", "zlib")
+    with tmp_env("zlib") as prefix:
         # Should install just fine
         zlib = PrefixData(prefix).get("zlib")
         assert zlib
 
         # This should fail because it contradicts the lock packages
-        out, err, retcode = run_command(
+        out, err, retcode = conda_cli(
             "install",
-            prefix,
-            "zlib=1.2.11",
+            f"--prefix={prefix}",
             "--dry-run",
+            "zlib=1.2.11",
             "--json",
-            use_exception_handler=True,
+            raises=SpecsConfigurationConflictError,
         )
-        data = json.loads(out)
-        assert retcode
-        assert data["exception_name"] == "SpecsConfigurationConflictError"
-        assert str(zlib) in data["error"]
+        assert str(zlib) in retcode.value.dump_map()["error"]
 
         # This is a no-op and ok. It won't involve changes.
-        out, err, retcode = run_command(
-            "install", prefix, "zlib", "--dry-run", "--json", use_exception_handler=True
-        )
-        data = json.loads(out)
-        assert not retcode
-        assert data.get("success")
-        assert data["message"] == "All requested packages already installed."
+        try:
+            out, err, retcode = conda_cli(
+                "install",
+                f"--prefix={prefix}",
+                "zlib",
+                "--dry-run",
+                "--json",
+            )
+        except DryRunExit:
+            assert True
+        else:
+            data = json.loads(out)
+            assert data.get("success")
+            assert data["message"] == "All requested packages already installed."
 
 
-def test_ca_certificates_pins():
+def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     ca_certificates_pin = "ca-certificates=2023"
-    with make_temp_env() as prefix:
+    with tmp_env() as prefix:
         Path(prefix, "conda-meta").mkdir(exist_ok=True)
         Path(prefix, "conda-meta", "pinned").write_text(f"{ca_certificates_pin}\n")
 
@@ -411,19 +390,17 @@ def test_ca_certificates_pins():
             "ca-certificates<2024",
             "ca-certificates!=2022",
         ):
-            out, err, retcode = run_command(
+            out, err, retcode = conda_cli(
                 "install",
-                prefix,
+                f"--prefix={prefix}",
                 cli_spec,
                 "--dry-run",
                 "--json",
                 "--override-channels",
-                "-c",
-                "conda-forge",
-                use_exception_handler=True,
+                "--channel=conda-forge",
+                raises=DryRunExit,
             )
             data = json.loads(out)
-            assert not retcode
             assert data.get("success")
             assert data.get("dry_run")
 
@@ -435,7 +412,13 @@ def test_ca_certificates_pins():
                 raise AssertionError("ca-certificates not found in LINK actions")
 
 
-def test_python_update_should_not_uninstall_history():
+@pytest.mark.skipif(
+    context.subdir == "osx-arm64", reason="python=2.7 not available in this platform"
+)
+def test_python_update_should_not_uninstall_history(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/341
 
@@ -451,52 +434,50 @@ def test_python_update_should_not_uninstall_history():
     """
     channels = "--override-channels", "-c", "conda-forge"
     solver = "--solver", "libmamba"
-    with make_temp_env("python=3.8", "typing_extensions>=4.8", *channels, *solver) as prefix:
+    with tmp_env("python=3.8", "typing_extensions>=4.8", *channels, *solver) as prefix:
         assert package_is_installed(prefix, "python=3.8")
         assert package_is_installed(prefix, "typing_extensions>=4.8")
         with pytest.raises(
             LibMambaUnsatisfiableError,
             match=r"python 2\.7.|\n*typing_extensions",
         ):
-            run_command(
-                Commands.INSTALL,
-                prefix,
+            conda_cli(
+                "install",
+                f"--prefix={prefix}",
                 "python=2.7",
                 *channels,
                 *solver,
                 "--dry-run",
-                no_capture=True,
             )
 
 
-def test_python_downgrade_with_pins_removes_truststore():
+def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/354
     """
     channels = "--override-channels", "-c", "conda-forge"
     solver = "--solver", "libmamba"
-    with make_temp_env("python=3.10", "conda", *channels, *solver) as prefix:
+    with tmp_env("python=3.10", "conda", *channels, *solver) as prefix:
         zstd_version = PrefixData(prefix).get("zstd").version
         for pin in (None, "zstd", f"zstd={zstd_version}"):
             env = os.environ.copy()
             if pin:
                 env["CONDA_PINNED_PACKAGES"] = pin
             p = conda_subprocess(
-                Commands.INSTALL,
-                "-p",
-                prefix,
+                "install",
+                f"--prefix={prefix}",
                 *channels,
                 *solver,
                 "--dry-run",
                 "--json",
                 "python=3.9",
                 env=env,
+                check=False,
             )
-            assert p.returncode == 0
             data = json.loads(p.stdout)
+            assert p.returncode == 0
             assert data.get("success")
             assert data.get("dry_run")
-            assertions = 0
             link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}
             unlink_dict = {pkg["name"]: pkg for pkg in data["actions"]["UNLINK"]}
             assert link_dict["python"]["version"].startswith("3.9.")
@@ -508,7 +489,7 @@ def test_python_downgrade_with_pins_removes_truststore():
 
 
 @pytest.mark.parametrize("spec", ("__glibc", "__unix", "__linux", "__osx", "__win"))
-def test_install_virtual_packages(conda_cli, spec):
+def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None:
     """
     Ensures a solver knows how to deal with virtual specs in the CLI.
     This mean succeeding only if the virtual package is available.
@@ -527,3 +508,146 @@ def test_install_virtual_packages(conda_cli, spec):
     else:
         raises = (UnsatisfiableError, PackagesNotFoundError)
     conda_cli("create", "--dry-run", "--offline", spec, raises=raises)
+
+
+def test_urls_are_percent_decoded(tmp_path: Path) -> None:
+    solver = Solver(
+        prefix=tmp_path, channels=["conda-forge"], specs_to_add=["x264"], command="create"
+    )
+    records = solver.solve_final_state()
+    for record in records:
+        if record.name == "x264":
+            print(record.url)
+            assert "!" in record.url
+            assert "%" not in record.url
+            break
+    else:
+        pytest.fail("Solution didn't include x264")
+
+
+def test_prune_existing_env(
+    conda_cli: CondaCLIFixture,
+    tmp_path: Path,
+    tmp_env: TmpEnvFixture,
+) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/595
+    """
+    (tmp_path / "env.yml").write_text(
+        dedent(
+            """
+        channels:
+        - defaults
+        dependencies:
+        - ca-certificates
+        """
+        )
+    )
+    with tmp_env("zstd") as prefix:
+        out, err, rc = conda_cli(
+            "env",
+            "update",
+            f"--prefix={prefix}",
+            f"--file={tmp_path / 'env.yml'}",
+            "--prune",
+        )
+        assert rc == 0
+        PrefixData._cache_.clear()
+        assert not PrefixData(prefix).get("zstd", None)
+        assert PrefixData(prefix).get("ca-certificates")
+
+
+def test_prune_existing_env_dependencies_are_solved(
+    conda_cli: CondaCLIFixture,
+    tmp_path: Path,
+    tmp_env: TmpEnvFixture,
+) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/595
+    """
+    (tmp_path / "env.yml").write_text(
+        dedent(
+            """
+            channels:
+            - conda-forge
+            dependencies:
+            - python=3.12
+            - numpy=2.1.2
+            """
+        )
+    )
+    with tmp_env("python=3.12") as prefix:
+        out, err, rc = conda_cli(
+            "env",
+            "update",
+            f"--prefix={prefix}",
+            f"--file={tmp_path / 'env.yml'}",
+            "--prune",
+            "-vv",
+        )
+        print(out)
+        print(err, file=sys.stderr)
+        assert rc == 0
+        PrefixData._cache_.clear()
+        assert PrefixData(prefix).get("python").version.startswith("3.12")
+        assert PrefixData(prefix).get("numpy")
+        out, err, rc = conda_cli("run", f"--prefix={prefix}", "python", "-c", "import numpy")
+        print(out)
+        print(err, file=sys.stderr)
+        assert rc == 0
+
+
+def test_satisfied_skip_solve_matchspec(
+    conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture
+) -> None:
+    with tmp_env("ca-certificates") as prefix:
+        conda_cli(
+            "install",
+            f"--prefix={prefix}",
+            "--satisfied-skip-solve",
+            "ca-certificates>10000",
+            raises=PackagesNotFoundError,
+        )
+
+
+# @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
+@pytest.mark.parametrize(
+    "specs",
+    (
+        pytest.param(("pytorch", "torchvision"), id="pytorch"),
+        pytest.param(("pytorch>0", "torchvision"), id="pytorch>0"),
+        pytest.param(("pytorch=2", "torchvision"), id="pytorch=2"),
+    ),
+)
+def test_pytorch_gpu(specs):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/646
+
+    This test must run in a subprocess because it's sensitive to side effects
+    from other tests. There must be some global state in the libmamba Database / Pool
+    objects. When run in isolation, it always passed.
+    """
+    env = os.environ.copy()
+    env["CONDA_OVERRIDE_CUDA"] = "12.6"
+    env["CONDA_OVERRIDE_GLIBC"] = "2.30"
+    env["CONDA_OVERRIDE_LINUX"] = "5.15.167.4"
+    env["CONDA_OVERRIDE_ARCHSPEC"] = "skylake"
+    p = conda_subprocess(
+        "create",
+        "--dry-run",
+        "--override-channels",
+        "--channel=conda-forge",
+        "--platform=linux-64",
+        "--json",
+        *specs,
+        env=env,
+    )
+    result = json.loads(p.stdout)
+    assert result["success"]
+    for record in result["actions"]["LINK"]:
+        if record["name"] == "pytorch":
+            print(record)
+            assert "cuda" in record["build_string"]
+            break
+    else:
+        raise AssertionError("No pytorch found")

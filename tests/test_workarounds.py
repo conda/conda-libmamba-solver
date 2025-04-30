@@ -66,6 +66,7 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
+    TIMEOUT = 15  # Used twice in total, so account for double the amount
     p = sp.Popen(
         [
             sys.executable,
@@ -78,6 +79,7 @@ def test_ctrl_c(stage):
             "--solver=libmamba",
             "--override-channels",
             "--channel=conda-forge",
+            "--quiet",
             "vaex",
         ],
         text=True,
@@ -87,7 +89,7 @@ def test_ctrl_c(stage):
     t0 = time.time()
     while stage not in p.stdout.readline():
         time.sleep(0.1)
-        if time.time() - t0 > 30:
+        if time.time() - t0 > TIMEOUT:
             raise RuntimeError("Timeout")
 
     # works around Windows' awkward CTRL-C signal handling
@@ -99,13 +101,12 @@ def test_ctrl_c(stage):
             kernel.AttachConsole(p.pid)
             kernel.SetConsoleCtrlHandler(None, 1)
             kernel.GenerateConsoleCtrlEvent(0, 0)
-            p.wait(timeout=30)
-            assert p.returncode != 0
-            assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+            p.wait(timeout=TIMEOUT)
         finally:
             kernel.SetConsoleCtrlHandler(None, 0)
     else:
         p.send_signal(signal.SIGINT)
-        p.wait(timeout=30)
-        assert p.returncode != 0
-        assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+        p.wait(timeout=TIMEOUT)
+
+    assert p.returncode != 0
+    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()

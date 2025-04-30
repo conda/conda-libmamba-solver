@@ -2,15 +2,14 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import os
 import pathlib
 import socket
-import subprocess
 import sys
-from typing import Tuple
 
 import pytest
-from conda.testing.integration import _get_temp_prefix, run_command
 from xprocess import ProcessStarter
 
 
@@ -52,7 +51,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
             try:
                 s.connect((address, port))
             except Exception as e:
-                print("something's wrong with %s:%d. Exception is %s" % (address, port, e))
+                print(f"something's wrong with {address}:{port}. Exception is {e}")
                 error = True
             finally:
                 s.close()
@@ -60,6 +59,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
             return not error
 
     logfile = xprocess.ensure(name, Starter)
+    print("Logfile at", logfile)
 
     if user and password:
         yield f"http://{user}:{password}@localhost:{port}"
@@ -129,41 +129,3 @@ def http_server_auth_token(xprocess):
         auth="token",
         token="xy-12345678-1234-1234-1234-123456789012",
     )
-
-
-def create_with_channel(
-    channel, solver="libmamba", check=True, **kwargs
-) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "conda",
-            "create",
-            "-p",
-            _get_temp_prefix(),
-            f"--solver={solver}",
-            "--json",
-            "--override-channels",
-            "-c",
-            channel,
-            "test-package",
-        ],
-        check=check,
-        **kwargs,
-    )
-
-
-def create_with_channel_in_process(channel, solver="libmamba", **kwargs) -> Tuple[str, str, int]:
-    stdout, stderr, returncode = run_command(
-        "create",
-        _get_temp_prefix(),
-        f"--solver={solver}",
-        "--json",
-        "--override-channels",
-        "-c",
-        channel,
-        "test-package",
-        **kwargs,
-    )
-    return stdout, stderr, returncode

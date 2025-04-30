@@ -13,6 +13,135 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 25.4.0 (2025-04-25)
+
+### Enhancements
+
+* Use `conda.reporters.get_spinner()` to support conda reporter plugins. (#641)
+
+### Bug fixes
+
+* Always percent-encode spaces in `file://` channel URLs. (#640)
+* Fix a bug where auto-selection of GPU variants of `pytorch` and `torchvision` didn't work as expected. (#646 via #647)
+* Avoid `libmamba` `MatchSpec` parsing errors by skipping nameless channel information in passed specs. (#645 via #648)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 25.3.0 (2025-03-14)
+
+### Bug fixes
+
+* Fix issue with content trust post-solve hooks that prevented signatures from being verified when the solved package records didn't include subdir information in their channel metadata. (#616 via #617)
+* Protect against `conda.base.context.context.restore_free_channel` deprecation by using `getattr`. (#629)
+* Remove all packages with `--no-deps`, not just the last one to be analyzed. (#632)
+
+### Docs
+
+* Mention conda ecosystem's adaptation of `libsolv`. (#624)
+
+### Contributors
+
+* @jaimergp
+* @jjerphan
+* @kenodegard
+
+
+## 25.1.1 (2025-01-24)
+
+### Bug fixes
+
+* Consider whether the full spec matches anything installed (not just name) when `--satisfied-skip-solve` is in use. (#605 via #606)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 25.1.0 (2025-01-21)
+
+### Bug fixes
+
+* Fix dependency handling in `conda env update --prune`. (#595 via #596)
+* Accept both `pathlib.Path()` and `str` for `LibMambaSolver()` prefix. (#586)
+
+### Contributors
+
+* @dholth
+* @jaimergp
+
+
+
+## 24.11.1 (2024-12-04)
+
+### Bug fixes
+
+* Ensure `PackageRecord` URLs are percent-decoded before passing them back to `conda`. (#583)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 24.11.0 (2024-11-27)
+
+🚀 This release ships compatibility for `libmamba 2.x`. It's a major rewrite! Make sure to check the changelog entry for `24.11.0rc` for more details.
+
+### Bug fixes
+
+* Load SOLV repodata cache in offline mode too. (#570)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 24.11.0rc (2024-10-31)
+
+### Enhancements
+
+* Require `libmambapy` v2. This is a big refactor in `libmamba` internals, which also allowed us to remove a lot of code in `conda-libmamba-solver`. (#457)
+
+### Deprecations
+
+* `CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED` has no effect anymore. Channels coming from installed packages are no longer added to the channel list. (#411 via #457)
+* Removed `conda_libmamba_solver.state.BaseIndexHelper`. The base class is now `conda_libmamba_solver.index.IndexHelper`. (#457)
+* Verbose logging in `libsolv` has a big overhead in `libmamba` v2, so we have disabled it by default (even if the user adds `-vvv` flags to the CLI). To opt-in, please set `CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV` to a truthy value. (#457)
+* Python 3.8 is no longer supported. The minimum version is now 3.9. (#457)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 24.9.0 (2024-09-25)
+
+### Bug fixes
+
+* Use `Solver` instance configuration to initialize the `libmamba` context without implicitly relying on the `conda` context settings. (#525)
+* Fix conda-build compatibility regression where arch-specific outputs can't be found in the test phase if a `noarch` output was built first. (#531)
+
+### Docs
+
+* Add installation workarounds FAQ with conda-standalone. (#505 via #511)
+* Update user guide to reflect conda-libmamba-solver being the default solver in conda. (#516 via #517)
+* Include `mamba-org/mamba` as a required cloned repository for setting up a dev environment. (#528)
+
+### Contributors
+
+* @jaimergp
+* @jjhelmus made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/528
+* @justmarkham made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/510
+
+
+
 ## 24.7.0 (2024-07-17)
 
 ### Bug fixes

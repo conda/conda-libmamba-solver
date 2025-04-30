@@ -7,10 +7,14 @@ Authors are sorted alphabetically.
 * Jaime Rodríguez-Guerra
 * Jannis Leidel
 * John Kirkham
+* Jonathan J. Helmus
+* Julien Jerphanion
 * Ken Odegard
+* Kevin Markham
 * Klaus Zimmermann
 * Matthew R. Becker
 * Thomas Lam
 * Travis Hathaway
 * conda-bot
+* dependabot[bot]
 * pre-commit-ci[bot]

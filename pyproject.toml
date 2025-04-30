@@ -14,17 +14,17 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.7",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy"
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
-  "conda >=23.7.3",
-  "libmambapy >=1.5.6,<2.0.0dev0",
+  "conda >=24.11",
+  # "libmambapy >=2",
   "boltons >=23.0.0",
 ]
 dynamic = [
@@ -42,7 +42,7 @@ source = "vcs"
 
 [tool.black]
 line-length = 99
-target-version = ['py37', 'py38', 'py39', 'py310']
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
 exclude = '''
 (
       ^/conda_libmamba_solver/_libmamba\.py
@@ -74,9 +74,39 @@ markers = [
   "slow: slow running tests",
 ]
 
-[tool.isort]
-profile = "black"
-filter_files = true
-
 [tool.ruff]
+exclude = ["conda_libmamba_solver/mamba_utils.py", "tests/data/"]
+target-version = "py39"
 line-length = 99
+
+[tool.ruff.lint]
+# E, W = pycodestyle errors and warnings
+# F = pyflakes
+# I = isort
+# D = pydocstyle
+# UP = pyupgrade
+# ISC = flake8-implicit-str-concat
+# TCH = flake8-type-checking
+# T10 = flake8-debugger
+# FA = flake8-future-annotations
+# see also https://docs.astral.sh/ruff/rules/
+select = ["E", "W", "F", "I", "D1", "UP", "ISC", "TCH", "T10", "FA"]
+# E402 module level import not at top of file
+# E501 line too long
+# E722 do not use bare 'except'
+# E731 do not assign a lambda expression, use a def
+# D101 Missing docstring in public class
+# D102 Missing docstring in public method
+# D103 Missing docstring in public function
+# D104 Missing docstring in public package
+# D105 Missing docstring in magic method
+# D107 Missing docstring in `__init__`
+ignore = ["E402", "E501", "E722", "E731", "D101", "D102", "D103", "D104", "D105", "D107"]
+extend-per-file-ignores = {"docs/*" = ["D1"], "tests/*" = ["D1"]}
+pydocstyle = {convention = "pep257"}
+flake8-type-checking = {exempt-modules = [], strict = true}
+
+# [tool.pyright]
+# include = ["conda_libmamba_solver"]
+# ignore = ["conda_libmamba_solver/*_v1.py"]
+# strict = ["**/"]

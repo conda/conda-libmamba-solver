@@ -4,82 +4,75 @@
 """
 Measure the speed and memory usage of the different backend solvers
 """
-import os
-import shutil
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from conda.base.context import context
-from conda.common.io import env_var
 from conda.exceptions import DryRunExit
-from conda.testing.integration import (
-    Commands,
-    _get_temp_prefix,
-    make_temp_env,
-    run_command,
-)
 
-platform = context.subdir
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
-TEST_DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+    from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
+    from pytest import FixtureRequest
+
+pytestmark = [pytest.mark.slow, pytest.mark.usefixtures("parametrized_solver_fixture")]
+
+TEST_DATA_DIR = Path(__file__).parent / "data"
+PLATFORM = context.subdir
 
 
-def _get_channels_from_lockfile(path):
+def _get_channels_from_lockfile(path: Path) -> tuple[str, ...]:
     """Parse `# channels: conda-forge,defaults` comments"""
-    with open(path) as f:
-        for line in f:
-            if line.startswith("# channels:"):
-                return line.split(":")[1].strip().split(",")
+    for line in path.read_text().splitlines():
+        if line.startswith("# channels:"):
+            return tuple(line.split(":")[1].strip().split(","))
+    return ()
 
 
-def _channels_as_args(channels):
+def _channels_as_args(channels: Iterable[str]) -> tuple[str, ...]:
     if not channels:
         return ()
-    args = ["--override-channels"]
-    for channel in channels:
-        args += ["-c", channel]
-    return tuple(args)
+    return ("--override-channels", *(f"--channel={channel}" for channel in channels))
 
 
-def _tmp_prefix_safe():
-    return _get_temp_prefix(use_restricted_unicode=True).replace(" ", "")
+@pytest.fixture(
+    scope="session",
+    params=TEST_DATA_DIR.glob("*.lock"),
+)
+def prefix_and_channels(
+    request: FixtureRequest,
+    session_tmp_env: TmpEnvFixture,
+) -> Iterable[tuple[Path, tuple[str, ...]]]:
+    lockfile = Path(request.param)
+    lock_platform = lockfile.suffixes[-2]
+    if lock_platform != PLATFORM:
+        pytest.skip(f"Running platform {PLATFORM} does not match file platform {lock_platform}")
 
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setenv("CONDA_TEST_SAVE_TEMPS", "1")
 
-@pytest.fixture(scope="module", params=os.listdir(TEST_DATA_DIR))
-def prefix_and_channels(request):
-    lockfile = os.path.join(TEST_DATA_DIR, request.param)
-    lock_platform = lockfile.split(".")[-2]
-    if lock_platform != platform:
-        pytest.skip(f"Running platform {platform} does not match file platform {lock_platform}")
-    with env_var("CONDA_TEST_SAVE_TEMPS", "1"):
-        prefix = _tmp_prefix_safe()
-        with make_temp_env("--file", lockfile, prefix=prefix) as prefix:
+        with session_tmp_env("--file", lockfile) as prefix:
             channels = _get_channels_from_lockfile(lockfile)
             yield prefix, channels
-    shutil.rmtree(prefix)
 
 
-@pytest.fixture(scope="function", params=["libmamba", "classic"])
-def solver_args(request):
-    yield ("--dry-run", "--solver", request.param)
-
-
-@pytest.mark.slow
-def test_a_warmup(prefix_and_channels, solver_args):
-    """Dummy test to install envs and warm up caches"""
-    prefix_and_channels, solver_args = prefix_and_channels, solver_args
-
-
-@pytest.mark.slow
-def test_update_python(prefix_and_channels, solver_args):
+def test_update_python(
+    prefix_and_channels: tuple[Path, tuple[str, ...]],
+    conda_cli: CondaCLIFixture,
+) -> None:
     prefix, channels = prefix_and_channels
     try:
-        run_command(
-            Commands.UPDATE,
-            prefix,
+        conda_cli(
+            "update",
+            f"--prefix={prefix}",
+            "--dry-run",
             *_channels_as_args(channels),
-            *solver_args,
             "python",
-            no_capture=True,
         )
     except DryRunExit:
         assert True
@@ -88,60 +81,43 @@ def test_update_python(prefix_and_channels, solver_args):
         assert True
 
 
-@pytest.mark.slow
-def test_install_python_update_deps(prefix_and_channels, solver_args):
+def test_install_python_update_deps(
+    prefix_and_channels: tuple[Path, tuple[str, ...]],
+    conda_cli: CondaCLIFixture,
+) -> None:
     prefix, channels = prefix_and_channels
-    try:
-        run_command(
-            Commands.INSTALL,
-            prefix,
-            *_channels_as_args(channels),
-            *solver_args,
-            "python",
-            "--update-deps",
-            no_capture=True,
-        )
-    except DryRunExit:
-        assert True
-    else:
-        # this can happen if "all requirements are satisfied"
-        assert True
+    conda_cli(
+        "install",
+        f"--prefix={prefix}",
+        "--dry-run",
+        *_channels_as_args(channels),
+        "python",
+        "--update-deps",
+        raises=DryRunExit,
+    )
 
 
-@pytest.mark.slow
-def test_update_all(prefix_and_channels, solver_args):
+def test_update_all(
+    prefix_and_channels: tuple[Path, tuple[str, ...]],
+    conda_cli: CondaCLIFixture,
+) -> None:
     prefix, channels = prefix_and_channels
-    try:
-        run_command(
-            Commands.UPDATE,
-            prefix,
-            *_channels_as_args(channels),
-            *solver_args,
-            "--all",
-            no_capture=True,
-        )
-    except DryRunExit:
-        assert True
-    else:
-        # this can happen if "all requirements are satisfied"
-        assert True
+    conda_cli(
+        "update",
+        f"--prefix={prefix}",
+        "--dry-run",
+        *_channels_as_args(channels),
+        "--all",
+        raises=DryRunExit,
+    )
 
 
-@pytest.mark.slow
-def test_install_vaex_from_conda_forge_and_defaults(solver_args):
-    try:
-        run_command(
-            Commands.CREATE,
-            _tmp_prefix_safe(),
-            *solver_args,
-            "--override-channels",
-            "-c",
-            "conda-forge",
-            "-c",
-            "defaults",
-            "python=3.9",
-            "vaex",
-            no_capture=True,
-        )
-    except DryRunExit:
-        assert True
+def test_install_vaex_from_conda_forge_and_defaults(conda_cli: CondaCLIFixture) -> None:
+    conda_cli(
+        "create",
+        "--dry-run",
+        *_channels_as_args(["conda-forge", "defaults"]),
+        "python=3.9",
+        "vaex",
+        raises=DryRunExit,
+    )
