@@ -64,6 +64,7 @@ as well as richer logging for each action.
 from __future__ import annotations
 
 import logging
+import warnings
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -394,8 +395,14 @@ class SolverInputState:
 
     def maybe_free_channel(self) -> Iterable[Channel]:
         # conda 25.9 removes context.restore_free_channel
-        if getattr(context, "restore_free_channel", False):
-            yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="conda.base.context.Context.restore_free_channel",
+                category=DeprecationWarning,
+            )
+            if getattr(context, "restore_free_channel", False):
+                yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
 
 
 class SolverOutputState:
