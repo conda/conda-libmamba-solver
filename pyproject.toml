@@ -58,17 +58,12 @@ addopts = [
   "--strict-markers"
 ]
 filterwarnings = [
-  # elevate conda's deprecated warning to an error
-  "error::PendingDeprecationWarning:conda",
-  "error::DeprecationWarning:conda",
+  # elevate all deprecation warnings to errors
+  "error::PendingDeprecationWarning",
+  "error::DeprecationWarning",
+  "error::FutureWarning",
+  # temporary ignores
   "ignore:conda.cli.install.print_activate:PendingDeprecationWarning:conda.env.env",
-  # elevate conda-libmamba-solver's deprecated warning to an error
-  "error::PendingDeprecationWarning:conda_libmamba_solver",
-  "error::DeprecationWarning:conda_libmamba_solver",
-  # ignore conda-index error
-  "ignore::PendingDeprecationWarning:conda_index",
-  "ignore::DeprecationWarning:conda_index",
-  "ignore:Python 3.14 will, by default, filter extracted tar archives and reject files or modify their metadata:DeprecationWarning",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
