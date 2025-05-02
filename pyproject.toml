@@ -64,6 +64,7 @@ filterwarnings = [
   "error::FutureWarning",
   # temporary ignores
   "ignore:conda.cli.install.print_activate:PendingDeprecationWarning:conda.env.env",
+  "ignore:`remote_definition`:FutureWarning:argparse",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
