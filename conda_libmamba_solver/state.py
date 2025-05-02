@@ -395,7 +395,7 @@ class SolverInputState:
     def maybe_free_channel(self) -> Iterable[Channel]:
         # FUTURE: conda 25.9+ remove restore_free_channel
         if channel := getattr(context, "_restore_free_channel", None):
-            context.restore_free_channel  # force deprecation warning
+            context.custom_multichannels  # force deprecation warning
         elif channel is None and (channel := getattr(context, "restore_free_channel", None)):
             # forwardport when context.restore_free_channel has been removed
             # backport when context._restore_free_channel didn't exist yet
