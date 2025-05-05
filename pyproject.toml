@@ -65,6 +65,7 @@ filterwarnings = [
   # temporary ignores
   "ignore:conda.cli.install.print_activate:PendingDeprecationWarning:conda.env.env",
   "ignore:`remote_definition`:FutureWarning:argparse",
+  "ignore:conda.core.prefix_data.python_record_for_prefix:PendingDeprecationWarning:conda.core.link",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
