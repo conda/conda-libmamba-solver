@@ -396,10 +396,8 @@ class SolverInputState:
         # FUTURE: conda 25.9+ remove restore_free_channel
         if channel := getattr(context, "_restore_free_channel", None):
             context.custom_multichannels  # force deprecation warning
-        elif channel is None and (channel := getattr(context, "restore_free_channel", None)):
-            # forwardport when context.restore_free_channel has been removed
-            # backport when context._restore_free_channel didn't exist yet
-            pass
+        elif channel is None:
+            channel = getattr(context, "restore_free_channel", None)
 
         if channel:
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
