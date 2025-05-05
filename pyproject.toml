@@ -55,7 +55,8 @@ minversion = "6.0"
 addopts = [
   "--color=yes",
   "--tb=native",
-  "--strict-markers"
+  "--strict-markers",
+  "-vv",
 ]
 
 markers = [
