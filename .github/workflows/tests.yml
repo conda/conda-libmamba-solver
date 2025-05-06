@@ -340,7 +340,6 @@ jobs:
           --splits=${{ env.PYTEST_SPLITS }}
           --reruns=${{ env.PYTEST_RERUN_FAILURES }}
           -m "${{ env.PYTEST_MARKER }}"
-          -k xonsh
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Run conda-libmamba-solver Tests
