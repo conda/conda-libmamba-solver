@@ -264,6 +264,7 @@ jobs:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
+      XONSH_SHOW_TRACEBACK: true
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -340,6 +341,10 @@ jobs:
           --splits=${{ env.PYTEST_SPLITS }}
           --reruns=${{ env.PYTEST_RERUN_FAILURES }}
           -m "${{ env.PYTEST_MARKER }}"
+
+      - name: Xonsh Debug
+        if: always()
+        run: cat /home/runner/.xonshrc
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Run conda-libmamba-solver Tests
