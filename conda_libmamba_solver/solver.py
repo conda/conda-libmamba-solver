@@ -9,6 +9,7 @@ This module defines the conda.core.solve.Solver interface and its immediate help
 
 from __future__ import annotations
 
+import copy
 import json
 import logging
 import os
@@ -640,9 +641,9 @@ class LibMambaSolver(Solver):
         # Signature verification requires channel information _with_ subdir data
         channel = Channel(pkg.channel)
         if not channel.subdir:
-            # conda caches channels created with a call, these should not be mutated.
-            # Create a new channel that is not cached and mutate
-            channel = Channel.from_value(pkg.channel)
+            # conda caches channels
+            # Create a new channel instance that is not cached and mutate
+            channel = copy.deepcopy(channel)
             channel.platform = pkg.platform
 
         return PackageRecord(
