@@ -614,9 +614,9 @@ def test_satisfied_skip_solve_matchspec(
 @pytest.mark.parametrize(
     "specs",
     (
-        pytest.param(("pytorch", "torchvision"), id="pytorch"),
-        pytest.param(("pytorch>0", "torchvision"), id="pytorch>0"),
-        pytest.param(("pytorch=2", "torchvision"), id="pytorch=2"),
+        pytest.param(("pytorch", "torchvision>0.12"), id="pytorch"),
+        pytest.param(("pytorch>0", "torchvision>0.12"), id="pytorch>0"),
+        pytest.param(("pytorch=2", "torchvision>0.12"), id="pytorch=2"),
     ),
 )
 def test_pytorch_gpu(specs):
