@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Correctly record channel platform in conda-meta record files (#662 via #663)
+* Correctly record channel platform in conda-meta record files. (#662 via #663)
 
 ### Deprecations
 
