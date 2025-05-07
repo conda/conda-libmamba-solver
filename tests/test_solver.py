@@ -651,3 +651,24 @@ def test_pytorch_gpu(specs):
             break
     else:
         raise AssertionError("No pytorch found")
+
+
+def test_channel_subdir_set_correctly(tmp_env: TmpEnvFixture) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/662
+    """
+    with tmp_env(
+        "--override-channels",
+        "--channel=conda-forge",
+        "--solver=libmamba",
+        "tzdata",
+        "bzip2",
+    ) as prefix:
+        cm_path: Path = prefix / "conda-meta"
+        for prec_path in cm_path.glob("*.json"):
+            if prec_path.name.startswith("bzip2-"):
+                payload = json.loads(prec_path.read_text())
+                assert not payload["channel"].endswith("noarch")
+            if prec_path.name.startswith("tzdata-"):
+                payload = json.loads(prec_path.read_text())
+                assert payload["channel"].endswith("noarch")
