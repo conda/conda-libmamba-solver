@@ -172,7 +172,7 @@ class SolverInputState:
         _pip_interop_enabled: bool | None = None,
     ):
         self.prefix = prefix
-        self._prefix_data = PrefixData(prefix, interoperability=_pip_interop_enabled)
+        self._prefix_data = PrefixData(prefix, pip_interop_enabled=_pip_interop_enabled)
         self._pip_interop_enabled = _pip_interop_enabled
         self._history = History(prefix).get_requested_specs_map()
         self._pinned = {spec.name: spec for spec in get_pinned_specs(prefix)}
