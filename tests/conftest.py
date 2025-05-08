@@ -2,5 +2,8 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 
-from conda.testing import conda_cli, path_factory, tmp_env  # noqa
-from conda.testing.fixtures import clear_subdir_cache, tmpdir  # noqa
+pytest_plugins = (
+    # Add testing fixtures and internal pytest plugins here
+    "conda.testing",
+    "conda.testing.fixtures",
+)

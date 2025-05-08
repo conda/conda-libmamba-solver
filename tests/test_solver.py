@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context
 from conda.common.compat import on_linux, on_mac, on_win
-from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
+from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
     DryRunExit,
     PackagesNotFoundError,
@@ -55,8 +55,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
         "pip",
         "python=3.10",
     ) as prefix:
-        py_ver = get_python_version_for_prefix(prefix)
-        assert py_ver.startswith("3.10")
+        assert PrefixData(prefix).get("python").version.startswith("3.10")
         if on_win:
             pip = str(prefix / "Scripts" / "pip.exe")
         else:

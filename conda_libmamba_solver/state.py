@@ -393,8 +393,13 @@ class SolverInputState:
                 yield channel
 
     def maybe_free_channel(self) -> Iterable[Channel]:
-        # conda 25.9 removes context.restore_free_channel
-        if getattr(context, "restore_free_channel", False):
+        # FUTURE: conda 25.9+ remove restore_free_channel
+        if channel := getattr(context, "_restore_free_channel", None):
+            context.custom_multichannels  # force deprecation warning
+        elif channel is None:
+            channel = getattr(context, "restore_free_channel", None)
+
+        if channel:
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
 
 

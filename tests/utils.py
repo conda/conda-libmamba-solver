@@ -32,6 +32,6 @@ def write_env_config(prefix, force=False, **kwargs):
     condarc = Path(prefix) / ".condarc"
     if condarc.is_file() and not force:
         raise RuntimeError(f"File {condarc} already exists. Use force=True to overwrite.")
-    yaml = YAML(typ="unsafe", pure=True)
+    yaml = YAML(typ="full", pure=True)
     with open(condarc, "w") as f:
         yaml.dump(kwargs, f)
