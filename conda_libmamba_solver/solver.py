@@ -640,7 +640,17 @@ class LibMambaSolver(Solver):
         # Signature verification requires channel information _with_ subdir data
         channel = Channel(pkg.channel)
         if not channel.subdir:
-            channel.platform = pkg.platform
+            # conda caches channels created using single values
+            # Avoid the cache by using keyword arguments
+            channel = Channel(
+                scheme=channel.scheme,
+                auth=channel.auth,
+                location=channel.location,
+                token=channel.token,
+                name=channel.name,
+                platform=pkg.platform,
+                package_filename=channel.package_filename,
+            )
 
         return PackageRecord(
             name=pkg.name,
