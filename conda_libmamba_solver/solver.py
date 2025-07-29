@@ -271,6 +271,7 @@ class LibMambaSolver(Solver):
                 *in_state.virtual.values(),
             ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
+            in_state=in_state,
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)

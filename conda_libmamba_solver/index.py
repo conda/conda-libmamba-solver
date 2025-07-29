@@ -160,6 +160,7 @@ class LibMambaIndexHelper:
         repodata_fn: str = REPODATA_FN,
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
+        in_state = None
     ):
         platform_less_channels = []
         for channel in channels:
@@ -177,6 +178,7 @@ class LibMambaIndexHelper:
         self.channels = platform_less_channels
         self.subdirs = subdirs or context.subdirs
         self.repodata_fn = repodata_fn
+        self.in_state = in_state
         self.db = self._init_db()
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
         if pkgs_dirs:
