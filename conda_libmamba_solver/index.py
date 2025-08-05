@@ -180,12 +180,21 @@ class LibMambaIndexHelper:
         self.repodata_fn = repodata_fn
         self.in_state = in_state
         self.db = self._init_db()
-        self.repos: list[_ChannelRepoInfo] = self._load_channels()
-        if pkgs_dirs:
-            self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
-        if installed_records:
-            self.repos.append(self._load_installed(installed_records))
-        self._set_repo_priorities()
+
+        # support lazy self.repos
+        self._pkgs_dirs = pkgs_dirs
+        self._installed_records = installed_records
+
+    @property
+    def repos(self):
+        if not hasattr(self, '_repos'):
+            self._repos: list[_ChannelRepoInfo] = self._load_channels()
+            if self._pkgs_dirs:
+                self._repos.extend(self._load_pkgs_cache(self._pkgs_dirs))
+            if self._installed_records:
+                self._repos.append(self._load_installed(self._installed_records))
+            self._set_repo_priorities()
+        return self._repos
 
     @classmethod
     def from_platform_aware_channel(cls, channel: Channel) -> LibMambaIndexHelper:
