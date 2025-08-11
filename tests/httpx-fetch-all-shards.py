@@ -36,7 +36,7 @@ base_url = "https://fast.prefix.dev/conda-forge/linux-64/repodata_shards.msgpack
 
 
 conn = connect("conda-forge-shards-httpx.db")
-conn.execute("CREATE TABLE IF NOT EXISTS shards (url TEXT PRIMARY KEY, package TEXT, shard BLOB)")
+conn.execute("CREATE TABLE IF NOT EXISTS shards (url TEXT PRIMARY KEY, package TEXT, shard BLOB)") # also last-used?
 
 
 def shard_urls(index):

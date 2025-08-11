@@ -1,37 +1,119 @@
+"""
+Test downloading shards; subsetting "all possible depedencies" for solver.
+"""
+from __future__ import annotations
+
 import os
 import pickle
 from pathlib import Path
 
-from conda_libmamba_solver.index import LibMambaIndexHelper
-
-from conda.base.context import reset_context
+from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
+from conda.gateways.connection.session import get_session
+from conda.gateways.repodata import RepodataState, _add_http_value_to_dict, conda_http_errors
 from conda.models.channel import Channel
+from requests import Response  # noqa: TC002
+
+from conda_libmamba_solver.index import LibMambaIndexHelper
 
 HERE = Path(__file__).parent
 
 
-def traverse_shards(channels, matchspecs, root_packages):
-    assert len(channels) == 1
-    channel = next(channels)
+class MaybeSharded:
+    def __init__(self, channel):
+        self.channel = channel
+
+    pass
+
+
+def repodata_shards(url, state: RepodataState) -> bytes | None:
+    session = get_session(url)  # does it care if repodata filename is included, and unexpected?
+
+    headers = {}
+    etag = state.etag
+    last_modified = state.mod
+    if etag:
+        headers["If-None-Match"] = str(etag)
+    if last_modified:
+        headers["If-Modified-Since"] = str(last_modified)
+    filename = "repodata_shards.msgpack.zst"
+
+    with conda_http_errors(url, filename):
+        timeout = (
+            context.remote_connect_timeout_secs,
+            context.remote_read_timeout_secs,
+        )
+        response: Response = session.get(
+            url, headers=headers, proxies=session.proxies, timeout=timeout
+        )
+        response.raise_for_status()
+
+    if response.status_code == 304:
+        # should we save cache-control to state here to put another n
+        # seconds on the "make a remote request" clock and/or touch cache
+        # mtime
+        raise NotImplementedError("TODO implement cache")
+
+    response_bytes = response.content
+
+    # We no longer add these tags to the large `resp.content` json
+    saved_fields = {"_url": url}
+    _add_http_value_to_dict(response, "Etag", saved_fields, "_etag")
+    _add_http_value_to_dict(response, "Last-Modified", saved_fields, "_mod")
+    _add_http_value_to_dict(response, "Cache-Control", saved_fields, "_cache_control")
+
+    state.update(saved_fields)
+
+    # should we return the response and let caller save cache data to state?
+    return response_bytes
+
+
+def traverse_shards(channels: list[Channel], matchspecs, root_packages):
+    assert len(channels)  # > 0
+    channel = channels[0]
     sd = SubdirData(channel)
     fetch = sd.repo_fetch
     cache = fetch.repo_cache
-    cache.load_state()  # without reading repodata.json or repodata_shards.msgpack.zst
+    cache_state = (
+        cache.load_state()
+    )  # without reading repodata.json or repodata_shards.msgpack.zst
     print(cache)
+
+    # cache.load(binary=True) looks for <hash>.msgpack.zst
+
+    # repodata, <RepodataState> object = sd.fetch_latest_parsed()
+
+    if cache_state.should_check_format("shards"):
+        try:
+            shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
+            found = repodata_shards(shards_index_url, cache_state)
+            print(len(found)) if found else print("No shards for", shards_index_url)
+            if found:
+                cache_state.set_has_format("shards", True)
+                cache.save(found)
+        except Exception as e:
+            cache_state.set_has_format("shards", False)
+            cache.refresh(refresh_ns=1)  # expired but not falsy
+
+            found = sd.load()
+
+    print(found)
 
 
 def test_shards():
     """
     Reduce full index to only packages needed.
     """
-    os.environ['CONDA_TOKEN'] = ""  # test channel doesn't understand tokens
+    os.environ["CONDA_TOKEN"] = ""  # test channel doesn't understand tokens
     reset_context()
 
     in_state = pickle.loads((HERE / "data" / "in_state.pickle").read_bytes())
     print(in_state)
 
-    channels = [Channel.from_url("https://conda.anaconda.org/conda-forge-sharded")]
+    channels = [
+        Channel.from_url(f"https://conda.anaconda.org/conda-forge-sharded/{subdir}")
+        for subdir in context.subdirs
+    ]
 
     installed = (
         *in_state.installed.values(),
