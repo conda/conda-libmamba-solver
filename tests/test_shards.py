@@ -74,9 +74,9 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
     sd = SubdirData(channel)
     fetch = sd.repo_fetch
     cache = fetch.repo_cache
-    cache_state = (
-        cache.load_state()
-    )  # without reading repodata.json or repodata_shards.msgpack.zst
+    # cache.load_state() has no binary=True flag
+    cache.load(state_only=True, binary=True)
+    cache_state = cache.state
     print(cache)
 
     # cache.load(binary=True) looks for <hash>.msgpack.zst
@@ -85,6 +85,7 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
 
     if cache_state.should_check_format("shards"):
         try:
+            # look for shards index
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
             found = repodata_shards(shards_index_url, cache_state)
             print(len(found)) if found else print("No shards for", shards_index_url)
@@ -92,12 +93,15 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
                 cache_state.set_has_format("shards", True)
                 cache.save(found)
         except Exception as e:
+            # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
             cache.refresh(refresh_ns=1)  # expired but not falsy
 
             found = sd.load()
 
-    print(found)
+    # cache.cache_path_state.read_text() has expected etag, but cache.load_state() does not.
+
+    print("done")
 
 
 def test_shards():
@@ -129,7 +133,9 @@ def test_shards():
         in_state=in_state,
     )
 
-    print(helper.repos)
+    # accessing "helper.repos" downloads repodata.json in the traditional way
+    # for all channels:
+    # print(helper.repos)
 
     traverse_shards(channels, in_state.requested, installed)
 
