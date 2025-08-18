@@ -1,6 +1,7 @@
 """
 Test downloading shards; subsetting "all possible depedencies" for solver.
 """
+
 from __future__ import annotations
 
 import os
@@ -10,9 +11,14 @@ from pathlib import Path
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
-from conda.gateways.repodata import RepodataState, _add_http_value_to_dict, conda_http_errors
+from conda.gateways.repodata import (
+    RepodataCache,
+    RepodataState,
+    _add_http_value_to_dict,
+    conda_http_errors,
+)
 from conda.models.channel import Channel
-from requests import Response  # noqa: TC002
+from requests import Response, HTTPError  # noqa: TC002
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
@@ -26,9 +32,10 @@ class MaybeSharded:
     pass
 
 
-def repodata_shards(url, state: RepodataState) -> bytes | None:
+def repodata_shards(url, cache: RepodataCache) -> bytes | None:
     session = get_session(url)  # does it care if repodata filename is included, and unexpected?
 
+    state = cache.state
     headers = {}
     etag = state.etag
     last_modified = state.mod
@@ -47,14 +54,13 @@ def repodata_shards(url, state: RepodataState) -> bytes | None:
             url, headers=headers, proxies=session.proxies, timeout=timeout
         )
         response.raise_for_status()
+        response_bytes = response.content
 
     if response.status_code == 304:
         # should we save cache-control to state here to put another n
         # seconds on the "make a remote request" clock and/or touch cache
         # mtime
-        raise NotImplementedError("TODO implement cache")
-
-    response_bytes = response.content
+        return cache.cache_path_shards.read_bytes()
 
     # We no longer add these tags to the large `resp.content` json
     saved_fields = {"_url": url}
@@ -74,8 +80,9 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
     sd = SubdirData(channel)
     fetch = sd.repo_fetch
     cache = fetch.repo_cache
-    # cache.load_state() has no binary=True flag
-    cache.load(state_only=True, binary=True)
+    # cache.load_state() will clear the file on JSONDecodeError but cache.load()
+    # will raise the exception
+    cache.load_state(binary=True)
     cache_state = cache.state
     print(cache)
 
@@ -87,12 +94,12 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
         try:
             # look for shards index
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
-            found = repodata_shards(shards_index_url, cache_state)
+            found = repodata_shards(shards_index_url, cache)
             print(len(found)) if found else print("No shards for", shards_index_url)
             if found:
                 cache_state.set_has_format("shards", True)
                 cache.save(found)
-        except Exception as e:
+        except HTTPError as e:
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
             cache.refresh(refresh_ns=1)  # expired but not falsy
