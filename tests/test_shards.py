@@ -7,7 +7,12 @@ from __future__ import annotations
 import os
 import pickle
 from pathlib import Path
+from typing import NotRequired, TypedDict
+from urllib.parse import urljoin
 
+import conda.gateways.repodata as repodata
+import msgpack
+import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
@@ -18,7 +23,7 @@ from conda.gateways.repodata import (
     conda_http_errors,
 )
 from conda.models.channel import Channel
-from requests import Response, HTTPError  # noqa: TC002
+from requests import HTTPError, Response  # noqa: TC002
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
@@ -32,7 +37,50 @@ class MaybeSharded:
     pass
 
 
+class RepodataInfo(TypedDict):
+    base_url: str  # where packages are stored
+    shards_base_url: str  # where shards are stored
+    subdir: str
+
+
+class ShardsIndex(TypedDict):
+    info: RepodataInfo
+    repodata_version: int
+    removed: list[str]
+    shards: dict[str, bytes]
+
+
+class Shards:
+    def __init__(self, shards_index: ShardsIndex, url: str):
+        self.shards_index = shards_index
+        self.url = url
+        assert self.url.endswith("/"), (
+            "channel url must end with / although this would work fine if we gave the entire shards index filename as self.url"
+        )
+
+    def shard_url(self, package: str):
+        """
+        Return shard URL for a given package.
+
+        Raise KeyError if package is not in the index.
+        """
+        shard_name = f"{self.shards[package].hex()}.msgpack.zst"
+        # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
+        return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
+
+    @property
+    def shards(self):
+        return self.shards_index["shards"]
+
+
 def repodata_shards(url, cache: RepodataCache) -> bytes | None:
+    """
+    Fetch shards index with cache.
+
+    Update cache state.
+
+    Return shards data, either newly fetched or from cache.
+    """
     session = get_session(url)  # does it care if repodata filename is included, and unexpected?
 
     state = cache.state
@@ -63,10 +111,10 @@ def repodata_shards(url, cache: RepodataCache) -> bytes | None:
         return cache.cache_path_shards.read_bytes()
 
     # We no longer add these tags to the large `resp.content` json
-    saved_fields = {"_url": url}
-    _add_http_value_to_dict(response, "Etag", saved_fields, "_etag")
-    _add_http_value_to_dict(response, "Last-Modified", saved_fields, "_mod")
-    _add_http_value_to_dict(response, "Cache-Control", saved_fields, "_cache_control")
+    saved_fields = {repodata.URL_KEY: url}
+    _add_http_value_to_dict(response, "Etag", saved_fields, repodata.ETAG_KEY)
+    _add_http_value_to_dict(response, "Last-Modified", saved_fields, repodata.LAST_MODIFIED_KEY)
+    _add_http_value_to_dict(response, "Cache-Control", saved_fields, repodata.CACHE_CONTROL_KEY)
 
     state.update(saved_fields)
 
@@ -74,9 +122,15 @@ def repodata_shards(url, cache: RepodataCache) -> bytes | None:
     return response_bytes
 
 
-def traverse_shards(channels: list[Channel], matchspecs, root_packages):
+def traverse_shards(
+    channels: list[Channel], matchspecs, root_packages
+) -> bytes | SubdirData | None:
     assert len(channels)  # > 0
+
+    # Should do this for all channels
     channel = channels[0]
+
+    # Use SubdirData to get at the correct fetch, cache objects
     sd = SubdirData(channel)
     fetch = sd.repo_fetch
     cache = fetch.repo_cache
@@ -99,6 +153,7 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
             if found:
                 cache_state.set_has_format("shards", True)
                 cache.save(found)
+            # indicate that we just found shards not json
         except HTTPError as e:
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
@@ -106,9 +161,7 @@ def traverse_shards(channels: list[Channel], matchspecs, root_packages):
 
             found = sd.load()
 
-    # cache.cache_path_state.read_text() has expected etag, but cache.load_state() does not.
-
-    print("done")
+    return found
 
 
 def test_shards():
@@ -144,7 +197,21 @@ def test_shards():
     # for all channels:
     # print(helper.repos)
 
-    traverse_shards(channels, in_state.requested, installed)
+    found = traverse_shards(channels, in_state.requested, installed)
+
+    if not isinstance(found, bytes):
+        return
+
+    shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
+    # ensure url ends with slash, for urljoin
+    channel_url = channels[0].url()
+    assert isinstance(channel_url, str)
+    # ensure ends with / for later urljoin
+    channel_url = channel_url.rstrip("/") + "/"
+    shards = Shards(shards_index, channel_url)
+
+    for key in shards.shards.keys():
+        assert shards.shard_url(key).startswith("http")
 
     """
     >>> in_state.requested
