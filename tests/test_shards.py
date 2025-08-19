@@ -27,14 +27,9 @@ from requests import HTTPError, Response  # noqa: TC002
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
+from . import shard_cache
+
 HERE = Path(__file__).parent
-
-
-class MaybeSharded:
-    def __init__(self, channel):
-        self.channel = channel
-
-    pass
 
 
 class RepodataInfo(TypedDict):
@@ -52,11 +47,13 @@ class ShardsIndex(TypedDict):
 
 class Shards:
     def __init__(self, shards_index: ShardsIndex, url: str):
+        """
+        Args:
+            shards_index: raw parsed msgpack dict
+            url: URL of repodata_shards.msgpack.zst
+        """
         self.shards_index = shards_index
         self.url = url
-        assert self.url.endswith("/"), (
-            "channel url must end with / although this would work fine if we gave the entire shards index filename as self.url"
-        )
 
     def shard_url(self, package: str):
         """
@@ -73,7 +70,7 @@ class Shards:
         return self.shards_index["shards"]
 
 
-def repodata_shards(url, cache: RepodataCache) -> bytes | None:
+def repodata_shards(url, cache: RepodataCache) -> bytes:
     """
     Fetch shards index with cache.
 
@@ -122,46 +119,40 @@ def repodata_shards(url, cache: RepodataCache) -> bytes | None:
     return response_bytes
 
 
-def traverse_shards(
-    channels: list[Channel], matchspecs, root_packages
-) -> bytes | SubdirData | None:
-    assert len(channels)  # > 0
+def fetch_shards(sd: SubdirData) -> Shards | None:
+    """
+    Check a SubdirData's URL for shards.
+    Return shards index bytes from cache or network.
+    Return None if not found; caller should fetch normal repodata.
+    """
 
-    # Should do this for all channels
-    channel = channels[0]
-
-    # Use SubdirData to get at the correct fetch, cache objects
-    sd = SubdirData(channel)
     fetch = sd.repo_fetch
     cache = fetch.repo_cache
     # cache.load_state() will clear the file on JSONDecodeError but cache.load()
     # will raise the exception
     cache.load_state(binary=True)
     cache_state = cache.state
-    print(cache)
-
-    # cache.load(binary=True) looks for <hash>.msgpack.zst
-
-    # repodata, <RepodataState> object = sd.fetch_latest_parsed()
 
     if cache_state.should_check_format("shards"):
         try:
             # look for shards index
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
             found = repodata_shards(shards_index_url, cache)
-            print(len(found)) if found else print("No shards for", shards_index_url)
-            if found:
-                cache_state.set_has_format("shards", True)
-                cache.save(found)
-            # indicate that we just found shards not json
-        except HTTPError as e:
+            cache_state.set_has_format("shards", True)
+            # redundant if repodata_shards() loaded from cache:
+            cache.save(found)
+
+            # basic parse (move into caller?)
+            shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
+            shards = Shards(shards_index, shards_index_url)
+            return shards
+
+        except HTTPError:
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
             cache.refresh(refresh_ns=1)  # expired but not falsy
 
-            found = sd.load()
-
-    return found
+    return None
 
 
 def test_shards():
@@ -197,21 +188,13 @@ def test_shards():
     # for all channels:
     # print(helper.repos)
 
-    found = traverse_shards(channels, in_state.requested, installed)
+    found = fetch_shards(SubdirData(channels[0]))
+    if not found:
+        return  # no repodata_shards.msgpack.zst found
 
-    if not isinstance(found, bytes):
-        return
-
-    shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
-    # ensure url ends with slash, for urljoin
-    channel_url = channels[0].url()
-    assert isinstance(channel_url, str)
-    # ensure ends with / for later urljoin
-    channel_url = channel_url.rstrip("/") + "/"
-    shards = Shards(shards_index, channel_url)
-
-    for key in shards.shards.keys():
-        assert shards.shard_url(key).startswith("http")
+    for package in found.shards:
+        shard_url = found.shard_url(package)
+        assert shard_url.startswith("http")  # or channel url or shards_base_url
 
     """
     >>> in_state.requested
@@ -235,3 +218,19 @@ def test_shards():
     conda-forge/osx-arm64::tk==8.6.13=h892fb3f_2
     conda-forge/noarch::tzdata==2025b=h78e105d_0
     """
+
+
+def test_shard_cache(tmp_path):
+    cache = shard_cache.ShardCache(tmp_path)
+
+    fake_shard = {"foo": "bar"}
+    cache.insert("foobar", "foobar_package", zstandard.compress(msgpack.dumps(fake_shard)))
+
+    data = cache.retrieve("foobar")
+    assert data == fake_shard
+    assert data is not fake_shard
+
+    data2 = cache.retrieve('notfound')
+    assert data2 is None
+
+    assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
