@@ -9,7 +9,7 @@ from pathlib import Path
 import msgpack
 import zstandard
 
-SHARD_CACHE_NAME = "shards.db"
+SHARD_CACHE_NAME = "repodata_shards.db"
 
 
 def connect(dburi="cache.db"):
@@ -29,15 +29,17 @@ class ShardCache:
     Handle caching for individual shards (not the index of shards).
     """
 
-    def __init__(self, base):
+    def __init__(self, base: Path):
         """
         base: directory and filename prefix for cache.
         """
-        self.base = Path(base)
+        # base includes /<hash for particular repodata url>
+        self.base = base
         self.connect()
 
     def connect(self):
-        self.conn = connect(f"file:///{str(self.base / SHARD_CACHE_NAME)}")
+        dburi = f"file://{str(self.base / SHARD_CACHE_NAME)}"
+        self.conn = connect(dburi)
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS shards ("
             "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "

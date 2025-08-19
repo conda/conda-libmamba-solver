@@ -9,6 +9,7 @@ import pickle
 from pathlib import Path
 from typing import NotRequired, TypedDict
 from urllib.parse import urljoin
+import random
 
 import conda.gateways.repodata as repodata
 import msgpack
@@ -30,6 +31,17 @@ from conda_libmamba_solver.index import LibMambaIndexHelper
 from . import shard_cache
 
 HERE = Path(__file__).parent
+
+
+def unpack_record(record):
+    """
+    Convert bytes checksums to hex.
+    """
+    if sha256 := record.get("sha256"):
+        record["sha256"] = sha256.hex()
+    if md5 := record.get("md5"):
+        record["md5"] = md5.hex()
+    return record
 
 
 class RepodataInfo(TypedDict):
@@ -188,13 +200,32 @@ def test_shards():
     # for all channels:
     # print(helper.repos)
 
-    found = fetch_shards(SubdirData(channels[0]))
+    subdir_data = SubdirData(channels[0])
+    found = fetch_shards(subdir_data)
     if not found:
         return  # no repodata_shards.msgpack.zst found
 
     for package in found.shards:
         shard_url = found.shard_url(package)
         assert shard_url.startswith("http")  # or channel url or shards_base_url
+
+    session = get_session(
+        subdir_data.url_w_subdir
+    )  # XXX session could be different based on shards_base_url and different than the packages base_url
+    # cache_path_base includes a per-repository hash
+    shards_cache = shard_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
+
+    # download or fetch-from-cache a random set of shards
+    for package in random.choices([*found.shards.keys()], k=16):
+        miss = False
+        shard_url = found.shard_url(package)
+        shard = shards_cache.retrieve(shard_url)
+        if not shard:
+            miss = True
+            raw_shard = session.get(shard_url).content
+            shard = msgpack.loads(zstandard.decompress(raw_shard))
+            shards_cache.insert(shard_url, package, raw_shard)
+        print(miss, shard)
 
     """
     >>> in_state.requested
@@ -230,7 +261,7 @@ def test_shard_cache(tmp_path):
     assert data == fake_shard
     assert data is not fake_shard
 
-    data2 = cache.retrieve('notfound')
+    data2 = cache.retrieve("notfound")
     assert data2 is None
 
     assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
