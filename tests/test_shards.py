@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import os
 import pickle
+import random
 from pathlib import Path
 from typing import NotRequired, TypedDict
 from urllib.parse import urljoin
-import random
 
 import conda.gateways.repodata as repodata
 import msgpack
@@ -19,11 +19,11 @@ from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
 from conda.gateways.repodata import (
     RepodataCache,
-    RepodataState,
     _add_http_value_to_dict,
     conda_http_errors,
 )
 from conda.models.channel import Channel
+from conda.models.records import PackageRecord
 from requests import HTTPError, Response  # noqa: TC002
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
@@ -55,6 +55,9 @@ class ShardsIndex(TypedDict):
     repodata_version: int
     removed: list[str]
     shards: dict[str, bytes]
+
+
+Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
 
 
 class Shards:
@@ -187,14 +190,15 @@ def test_shards():
         *in_state.virtual.values(),
     )
 
-    helper = LibMambaIndexHelper(
-        channels,
-        (),  # subdirs
-        "repodata.json",
-        installed,
-        (),  # pkgs_dirs to load packages locally when offline
-        in_state=in_state,
-    )
+    # Would eagerly download repodata.json.zst for all channels
+    # helper = LibMambaIndexHelper(
+    #     channels,
+    #     (),  # subdirs
+    #     "repodata.json",
+    #     installed,
+    #     (),  # pkgs_dirs to load packages locally when offline
+    #     in_state=in_state,
+    # )
 
     # accessing "helper.repos" downloads repodata.json in the traditional way
     # for all channels:
@@ -202,8 +206,7 @@ def test_shards():
 
     subdir_data = SubdirData(channels[0])
     found = fetch_shards(subdir_data)
-    if not found:
-        return  # no repodata_shards.msgpack.zst found
+    assert found, f"Shards not found for {channels[0]}"
 
     for package in found.shards:
         shard_url = found.shard_url(package)
@@ -216,6 +219,7 @@ def test_shards():
     shards_cache = shard_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
 
     # download or fetch-from-cache a random set of shards
+
     for package in random.choices([*found.shards.keys()], k=16):
         miss = False
         shard_url = found.shard_url(package)
@@ -223,9 +227,12 @@ def test_shards():
         if not shard:
             miss = True
             raw_shard = session.get(shard_url).content
-            shard = msgpack.loads(zstandard.decompress(raw_shard))
+            shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))
             shards_cache.insert(shard_url, package, raw_shard)
         print(miss, shard)
+
+        mentioned_in_shard = shard_mentioned_packages(shard)
+        print(mentioned_in_shard)
 
     """
     >>> in_state.requested
@@ -251,7 +258,24 @@ def test_shards():
     """
 
 
-def test_shard_cache(tmp_path):
+def shard_mentioned_packages(shard: Shard):
+    """
+    Return all dependencies mentioned in a shard, including the shard's own
+    package name.
+
+    Includes virtual packages.
+    """
+    mentioned = set()
+    for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
+        # to go faster, don't use PackageRecord, record.combined_depends, or
+        # MatchSpec
+        record = PackageRecord(**unpack_record(package))
+        mentioned.add(record.name)
+        mentioned.update(spec.name for spec in record.combined_depends)
+    return mentioned
+
+
+def test_shard_cache(tmp_path: Path):
     cache = shard_cache.ShardCache(tmp_path)
 
     fake_shard = {"foo": "bar"}
