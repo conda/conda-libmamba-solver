@@ -4,9 +4,11 @@ Test downloading shards; subsetting "all possible depedencies" for solver.
 
 from __future__ import annotations
 
+import json
 import os
 import pickle
 import random
+from collections import defaultdict
 from pathlib import Path
 from typing import NotRequired, TypedDict
 from urllib.parse import urljoin
@@ -58,6 +60,29 @@ class ShardsIndex(TypedDict):
 
 
 Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
+
+
+class ShardLike:
+    """
+    Present a "classic" repodata.json as per-package shards.
+    """
+
+    def __init__(self, repodata: dict):
+        all_packages = {
+            "packages": repodata.pop("packages", {}),
+            "packages.conda": repodata.pop("packages.conda", {}),
+        }
+
+        shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
+
+        self.repodata = repodata
+
+        for package_group in all_packages:
+            for package, record in all_packages[package_group].items():
+                name = record["name"]
+                shards[name][package_group][package] = record
+
+        self.shards = dict(shards)  # no longer a defaultdict
 
 
 class Shards:
@@ -289,3 +314,31 @@ def test_shard_cache(tmp_path: Path):
     assert data2 is None
 
     assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
+
+
+def test_shardlike():
+    """
+    ShardLike class presents repodata.json as shards in a way that is suitable
+    for our subsetting algorithm.
+    """
+    repodata = json.loads(
+        (Path(__file__).parent / "data" / "mamba_repo" / "noarch" / "repodata.json").read_text()
+    )
+
+    # make fake packages
+    for n in range(10):
+        for m in range(n):
+            repodata["packages"][f"test{n}{m}.tar.bz2"] = {"name": f"test{n}"}
+            repodata["packages.conda"][f"test{n}{m}.tar.bz2"] = {"name": f"test{n}"}
+
+    as_shards = ShardLike(repodata)
+
+    assert len(as_shards.repodata)
+    assert len(as_shards.shards)
+
+    assert sorted(as_shards.shards["test4"]["packages"].keys()) == [
+        "test40.tar.bz2",
+        "test41.tar.bz2",
+        "test42.tar.bz2",
+        "test43.tar.bz2",
+    ]
