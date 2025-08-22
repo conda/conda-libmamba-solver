@@ -3,13 +3,21 @@ Cache suitable for shards, not allowed to change because they are named
 after their own sha256 hash.
 """
 
+from __future__ import annotations
+
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING, TypedDict
 
 import msgpack
 import zstandard
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 SHARD_CACHE_NAME = "repodata_shards.db"
+
+
+Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
 
 
 def connect(dburi="cache.db"):
@@ -46,14 +54,14 @@ class ShardCache:
             "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
         )
 
-    def insert(self, url, package, shard):
+    def insert(self, url, package, raw_shard: bytes):
         with self.conn as c:
             c.execute(
                 "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
-                (url, package, shard),
+                (url, package, raw_shard),
             )
 
-    def retrieve(self, url):
+    def retrieve(self, url) -> Shard | None:
         with self.conn as c:
             row = c.execute("SELECT shard FROM shards WHERE url = ?", (url,)).fetchone()
-            return msgpack.loads(zstandard.decompress(row["shard"])) if row else None
+            return msgpack.loads(zstandard.decompress(row["shard"])) if row else None  # type: ignore

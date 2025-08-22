@@ -5,12 +5,13 @@ Test downloading shards; subsetting "all possible depedencies" for solver.
 from __future__ import annotations
 
 import json
-import os
 import pickle
 import random
+import textwrap
+import time
 from collections import defaultdict
 from pathlib import Path
-from typing import NotRequired, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urljoin
 
 import conda.gateways.repodata as repodata
@@ -21,7 +22,6 @@ from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
 from conda.gateways.repodata import (
-    RepodataCache,
     _add_http_value_to_dict,
     conda_http_errors,
 )
@@ -29,21 +29,26 @@ from conda.models.channel import Channel
 from conda.models.records import PackageRecord
 from requests import HTTPError, Response  # noqa: TC002
 
-from conda_libmamba_solver.index import LibMambaIndexHelper
-
 from . import shard_cache
+
+if TYPE_CHECKING:
+    from conda.gateways.repodata import (
+        RepodataCache,
+    )
+
+    from .shard_cache import Shard
 
 HERE = Path(__file__).parent
 
 
-def unpack_record(record):
+def maybe_unpack_record(record):
     """
-    Convert bytes checksums to hex.
+    Convert bytes checksums to hex; leave unchanged if already str.
     """
-    if sha256 := record.get("sha256"):
-        record["sha256"] = sha256.hex()
-    if md5 := record.get("md5"):
-        record["md5"] = md5.hex()
+    for hash_type in "sha256", "md5":
+        if hash_value := record.get(hash_type):
+            if isinstance(hash_value, bytes):
+                record[hash_type] = hash_value.hex()
     return record
 
 
@@ -58,9 +63,6 @@ class ShardsIndex(TypedDict):
     repodata_version: int
     removed: list[str]
     shards: dict[str, bytes]
-
-
-Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
 
 
 class ShardLike:
@@ -83,11 +85,23 @@ class ShardLike:
                 name = record["name"]
                 shards[name][package_group][package] = record
 
-        self.shards = dict(shards)  # no longer a defaultdict
+        # defaultdict behavior no longer wanted
+        self.shards: dict[str, Shard] = dict(shards)  # type: ignore
+
+    def fetch_shard(self, package: str, session) -> Shard:
+        """
+        "Fetch" an individual shard.
+
+        Raise KeyError if package is not in the index.
+        """
+        return self.shards[package]
+
+    def __contains__(self, package):
+        return package in self.shards
 
 
-class Shards:
-    def __init__(self, shards_index: ShardsIndex, url: str):
+class Shards(ShardLike):
+    def __init__(self, shards_index: ShardsIndex, url: str, shards_cache: shard_cache.ShardCache):
         """
         Args:
             shards_index: raw parsed msgpack dict
@@ -95,6 +109,8 @@ class Shards:
         """
         self.shards_index = shards_index
         self.url = url
+        self.shards_cache = shards_cache
+        self.fetched_shards: dict[str, dict] = {}
 
     def shard_url(self, package: str):
         """
@@ -105,6 +121,27 @@ class Shards:
         shard_name = f"{self.shards[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
+
+    def fetch_shard(self, package: str, session) -> Shard:
+        """
+        Fetch an individual shard or retrieve from cache.
+
+        Raise KeyError if package is not in the index.
+        """
+
+        shard_url = self.shard_url(package)
+        shard_or_none = self.shards_cache.retrieve(shard_url)
+        if shard_or_none:
+            return shard_or_none
+        else:
+            raw_shard = session.get(shard_url).content
+            # ensure it is real msgpack+zstd before inserting into cache
+            shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
+            self.shards_cache.insert(shard_url, package, raw_shard)
+            return shard
+
+    def __contains__(self, package):
+        return package in self.shards
 
     @property
     def shards(self):
@@ -119,7 +156,7 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
 
     Return shards data, either newly fetched or from cache.
     """
-    session = get_session(url)  # does it care if repodata filename is included, and unexpected?
+    session = get_session(url)
 
     state = cache.state
     headers = {}
@@ -186,7 +223,11 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
 
             # basic parse (move into caller?)
             shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
-            shards = Shards(shards_index, shards_index_url)
+            shards = Shards(
+                shards_index,
+                shards_index_url,
+                shard_cache.ShardCache(Path(repodata.create_cache_dir())),
+            )
             return shards
 
         except (HTTPError, repodata.RepodataIsEmpty):
@@ -198,7 +239,7 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
 
 
 @pytest.fixture
-def conda_no_token(monkeypatch):
+def conda_no_token(monkeypatch: pytest.MonkeyPatch):
     """
     Reset token to avoid being logged in. e.g. the testing channel doesn't understand them.
     """
@@ -206,7 +247,7 @@ def conda_no_token(monkeypatch):
     reset_context()
 
 
-def test_shards(conda_no_token):
+def test_shards(conda_no_token: None):
     """
     Test basic shard fetch etc.
     """
@@ -243,21 +284,12 @@ def test_shards(conda_no_token):
     session = get_session(
         subdir_data.url_w_subdir
     )  # XXX session could be different based on shards_base_url and different than the packages base_url
-    # cache_path_base includes a per-repository hash
-    shards_cache = shard_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
 
     # download or fetch-from-cache a random set of shards
 
     for package in random.choices([*found.shards.keys()], k=16):
-        miss = False
-        shard_url = found.shard_url(package)
-        shard = shards_cache.retrieve(shard_url)
-        if not shard:
-            miss = True
-            raw_shard = session.get(shard_url).content
-            shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))
-            shards_cache.insert(shard_url, package, raw_shard)
-        print(miss, shard)
+        shard = found.fetch_shard(package, session)
+        print(shard)
 
         mentioned_in_shard = shard_mentioned_packages(shard)
         print(mentioned_in_shard)
@@ -286,7 +318,7 @@ def test_shards(conda_no_token):
     """
 
 
-def test_shards_2(conda_no_token):
+def test_shards_2(conda_no_token: None):
     """
     Test all channels fetch.
     """
@@ -311,7 +343,7 @@ def test_shards_2(conda_no_token):
         *in_state.virtual.values(),
     )
 
-    channel_data = {}
+    channel_data: dict[str, ShardLike] = {}
     for channel in channels:
         for url in Channel(channel).urls(True, context.subdirs):
             subdir_data = SubdirData(Channel(url))
@@ -322,6 +354,65 @@ def test_shards_2(conda_no_token):
             channel_data[url] = found
 
     print(channel_data)
+
+    shards_to_get = set(package.name for package in installed)
+
+    shards_to_get_more = set(
+        package.name for root in installed for package in root.combined_depends
+    )
+
+    print(
+        "Are the installed packages the same as all their dependencies?",
+        shards_to_get == shards_to_get_more,
+        f"{len(shards_to_get)} from installed",
+        f"{len(shards_to_get_more)} from installed's dependencies",  # includes virtual packages, doesn't matter
+    )
+
+    # e.g. shards_to_get_more - shards_to_get
+    # {'expat', 'xz', 'zlib'}
+    # shards_to_get - shards_to_get_more
+    # {'__conda', '__archspec'}
+
+    shards_to_get |= shards_to_get_more
+
+    shards_have = {
+        url: {} for url in channel_data
+    }  # mapping between URL and shards fetched or attempted-to-fetch
+    iteration = 0
+    waste = 0
+
+    time_start = time.monotonic()
+    while shards_to_get:
+        print(f"Seek {len(shards_to_get)} shards in iteration {iteration}:")
+        print("\n".join(textwrap.wrap(" ".join(sorted(shards_to_get)))))
+        new_shards_to_get = set()
+        for url, channel_shards in channel_data.items():
+            session = get_session(url)  # XXX inefficient but it has a @cache decorator
+            new_shards_to_get = set()
+            for package in shards_to_get:
+                if package not in shards_have[url]:  # XXX also inefficient
+                    if package in channel_shards:
+                        new_shard = channel_shards.fetch_shard(package, session)
+                        new_shards_to_get.update(shard_mentioned_packages(new_shard))
+                        shards_have[url][package] = new_shard
+                    else:
+                        shards_have[url][package] = None
+                else:
+                    waste += 1
+
+        shards_to_get = new_shards_to_get
+        iteration += 1
+    time_end = time.monotonic()
+
+    relevant_packages = [set(value) for value in shards_have.values()]
+    assert all(len(x) == len(relevant_packages[0]) for x in relevant_packages)
+    print("Sought data for the following packages:")
+    print("\n".join(textwrap.wrap(" ".join(sorted(relevant_packages[0])))))
+    print(f"Wasted {waste} inner loop iterations")
+    print(f"Took {time_end - time_start:.2f}s")
+
+    # Now write out shards_have packages that are not None, as small
+    # repodata.json for the solver.
 
 
 def shard_mentioned_packages(shard: Shard):
@@ -337,7 +428,7 @@ def shard_mentioned_packages(shard: Shard):
     for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
         # to go faster, don't use PackageRecord, record.combined_depends, or
         # MatchSpec
-        record = PackageRecord(**unpack_record(package))
+        record = PackageRecord(**maybe_unpack_record(package))
         mentioned.add(record.name)
         mentioned.update(spec.name for spec in record.combined_depends)
     return mentioned
@@ -347,7 +438,7 @@ def test_shard_cache(tmp_path: Path):
     cache = shard_cache.ShardCache(tmp_path)
 
     fake_shard = {"foo": "bar"}
-    cache.insert("foobar", "foobar_package", zstandard.compress(msgpack.dumps(fake_shard)))
+    cache.insert("foobar", "foobar_package", zstandard.compress(msgpack.dumps(fake_shard)))  # type: ignore
 
     data = cache.retrieve("foobar")
     assert data == fake_shard
