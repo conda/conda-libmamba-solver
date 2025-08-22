@@ -15,6 +15,7 @@ from urllib.parse import urljoin
 
 import conda.gateways.repodata as repodata
 import msgpack
+import pytest
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
@@ -179,7 +180,8 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
             found = repodata_shards(shards_index_url, cache)
             cache_state.set_has_format("shards", True)
-            # redundant if repodata_shards() loaded from cache:
+            # this will also set state["refresh_ns"] = time.time_ns(); we could
+            # call cache.refresh() if we got a 304 instead:
             cache.save(found)
 
             # basic parse (move into caller?)
@@ -187,7 +189,7 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
             shards = Shards(shards_index, shards_index_url)
             return shards
 
-        except HTTPError:
+        except (HTTPError, repodata.RepodataIsEmpty):
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
             cache.refresh(refresh_ns=1)  # expired but not falsy
@@ -195,13 +197,19 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
     return None
 
 
-def test_shards():
+@pytest.fixture
+def conda_no_token(monkeypatch):
     """
-    Reduce full index to only packages needed.
+    Reset token to avoid being logged in. e.g. the testing channel doesn't understand them.
     """
-    os.environ["CONDA_TOKEN"] = ""  # test channel doesn't understand tokens
+    monkeypatch.setenv("CONDA_TOKEN", "")
     reset_context()
 
+
+def test_shards(conda_no_token):
+    """
+    Test basic shard fetch etc.
+    """
     in_state = pickle.loads((HERE / "data" / "in_state.pickle").read_bytes())
     print(in_state)
 
@@ -209,11 +217,6 @@ def test_shards():
         Channel.from_url(f"https://conda.anaconda.org/conda-forge-sharded/{subdir}")
         for subdir in context.subdirs
     ]
-
-    installed = (
-        *in_state.installed.values(),
-        *in_state.virtual.values(),
-    )
 
     # Would eagerly download repodata.json.zst for all channels
     # helper = LibMambaIndexHelper(
@@ -283,6 +286,44 @@ def test_shards():
     """
 
 
+def test_shards_2(conda_no_token):
+    """
+    Test all channels fetch.
+    """
+    channels = list(context.default_channels)
+    print(channels)
+    # is (pkgs/main, pkgs/r) in mine
+
+    # Channel('pkgs/main').url()
+    # 'https://repo.anaconda.com/pkgs/main/osx-arm64'
+    # context.default_channels[0].url()
+    # 'https://repo.anaconda.com/pkgs/main/osx-arm64'
+    # Channel('main').url()
+
+    # state to initiate a solve
+    in_state = pickle.loads((HERE / "data" / "in_state.pickle").read_bytes())
+    print(in_state)
+
+    channels.append(Channel("conda-forge-sharded"))
+
+    installed = (
+        *in_state.installed.values(),
+        *in_state.virtual.values(),
+    )
+
+    channel_data = {}
+    for channel in channels:
+        for url in Channel(channel).urls(True, context.subdirs):
+            subdir_data = SubdirData(Channel(url))
+            found = fetch_shards(subdir_data)
+            if not found:
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
+                found = ShardLike(repodata_json)
+            channel_data[url] = found
+
+    print(channel_data)
+
+
 def shard_mentioned_packages(shard: Shard):
     """
     Return all dependencies mentioned in a shard, including the shard's own
@@ -290,6 +331,8 @@ def shard_mentioned_packages(shard: Shard):
 
     Includes virtual packages.
     """
+    # XXX filter by package name for the possibility of a shard with multiple
+    # (small) packages
     mentioned = set()
     for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
         # to go faster, don't use PackageRecord, record.combined_depends, or
