@@ -73,6 +73,9 @@ class ShardCache:
             return msgpack.loads(zstandard.decompress(row["shard"])) if row else None  # type: ignore
 
     def retrieve_multiple(self, urls: list[str]) -> dict[str, Shard | None]:
+        # in sqlite, multiple queries are very fast since there is no server.
+        # "with self.conn" may have overhead. nevertheless, try querying
+        # multiple in a single call.
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}"
         with self.conn as c:
             result: dict[str, Shard | None] = {

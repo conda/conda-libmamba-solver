@@ -78,10 +78,9 @@ class ShardLike:
             "packages": repodata.pop("packages", {}),
             "packages.conda": repodata.pop("packages.conda", {}),
         }
+        self.repodata = repodata  # without packages, packges.conda
 
         shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
-
-        self.repodata = repodata
 
         for package_group in all_packages:
             for package, record in all_packages[package_group].items():
@@ -91,19 +90,42 @@ class ShardLike:
         # defaultdict behavior no longer wanted
         self.shards: dict[str, Shard] = dict(shards)  # type: ignore
 
+        # used to write out repodata subset
+        self.visited_shards: dict[str, Shard] = {}
+
+    def __contains__(self, package):
+        return package in self.shards
+
     def fetch_shard(self, package: str, session) -> Shard:
         """
         "Fetch" an individual shard.
 
+        Update self.visited_shards with all not-None packages.
+
         Raise KeyError if package is not in the index.
         """
-        return self.shards[package]
+        shard = self.shards[package]
+        self.visited_shards[package] = shard
+        return shard
 
     def fetch_shards(self, packages: list[str], session) -> dict[str, Shard]:
+        """
+        Fetch multiple shards in one go.
+
+        Update self.visited_shards with all not-None packages.
+        """
         return {package: self.fetch_shard(package, session) for package in packages}
 
-    def __contains__(self, package):
-        return package in self.shards
+    def build_repodata(self):
+        """
+        Return monolithic repodata including all visited shards.
+        """
+        repodata = self.repodata.copy()
+        repodata.update({"packages": {}, "packages.conda": {}})
+        for package, shard in self.visited_shards.items():
+            for package_group in ("packages", "packages.conda"):
+                repodata[package_group].update(shard[package_group])
+        return repodata
 
 
 class Shards(ShardLike):
@@ -113,17 +135,21 @@ class Shards(ShardLike):
             shards_index: raw parsed msgpack dict
             url: URL of repodata_shards.msgpack.zst
         """
-        self._shards_index = shards_index
+        self.shards_index = shards_index
         self.url = url
         self.shards_cache = shards_cache
-        self.fetched_shards: dict[str, dict] = {}
+
+        self.repodata = {k: v for k, v in self.shards_index.items() if k not in ("shards",)}
+
+        # used to write out repodata subset
+        self.visited_shards: dict[str, Shard] = {}
 
     def __contains__(self, package):
-        return package in self.shards_index
+        return package in self.packages_index
 
     @property
-    def shards_index(self):
-        return self._shards_index["shards"]
+    def packages_index(self):
+        return self.shards_index["shards"]
 
     def shard_url(self, package: str):
         """
@@ -131,7 +157,7 @@ class Shards(ShardLike):
 
         Raise KeyError if package is not in the index.
         """
-        shard_name = f"{self.shards_index[package].hex()}.msgpack.zst"
+        shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
 
@@ -146,12 +172,14 @@ class Shards(ShardLike):
         # XXX do we call this with the same shard, decompressing twice, in a single instance?
         shard_or_none = self.shards_cache.retrieve(shard_url)
         if shard_or_none:
+            self.visited_shards[package] = shard_or_none
             return shard_or_none
         else:
             raw_shard = session.get(shard_url).content
             # ensure it is real msgpack+zstd before inserting into cache
             shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
             self.shards_cache.insert(shard_url, package, raw_shard)
+            self.visited_shards[package] = shard
             return shard
 
     def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
@@ -319,7 +347,7 @@ def test_shards(conda_no_token: None):
     found = fetch_shards(subdir_data)
     assert found, f"Shards not found for {channels[0]}"
 
-    for package in found.shards_index:
+    for package in found.packages_index:
         shard_url = found.shard_url(package)
         assert shard_url.startswith("http")  # or channel url or shards_base_url
 
@@ -329,7 +357,7 @@ def test_shards(conda_no_token: None):
 
     # download or fetch-from-cache a random set of shards
 
-    for package in random.choices([*found.shards_index.keys()], k=16):
+    for package in random.choices([*found.packages_index.keys()], k=16):
         shard = found.fetch_shard(package, session)
         print(shard)
 
