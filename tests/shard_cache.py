@@ -55,6 +55,12 @@ class ShardCache:
         )
 
     def insert(self, url, package, raw_shard: bytes):
+        """
+        Args:
+            url: of shard
+            package: package name
+            raw_shard: msgpack.zst compressed shard data
+        """
         with self.conn as c:
             c.execute(
                 "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
@@ -65,3 +71,12 @@ class ShardCache:
         with self.conn as c:
             row = c.execute("SELECT shard FROM shards WHERE url = ?", (url,)).fetchone()
             return msgpack.loads(zstandard.decompress(row["shard"])) if row else None  # type: ignore
+
+    def retrieve_multiple(self, urls: list[str]) -> dict[str, Shard | None]:
+        query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}"
+        with self.conn as c:
+            result: dict[str, Shard | None] = {
+                row.url: msgpack.loads(zstandard.decompress(row["shard"])) if row else None
+                for row in c.execute(query, urls)  # type: ignore
+            }
+            return result

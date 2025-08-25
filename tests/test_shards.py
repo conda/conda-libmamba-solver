@@ -4,6 +4,7 @@ Test downloading shards; subsetting "all possible depedencies" for solver.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import pickle
 import random
@@ -32,6 +33,8 @@ from requests import HTTPError, Response  # noqa: TC002
 from . import shard_cache
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from conda.gateways.repodata import (
         RepodataCache,
     )
@@ -96,6 +99,9 @@ class ShardLike:
         """
         return self.shards[package]
 
+    def fetch_shards(self, packages: list[str], session) -> dict[str, Shard]:
+        return {package: self.fetch_shard(package, session) for package in packages}
+
     def __contains__(self, package):
         return package in self.shards
 
@@ -107,10 +113,17 @@ class Shards(ShardLike):
             shards_index: raw parsed msgpack dict
             url: URL of repodata_shards.msgpack.zst
         """
-        self.shards_index = shards_index
+        self._shards_index = shards_index
         self.url = url
         self.shards_cache = shards_cache
         self.fetched_shards: dict[str, dict] = {}
+
+    def __contains__(self, package):
+        return package in self.shards_index
+
+    @property
+    def shards_index(self):
+        return self._shards_index["shards"]
 
     def shard_url(self, package: str):
         """
@@ -118,7 +131,7 @@ class Shards(ShardLike):
 
         Raise KeyError if package is not in the index.
         """
-        shard_name = f"{self.shards[package].hex()}.msgpack.zst"
+        shard_name = f"{self.shards_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
 
@@ -130,6 +143,7 @@ class Shards(ShardLike):
         """
 
         shard_url = self.shard_url(package)
+        # XXX do we call this with the same shard, decompressing twice, in a single instance?
         shard_or_none = self.shards_cache.retrieve(shard_url)
         if shard_or_none:
             return shard_or_none
@@ -140,12 +154,40 @@ class Shards(ShardLike):
             self.shards_cache.insert(shard_url, package, raw_shard)
             return shard
 
-    def __contains__(self, package):
-        return package in self.shards
+    def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
+        result = {}
 
-    @property
-    def shards(self):
-        return self.shards_index["shards"]
+        def fetch(s, package, url):
+            b1 = time.time_ns()
+            data = s.get(url).content
+            e1 = time.time_ns()
+            print(f"{(e1 - b1) / 1e9}s", package, url)
+            return data
+
+        shard_urls = {package: self.shard_url(package) for package in packages}
+
+        cached = self.shards_cache.retrieve_multiple(list(shard_urls.values()))
+        for package in cached:
+            result[package] = cached[package]
+
+        # beneficial to have thread pool larger than requests' default 10 max
+        # connections per session
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            futures = {
+                executor.submit(fetch, session, package, url): (url, package)
+                for package, url in shard_urls
+                if package not in result
+            }
+            # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
+            for future in concurrent.futures.as_completed(futures):
+                print(".", futures[future])
+                data = future.result()
+                url, package = futures[future]
+                # XXX catch exception / 404 / whatever
+                result[package] = msgpack.loads(zstandard.decompress(data))
+                self.shards_cache.insert(url, package, data)
+
+        return result
 
 
 def repodata_shards(url, cache: RepodataCache) -> bytes:
@@ -277,7 +319,7 @@ def test_shards(conda_no_token: None):
     found = fetch_shards(subdir_data)
     assert found, f"Shards not found for {channels[0]}"
 
-    for package in found.shards:
+    for package in found.shards_index:
         shard_url = found.shard_url(package)
         assert shard_url.startswith("http")  # or channel url or shards_base_url
 
@@ -287,7 +329,7 @@ def test_shards(conda_no_token: None):
 
     # download or fetch-from-cache a random set of shards
 
-    for package in random.choices([*found.shards.keys()], k=16):
+    for package in random.choices([*found.shards_index.keys()], k=16):
         shard = found.fetch_shard(package, session)
         print(shard)
 
@@ -357,6 +399,10 @@ def test_shards_2(conda_no_token: None):
 
     shards_to_get = set(package.name for package in installed)
 
+    # what we want to install
+    # shards_to_get.update(in_state.requested)
+    shards_to_get.add("twine")
+
     shards_to_get_more = set(
         package.name for root in installed for package in root.combined_depends
     )
@@ -383,6 +429,7 @@ def test_shards_2(conda_no_token: None):
 
     time_start = time.monotonic()
     while shards_to_get:
+        iteration_start = time.monotonic()
         print(f"Seek {len(shards_to_get)} shards in iteration {iteration}:")
         print("\n".join(textwrap.wrap(" ".join(sorted(shards_to_get)))))
         new_shards_to_get = set()
@@ -401,12 +448,14 @@ def test_shards_2(conda_no_token: None):
                     waste += 1
 
         shards_to_get = new_shards_to_get
+        iteration_end = time.monotonic()
+        print(f"Iteration {iteration} took {iteration_end - iteration_start:.2f}s")
         iteration += 1
     time_end = time.monotonic()
 
     relevant_packages = [set(value) for value in shards_have.values()]
     assert all(len(x) == len(relevant_packages[0]) for x in relevant_packages)
-    print("Sought data for the following packages:")
+    print(f"Sought data for the following {len(relevant_packages[0])} packages:")
     print("\n".join(textwrap.wrap(" ".join(sorted(relevant_packages[0])))))
     print(f"Wasted {waste} inner loop iterations")
     print(f"Took {time_end - time_start:.2f}s")
