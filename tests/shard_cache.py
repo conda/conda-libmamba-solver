@@ -61,6 +61,8 @@ class ShardCache:
             package: package name
             raw_shard: msgpack.zst compressed shard data
         """
+        # decompress and return shard for convenience, also to validate? unless
+        # caller would rather retrieve the shard from another thread.
         with self.conn as c:
             c.execute(
                 "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
