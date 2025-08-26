@@ -119,6 +119,8 @@ if TYPE_CHECKING:
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
+    from .state import SolverInputState
+
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -160,7 +162,7 @@ class LibMambaIndexHelper:
         repodata_fn: str = REPODATA_FN,
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
-        in_state=None,
+        in_state: SolverInputState | None = None,
     ):
         platform_less_channels = []
         for channel in channels:

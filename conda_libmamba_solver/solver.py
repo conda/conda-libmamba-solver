@@ -163,6 +163,7 @@ class LibMambaSolver(Solver):
         with get_spinner(
             self._collect_all_metadata_spinner_message(channels, conda_build_channels),
         ):
+            # only called here by c-l-s
             index = self._collect_all_metadata(
                 channels=channels,
                 conda_build_channels=conda_build_channels,
