@@ -10,6 +10,7 @@ from conda import plugins
 try:
     from conda.plugins import CondaSolver
 except ImportError:
+    # FUTURE: Use this import only in conda 26.3+
     from conda.plugins.types import CondaSolver
 
 from .repoquery import configure_parser, repoquery
