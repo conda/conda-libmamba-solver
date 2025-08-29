@@ -7,6 +7,11 @@ Entry points for the conda plugin system
 
 from conda import plugins
 
+try:
+    from conda.plugins import CondaSolver
+except ImportError:
+    from conda.plugins.types import CondaSolver
+
 from .repoquery import configure_parser, repoquery
 from .solver import LibMambaSolver
 
@@ -16,7 +21,7 @@ def conda_solvers():
     """
     The conda plugin hook implementation to load the solver into conda.
     """
-    yield plugins.CondaSolver(
+    yield CondaSolver(
         name="libmamba",
         backend=LibMambaSolver,
     )
