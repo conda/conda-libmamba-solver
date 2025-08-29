@@ -20,43 +20,37 @@ Send to the solver.
 from __future__ import annotations
 
 import concurrent.futures
-import json
-import pickle
-import random
-import textwrap
 import time
 from collections import defaultdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urljoin
 
 import conda.gateways.repodata as repodata
 import msgpack
-import pytest
 import zstandard
-from conda.base.context import context, reset_context
-from conda.core.subdir_data import SubdirData
+from conda.base.context import context
 from conda.gateways.connection.session import get_session
 from conda.gateways.repodata import (
     _add_http_value_to_dict,
     conda_http_errors,
 )
-from conda.models.channel import Channel
 from conda.models.records import PackageRecord
-from requests import HTTPError, Response
+from requests import HTTPError
 
 from . import shard_cache  # type: ignore
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import (
         RepodataCache,
     )
+    from requests import Response
 
     from ..conda_libmamba_solver.shard_cache import Shard
-
-from typing import TypedDict
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
@@ -107,12 +101,16 @@ class ShardLike:
     Present a "classic" repodata.json as per-package shards.
     """
 
-    def __init__(self, repodata: dict):
+    def __init__(self, repodata: dict, url: str = ""):
+        """
+        url: for debugging; not used by this class.
+        """
         all_packages = {
             "packages": repodata.pop("packages", {}),
             "packages.conda": repodata.pop("packages.conda", {}),
         }
-        self.repodata = repodata  # without packages, packges.conda
+        self.repodata = repodata  # without packages, packages.conda
+        self.url = url
 
         shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
 
@@ -125,7 +123,10 @@ class ShardLike:
         self.shards: dict[str, Shard] = dict(shards)  # type: ignore
 
         # used to write out repodata subset
-        self.visited_shards: dict[str, Shard] = {}
+        self.visited: dict[str, Shard | None] = {}
+
+    def __repr__(self):
+        return self.url.join(super().__repr__().split(maxsplit=1))
 
     def __contains__(self, package):
         return package in self.shards
@@ -134,19 +135,19 @@ class ShardLike:
         """
         "Fetch" an individual shard.
 
-        Update self.visited_shards with all not-None packages.
+        Update self.visited with all not-None packages.
 
         Raise KeyError if package is not in the index.
         """
         shard = self.shards[package]
-        self.visited_shards[package] = shard
+        self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: list[str], session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
         """
         Fetch multiple shards in one go.
 
-        Update self.visited_shards with all not-None packages.
+        Update self.visited with all not-None packages.
         """
         return {package: self.fetch_shard(package, session) for package in packages}
 
@@ -156,10 +157,15 @@ class ShardLike:
         """
         repodata = self.repodata.copy()
         repodata.update({"packages": {}, "packages.conda": {}})
-        for package, shard in self.visited_shards.items():
+        for package, shard in self.visited.items():
+            if shard is None:
+                continue  # recorded visited but not available shards
             for package_group in ("packages", "packages.conda"):
                 repodata[package_group].update(shard[package_group])
         return repodata
+
+
+FETCHED_THIS_PROCESS = set()
 
 
 class Shards(ShardLike):
@@ -176,7 +182,7 @@ class Shards(ShardLike):
         self.repodata = {k: v for k, v in self.shards_index.items() if k not in ("shards",)}
 
         # used to write out repodata subset
-        self.visited_shards: dict[str, Shard] = {}
+        self.visited: dict[str, Shard | None] = {}
 
     def __contains__(self, package):
         return package in self.packages_index
@@ -206,49 +212,73 @@ class Shards(ShardLike):
         # XXX do we call this with the same shard, decompressing twice, in a single instance?
         shard_or_none = self.shards_cache.retrieve(shard_url)
         if shard_or_none:
-            self.visited_shards[package] = shard_or_none
+            self.visited[package] = shard_or_none
             return shard_or_none
         else:
             raw_shard = session.get(shard_url).content
             # ensure it is real msgpack+zstd before inserting into cache
             shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
-            self.shards_cache.insert(shard_url, package, raw_shard)
-            self.visited_shards[package] = shard
+            self.shards_cache.insert(shard_cache.AnnotatedRawShard(shard_url, package, raw_shard))
+            self.visited[package] = shard
             return shard
 
     def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
+        """
+        Return mapping of *package names* to Shard for given packages.
+        """
         result = {}
 
-        def fetch(s, package, url):
+        def fetch(s, url, package):
+            if url in FETCHED_THIS_PROCESS:
+                print("Already got", url)
+                raise RuntimeError("Can't fetch same url twice")
+            FETCHED_THIS_PROCESS.add(url)
             b1 = time.time_ns()
             data = s.get(url).content
             e1 = time.time_ns()
-            print(f"{(e1 - b1) / 1e9}s", package, url)
-            return data
+            print(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
+            return shard_cache.AnnotatedRawShard(url=url, package=package, raw_shard=data)
 
-        shard_urls = {package: self.shard_url(package) for package in packages}
+        packages = sorted(list(packages))
+        urls_packages = {self.shard_url(package): package for package in packages}
 
-        cached = self.shards_cache.retrieve_multiple(list(shard_urls.values()))
-        for package in cached:
-            result[package] = cached[package]
+        cached = self.shards_cache.retrieve_multiple(sorted(urls_packages))
+        for url, shard in cached.items():
+            package = urls_packages[url]
+            assert not package.startswith(("https://", "http://"))
+            result[package] = shard
 
         # beneficial to have thread pool larger than requests' default 10 max
         # connections per session. There is "context.repodata_threads" but it's
         # None in the REPL.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = {
-                executor.submit(fetch, session, package, url): (url, package)
-                for package, url in shard_urls
+                executor.submit(fetch, session, url, package): (url, package)
+                for url, package in urls_packages.items()
                 if package not in result
             }
             # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
             for future in concurrent.futures.as_completed(futures):
                 print(".", futures[future])
-                data = future.result()
-                url, package = futures[future]
+                fetch_result = future.result()
                 # XXX catch exception / 404 / whatever
-                result[package] = msgpack.loads(zstandard.decompress(data))
-                self.shards_cache.insert(url, package, data)
+                result[fetch_result.package] = msgpack.loads(
+                    zstandard.decompress(fetch_result.raw_shard)
+                )
+                try:
+                    package_names = [
+                        p["name"]
+                        for p in (
+                            *result[fetch_result.package]["packages"].values(),
+                            *result[fetch_result.package]["packages.conda"].values(),
+                        )
+                    ]
+                    print("expected", fetch_result.package, "actual", set(package_names))
+                except (AttributeError, KeyError):
+                    print("oops")
+                self.shards_cache.insert(fetch_result)
+
+        self.visited.update(result)
 
         return result
 

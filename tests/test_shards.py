@@ -4,48 +4,27 @@ Test downloading shards; subsetting "all possible depedencies" for solver.
 
 from __future__ import annotations
 
-import concurrent.futures
 import json
 import pickle
 import random
 import textwrap
 import time
-from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
-from urllib.parse import urljoin
 
-import conda.gateways.repodata as repodata
 import msgpack
 import pytest
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
-from conda.gateways.repodata import (
-    _add_http_value_to_dict,
-    conda_http_errors,
-)
 from conda.models.channel import Channel
-from conda.models.records import PackageRecord
-from requests import HTTPError, Response
 
-from conda_libmamba_solver import shard_cache, shards
+from conda_libmamba_solver import shard_cache
 from conda_libmamba_solver.shards import (
-    RepodataInfo,
     ShardLike,
     fetch_shards,
     shard_mentioned_packages,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Iterable
-
-    from conda.gateways.repodata import (
-        RepodataCache,
-    )
-
-    from ..conda_libmamba_solver.shard_cache import Shard
 
 HERE = Path(__file__).parent
 
@@ -162,7 +141,7 @@ def test_shards_2(conda_no_token: None):
             found = fetch_shards(subdir_data)
             if not found:
                 repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                found = ShardLike(repodata_json)
+                found = ShardLike(repodata_json, channel_url)
             channel_data[channel_url] = found
 
     print(channel_data)
@@ -191,7 +170,7 @@ def test_shards_2(conda_no_token: None):
 
     shards_to_get |= shards_to_get_more
 
-    shards_have = {
+    shards_have: dict[str, dict[str, shard_cache.Shard | None]] = {
         url: {} for url in channel_data
     }  # mapping between URL and shards fetched or attempted-to-fetch
     iteration = 0
@@ -212,23 +191,42 @@ def test_shards_2(conda_no_token: None):
                 for package in shards_to_get
                 if package in shardlike
                 and package
-                not in shardlike.visited_shards  # may make sense to update visited_shards with negative matches
+                not in shardlike.visited  # may make sense to update visited with negative matches
             )
-            shards_fetched_serially = set()
-            for package in shards_to_get:
-                if package not in shards_have[channel_url]:  # XXX also inefficient
-                    if package in shardlike:
-                        new_shard = shardlike.fetch_shard(package, session)
-                        new_shards_to_get.update(shard_mentioned_packages(new_shard))
-                        shards_have[channel_url][package] = new_shard
-                        shards_fetched_serially.add(package)
+            shards_unavailable = set(
+                package
+                for package in shards_to_get
+                if package not in shardlike
+                and package
+                not in shardlike.visited  # may make sense to update visited with negative matches
+            )
+            for package in shards_unavailable:
+                shardlike.visited[package] = None
+
+            fetched_shards = shardlike.fetch_shards(shards_to_fetch, session)
+            for package, shard in fetched_shards.items():
+                new_shards_to_get.update(shard_mentioned_packages(shard))
+
+            # also a property of the shardlike instance:
+            shards_have[channel_url].update(fetched_shards)
+
+            if False:  # earlier "one at a time" method
+                shards_fetched_serially = set()
+                for package in shards_to_get:
+                    if package not in shards_have[channel_url]:  # XXX also inefficient
+                        if package in shardlike:
+                            new_shard = shardlike.fetch_shard(package, session)
+                            new_shards_to_get.update(shard_mentioned_packages(new_shard))
+                            shards_have[channel_url][package] = package
+                            shards_fetched_serially.add(package)
+                        else:
+                            shards_have[channel_url][package] = None
                     else:
-                        shards_have[channel_url][package] = None
-                else:
-                    waste += 1
-            print("To-fetch same both ways?", shards_fetched_serially == shards_to_fetch)
+                        waste += 1
+            # print("To-fetch same both ways?", shards_fetched_serially == shards_to_fetch)
 
         shards_to_get = new_shards_to_get
+        shards_to_get -= set(next(iter(shards_have.values())))
         iteration_end = time.monotonic()
         print(f"Iteration {iteration} took {iteration_end - iteration_start:.2f}s")
         iteration += 1

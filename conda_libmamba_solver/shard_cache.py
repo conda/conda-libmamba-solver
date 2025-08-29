@@ -6,6 +6,7 @@ after their own sha256 hash.
 from __future__ import annotations
 
 import sqlite3
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypedDict
 
 import msgpack
@@ -18,6 +19,13 @@ SHARD_CACHE_NAME = "repodata_shards.db"
 
 
 Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
+
+
+@dataclass
+class AnnotatedRawShard:
+    url: str
+    package: str
+    raw_shard: bytes
 
 
 def connect(dburi="cache.db"):
@@ -48,13 +56,15 @@ class ShardCache:
     def connect(self):
         dburi = f"file://{str(self.base / SHARD_CACHE_NAME)}"
         self.conn = connect(dburi)
+        # this schema will also get confused if we merge packages into a single
+        # shard, but the package name should be advisory.
         self.conn.execute(
             "CREATE TABLE IF NOT EXISTS shards ("
             "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
             "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
         )
 
-    def insert(self, url, package, raw_shard: bytes):
+    def insert(self, raw_shard: AnnotatedRawShard):
         """
         Args:
             url: of shard
@@ -66,7 +76,7 @@ class ShardCache:
         with self.conn as c:
             c.execute(
                 "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
-                (url, package, raw_shard),
+                (raw_shard.url, raw_shard.package, raw_shard.raw_shard),
             )
 
     def retrieve(self, url) -> Shard | None:
@@ -75,13 +85,18 @@ class ShardCache:
             return msgpack.loads(zstandard.decompress(row["shard"])) if row else None  # type: ignore
 
     def retrieve_multiple(self, urls: list[str]) -> dict[str, Shard | None]:
+        """
+        Query database for cached shard urls.
+
+        Return a dict of urls in cache mapping to the Shard or None if not present.
+        """
         # in sqlite, multiple queries are very fast since there is no server.
         # "with self.conn" may have overhead. nevertheless, try querying
         # multiple in a single call.
-        query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}"
+        query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
         with self.conn as c:
             result: dict[str, Shard | None] = {
-                row.url: msgpack.loads(zstandard.decompress(row["shard"])) if row else None
+                row["url"]: msgpack.loads(zstandard.decompress(row["shard"])) if row else None
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result
