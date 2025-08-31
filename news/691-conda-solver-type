@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Import `CondaSolver` from its new location in `conda.plugins.types`. (#691)
+* Import `CondaSolver` from its canonical location in `conda.plugins.types`. (#691)
 
 ### Deprecations
 
