@@ -6,7 +6,6 @@ Entry points for the conda plugin system
 """
 
 from conda.plugins import hookimpl
-
 from conda.plugins.types import CondaSolver, CondaSubcommand
 
 from .repoquery import configure_parser, repoquery
