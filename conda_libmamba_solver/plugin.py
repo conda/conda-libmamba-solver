@@ -7,11 +7,7 @@ Entry points for the conda plugin system
 
 from conda.plugins import hookimpl
 
-try:
-    # FUTURE: Use this import only in conda 26.3+
-    from conda.plugins.types import CondaSolver, CondaSubcommand
-except ImportError:
-    from conda.plugins import CondaSolver, CondaSubcommand
+from conda.plugins.types import CondaSolver, CondaSubcommand
 
 from .repoquery import configure_parser, repoquery
 from .solver import LibMambaSolver
