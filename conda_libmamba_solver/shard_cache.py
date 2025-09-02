@@ -23,9 +23,18 @@ Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[
 
 @dataclass
 class AnnotatedRawShard:
+    def __init__(self, url: str, package: str, compressed_shard: bytes):
+        # debugging
+        assert "://" in url
+        assert "://" not in package
+
+        self.url = url
+        self.package = package  # remove this field to avoid confusion?
+        self.compressed_shard = compressed_shard
+
     url: str
     package: str
-    raw_shard: bytes
+    compressed_shard: bytes
 
 
 def connect(dburi="cache.db"):
@@ -76,7 +85,7 @@ class ShardCache:
         with self.conn as c:
             c.execute(
                 "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
-                (raw_shard.url, raw_shard.package, raw_shard.raw_shard),
+                (raw_shard.url, raw_shard.package, raw_shard.compressed_shard),
             )
 
     def retrieve(self, url) -> Shard | None:

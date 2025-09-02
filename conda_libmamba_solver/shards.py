@@ -22,7 +22,6 @@ from __future__ import annotations
 import concurrent.futures
 import time
 from collections import defaultdict
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urljoin
@@ -237,7 +236,7 @@ class Shards(ShardLike):
             data = s.get(url).content
             e1 = time.time_ns()
             print(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
-            return shard_cache.AnnotatedRawShard(url=url, package=package, raw_shard=data)
+            return shard_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
         packages = sorted(list(packages))
         urls_packages = {self.shard_url(package): package for package in packages}
@@ -263,7 +262,7 @@ class Shards(ShardLike):
                 fetch_result = future.result()
                 # XXX catch exception / 404 / whatever
                 result[fetch_result.package] = msgpack.loads(
-                    zstandard.decompress(fetch_result.raw_shard)
+                    zstandard.decompress(fetch_result.compressed_shard)
                 )
                 try:
                     package_names = [
