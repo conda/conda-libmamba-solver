@@ -1,3 +1,6 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Cache suitable for shards, not allowed to change because they are named
 after their own sha256 hash.
@@ -58,7 +61,6 @@ class ShardCache:
         """
         base: directory and filename prefix for cache.
         """
-        # base includes /<hash for particular repodata url>
         self.base = base
         self.connect()
 
