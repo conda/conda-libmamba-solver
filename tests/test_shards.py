@@ -256,6 +256,7 @@ def test_traverse_shards_3(conda_no_token: None):
     Another go at the dependency traversal algorithm.
     """
 
+    # installed, plus what we want to add (twine)
     root_packages = [
         "__archspec",
         "__conda",
