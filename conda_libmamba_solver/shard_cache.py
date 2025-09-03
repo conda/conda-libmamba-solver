@@ -65,7 +65,7 @@ class ShardCache:
         self.connect()
 
     def connect(self):
-        dburi = f"file://{str(self.base / SHARD_CACHE_NAME)}"
+        dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
         # this schema will also get confused if we merge packages into a single
         # shard, but the package name should be advisory.
