@@ -5,26 +5,27 @@
 Entry points for the conda plugin system
 """
 
-from conda import plugins
+from conda.plugins import hookimpl
+from conda.plugins.types import CondaSolver, CondaSubcommand
 
 from .repoquery import configure_parser, repoquery
 from .solver import LibMambaSolver
 
 
-@plugins.hookimpl
+@hookimpl
 def conda_solvers():
     """
     The conda plugin hook implementation to load the solver into conda.
     """
-    yield plugins.CondaSolver(
+    yield CondaSolver(
         name="libmamba",
         backend=LibMambaSolver,
     )
 
 
-@plugins.hookimpl
+@hookimpl
 def conda_subcommands():
-    yield plugins.CondaSubcommand(
+    yield CondaSubcommand(
         name="repoquery",
         summary="Advanced search for repodata.",
         action=repoquery,
