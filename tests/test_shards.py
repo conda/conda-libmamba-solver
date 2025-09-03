@@ -139,7 +139,7 @@ def test_shards_2(conda_no_token: None):
 
     installed = (
         *in_state.installed.values(),
-        *in_state.virtual.values(),
+        # *in_state.virtual.values(),  # skip these which will not exist in channels
     )
 
     channel_data: dict[str, ShardLike] = {}
@@ -249,6 +249,53 @@ def test_shards_2(conda_no_token: None):
 
     # Now write out shards_have packages that are not None, as small
     # repodata.json for the solver.
+
+
+def test_traverse_shards_3(conda_no_token: None):
+    """
+    Another go at the dependency traversal algorithm.
+    """
+
+    root_packages = [
+        "__archspec",
+        "__conda",
+        "__osx",
+        "__unix",
+        "bzip2",
+        "ca-certificates",
+        "expat",
+        "icu",
+        "libexpat",
+        "libffi",
+        "liblzma",
+        "libmpdec",
+        "libsqlite",
+        "libzlib",
+        "ncurses",
+        "openssl",
+        "pip",
+        "python",
+        "python_abi",
+        "readline",
+        "tk",
+        "twine",
+        "tzdata",
+        "xz",
+        "zlib",
+    ]
+
+    channels = list(context.default_channels)
+    channels.append(Channel("conda-forge-sharded"))
+
+    channel_data: dict[str, ShardLike] = {}
+    for channel in channels:
+        for channel_url in Channel(channel).urls(True, context.subdirs):
+            subdir_data = SubdirData(Channel(channel_url))
+            found = fetch_shards(subdir_data)
+            if not found:
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
+                found = ShardLike(repodata_json, channel_url)
+            channel_data[channel_url] = found
 
 
 def test_shard_cache(tmp_path: Path):
