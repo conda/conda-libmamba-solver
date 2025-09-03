@@ -1,6 +1,6 @@
 ### Enhancements
 
-* Add sqlite3-based sharded repodata cache (#695)
+* Add sqlite3-based sharded repodata cache. (#695)
 
 ### Bug fixes
 
