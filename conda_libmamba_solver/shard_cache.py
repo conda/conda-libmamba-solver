@@ -61,7 +61,6 @@ class ShardCache:
         """
         base: directory and filename prefix for cache.
         """
-        # base includes /<hash for particular repodata url>
         self.base = base
         self.connect()
 
