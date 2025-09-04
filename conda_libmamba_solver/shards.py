@@ -1,20 +1,9 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
-Seek out, fetch, and subset sharded repodata.
-
-When shards are in use, we can do minimal parsing of the repodata to fetch only
-the subset that can be used for the solver. We only need to determine the
-package names and the package names of their dependencies, and could skip
-creating inefficient PackageRecord instances.
-
-For each installed or requested package, find its dependencies by package name.
-Add those package names to a set of package names to collect. Each channel
-collects the metadata for the named packages, and adds those packages'
-dependencies to the package names to collect.
-
-Repeat until no new packages have been discovered.
-
-Serialize repodata.json with only the package name visited in the prior step.
-Send to the solver.
+Models for sharded repodata, and to make monolithic repodata look like sharded
+repodata.
 """
 
 from __future__ import annotations
@@ -38,18 +27,32 @@ from conda.gateways.repodata import (
 from conda.models.records import PackageRecord
 from requests import HTTPError
 
-from . import shard_cache  # type: ignore
+from . import shard_cache
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from typing import NotRequired
 
     from conda.core.subdir_data import SubdirData
-    from conda.gateways.repodata import (
-        RepodataCache,
-    )
-    from requests import Response
+    from conda.gateways.repodata import RepodataCache
+    from requests import Response, Session
 
-    from ..conda_libmamba_solver.shard_cache import Shard
+
+class PackageRecordDict(TypedDict):
+    """
+    Basic package attributes that this module cares about.
+    """
+
+    name: str
+    sha256: NotRequired[str | bytes]
+    md5: NotRequired[str | bytes]
+
+
+# in this style because "packages.conda" is not a Python identifier
+Shard = TypedDict(
+    "Shard",
+    {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
+)
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
@@ -58,7 +61,26 @@ class RepodataInfo(TypedDict):  # noqa: F811
     subdir: str
 
 
-def maybe_unpack_record(record):
+class RepodataDict(Shard):
+    """
+    Packages plus info.
+    """
+
+    info: RepodataInfo
+
+
+class ShardsIndex(TypedDict):
+    """
+    Shards index as deserialized from repodata_shards.msgpack.zst
+    """
+
+    info: RepodataInfo
+    repodata_version: int
+    removed: list[str]
+    shards: dict[str, bytes]
+
+
+def maybe_unpack_record(record: PackageRecordDict):
     """
     Convert bytes checksums to hex; leave unchanged if already str.
     """
@@ -69,9 +91,9 @@ def maybe_unpack_record(record):
     return record
 
 
-def shard_mentioned_packages(shard: Shard):
+def shard_mentioned_packages(shard: Shard) -> set[str]:
     """
-    Return all dependencies mentioned in a shard, including the shard's own
+    Return all dependency names mentioned in a shard, including the shard's own
     package name.
 
     Includes virtual packages.
@@ -88,27 +110,22 @@ def shard_mentioned_packages(shard: Shard):
     return mentioned
 
 
-class ShardsIndex(TypedDict):
-    info: RepodataInfo
-    repodata_version: int
-    removed: list[str]
-    shards: dict[str, bytes]
-
-
 class ShardLike:
     """
     Present a "classic" repodata.json as per-package shards.
     """
 
-    def __init__(self, repodata: dict, url: str = ""):
+    def __init__(self, repodata: RepodataDict, url: str = ""):
         """
-        url: for debugging; not used by this class.
+        url: affects the repr but not the functionality of this class.
         """
         all_packages = {
-            "packages": repodata.pop("packages", {}),
-            "packages.conda": repodata.pop("packages.conda", {}),
+            "packages": repodata["packages"],
+            "packages.conda": repodata["packages.conda"],
         }
-        self.repodata = repodata  # without packages, packages.conda
+        repodata.pop("packages")
+        repodata.pop("packages.conda")
+        self.repodata_no_packages = repodata  # without packages, packages.conda
         self.url = url
 
         shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
@@ -127,10 +144,10 @@ class ShardLike:
     def __repr__(self):
         return self.url.join(super().__repr__().split(maxsplit=1))
 
-    def __contains__(self, package):
-        return package in self.shards
+    def __contains__(self, package_name: str) -> bool:
+        return package_name in self.shards
 
-    def fetch_shard(self, package: str, session) -> Shard:
+    def fetch_shard(self, package: str, session: Session) -> Shard:
         """
         "Fetch" an individual shard.
 
@@ -142,7 +159,7 @@ class ShardLike:
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
         """
         Fetch multiple shards in one go.
 
@@ -150,11 +167,11 @@ class ShardLike:
         """
         return {package: self.fetch_shard(package, session) for package in packages}
 
-    def build_repodata(self):
+    def build_repodata(self) -> RepodataDict:
         """
         Return monolithic repodata including all visited shards.
         """
-        repodata = self.repodata.copy()
+        repodata = self.repodata_no_packages.copy()
         repodata.update({"packages": {}, "packages.conda": {}})
         for package, shard in self.visited.items():
             if shard is None:
@@ -190,7 +207,7 @@ class Shards(ShardLike):
     def packages_index(self):
         return self.shards_index["shards"]
 
-    def shard_url(self, package: str):
+    def shard_url(self, package: str) -> str:
         """
         Return shard URL for a given package.
 
@@ -200,9 +217,9 @@ class Shards(ShardLike):
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
 
-    def fetch_shard(self, package: str, session) -> Shard:
+    def fetch_shard(self, package: str, session: Session) -> Shard:
         """
-        Fetch an individual shard or retrieve from cache.
+        Fetch an individual shard.
 
         Raise KeyError if package is not in the index.
         """
@@ -221,7 +238,7 @@ class Shards(ShardLike):
             self.visited[package] = shard
             return shard
 
-    def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
         """
         Return mapping of *package names* to Shard for given packages.
         """
