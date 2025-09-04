@@ -30,9 +30,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from conda.core.subdir_data import SubdirData
-    from conda.gateways.repodata import (
-        RepodataCache,
-    )
+    from conda.gateways.repodata import RepodataCache
     from requests import Response
 
 
@@ -56,9 +54,9 @@ def maybe_unpack_record(record):
     return record
 
 
-def shard_mentioned_packages(shard: Shard):
+def shard_mentioned_packages(shard: Shard) -> set[str]:
     """
-    Return all dependencies mentioned in a shard, including the shard's own
+    Return all dependency names mentioned in a shard, including the shard's own
     package name.
 
     Includes virtual packages.
@@ -114,8 +112,8 @@ class ShardLike:
     def __repr__(self):
         return self.url.join(super().__repr__().split(maxsplit=1))
 
-    def __contains__(self, package):
-        return package in self.shards
+    def __contains__(self, package_name: str) -> bool:
+        return package_name in self.shards
 
     def fetch_shard(self, package: str, session) -> Shard:
         """
@@ -137,7 +135,7 @@ class ShardLike:
         """
         return {package: self.fetch_shard(package, session) for package in packages}
 
-    def build_repodata(self):
+    def build_repodata(self) -> dict:
         """
         Return monolithic repodata including all visited shards.
         """
@@ -176,7 +174,7 @@ class Shards(ShardLike):
     def packages_index(self):
         return self.shards_index["shards"]
 
-    def shard_url(self, package: str):
+    def shard_url(self, package: str) -> str:
         """
         Return shard URL for a given package.
 
@@ -217,7 +215,7 @@ class Shards(ShardLike):
             print(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
             return (url, package, data)
 
-        packages = sorted(list(packages))
+        packages = sorted(packages)
         urls_packages = {self.shard_url(package): package for package in packages}
 
         # beneficial to have thread pool larger than requests' default 10 max
