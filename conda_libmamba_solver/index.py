@@ -486,6 +486,13 @@ class LibMambaIndexHelper:
             noarch = NoArchType(record.noarch.value.title())
         else:
             noarch = NoArchType("No")
+        # include the python_site_packages_path attribute if libmambapy includes support
+        if hasattr(PackageInfo, "python_site_packages_path"):
+            extra = {
+                "python_site_packages_path": record.get("python_site_packages_path") or "",
+            }
+        else:
+            extra = {}
         return PackageInfo(
             name=record.name,
             version=record.version,
@@ -507,6 +514,7 @@ class LibMambaIndexHelper:
             noarch=noarch,
             size=record.get("size") or 0,
             timestamp=int((record.get("timestamp") or 0) * 1000),
+            **extra,
         )
 
     def _set_repo_priorities(self) -> None:
