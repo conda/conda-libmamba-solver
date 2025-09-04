@@ -21,8 +21,9 @@ from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
 from conda.testing.integration import package_is_installed
 
+from conda_libmamba_solver.index import LibMambaIndexHelper
+
 from .channel_testing.helpers import (
-    create_with_channel,
     http_server_auth_basic,  # noqa: F401
     http_server_auth_basic_email,  # noqa: F401
     http_server_auth_none,  # noqa: F401
@@ -267,20 +268,68 @@ def test_conda_build_with_aliased_channels(tmp_path):
             condarc.unlink()
 
 
-def test_http_server_auth_none(http_server_auth_none):  # noqa: F811
-    create_with_channel(http_server_auth_none)
+def test_http_server_auth_none(
+    http_server_auth_none: str,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_none}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_basic(http_server_auth_basic):  # noqa: F811
-    create_with_channel(http_server_auth_basic)
+def test_http_server_auth_basic(
+    http_server_auth_basic,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_basic}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_basic_email(http_server_auth_basic_email):  # noqa: F811
-    create_with_channel(http_server_auth_basic_email)
+def test_http_server_auth_basic_email(
+    http_server_auth_basic_email,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_basic_email}",
+        "test-package",
+    )
 
 
-def test_http_server_auth_token(http_server_auth_token):  # noqa: F811
-    create_with_channel(http_server_auth_token)
+def test_http_server_auth_token(
+    http_server_auth_token,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+):
+    conda_cli(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--json",
+        "--override-channels",
+        f"--channel={http_server_auth_token}",
+        "test-package",
+    )
 
 
 def test_http_server_auth_token_in_defaults(
@@ -335,6 +384,36 @@ def test_local_spec() -> None:
     assert process.returncode == 0
 
 
+def test_nameless_channel(
+    http_server_auth_none: str,  # noqa: F811
+    conda_cli: CondaCLIFixture,
+    tmp_path: Path,
+):
+    out, err, rc = conda_cli(
+        "create",
+        f"--prefix={tmp_path}",
+        "--solver=libmamba",
+        "--yes",
+        "--override-channels",
+        f"--channel={http_server_auth_none}",
+        "test-package",
+    )
+    print(out)
+    print(err, file=sys.stderr)
+    assert not rc
+    out, err, rc = conda_cli(
+        "install",
+        f"--prefix={tmp_path}",
+        "--solver=libmamba",
+        "--yes",
+        f"--channel={http_server_auth_none}",
+        "zlib",
+    )
+    print(out)
+    print(err, file=sys.stderr)
+    assert not rc
+
+
 def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
     """https://github.com/conda/conda-libmamba-solver/issues/418"""
     DATA = Path(__file__).parent / "data"
@@ -384,3 +463,22 @@ def test_use_cache_works_offline_fresh_install_keep(tmp_path):
     conda_subprocess(*args, "--offline", **kwargs)
     conda_subprocess(*args, "--use-index-cache", **kwargs)
     conda_subprocess(*args, "--offline", "--use-index-cache", **kwargs)
+
+
+def test_channels_are_percent_encoded(tmp_path):
+    channel = tmp_path / "channel with spaces"
+    noarch = channel / "noarch"
+    noarch.mkdir(parents=True, exist_ok=True)
+    (noarch / "repodata.json").write_text("{}")
+
+    index = LibMambaIndexHelper(channels=[Channel(str(channel))])
+    assert index.repos
+    for repo in index.repos:
+        assert "%20" in repo.url_no_cred
+        assert "%20" in repo.url_w_cred
+
+    index = LibMambaIndexHelper(channels=[], pkgs_dirs=[str(channel)])
+    assert index.repos
+    for repo in index.repos:
+        assert "%20" in repo.url_no_cred
+        assert "%20" in repo.url_w_cred

@@ -21,7 +21,7 @@ requirements:
     - hatch-vcs
   run:
     - python >=3.9
-    - conda >=23.7.3
+    - conda >=24.11
     - libmambapy >=2.0.0
     - boltons >=23.0.0
 

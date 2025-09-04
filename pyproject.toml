@@ -23,8 +23,8 @@ classifiers = [
 ]
 requires-python = ">=3.9"
 dependencies = [
-  "conda >=23.7.3",
-  "libmambapy >=2",
+  "conda >=24.11",
+  # "libmambapy >=2",
   "boltons >=23.0.0",
 ]
 dynamic = [
@@ -57,7 +57,25 @@ addopts = [
   "--tb=native",
   "--strict-markers"
 ]
-
+filterwarnings = [
+  # elevate all deprecation warnings to errors
+  "error::PendingDeprecationWarning",
+  "error::DeprecationWarning",
+  "error::FutureWarning",
+  # temporary ignores
+  "ignore:conda.cli.install.print_activate:PendingDeprecationWarning:conda.env.env",
+  "ignore:`remote_definition`:FutureWarning:argparse",
+  "ignore:conda.core.prefix_data.python_record_for_prefix:PendingDeprecationWarning:conda.core.link",
+  "ignore:conda.core.prefix_data.PrefixDataType.__call__:PendingDeprecationWarning:conda_libmamba_solver.state",
+  "ignore:conda.env.specs.binstar:DeprecationWarning:conda",
+  "ignore:conda.env.specs.binstar:PendingDeprecationWarning:conda",
+  "ignore:.*conda.plugins.types.*:DeprecationWarning",
+  "ignore:.*conda.plugins.types.*:PendingDeprecationWarning",
+  "ignore:conda.trust:DeprecationWarning:conda",
+  "ignore:conda.trust:PendingDeprecationWarning:conda",
+  "ignore:conda.core.link.PrefixActions:DeprecationWarning:conda",
+  "ignore:conda.core.link.PrefixActions:PendingDeprecationWarning:conda",
+]
 markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",

@@ -30,7 +30,7 @@ from conda.base.constants import (
 )
 from conda.base.context import context
 from conda.common.constants import NULL
-from conda.common.io import Spinner, time_recorder
+from conda.common.io import time_recorder
 from conda.common.path import paths_equal
 from conda.common.url import percent_decode
 from conda.core.solve import Solver
@@ -43,6 +43,7 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
 from conda.models.version import VersionOrder
+from conda.reporters import get_spinner
 from libmambapy.solver import Request, Solution
 from libmambapy.solver.libsolv import Solver as LibsolvSolver
 from libmambapy.specs import MatchSpec as LibmambaMatchSpec
@@ -68,6 +69,7 @@ if TYPE_CHECKING:
         DepsModifier,
         UpdateModifier,
     )
+    from conda.common.path import PathType
     from libmambapy.solver.libsolv import Database, UnSolvable
     from libmambapy.specs import PackageInfo
 
@@ -88,7 +90,7 @@ class LibMambaSolver(Solver):
 
     def __init__(
         self,
-        prefix: os.PathLike | str,
+        prefix: PathType,
         channels: Iterable[Channel | str],
         subdirs: Iterable[str] = (),
         specs_to_add: Iterable[MatchSpec | str] = (),
@@ -158,10 +160,8 @@ class LibMambaSolver(Solver):
 
         channels = self._collect_channel_list(in_state)
         conda_build_channels = self._collect_channels_subdirs_from_conda_build(seen=set(channels))
-        with Spinner(
+        with get_spinner(
             self._collect_all_metadata_spinner_message(channels, conda_build_channels),
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
         ):
             index = self._collect_all_metadata(
                 channels=channels,
@@ -171,10 +171,8 @@ class LibMambaSolver(Solver):
             )
             out_state.check_for_pin_conflicts(index)
 
-        with Spinner(
+        with get_spinner(
             self._solving_loop_spinner_message(),
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
         ):
             # This function will copy and mutate `out_state`
             # Make sure we get the latest copy to return the correct solution below
@@ -383,7 +381,9 @@ class LibMambaSolver(Solver):
             "force_reinstall": in_state.force_reinstall,
             "keep_dependencies": True,
             "keep_user_specs": True,
-            "order_request": False,  # we do this ourselves
+            # we do the sorting ourselves, but we need it as True anyway to
+            # make test_solver.py::test_pytorch_gpu pass
+            "order_request": True,
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
         if log.isEnabledFor(logging.DEBUG):
@@ -636,12 +636,28 @@ class LibMambaSolver(Solver):
         else:
             url = pkg.package_url
         url = percent_decode(url)
+
+        # Signature verification requires channel information _with_ subdir data
+        channel = Channel(pkg.channel)
+        if not channel.subdir:
+            # conda caches channels created using single values
+            # Avoid the cache by using keyword arguments
+            channel = Channel(
+                scheme=channel.scheme,
+                auth=channel.auth,
+                location=channel.location,
+                token=channel.token,
+                name=channel.name,
+                platform=pkg.platform,
+                package_filename=channel.package_filename,
+            )
+
         return PackageRecord(
             name=pkg.name,
             version=pkg.version,
             build=pkg.build_string,  # NOTE: Different attribute name
             build_number=pkg.build_number,
-            channel=pkg.channel,
+            channel=channel,
             url=url,
             subdir=pkg.platform,  # NOTE: Different attribute name
             fn=pkg.filename,  # NOTE: Different attribute name
@@ -748,7 +764,7 @@ class LibMambaSolver(Solver):
         index: LibMambaIndexHelper,
         out_state: SolverOutputState,
         previous_conflicts: Mapping[str, MatchSpec] = None,
-    ):
+    ) -> None:
         parsed_problems = self._parse_problems(unsolvable, index.db)
         # We allow conda-build (if present) to process the exception early
         self._maybe_raise_for_conda_build(
@@ -820,7 +836,7 @@ class LibMambaSolver(Solver):
         self,
         conflicting_specs: Mapping[str, MatchSpec],
         message: str = None,
-    ):
+    ) -> None:
         # TODO: Remove this hack for conda-build compatibility >_<
         # conda-build expects a slightly different exception format
         # good news is that we don't need to retry much, because all
@@ -848,7 +864,7 @@ class LibMambaSolver(Solver):
     # region General helpers
     ########################
 
-    def _log_info(self):
+    def _log_info(self) -> None:
         log.info("conda version: %s", _conda_version)
         log.info("conda-libmamba-solver version: %s", __version__)
         log.info("libmambapy version: %s", mamba_version())
@@ -882,8 +898,16 @@ class LibMambaSolver(Solver):
         for field in spec.FIELD_NAMES:
             value = spec.get_raw_value(field)
             if value:
-                if field == "channel" and str(value) == "<unknown>":
-                    continue
+                if field == "channel":
+                    if str(value) == "<unknown>":
+                        continue
+                    if not getattr(value, "name", ""):
+                        # channels like http://localhost:8000 don't have a name
+                        # this makes mamba choke so we should skip it
+                        # however the subdir is still useful information; keep it!
+                        if getattr(value, "platform", ""):
+                            spec_fields["subdir"] = value.platform
+                        continue
                 spec_fields[field] = value
         return MatchSpec(**spec_fields)
 
@@ -976,7 +1000,7 @@ class LibMambaSolver(Solver):
         link_precs: Iterable[PackageRecord],
         index: LibMambaIndexHelper | None = None,
         final_state: Iterable[PackageRecord] | None = None,
-    ):
+    ) -> None:
         """
         We are overriding the base class implementation, which gets called in
         Solver.solve_for_diff() once 'link_precs' is available. However, we

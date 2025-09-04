@@ -13,6 +13,43 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 25.4.0 (2025-04-25)
+
+### Enhancements
+
+* Use `conda.reporters.get_spinner()` to support conda reporter plugins. (#641)
+
+### Bug fixes
+
+* Always percent-encode spaces in `file://` channel URLs. (#640)
+* Fix a bug where auto-selection of GPU variants of `pytorch` and `torchvision` didn't work as expected. (#646 via #647)
+* Avoid `libmamba` `MatchSpec` parsing errors by skipping nameless channel information in passed specs. (#645 via #648)
+
+### Contributors
+
+* @jaimergp
+
+
+
+## 25.3.0 (2025-03-14)
+
+### Bug fixes
+
+* Fix issue with content trust post-solve hooks that prevented signatures from being verified when the solved package records didn't include subdir information in their channel metadata. (#616 via #617)
+* Protect against `conda.base.context.context.restore_free_channel` deprecation by using `getattr`. (#629)
+* Remove all packages with `--no-deps`, not just the last one to be analyzed. (#632)
+
+### Docs
+
+* Mention conda ecosystem's adaptation of `libsolv`. (#624)
+
+### Contributors
+
+* @jaimergp
+* @jjerphan
+* @kenodegard
+
+
 ## 25.1.1 (2025-01-24)
 
 ### Bug fixes

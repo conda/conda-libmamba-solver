@@ -7,11 +7,9 @@ from __future__ import annotations
 import os
 import pathlib
 import socket
-import subprocess
 import sys
 
 import pytest
-from conda.testing.integration import _get_temp_prefix
 from xprocess import ProcessStarter
 
 
@@ -130,27 +128,4 @@ def http_server_auth_token(xprocess):
         port=8000,
         auth="token",
         token="xy-12345678-1234-1234-1234-123456789012",
-    )
-
-
-def create_with_channel(
-    channel, solver="libmamba", check=True, **kwargs
-) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "conda",
-            "create",
-            "-p",
-            _get_temp_prefix(),
-            f"--solver={solver}",
-            "--json",
-            "--override-channels",
-            "-c",
-            channel,
-            "test-package",
-        ],
-        check=check,
-        **kwargs,
     )

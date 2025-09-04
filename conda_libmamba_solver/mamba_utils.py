@@ -11,7 +11,6 @@
 
 from __future__ import annotations
 
-from __future__ import annotations
 import os
 import logging
 import sys
@@ -40,7 +39,7 @@ def mamba_version() -> str:
     return version("libmambapy")
 
 
-def _get_base_url(url: str, name: str | None = None):
+def _get_base_url(url: str, name: str | None = None) -> str:
     tmp = url.rsplit("/", 1)[0]
     if name:
         if tmp.endswith(name):
@@ -50,8 +49,8 @@ def _get_base_url(url: str, name: str | None = None):
 
 def init_libmamba_context(
     channels: Iterable[str] | None = None,
-    platform: str = None,
-    target_prefix: str = None,
+    platform: str | None = None,
+    target_prefix: str | None = None,
 ) -> libmambapy.Context:
     global _libmamba_context
     if _libmamba_context is None:
@@ -145,7 +144,7 @@ def init_libmamba_context(
     return libmamba_context
 
 
-def logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger=_db_log):
+def logger_callback(level: libmambapy.solver.libsolv.LogLevel, msg: str, logger: logging.Logger =_db_log) -> None:
     # from libmambapy.solver.libsolv import LogLevel
     # levels = {
     #     LogLevel.Debug: logging.DEBUG, # 0 -> 10

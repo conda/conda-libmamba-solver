@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context
 from conda.common.compat import on_linux, on_mac, on_win
-from conda.core.prefix_data import PrefixData, get_python_version_for_prefix
+from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
     DryRunExit,
     PackagesNotFoundError,
@@ -55,8 +55,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
         "pip",
         "python=3.10",
     ) as prefix:
-        py_ver = get_python_version_for_prefix(prefix)
-        assert py_ver.startswith("3.10")
+        assert PrefixData(prefix).get("python").version.startswith("3.10")
         if on_win:
             pip = str(prefix / "Scripts" / "pip.exe")
         else:
@@ -609,6 +608,69 @@ def test_satisfied_skip_solve_matchspec(
             raises=PackagesNotFoundError,
         )
 
+
+# @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
+@pytest.mark.parametrize(
+    "specs",
+    (
+        pytest.param(("pytorch", "torchvision>0.12"), id="pytorch"),
+        pytest.param(("pytorch>0", "torchvision>0.12"), id="pytorch>0"),
+        pytest.param(("pytorch=2", "torchvision>0.12"), id="pytorch=2"),
+    ),
+)
+def test_pytorch_gpu(specs):
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/646
+
+    This test must run in a subprocess because it's sensitive to side effects
+    from other tests. There must be some global state in the libmamba Database / Pool
+    objects. When run in isolation, it always passed.
+    """
+    env = os.environ.copy()
+    env["CONDA_OVERRIDE_CUDA"] = "12.6"
+    env["CONDA_OVERRIDE_GLIBC"] = "2.30"
+    env["CONDA_OVERRIDE_LINUX"] = "5.15.167.4"
+    env["CONDA_OVERRIDE_ARCHSPEC"] = "skylake"
+    p = conda_subprocess(
+        "create",
+        "--dry-run",
+        "--override-channels",
+        "--channel=conda-forge",
+        "--platform=linux-64",
+        "--json",
+        *specs,
+        env=env,
+    )
+    result = json.loads(p.stdout)
+    assert result["success"]
+    for record in result["actions"]["LINK"]:
+        if record["name"] == "pytorch":
+            print(record)
+            assert "cuda" in record["build_string"]
+            break
+    else:
+        raise AssertionError("No pytorch found")
+
+
+def test_channel_subdir_set_correctly(tmp_env: TmpEnvFixture) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/662
+    """
+    with tmp_env(
+        "--override-channels",
+        "--channel=conda-forge",
+        "--solver=libmamba",
+        "tzdata",
+        "bzip2",
+    ) as prefix:
+        cm_path: Path = prefix / "conda-meta"
+        for prec_path in cm_path.glob("*.json"):
+            if prec_path.name.startswith("bzip2-"):
+                payload = json.loads(prec_path.read_text())
+                assert not payload["channel"].endswith("noarch")
+            if prec_path.name.startswith("tzdata-"):
+                payload = json.loads(prec_path.read_text())
+                assert payload["channel"].endswith("noarch")
 
 def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
     with tmp_env(

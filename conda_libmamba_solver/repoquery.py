@@ -15,11 +15,11 @@ from itertools import chain
 
 from conda.base.context import context
 from conda.cli import conda_argparse
-from conda.common.io import Spinner
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import CondaError
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
+from conda.reporters import get_spinner
 from libmambapy import Context as LibmambaContext
 
 from .index import LibMambaIndexHelper
@@ -97,7 +97,7 @@ def configure_parser(parser: argparse.ArgumentParser):
         conda_argparse.add_parser_json(cmd)
 
 
-def repoquery(args: argparse.Namespace):
+def repoquery(args: argparse.Namespace) -> int:
     if not args.subcmd:
         print("repoquery needs a subcommand (search, depends or whoneeds), e.g.:", file=sys.stderr)
         print("    conda repoquery search python\n", file=sys.stderr)
@@ -145,11 +145,7 @@ def repoquery(args: argparse.Namespace):
         installed_records = ()
 
     if args.use_cache_only:
-        with Spinner(
-            "Collecting package metadata from pkgs_dirs",
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
-        ):
+        with get_spinner("Collecting package metadata from pkgs_dirs"):
             index = LibMambaIndexHelper(
                 installed_records=(),
                 channels=(),
@@ -164,11 +160,7 @@ def repoquery(args: argparse.Namespace):
             channel = ms.get_exact_value("channel")
             if channel:
                 channels_from_specs.append(channel)
-        with Spinner(
-            "Collecting package metadata",
-            enabled=not context.verbosity and not context.quiet,
-            json=context.json,
-        ):
+        with get_spinner("Collecting package metadata"):
             index = LibMambaIndexHelper(
                 installed_records=installed_records,
                 channels=[
@@ -220,3 +212,5 @@ def repoquery(args: argparse.Namespace):
             print(result.sort("name").table())
     else:
         raise CondaError(f"Unrecognized subcommand: {args.subcmd}")
+
+    return 0

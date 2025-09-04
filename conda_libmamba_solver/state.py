@@ -72,7 +72,7 @@ from conda.auxlib import NULL
 from conda.base.constants import DepsModifier, UpdateModifier
 from conda.base.context import context
 from conda.common.path import paths_equal
-from conda.core.index import _supplement_index_with_system
+from conda.core.index import Index
 from conda.core.prefix_data import PrefixData
 from conda.core.solve import get_pinned_specs
 from conda.exceptions import PackagesNotFoundError, SpecsConfigurationConflictError
@@ -88,6 +88,8 @@ if TYPE_CHECKING:
 
     from conda.core.solve import Solver
     from conda.models.records import PackageRecord
+
+    from .index import LibMambaIndexHelper
 
 from .utils import EnumAsBools, compatible_specs
 
@@ -176,8 +178,7 @@ class SolverInputState:
         self._pinned = {spec.name: spec for spec in get_pinned_specs(prefix)}
         self._aggressive_updates = {spec.name: spec for spec in context.aggressive_update_packages}
 
-        virtual = {}
-        _supplement_index_with_system(virtual)
+        virtual = Index().system_packages
         self._virtual = {record.name: record for record in virtual}
 
         self._requested = {}
@@ -392,7 +393,13 @@ class SolverInputState:
                 yield channel
 
     def maybe_free_channel(self) -> Iterable[Channel]:
-        if context.restore_free_channel:
+        # FUTURE: conda 25.9+ remove restore_free_channel
+        if channel := getattr(context, "_restore_free_channel", None):
+            context.custom_multichannels  # force deprecation warning
+        elif channel is None:
+            channel = getattr(context, "restore_free_channel", None)
+
+        if channel:
             yield Channel.from_url("https://repo.anaconda.com/pkgs/free")
 
 
@@ -512,7 +519,7 @@ class SolverOutputState:
         """
         return {name: spec for name, spec in self.specs.items() if name.startswith("__")}
 
-    def early_exit(self) -> IndexedSet[PackageRecord]:
+    def early_exit(self) -> IndexedSet[PackageRecord] | None:
         """
         Operations that do not need a solver and might result in returning
         early are collected here.
@@ -524,7 +531,7 @@ class SolverOutputState:
             # When 'remove --force' is set, remove the package without solving.
             if sis.force_remove:
                 force_remove_solution = self.current_solution
-            not_installed = []
+            not_installed: list[MatchSpec] = []
             for name, spec in sis.requested.items():
                 for record in sis.installed.values():
                     if spec.match(record):
@@ -553,7 +560,7 @@ class SolverOutputState:
                 # to the map of installed packages)
                 return self.current_solution
 
-    def check_for_pin_conflicts(self, index):
+    def check_for_pin_conflicts(self, index: LibMambaIndexHelper) -> None:
         """
         Last part of the logic, common to addition and removal of packages. Originally,
         the legacy logic will also minimize the conflicts here by doing a pre-solve
@@ -590,7 +597,7 @@ class SolverOutputState:
                 exc.allow_retry = False
                 raise exc
 
-    def post_solve(self, solver: type[Solver]):
+    def post_solve(self, solver: Solver) -> None:
         """
         These tasks are performed _after_ the solver has done its work. It essentially
         post-processes the ``records`` mapping.
@@ -692,7 +699,7 @@ class SolverOutputState:
                 if installed:
                     self.records[name] = installed
                 else:
-                    self.records.pop(record.name)
+                    self.records.pop(name, None)
 
         elif sis.update_modifier.UPDATE_DEPS:
             # Here we have to SAT solve again :(  It's only now that we know the dependency

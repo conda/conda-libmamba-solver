@@ -1,0 +1,19 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* Replace deprecated `conda.core.index._supplement_index_with_system` with `conda.core.index.Index().system_packages`. (#654 via #655)
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
