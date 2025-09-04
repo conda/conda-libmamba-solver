@@ -28,13 +28,24 @@ from requests import HTTPError
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from typing import NotRequired
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
     from requests import Response
 
 
-Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
+class PackageRecordDict(TypedDict):
+    name: str
+    sha256: NotRequired[str | bytes]
+    md5: NotRequired[str | bytes]
+
+
+# in this style because "packages.conda" is not a Python identifier
+Shard = TypedDict(
+    "Shard",
+    {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
+)
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
@@ -43,7 +54,11 @@ class RepodataInfo(TypedDict):  # noqa: F811
     subdir: str
 
 
-def maybe_unpack_record(record):
+class RepodataDict(Shard):
+    info: RepodataInfo
+
+
+def maybe_unpack_record(record: PackageRecordDict):
     """
     Convert bytes checksums to hex; leave unchanged if already str.
     """
@@ -85,15 +100,17 @@ class ShardLike:
     Present a "classic" repodata.json as per-package shards.
     """
 
-    def __init__(self, repodata: dict, url: str = ""):
+    def __init__(self, repodata: RepodataDict, url: str = ""):
         """
         url: for debugging; not used by this class.
         """
         all_packages = {
-            "packages": repodata.pop("packages", {}),
-            "packages.conda": repodata.pop("packages.conda", {}),
+            "packages": repodata["packages"],
+            "packages.conda": repodata["packages.conda"],
         }
-        self.repodata = repodata  # without packages, packages.conda
+        repodata.pop("packages")
+        repodata.pop("packages.conda")
+        self.repodata_no_packages = repodata  # without packages, packages.conda
         self.url = url
 
         shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
@@ -135,11 +152,11 @@ class ShardLike:
         """
         return {package: self.fetch_shard(package, session) for package in packages}
 
-    def build_repodata(self) -> dict:
+    def build_repodata(self) -> RepodataDict:
         """
         Return monolithic repodata including all visited shards.
         """
-        repodata = self.repodata.copy()
+        repodata = self.repodata_no_packages.copy()
         repodata.update({"packages": {}, "packages.conda": {}})
         for package, shard in self.visited.items():
             if shard is None:

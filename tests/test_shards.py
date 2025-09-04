@@ -105,7 +105,7 @@ def test_shardlike():
 
     as_shards = ShardLike(repodata)
 
-    assert len(as_shards.repodata)
+    assert len(as_shards.repodata_no_packages)
     assert len(as_shards.shards)
 
     assert sorted(as_shards.shards["test4"]["packages"].keys()) == [
