@@ -114,7 +114,7 @@ class ShardLike:
 
     def __init__(self, repodata: RepodataDict, url: str = ""):
         """
-        url: for debugging; not used by this class.
+        url: affects the repr but not the functionality of this class.
         """
         all_packages = {
             "packages": repodata["packages"],
