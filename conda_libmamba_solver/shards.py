@@ -32,10 +32,14 @@ if TYPE_CHECKING:
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
-    from requests import Response
+    from requests import Response, Session
 
 
 class PackageRecordDict(TypedDict):
+    """
+    Basic package attributes that this module cares about.
+    """
+
     name: str
     sha256: NotRequired[str | bytes]
     md5: NotRequired[str | bytes]
@@ -55,7 +59,22 @@ class RepodataInfo(TypedDict):  # noqa: F811
 
 
 class RepodataDict(Shard):
+    """
+    Packages plus info.
+    """
+
     info: RepodataInfo
+
+
+class ShardsIndex(TypedDict):
+    """
+    Shards index as deserialized from repodata_shards.msgpack.zst
+    """
+
+    info: RepodataInfo
+    repodata_version: int
+    removed: list[str]
+    shards: dict[str, bytes]
 
 
 def maybe_unpack_record(record: PackageRecordDict):
@@ -86,13 +105,6 @@ def shard_mentioned_packages(shard: Shard) -> set[str]:
         mentioned.add(record.name)
         mentioned.update(spec.name for spec in record.combined_depends)
     return mentioned
-
-
-class ShardsIndex(TypedDict):
-    info: RepodataInfo
-    repodata_version: int
-    removed: list[str]
-    shards: dict[str, bytes]
 
 
 class ShardLike:
@@ -132,7 +144,7 @@ class ShardLike:
     def __contains__(self, package_name: str) -> bool:
         return package_name in self.shards
 
-    def fetch_shard(self, package: str, session) -> Shard:
+    def fetch_shard(self, package: str, session: Session) -> Shard:
         """
         "Fetch" an individual shard.
 
@@ -144,7 +156,7 @@ class ShardLike:
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
         """
         Fetch multiple shards in one go.
 
@@ -201,7 +213,7 @@ class Shards(ShardLike):
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
 
-    def fetch_shard(self, package: str, session) -> Shard:
+    def fetch_shard(self, package: str, session: Session) -> Shard:
         """
         Fetch an individual shard.
 
@@ -215,7 +227,7 @@ class Shards(ShardLike):
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str], session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
         """
         Return mapping of *package names* to Shard for given packages.
         """
