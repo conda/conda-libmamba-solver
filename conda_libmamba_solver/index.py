@@ -119,6 +119,8 @@ if TYPE_CHECKING:
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
+    from .state import SolverInputState
+
 
 log = logging.getLogger(f"conda.{__name__}")
 
@@ -160,6 +162,7 @@ class LibMambaIndexHelper:
         repodata_fn: str = REPODATA_FN,
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
+        in_state: SolverInputState | None = None,
     ):
         platform_less_channels = []
         for channel in channels:
@@ -177,13 +180,33 @@ class LibMambaIndexHelper:
         self.channels = platform_less_channels
         self.subdirs = subdirs or context.subdirs
         self.repodata_fn = repodata_fn
+        self.in_state = in_state
         self.db = self._init_db()
+
+        # XXX needs to be lazy (to not download "classic" repodata eagerly)
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
         if pkgs_dirs:
             self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
         if installed_records:
             self.repos.append(self._load_installed(installed_records))
         self._set_repo_priorities()
+
+        # support lazy self.repos
+        self._pkgs_dirs = pkgs_dirs
+        self._installed_records = installed_records
+
+    # @property
+    # def repos(self):
+    #     # causes "python not found in repository" e.g. errors
+    #     if not hasattr(self, "_repos"):
+    #         our_repos: list[_ChannelRepoInfo] = self._load_channels()
+    #         if self._pkgs_dirs:
+    #             our_repos.extend(self._load_pkgs_cache(self._pkgs_dirs))
+    #         if self._installed_records:
+    #             our_repos.append(self._load_installed(self._installed_records))
+    #         self._repos = our_repos
+    #         self._set_repo_priorities()
+    #     return self._repos
 
     @classmethod
     def from_platform_aware_channel(cls, channel: Channel) -> LibMambaIndexHelper:
