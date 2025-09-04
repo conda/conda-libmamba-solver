@@ -672,6 +672,7 @@ def test_channel_subdir_set_correctly(tmp_env: TmpEnvFixture) -> None:
                 payload = json.loads(prec_path.read_text())
                 assert payload["channel"].endswith("noarch")
 
+
 def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
     with tmp_env(
         "--override-channels",
