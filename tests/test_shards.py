@@ -482,7 +482,7 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
-    print(len(subset.nodes))
+    print(len(subset.nodes), "package names discovered")
 
     repodata_size = 0
     for shardlike in subset.shardlikes:
@@ -495,3 +495,18 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
         repodata_path.write_text(repodata_text)
 
     print(f"Repodata subset is {repodata_size} bytes")
+
+    # e.g. this for noarch and osx-arm64
+    # % curl https://conda.anaconda.org/conda-forge-sharded/noarch/repodata.json.zst | zstd -d | wc
+    full_repodata_benchmark = 138186556 + 142680224
+
+    print(
+        f"Versus only noarch and osx-arm64 full repodata: {repodata_size / full_repodata_benchmark:.02f} times as large"
+    )
+
+    channel_names = []
+    for shardlike in subset.shardlikes:
+        _, *channel = shardlike.url.replace("/repodata_shards.msgpack.zst", "").rsplit("/", 2)
+        channel_names.append("/".join(channel))
+
+    print(f"Repodata subset includes {', '.join(channel_names)}")
