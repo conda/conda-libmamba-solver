@@ -214,7 +214,7 @@ class Shards(ShardLike):
         """
         shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.url, f"{self.base_url}{shard_name}")
+        return urljoin(self.base_url, shard_name)
 
     def fetch_shard(self, package: str) -> Shard:
         """

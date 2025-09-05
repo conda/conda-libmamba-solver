@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import heapq
 import json
+import logging
 import pickle
 import random
 import sys
@@ -25,7 +26,7 @@ from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
 from conda.models.channel import Channel
 
-from conda_libmamba_solver import shard_cache
+from conda_libmamba_solver import shard_cache, shards
 from conda_libmamba_solver.shards import (
     RepodataDict,
     ShardLike,
@@ -354,10 +355,14 @@ class RepodataSubset:
         discovered = set()
         for shardlike in self.shardlikes:
             if node.package in shardlike:
-                shard = shardlike.fetch_shard(node.package)
+                try:
+                    shard = shardlike.fetch_shard(node.package)
+                except:
+                    raise
                 for package in shard_mentioned_packages(shard):
                     if package not in self.nodes:
                         self.nodes[package] = Node(node.distance + 1, package)
+                        print(f"{node.package} -> {package};")
                     if package not in discovered:
                         yield self.nodes[package]
 
@@ -393,6 +398,10 @@ def test_traverse_shards_3(conda_no_token: None):
     """
     Another go at the dependency traversal algorithm.
     """
+
+    logging.basicConfig(level=logging.INFO)
+    shards.log.setLevel(logging.DEBUG)
+    shard_cache.log.setLevel(logging.DEBUG)
 
     # installed, plus what we want to add (twine)
     root_packages = [
@@ -459,5 +468,4 @@ def test_traverse_shards_3(conda_no_token: None):
     print(channel_data)
 
     subset = RepodataSubset((*channel_data.values(),))
-
-    print(subset)
+    subset.shortest(root_packages)
