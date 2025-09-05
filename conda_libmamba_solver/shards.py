@@ -9,6 +9,7 @@ repodata.
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -29,6 +30,8 @@ from requests import HTTPError
 
 from . import shard_cache
 from .shard_cache import Shard
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -127,12 +130,13 @@ class ShardLike:
         self.visited: dict[str, Shard | None] = {}
 
     def __repr__(self):
-        return self.url.join(super().__repr__().split(maxsplit=1))
+        left, right = super().__repr__().split(maxsplit=1)
+        return f"{left} {self.url} {right}"
 
     def __contains__(self, package_name: str) -> bool:
         return package_name in self.shards
 
-    def fetch_shard(self, package: str, session: Session) -> Shard:
+    def fetch_shard(self, package: str) -> Shard:
         """
         "Fetch" an individual shard.
 
@@ -144,13 +148,13 @@ class ShardLike:
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
         """
         Fetch multiple shards in one go.
 
         Update self.visited with all not-None packages.
         """
-        return {package: self.fetch_shard(package, session) for package in packages}
+        return {package: self.fetch_shard(package) for package in packages}
 
     def build_repodata(self) -> RepodataDict:
         """
@@ -180,6 +184,8 @@ class Shards(ShardLike):
         self.url = url
         self.shards_cache = shards_cache
 
+        self.session = get_session(self.base_url)
+
         self.repodata = {k: v for k, v in self.shards_index.items() if k not in ("shards",)}
 
         # used to write out repodata subset
@@ -192,6 +198,14 @@ class Shards(ShardLike):
     def packages_index(self):
         return self.shards_index["shards"]
 
+    @property
+    def base_url(self) -> str:
+        """
+        Return self.url joined with shards_base_url.
+        Note shards_base_url can be a relative or an absolute url.
+        """
+        return urljoin(self.url, self.shards_index["info"]["shards_base_url"])
+
     def shard_url(self, package: str) -> str:
         """
         Return shard URL for a given package.
@@ -200,14 +214,21 @@ class Shards(ShardLike):
         """
         shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
+        return urljoin(self.url, f"{self.base_url}{shard_name}")
 
-    def fetch_shard(self, package: str, session: Session) -> Shard:
+    def fetch_shard(self, package: str) -> Shard:
         """
         Fetch an individual shard.
 
         Raise KeyError if package is not in the index.
         """
+
+        if package in self.visited:
+            log.debug("Revisit %s %s", self.url, package)
+            shard_or_none = self.visited[package]
+            if shard_or_none is None:
+                raise KeyError(package)
+            return shard_or_none
 
         shard_url = self.shard_url(package)
         # XXX do we call this with the same shard, decompressing twice, in a single instance?
@@ -216,14 +237,14 @@ class Shards(ShardLike):
             self.visited[package] = shard_or_none
             return shard_or_none
         else:
-            raw_shard = session.get(shard_url).content
+            raw_shard = self.session.get(shard_url).content
             # ensure it is real msgpack+zstd before inserting into cache
             shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
             self.shards_cache.insert(shard_cache.AnnotatedRawShard(shard_url, package, raw_shard))
             self.visited[package] = shard
             return shard
 
-    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
         """
         Return mapping of *package names* to Shard for given packages.
         """
@@ -231,13 +252,13 @@ class Shards(ShardLike):
 
         def fetch(s, url, package):
             if url in FETCHED_THIS_PROCESS:
-                print("Already got", url)
+                log.debug("Already got", url)
                 raise RuntimeError("Can't fetch same url twice")
             FETCHED_THIS_PROCESS.add(url)
             b1 = time.time_ns()
             data = s.get(url).content
             e1 = time.time_ns()
-            print(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
+            log.debug(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
             return shard_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
         packages = sorted(list(packages))
@@ -254,13 +275,13 @@ class Shards(ShardLike):
         # None in the REPL.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = {
-                executor.submit(fetch, session, url, package): (url, package)
+                executor.submit(fetch, self.session, url, package): (url, package)
                 for url, package in urls_packages.items()
                 if package not in result
             }
             # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
             for future in concurrent.futures.as_completed(futures):
-                print(".", futures[future])
+                log.debug(".", futures[future])
                 fetch_result = future.result()
                 # XXX catch exception / 404 / whatever
                 result[fetch_result.package] = msgpack.loads(
@@ -274,9 +295,9 @@ class Shards(ShardLike):
                             *result[fetch_result.package]["packages.conda"].values(),
                         )
                     ]
-                    print("expected", fetch_result.package, "actual", set(package_names))
+                    log.debug("expected", fetch_result.package, "actual", set(package_names))
                 except (AttributeError, KeyError):
-                    print("oops")
+                    log.exception("oops")
                 self.shards_cache.insert(fetch_result)
 
         self.visited.update(result)

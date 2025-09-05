@@ -7,11 +7,14 @@ Test sharded repodata.
 
 from __future__ import annotations
 
+import heapq
 import json
 import pickle
 import random
+import sys
 import textwrap
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import msgpack
@@ -230,54 +233,6 @@ def test_shards_2(conda_no_token: None):
     # repodata.json for the solver.
 
 
-def test_traverse_shards_3(conda_no_token: None):
-    """
-    Another go at the dependency traversal algorithm.
-    """
-
-    # installed, plus what we want to add (twine)
-    root_packages = [
-        "__archspec",
-        "__conda",
-        "__osx",
-        "__unix",
-        "bzip2",
-        "ca-certificates",
-        "expat",
-        "icu",
-        "libexpat",
-        "libffi",
-        "liblzma",
-        "libmpdec",
-        "libsqlite",
-        "libzlib",
-        "ncurses",
-        "openssl",
-        "pip",
-        "python",
-        "python_abi",
-        "readline",
-        "tk",
-        "twine",
-        "tzdata",
-        "xz",
-        "zlib",
-    ]
-
-    channels = list(context.default_channels)
-    channels.append(Channel("conda-forge-sharded"))
-
-    channel_data: dict[str, ShardLike] = {}
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data)
-            if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                found = ShardLike(repodata_json, channel_url)  # type: ignore
-            channel_data[channel_url] = found
-
-
 def test_shard_cache(tmp_path: Path):
     cache = shard_cache.ShardCache(tmp_path)
 
@@ -353,3 +308,156 @@ def test_shardlike():
         "test42.tar.bz2",
         "test43.tar.bz2",
     ]
+
+
+def test_shardlike_repr():
+    shardlike = ShardLike(
+        {
+            "packages": {},
+            "packages.conda": {},
+            "info": {"base_url": "", "shards_base_url": "", "subdir": "noarch"},
+        },
+        "https://conda.anaconda.org/",
+    )
+    cls, url, *rest = repr(shardlike).split()
+    assert "ShardLike" in cls
+    assert shardlike.url == url
+
+
+@dataclass(order=True)
+class Node:
+    distance: int = sys.maxsize
+    package: str = ""
+    visited: bool = False
+
+    def __hash__(self):
+        return hash(self.package)
+
+    def reset(self):
+        self.visited = False
+        self.distance = sys.maxsize
+
+
+@dataclass
+class RepodataSubset:
+    nodes: dict[str, Node]
+    shardlikes: list[ShardLike]
+
+    def __init__(self, shardlikes):
+        self.nodes = {}
+        self.shardlikes = shardlikes
+
+    def neighbors(self, node: Node):
+        """
+        All neighbors for node.
+        """
+        discovered = set()
+        for shardlike in self.shardlikes:
+            if node.package in shardlike:
+                shard = shardlike.fetch_shard(node.package)
+                for package in shard_mentioned_packages(shard):
+                    if package not in self.nodes:
+                        self.nodes[package] = Node(node.distance + 1, package)
+                    if package not in discovered:
+                        yield self.nodes[package]
+
+    def outgoing(self, node: Node):
+        """
+        All nodes that can be reached by this node, plus cost.
+        """
+        for n in self.neighbors(node):
+            yield n, 1
+
+    def shortest(self, start_packages):
+        # nodes.visited and nodes.distance should be reset before calling
+        self.nodes = {package: Node(0, package) for package in start_packages}
+        unvisited = [(n.distance, n) for n in self.nodes.values()]
+        while unvisited:
+            original_priority, node = heapq.heappop(unvisited)
+            if original_priority != node.distance:  # ???
+                continue
+            if node.visited:
+                continue
+            node.visited = True
+
+            for next, cost in self.outgoing(node):
+                if not next.visited:
+                    next.distance = min(node.distance + cost, next.distance)
+                    heapq.heappush(unvisited, (next.distance, next))
+
+    def reset(self):
+        self.nodes = {}
+
+
+def test_traverse_shards_3(conda_no_token: None):
+    """
+    Another go at the dependency traversal algorithm.
+    """
+
+    # installed, plus what we want to add (twine)
+    root_packages = [
+        "__archspec",
+        "__conda",
+        "__osx",
+        "__unix",
+        "bzip2",
+        "ca-certificates",
+        "expat",
+        "icu",
+        "libexpat",
+        "libffi",
+        "liblzma",
+        "libmpdec",
+        "libsqlite",
+        "libzlib",
+        "ncurses",
+        "openssl",
+        "pip",
+        "python",
+        "python_abi",
+        "readline",
+        "tk",
+        "twine",
+        "tzdata",
+        "xz",
+        "zlib",
+    ]
+
+    channels = list(context.default_channels)
+    channels.append(Channel("conda-forge-sharded"))
+
+    channel_data: dict[str, ShardLike] = {}
+    for channel in channels:
+        for channel_url in Channel(channel).urls(True, context.subdirs):
+            subdir_data = SubdirData(Channel(channel_url))
+            found = fetch_shards(subdir_data)
+            if not found:
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
+                found = ShardLike(repodata_json, channel_url)  # type: ignore
+            channel_data[channel_url] = found
+
+    channels = list(context.default_channels)
+    print(channels)
+
+    # state to initiate a solve
+    in_state = pickle.loads((HERE / "data" / "in_state.pickle").read_bytes())
+    print(in_state)
+
+    channels.append(Channel("conda-forge-sharded"))
+
+    channel_data: dict[str, ShardLike] = {}
+    for channel in channels:
+        for channel_url in Channel(channel).urls(True, context.subdirs):
+            subdir_data = SubdirData(Channel(channel_url))
+            found = fetch_shards(subdir_data)
+            if not found:
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
+                repodata_json = RepodataDict(repodata_json)  # type: ignore
+                found = ShardLike(repodata_json, channel_url)
+            channel_data[channel_url] = found
+
+    print(channel_data)
+
+    subset = RepodataSubset((*channel_data.values(),))
+
+    print(subset)
