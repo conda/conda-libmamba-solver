@@ -186,7 +186,9 @@ class Shards(ShardLike):
 
         self.session = get_session(self.base_url)
 
-        self.repodata = {k: v for k, v in self.shards_index.items() if k not in ("shards",)}
+        self.repodata_no_packages = {
+            k: v for k, v in self.shards_index.items() if k not in ("shards",)
+        }
 
         # used to write out repodata subset
         self.visited: dict[str, Shard | None] = {}

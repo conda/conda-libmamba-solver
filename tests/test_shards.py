@@ -356,15 +356,28 @@ class RepodataSubset:
         for shardlike in self.shardlikes:
             if node.package in shardlike:
                 try:
+                    # check that we don't fetch the same shard twice...
                     shard = shardlike.fetch_shard(node.package)
                 except:
                     raise
                 for package in shard_mentioned_packages(shard):
                     if package not in self.nodes:
                         self.nodes[package] = Node(node.distance + 1, package)
-                        print(f"{node.package} -> {package};")
+                        # by moving yield up here we try to only visit dependencies
+                        # that no other node already knows about. Doesn't make it faster.
+                        if package not in discovered:  # redundant with not in self.nodes?
+                            print(f"{json.dumps(node.package)} -> {json.dumps(package)};")
+                            yield self.nodes[package]
                     if package not in discovered:
-                        yield self.nodes[package]
+                        pass
+                        # dot format valid ids: https://graphviz.org/doc/info/lang.html#ids (or quote string)
+
+                        # we might not require "in self.nodes" neighbors since
+                        # we don't need to find the shortest path
+
+                        # yield self.nodes[package]
+
+                    discovered.add(package)  # also doesn't make it faster
 
     def outgoing(self, node: Node):
         """
@@ -394,7 +407,7 @@ class RepodataSubset:
         self.nodes = {}
 
 
-def test_traverse_shards_3(conda_no_token: None):
+def test_traverse_shards_3(conda_no_token: None, tmp_path):
     """
     Another go at the dependency traversal algorithm.
     """
@@ -469,3 +482,16 @@ def test_traverse_shards_3(conda_no_token: None):
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
+    print(len(subset.nodes))
+
+    repodata_size = 0
+    for shardlike in subset.shardlikes:
+        _, *channel = shardlike.url.replace("/repodata_shards.msgpack.zst", "").rsplit("/", 2)
+        repodata = shardlike.build_repodata()
+        repodata_path = tmp_path / ("_".join(channel))
+        # most compact json
+        repodata_text = json.dumps(repodata, indent=0, separators=(",", ":"))
+        repodata_size += len(repodata_text)
+        repodata_path.write_text(repodata_text)
+
+    print(f"Repodata subset is {repodata_size} bytes")
