@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
-    from requests import Response, Session
+    from requests import Response
 
     from .shard_cache import PackageRecordDict
 
