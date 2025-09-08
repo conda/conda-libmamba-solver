@@ -5,6 +5,7 @@
 Tests related to sharded repodata.
 """
 
+import time
 from pathlib import Path
 
 import msgpack
@@ -32,6 +33,53 @@ def test_shard_cache(tmp_path: Path):
 
     data2 = cache.retrieve("notfound")
     assert data2 is None
+
+    assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
+
+
+def test_shard_cache_multiple(tmp_path: Path):
+    """
+    Test that retrieve_multiple() is equivalent to several retrieve() calls.
+    """
+    cache = shard_cache.ShardCache(tmp_path)
+
+    fake_shards = []
+
+    compressor = zstandard.ZstdCompressor(level=1)
+    for i in range(64):
+        fake_shard = {f"foo{i}": "bar"}
+        annotated_shard = shard_cache.AnnotatedRawShard(
+            f"https://foo{i}",
+            f"foo{i}",
+            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
+        )
+        cache.insert(annotated_shard)
+        fake_shards.append(annotated_shard)
+
+    start_multiple = time.monotonic_ns()
+    retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
+    end_multiple = time.monotonic_ns()
+
+    print(
+        f"retrieve {len(fake_shards)} shards in a single call: {(end_multiple - start_multiple) / 1e9:0.6f}s"
+    )
+
+    start_single = time.monotonic_ns()
+    for i, url in enumerate([shard.url for shard in fake_shards]):
+        single = cache.retrieve(url)
+        assert retrieved[url] == single
+    end_single = time.monotonic_ns()
+    print(
+        f"retrieve {len(fake_shards)} shards with multiple calls: {(end_single - start_single) / 1e9:0.6f}s"
+    )
+
+    print(
+        f"Multiple API takes {(end_multiple - start_multiple) / (end_single - start_single):.2f} times as long."
+    )
+
+    assert (end_multiple - start_multiple) / (end_single - start_single) < 1, (
+        "batch API took longer"
+    )
 
     assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
 
