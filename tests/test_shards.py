@@ -41,12 +41,13 @@ def test_shard_cache_multiple(tmp_path: Path):
     """
     Test that retrieve_multiple() is equivalent to several retrieve() calls.
     """
-    cache = shard_cache.ShardCache(tmp_path)
+    NUM_FAKE_SHARDS = 64
 
+    cache = shard_cache.ShardCache(tmp_path)
     fake_shards = []
 
     compressor = zstandard.ZstdCompressor(level=1)
-    for i in range(64):
+    for i in range(NUM_FAKE_SHARDS):
         fake_shard = {f"foo{i}": "bar"}
         annotated_shard = shard_cache.AnnotatedRawShard(
             f"https://foo{i}",
@@ -59,6 +60,8 @@ def test_shard_cache_multiple(tmp_path: Path):
     start_multiple = time.monotonic_ns()
     retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
     end_multiple = time.monotonic_ns()
+
+    assert len(retrieved) == NUM_FAKE_SHARDS
 
     print(
         f"retrieve {len(fake_shards)} shards in a single call: {(end_multiple - start_multiple) / 1e9:0.6f}s"
@@ -73,13 +76,14 @@ def test_shard_cache_multiple(tmp_path: Path):
         f"retrieve {len(fake_shards)} shards with multiple calls: {(end_single - start_single) / 1e9:0.6f}s"
     )
 
-    print(
-        f"Multiple API takes {(end_multiple - start_multiple) / (end_single - start_single):.2f} times as long."
-    )
+    if (end_single - start_single) != 0:  # avoid ZeroDivisionError
+        print(
+            f"Multiple API takes {(end_multiple - start_multiple) / (end_single - start_single):.2f} times as long."
+        )
 
-    assert (end_multiple - start_multiple) / (end_single - start_single) < 1, (
-        "batch API took longer"
-    )
+        assert (end_multiple - start_multiple) / (end_single - start_single) < 1, (
+            "batch API took longer"
+        )
 
     assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
 
