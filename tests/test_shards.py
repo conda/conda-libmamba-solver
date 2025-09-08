@@ -71,6 +71,9 @@ def test_shards(conda_no_token: None):
         shard = found.fetch_shard(package, session)
 
         mentioned_in_shard = shard_mentioned_packages(shard)
+        assert (
+            package in mentioned_in_shard
+        )  # the package's own name is mentioned, as well as any dependencies.
         print(package_names(shard), mentioned_in_shard)
 
 
