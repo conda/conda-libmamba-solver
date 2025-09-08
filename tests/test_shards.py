@@ -53,20 +53,6 @@ def test_shards(conda_no_token: None):
         for subdir in context.subdirs
     ]
 
-    # Would eagerly download repodata.json.zst for all channels
-    # helper = LibMambaIndexHelper(
-    #     channels,
-    #     (),  # subdirs
-    #     "repodata.json",
-    #     installed,
-    #     (),  # pkgs_dirs to load packages locally when offline
-    #     in_state=in_state,
-    # )
-
-    # accessing "helper.repos" downloads repodata.json in the traditional way
-    # for all channels:
-    # print(helper.repos)
-
     subdir_data = SubdirData(channels[0])
     found = fetch_shards(subdir_data)
     assert found, f"Shards not found for {channels[0]}"
