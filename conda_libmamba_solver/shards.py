@@ -80,7 +80,7 @@ class ShardsIndex(TypedDict):
     shards: dict[str, bytes]
 
 
-def maybe_unpack_record(record: PackageRecordDict):
+def ensure_hex_hash(record: PackageRecordDict):
     """
     Convert bytes checksums to hex; leave unchanged if already str.
     """
@@ -104,7 +104,7 @@ def shard_mentioned_packages(shard: Shard) -> set[str]:
     for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
         # to go faster, don't use PackageRecord, record.combined_depends, or
         # MatchSpec
-        record = PackageRecord(**maybe_unpack_record(package))
+        record = PackageRecord(**ensure_hex_hash(package))
         mentioned.add(record.name)
         mentioned.update(spec.name for spec in record.combined_depends)
     return mentioned
