@@ -9,6 +9,7 @@ repodata.
 from __future__ import annotations
 
 import concurrent.futures
+import logging
 import time
 from collections import defaultdict
 from typing import TYPE_CHECKING, TypedDict
@@ -25,6 +26,8 @@ from conda.gateways.repodata import (
 )
 from conda.models.records import PackageRecord
 from requests import HTTPError
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -141,8 +144,8 @@ class ShardLike:
     def __repr__(self):
         return self.url.join(super().__repr__().split(maxsplit=1))
 
-    def __contains__(self, package_name: str) -> bool:
-        return package_name in self.shards
+    def __contains__(self, package: str) -> bool:
+        return package in self.shards
 
     def fetch_shard(self, package: str, session: Session) -> Shard:
         """
@@ -196,7 +199,7 @@ class Shards(ShardLike):
         # used to write out repodata subset
         self.visited: dict[str, Shard | None] = {}
 
-    def __contains__(self, package):
+    def __contains__(self, package: str) -> bool:
         return package in self.packages_index
 
     @property
@@ -235,13 +238,13 @@ class Shards(ShardLike):
 
         def fetch(s, url, package):
             if url in FETCHED_THIS_PROCESS:
-                print("Already got", url)
+                log.debug("Already got %s", url)
                 raise RuntimeError("Can't fetch same url twice")
             FETCHED_THIS_PROCESS.add(url)
             b1 = time.time_ns()
             data = s.get(url).content
             e1 = time.time_ns()
-            print(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
+            log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
             return (url, package, data)
 
         packages = sorted(packages)
@@ -258,7 +261,7 @@ class Shards(ShardLike):
             }
             # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
             for future in concurrent.futures.as_completed(futures):
-                print(".", futures[future])
+                log.debug(". %r", futures[future])
                 url, package, compressed_shard = future.result()
                 # XXX catch exception / 404 / whatever
                 result[package] = msgpack.loads(zstandard.decompress(compressed_shard))
@@ -270,9 +273,9 @@ class Shards(ShardLike):
                             *result[package]["packages.conda"].values(),
                         )
                     ]
-                    print("expected", package, "actual", set(package_names))
+                    log.debug("expected %s actual %s", package, set(package_names))
                 except (AttributeError, KeyError):
-                    print("oops")
+                    log.exception("Error fetching shard")
 
         self.visited.update(result)
 
