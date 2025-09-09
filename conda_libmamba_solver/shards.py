@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
-    from requests import Response, Session
+    from requests import Response
 
 
 class PackageRecordDict(TypedDict):
@@ -142,12 +142,13 @@ class ShardLike:
         self.visited: dict[str, Shard | None] = {}
 
     def __repr__(self):
-        return self.url.join(super().__repr__().split(maxsplit=1))
+        left, right = super().__repr__().split(maxsplit=1)
+        return f"{left} {self.url} {right}"
 
     def __contains__(self, package: str) -> bool:
         return package in self.shards
 
-    def fetch_shard(self, package: str, session: Session) -> Shard:
+    def fetch_shard(self, package: str) -> Shard:
         """
         "Fetch" an individual shard.
 
@@ -159,13 +160,13 @@ class ShardLike:
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
         """
         Fetch multiple shards in one go.
 
         Update self.visited with all not-None packages.
         """
-        return {package: self.fetch_shard(package, session) for package in packages}
+        return {package: self.fetch_shard(package) for package in packages}
 
     def build_repodata(self) -> RepodataDict:
         """
@@ -194,7 +195,11 @@ class Shards(ShardLike):
         self.shards_index = shards_index
         self.url = url
 
-        self.repodata = {k: v for k, v in self.shards_index.items() if k not in ("shards",)}
+        self.session = get_session(self.base_url)
+
+        self.repodata_no_packages = {
+            k: v for k, v in self.shards_index.items() if k not in ("shards",)
+        }
 
         # used to write out repodata subset
         self.visited: dict[str, Shard | None] = {}
@@ -206,6 +211,14 @@ class Shards(ShardLike):
     def packages_index(self):
         return self.shards_index["shards"]
 
+    @property
+    def base_url(self) -> str:
+        """
+        Return self.url joined with shards_base_url.
+        Note shards_base_url can be a relative or an absolute url.
+        """
+        return urljoin(self.url, self.shards_index["info"]["shards_base_url"])
+
     def shard_url(self, package: str) -> str:
         """
         Return shard URL for a given package.
@@ -214,23 +227,31 @@ class Shards(ShardLike):
         """
         shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.url, f"{self.shards_index['info']['shards_base_url']}{shard_name}")
+        return urljoin(self.base_url, shard_name)
 
-    def fetch_shard(self, package: str, session: Session) -> Shard:
+    def fetch_shard(self, package: str) -> Shard:
         """
         Fetch an individual shard.
 
         Raise KeyError if package is not in the index.
         """
 
+        if package in self.visited:
+            log.debug("Revisit %s %s", self.url, package)
+            shard_or_none = self.visited[package]
+            if shard_or_none is None:
+                raise KeyError(package)
+            return shard_or_none
+
         shard_url = self.shard_url(package)
-        raw_shard = session.get(shard_url).content
+
+        raw_shard = self.session.get(shard_url).content
         # ensure it is real msgpack+zstd before inserting into cache
         shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str], session: Session) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
         """
         Return mapping of *package names* to Shard for given packages.
         """
@@ -244,7 +265,7 @@ class Shards(ShardLike):
             b1 = time.time_ns()
             data = s.get(url).content
             e1 = time.time_ns()
-            log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
+            log.debug(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
             return (url, package, data)
 
         packages = sorted(packages)
@@ -255,7 +276,7 @@ class Shards(ShardLike):
         # None in the REPL.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             futures = {
-                executor.submit(fetch, session, url, package): (url, package)
+                executor.submit(fetch, self.session, url, package): (url, package)
                 for url, package in urls_packages.items()
                 if package not in result
             }
@@ -357,10 +378,7 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
 
             # basic parse (move into caller?)
             shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
-            shards = Shards(
-                shards_index,
-                shards_index_url,
-            )
+            shards = Shards(shards_index, shards_index_url)
             return shards
 
         except (HTTPError, repodata.RepodataIsEmpty):

@@ -61,14 +61,10 @@ def test_shards(conda_no_token: None):
         shard_url = found.shard_url(package)
         assert shard_url.startswith("http")  # or channel url or shards_base_url
 
-    session = get_session(
-        subdir_data.url_w_subdir
-    )  # XXX session could be different based on shards_base_url and different than the packages base_url
-
     # download or fetch-from-cache a random set of shards
 
     for package in random.choices([*found.packages_index.keys()], k=16):
-        shard = found.fetch_shard(package, session)
+        shard = found.fetch_shard(package)
 
         mentioned_in_shard = shard_mentioned_packages(shard)
         assert (
@@ -104,12 +100,12 @@ def test_shardlike():
         "test43.tar.bz2",
     ]
 
-    fetched_shard = as_shards.fetch_shard("test1", None)  # type: ignore
+    fetched_shard = as_shards.fetch_shard("test1")
     assert fetched_shard["packages"]["test10.tar.bz2"]["name"] == "test1"
     assert as_shards.url in repr(as_shards)
     assert "test1" in as_shards
 
-    fetched_shards = as_shards.fetch_shards(("test1", "test2"), None)  # type: ignore
+    fetched_shards = as_shards.fetch_shards(("test1", "test2"))
     assert len(fetched_shards) == 2
     assert fetched_shards["test1"]
     assert fetched_shards["test2"]
