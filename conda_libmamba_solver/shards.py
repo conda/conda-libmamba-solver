@@ -133,8 +133,8 @@ class ShardLike:
         left, right = super().__repr__().split(maxsplit=1)
         return f"{left} {self.url} {right}"
 
-    def __contains__(self, package_name: str) -> bool:
-        return package_name in self.shards
+    def __contains__(self, package: str) -> bool:
+        return package in self.shards
 
     def fetch_shard(self, package: str) -> Shard:
         """
@@ -193,7 +193,7 @@ class Shards(ShardLike):
         # used to write out repodata subset
         self.visited: dict[str, Shard | None] = {}
 
-    def __contains__(self, package):
+    def __contains__(self, package: str) -> bool:
         return package in self.packages_index
 
     @property
@@ -254,7 +254,7 @@ class Shards(ShardLike):
 
         def fetch(s, url, package):
             if url in FETCHED_THIS_PROCESS:
-                log.debug("Already got", url)
+                log.debug("Already got %s", url)
                 raise RuntimeError("Can't fetch same url twice")
             FETCHED_THIS_PROCESS.add(url)
             b1 = time.time_ns()
@@ -299,7 +299,7 @@ class Shards(ShardLike):
                     ]
                     log.debug("expected", fetch_result.package, "actual", set(package_names))
                 except (AttributeError, KeyError):
-                    log.exception("oops")
+                    log.exception("Error fetching shard")
                 self.shards_cache.insert(fetch_result)
 
         self.visited.update(result)

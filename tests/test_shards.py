@@ -64,20 +64,6 @@ def test_shards(conda_no_token: None):
         for subdir in context.subdirs
     ]
 
-    # Would eagerly download repodata.json.zst for all channels
-    # helper = LibMambaIndexHelper(
-    #     channels,
-    #     (),  # subdirs
-    #     "repodata.json",
-    #     installed,
-    #     (),  # pkgs_dirs to load packages locally when offline
-    #     in_state=in_state,
-    # )
-
-    # accessing "helper.repos" downloads repodata.json in the traditional way
-    # for all channels:
-    # print(helper.repos)
-
     subdir_data = SubdirData(channels[0])
     found = fetch_shards(subdir_data)
     assert found, f"Shards not found for {channels[0]}"
@@ -86,16 +72,15 @@ def test_shards(conda_no_token: None):
         shard_url = found.shard_url(package)
         assert shard_url.startswith("http")  # or channel url or shards_base_url
 
-    session = get_session(
-        subdir_data.url_w_subdir
-    )  # XXX session could be different based on shards_base_url and different than the packages base_url
-
     # download or fetch-from-cache a random set of shards
 
     for package in random.choices([*found.packages_index.keys()], k=16):
-        shard = found.fetch_shard(package, session)
+        shard = found.fetch_shard(package)
 
         mentioned_in_shard = shard_mentioned_packages(shard)
+        assert (
+            package in mentioned_in_shard
+        )  # the package's own name is mentioned, as well as any dependencies.
         print(package_names(shard), mentioned_in_shard)
 
 
@@ -194,7 +179,7 @@ def test_shards_2(conda_no_token: None):
             for package in shards_unavailable:
                 shardlike.visited[package] = None
 
-            fetched_shards = shardlike.fetch_shards(shards_to_fetch, session)
+            fetched_shards = shardlike.fetch_shards(shards_to_fetch)
             for package, shard in fetched_shards.items():
                 new_shards_to_get.update(shard_mentioned_packages(shard))
 
@@ -294,7 +279,7 @@ def test_shardlike():
 
     # make fake packages
     for n in range(10):
-        for m in range(n):
+        for m in range(n):  # 0 test0's
             repodata["packages"][f"test{n}{m}.tar.bz2"] = {"name": f"test{n}"}
             repodata["packages.conda"][f"test{n}{m}.tar.bz2"] = {"name": f"test{n}"}
 
@@ -309,6 +294,22 @@ def test_shardlike():
         "test42.tar.bz2",
         "test43.tar.bz2",
     ]
+
+    fetched_shard = as_shards.fetch_shard("test1")
+    assert fetched_shard["packages"]["test10.tar.bz2"]["name"] == "test1"
+    assert as_shards.url in repr(as_shards)
+    assert "test1" in as_shards
+
+    fetched_shards = as_shards.fetch_shards(("test1", "test2"))
+    assert len(fetched_shards) == 2
+    assert fetched_shards["test1"]
+    assert fetched_shards["test2"]
+
+    as_shards.visited.update(fetched_shards)
+    as_shards.visited["package-that-does-not-exist"] = None
+    repodata = as_shards.build_repodata()
+    assert len(repodata["packages"]) == 3
+    assert len(repodata["packages.conda"]) == 3
 
 
 def test_shardlike_repr():
