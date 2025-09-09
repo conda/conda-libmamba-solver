@@ -88,7 +88,7 @@ def test_shardlike():
 
     # make fake packages
     for n in range(10):
-        for m in range(n):
+        for m in range(n):  # 0 test0's
             repodata["packages"][f"test{n}{m}.tar.bz2"] = {"name": f"test{n}"}
             repodata["packages.conda"][f"test{n}{m}.tar.bz2"] = {"name": f"test{n}"}
 
@@ -103,3 +103,19 @@ def test_shardlike():
         "test42.tar.bz2",
         "test43.tar.bz2",
     ]
+
+    fetched_shard = as_shards.fetch_shard("test1", None)  # type: ignore
+    assert fetched_shard["packages"]["test10.tar.bz2"]["name"] == "test1"
+    assert as_shards.url in repr(as_shards)
+    assert "test1" in as_shards
+
+    fetched_shards = as_shards.fetch_shards(("test1", "test2"), None)  # type: ignore
+    assert len(fetched_shards) == 2
+    assert fetched_shards["test1"]
+    assert fetched_shards["test2"]
+
+    as_shards.visited.update(fetched_shards)
+    as_shards.visited["package-that-does-not-exist"] = None
+    repodata = as_shards.build_repodata()
+    assert len(repodata["packages"]) == 3
+    assert len(repodata["packages.conda"]) == 3

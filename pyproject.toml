@@ -117,3 +117,9 @@ flake8-type-checking = {exempt-modules = [], strict = true}
 # include = ["conda_libmamba_solver"]
 # ignore = ["conda_libmamba_solver/*_v1.py"]
 # strict = ["**/"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+]
