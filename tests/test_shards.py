@@ -271,13 +271,6 @@ class Node:
     package: str = ""
     visited: bool = False
 
-    def __hash__(self):
-        return hash(self.package)
-
-    def reset(self):
-        self.visited = False
-        self.distance = sys.maxsize
-
 
 @dataclass
 class RepodataSubset:
@@ -295,11 +288,8 @@ class RepodataSubset:
         discovered = set()
         for shardlike in self.shardlikes:
             if node.package in shardlike:
-                try:
-                    # check that we don't fetch the same shard twice...
-                    shard = shardlike.fetch_shard(node.package)
-                except:
-                    raise
+                # check that we don't fetch the same shard twice...
+                shard = shardlike.fetch_shard(node.package)
                 for package in shard_mentioned_packages(shard):
                     if package not in self.nodes:
                         self.nodes[package] = Node(node.distance + 1, package)
@@ -332,9 +322,11 @@ class RepodataSubset:
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         while unvisited:
             original_priority, node = heapq.heappop(unvisited)
-            if original_priority != node.distance:  # ???
+            if (
+                original_priority != node.distance
+            ):  # pragma: no cover; didn't match what's in the heap
                 continue
-            if node.visited:
+            if node.visited:  # pragma: no cover
                 continue
             node.visited = True
 
@@ -342,9 +334,6 @@ class RepodataSubset:
                 if not next.visited:
                     next.distance = min(node.distance + cost, next.distance)
                     heapq.heappush(unvisited, (next.distance, next))
-
-    def reset(self):
-        self.nodes = {}
 
 
 def test_traverse_shards_3(conda_no_token: None, tmp_path):

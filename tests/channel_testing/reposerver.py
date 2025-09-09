@@ -343,11 +343,14 @@ elif args.auth == "basic" or (args.user and args.password):
     handler = BasicAuthHandler
 elif args.auth == "token" or args.token:
     handler = CondaTokenHandler
+else:
+    print("No auth method given.")
+    exit(1)
 
 PORT = args.port
 
 server = HTTPServer(("", PORT), handler)
-print("Server started at localhost:" + str(PORT))
+print("Server started at localhost:" + str(server.server_port))
 try:
     server.serve_forever()
 except Exception as exc:

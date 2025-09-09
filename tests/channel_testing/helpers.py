@@ -22,7 +22,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
     print("Starting dummy_http_server")
 
     class Starter(ProcessStarter):
-        pattern = f"Server started at localhost:{port}"
+        pattern = r"Server started at localhost:(\d+)"
         terminate_on_interrupt = True
         timeout = 10
         args = [
