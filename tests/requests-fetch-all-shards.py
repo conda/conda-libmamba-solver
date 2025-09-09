@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Collect all repodata shards from fast.prefix.dev/conda-forge.
 
@@ -51,7 +54,7 @@ def fetch(s, package, url):
     b1 = time.time_ns()
     data = s.get(url).content
     e1 = time.time_ns()
-    print(f"{(e1-b1)/1e9}s", package, url)
+    print(f"{(e1 - b1) / 1e9}s", package, url)
     return data
 
 
@@ -78,4 +81,4 @@ end = time.time_ns()
 
 conn.close()
 
-print(f"Took {(end-begin)/1e9} seconds")
+print(f"Took {(end - begin) / 1e9} seconds")

@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Collect all repodata shards from fast.prefix.dev/conda-forge.
 
@@ -36,7 +39,9 @@ base_url = "https://fast.prefix.dev/conda-forge/linux-64/repodata_shards.msgpack
 
 
 conn = connect("conda-forge-shards-httpx.db")
-conn.execute("CREATE TABLE IF NOT EXISTS shards (url TEXT PRIMARY KEY, package TEXT, shard BLOB)") # also last-used?
+conn.execute(
+    "CREATE TABLE IF NOT EXISTS shards (url TEXT PRIMARY KEY, package TEXT, shard BLOB)"
+)  # also last-used?
 
 
 def shard_urls(index):
@@ -86,5 +91,5 @@ if __name__ == "__main__":
     begin = time.time_ns()
     asyncio.run(main())
     end = time.time_ns()
-    print(f"Took {(end-begin)/1e9} seconds")
+    print(f"Took {(end - begin) / 1e9} seconds")
     conn.close()
