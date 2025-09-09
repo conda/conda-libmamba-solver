@@ -27,7 +27,7 @@ from conda.testing.integration import package_is_installed
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.solver import LibMambaSolver as Solver
 
-from .utils import conda_subprocess
+from .utils import conda_subprocess, python_site_packages_path_support
 
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
@@ -671,3 +671,23 @@ def test_channel_subdir_set_correctly(tmp_env: TmpEnvFixture) -> None:
             if prec_path.name.startswith("tzdata-"):
                 payload = json.loads(prec_path.read_text())
                 assert payload["channel"].endswith("noarch")
+
+
+def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
+    with tmp_env(
+        "--override-channels",
+        "--channel=conda-forge",
+        "--solver=libmamba",
+        "python-freethreading=3.13",
+    ) as prefix:
+        PrefixData._cache_.clear()
+        prec = PrefixData(prefix).get("python")
+        assert prec.name == "python"
+        assert prec.version.startswith("3.13")
+        if python_site_packages_path_support:
+            if context.subdir.startswith("win"):
+                assert prec.python_site_packages_path == "Lib/site-packages"
+            else:
+                assert prec.python_site_packages_path == "lib/python3.13t/site-packages"
+        else:
+            assert prec.python_site_packages_path is None

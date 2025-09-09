@@ -662,6 +662,7 @@ class LibMambaSolver(Solver):
             subdir=pkg.platform,  # NOTE: Different attribute name
             fn=pkg.filename,  # NOTE: Different attribute name
             license=pkg.license,
+            python_site_packages_path=getattr(pkg, "python_site_packages_path", "") or None,
             md5=pkg.md5,
             sha256=pkg.sha256,
             signatures=pkg.signatures,
