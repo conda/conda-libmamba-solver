@@ -13,7 +13,6 @@ import logging
 import pickle
 import random
 import sys
-import textwrap
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,13 +22,13 @@ import pytest
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import get_session
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shard_cache, shards
 from conda_libmamba_solver.shards import (
     RepodataDict,
     ShardLike,
+    Shards,
     fetch_shards,
     shard_mentioned_packages,
 )
@@ -84,30 +83,14 @@ def test_shards(conda_no_token: None):
         print(package_names(shard), mentioned_in_shard)
 
 
-def test_shards_2(conda_no_token: None):
+def test_fetch_shards(conda_no_token: None):
     """
-    Test all channels fetch.
+    Test all channels fetch as Shards or ShardLike, depending on availability.
     """
     channels = list(context.default_channels)
     print(channels)
-    # is (pkgs/main, pkgs/r) in mine
-
-    # Channel('pkgs/main').url()
-    # 'https://repo.anaconda.com/pkgs/main/osx-arm64'
-    # context.default_channels[0].url()
-    # 'https://repo.anaconda.com/pkgs/main/osx-arm64'
-    # Channel('main').url()
-
-    # state to initiate a solve
-    in_state = pickle.loads((HERE / "data" / "in_state.pickle").read_bytes())
-    print(in_state)
 
     channels.append(Channel("conda-forge-sharded"))
-
-    installed = (
-        *in_state.installed.values(),
-        # *in_state.virtual.values(),  # skip these which will not exist in channels
-    )
 
     channel_data: dict[str, ShardLike] = {}
     for channel in channels:
@@ -120,103 +103,8 @@ def test_shards_2(conda_no_token: None):
                 found = ShardLike(repodata_json, channel_url)
             channel_data[channel_url] = found
 
-    print(channel_data)
-
-    shards_to_get = set(package.name for package in installed)
-
-    # what we want to install
-    # shards_to_get.update(in_state.requested)
-    shards_to_get.add("twine")
-
-    shards_to_get_more = set(
-        package.name for root in installed for package in root.combined_depends
-    )
-
-    print(
-        "Are the installed packages the same as all their dependencies?",
-        shards_to_get == shards_to_get_more,
-        f"{len(shards_to_get)} from installed",
-        f"{len(shards_to_get_more)} from installed's dependencies",  # includes virtual packages, doesn't matter
-    )
-
-    # e.g. shards_to_get_more - shards_to_get
-    # {'expat', 'xz', 'zlib'}
-    # shards_to_get - shards_to_get_more
-    # {'__conda', '__archspec'}
-
-    shards_to_get |= shards_to_get_more
-
-    shards_have: dict[str, dict[str, shard_cache.Shard | None]] = {
-        url: {} for url in channel_data
-    }  # mapping between URL and shards fetched or attempted-to-fetch
-    iteration = 0
-    waste = 0
-
-    time_start = time.monotonic()
-    while shards_to_get:
-        iteration_start = time.monotonic()
-        print(f"Seek {len(shards_to_get)} shards in iteration {iteration}:")
-        print("\n".join(textwrap.wrap(" ".join(sorted(shards_to_get)))))
-        new_shards_to_get = set()
-        for channel_url, shardlike in channel_data.items():
-            session = get_session(channel_url)  # XXX inefficient but it has a @cache decorator
-            new_shards_to_get = set()
-            # packages available in the channel that we don't already have
-            shards_to_fetch = set(
-                package
-                for package in shards_to_get
-                if package in shardlike
-                and package
-                not in shardlike.visited  # may make sense to update visited with negative matches
-            )
-            shards_unavailable = set(
-                package
-                for package in shards_to_get
-                if package not in shardlike
-                and package
-                not in shardlike.visited  # may make sense to update visited with negative matches
-            )
-            for package in shards_unavailable:
-                shardlike.visited[package] = None
-
-            fetched_shards = shardlike.fetch_shards(shards_to_fetch)
-            for package, shard in fetched_shards.items():
-                new_shards_to_get.update(shard_mentioned_packages(shard))
-
-            # also a property of the shardlike instance:
-            shards_have[channel_url].update(fetched_shards)
-
-            if False:  # earlier "one at a time" method
-                shards_fetched_serially = set()
-                for package in shards_to_get:
-                    if package not in shards_have[channel_url]:  # XXX also inefficient
-                        if package in shardlike:
-                            new_shard = shardlike.fetch_shard(package, session)
-                            new_shards_to_get.update(shard_mentioned_packages(new_shard))
-                            shards_have[channel_url][package] = package
-                            shards_fetched_serially.add(package)
-                        else:
-                            shards_have[channel_url][package] = None
-                    else:
-                        waste += 1
-            # print("To-fetch same both ways?", shards_fetched_serially == shards_to_fetch)
-
-        shards_to_get = new_shards_to_get
-        shards_to_get -= set(next(iter(shards_have.values())))
-        iteration_end = time.monotonic()
-        print(f"Iteration {iteration} took {iteration_end - iteration_start:.2f}s")
-        iteration += 1
-    time_end = time.monotonic()
-
-    relevant_packages = [set(value) for value in shards_have.values()]
-    assert all(len(x) == len(relevant_packages[0]) for x in relevant_packages)
-    print(f"Sought data for the following {len(relevant_packages[0])} packages:")
-    print("\n".join(textwrap.wrap(" ".join(sorted(relevant_packages[0])))))
-    print(f"Wasted {waste} inner loop iterations")
-    print(f"Took {time_end - time_start:.2f}s")
-
-    # Now write out shards_have packages that are not None, as small
-    # repodata.json for the solver.
+    # at least one should be real shards, not repodata.json presented as shards.
+    assert any(isinstance(channel, Shards) for channel in channel_data.values())
 
 
 def test_shard_cache(tmp_path: Path):
