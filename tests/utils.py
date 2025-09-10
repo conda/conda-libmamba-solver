@@ -5,7 +5,10 @@ import sys
 from pathlib import Path
 from subprocess import CompletedProcess, run
 
+from libmambapy.specs import PackageInfo
 from ruamel.yaml import YAML
+
+python_site_packages_path_support = getattr(PackageInfo, "python_site_packages_path", False)
 
 
 def conda_subprocess(*args, explain=False, capture_output=True, **kwargs) -> CompletedProcess:
