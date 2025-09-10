@@ -34,7 +34,7 @@ from .shard_cache import Shard
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, KeysView
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
@@ -133,8 +133,12 @@ class ShardLike:
         left, right = super().__repr__().split(maxsplit=1)
         return f"{left} {self.url} {right}"
 
+    @property
+    def package_names(self) -> KeysView[str]:
+        return self.shards.keys()
+
     def __contains__(self, package: str) -> bool:
-        return package in self.shards
+        return package in self.package_names
 
     def fetch_shard(self, package: str) -> Shard:
         """
@@ -193,8 +197,9 @@ class Shards(ShardLike):
         # used to write out repodata subset
         self.visited: dict[str, Shard | None] = {}
 
-    def __contains__(self, package: str) -> bool:
-        return package in self.packages_index
+    @property
+    def package_names(self):
+        return self.packages_index.keys()
 
     @property
     def packages_index(self):
