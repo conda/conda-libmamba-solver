@@ -11,7 +11,6 @@ import hashlib
 import heapq
 import json
 import logging
-import pickle
 import random
 import sys
 import time
@@ -437,10 +436,6 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
 
     channels = list(context.default_channels)
     print(channels)
-
-    # state to initiate a solve
-    in_state = pickle.loads((HERE / "data" / "in_state.pickle").read_bytes())
-    print(in_state)
 
     channels.append(Channel("conda-forge-sharded"))
 
