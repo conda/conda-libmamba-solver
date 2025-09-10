@@ -174,9 +174,6 @@ class ShardLike:
         return repodata
 
 
-FETCHED_THIS_PROCESS = set()
-
-
 class Shards(ShardLike):
     def __init__(self, shards_index: ShardsIndex, url: str, shards_cache: shard_cache.ShardCache):
         """
@@ -230,26 +227,8 @@ class Shards(ShardLike):
         Raise KeyError if package is not in the index.
         """
 
-        if package in self.visited:
-            log.debug("Revisit %s %s", self.url, package)
-            shard_or_none = self.visited[package]
-            if shard_or_none is None:
-                raise KeyError(package)
-            return shard_or_none
-
-        shard_url = self.shard_url(package)
-        # XXX do we call this with the same shard, decompressing twice, in a single instance?
-        shard_or_none = self.shards_cache.retrieve(shard_url)
-        if shard_or_none:
-            self.visited[package] = shard_or_none
-            return shard_or_none
-        else:
-            raw_shard = self.session.get(shard_url).content
-            # ensure it is real msgpack+zstd before inserting into cache
-            shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
-            self.shards_cache.insert(shard_cache.AnnotatedRawShard(shard_url, package, raw_shard))
-            self.visited[package] = shard
-            return shard
+        shards = self.fetch_shards((package,))
+        return shards[package]
 
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
         """
@@ -258,14 +237,11 @@ class Shards(ShardLike):
         result = {}
 
         def fetch(s, url, package):
-            if url in FETCHED_THIS_PROCESS:
-                log.debug("Already got %s", url)
-                raise RuntimeError("Can't fetch same url twice")
-            FETCHED_THIS_PROCESS.add(url)
+            # due to cache, the same url won't be fetched twice
             b1 = time.time_ns()
             data = s.get(url).content
             e1 = time.time_ns()
-            log.debug(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
+            log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
             return shard_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
         packages = sorted(list(packages))
@@ -288,7 +264,7 @@ class Shards(ShardLike):
             }
             # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
             for future in concurrent.futures.as_completed(futures):
-                log.debug(".", futures[future])
+                log.debug(". %s", futures[future])
                 fetch_result = future.result()
                 # XXX catch exception / 404 / whatever
                 result[fetch_result.package] = msgpack.loads(
@@ -302,10 +278,10 @@ class Shards(ShardLike):
                             *result[fetch_result.package]["packages.conda"].values(),
                         )
                     ]
-                    log.debug("expected", fetch_result.package, "actual", set(package_names))
+                    log.debug("expected %s, actual %s", fetch_result.package, set(package_names))
+                    self.shards_cache.insert(fetch_result)
                 except (AttributeError, KeyError):
-                    log.exception("Error fetching shard")
-                self.shards_cache.insert(fetch_result)
+                    log.exception("Error fetching shard for %s", fetch_result.package)
 
         self.visited.update(result)
 

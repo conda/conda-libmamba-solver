@@ -6,20 +6,37 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import socket
 import sys
+from typing import TYPE_CHECKING
 
 import pytest
 from xprocess import ProcessStarter
 
+if TYPE_CHECKING:
+    from xprocess import XProcess
 
-def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=None, token=None):
+
+def _dummy_http_server(
+    xprocess: XProcess,
+    name,
+    port,
+    auth="none",
+    user=None,
+    password=None,
+    token=None,
+    path=None,
+):
     """
     Adapted from
     https://github.com/mamba-org/powerloader/blob/effe2b7e1/test/helpers.py#L11
     """
     curdir = pathlib.Path(__file__).parent
     print("Starting dummy_http_server")
+
+    if not path:
+        path = curdir / ".." / "data" / "mamba_repo"
 
     class Starter(ProcessStarter):
         pattern = r"Server started at localhost:(\d+)"
@@ -30,7 +47,7 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
             "-u",  # unbuffered
             str(curdir / "reposerver.py"),
             "-d",
-            str(curdir / ".." / "data" / "mamba_repo"),
+            str(path),
             "--port",
             str(port),
         ]
@@ -45,6 +62,14 @@ def _dummy_http_server(xprocess, name, port, auth="none", user=None, password=No
             env["TESTPWD"] = f"{user}:{password}"
 
         def startup_check(self):
+            nonlocal xprocess, port
+            info = xprocess.getinfo(name)
+            loglines: str = info.logpath.read_text(encoding="utf-8")
+            for line in reversed(loglines.splitlines()):
+                match = re.search(self.pattern, line)
+                if match:
+                    port = int(match.group(1))
+                    break
             s = socket.socket()
             address = "localhost"
             error = False

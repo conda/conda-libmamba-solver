@@ -7,6 +7,7 @@ Test sharded repodata.
 
 from __future__ import annotations
 
+import hashlib
 import heapq
 import json
 import logging
@@ -16,6 +17,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import msgpack
 import pytest
@@ -32,6 +34,10 @@ from conda_libmamba_solver.shards import (
     fetch_shards,
     shard_mentioned_packages,
 )
+from tests.channel_testing.helpers import _dummy_http_server
+
+if TYPE_CHECKING:
+    from conda_libmamba_solver.shards import ShardsIndex
 
 HERE = Path(__file__).parent
 
@@ -54,9 +60,51 @@ def conda_no_token(monkeypatch: pytest.MonkeyPatch):
     reset_context()
 
 
+@pytest.fixture
+def http_server_shards(xprocess, tmp_path_factory):
+    """
+    A shard repository with a difference.
+    """
+    shards_repository = tmp_path_factory.mktemp("sharded_repo")
+    (shards_repository / "noarch").mkdir()
+    malformed = {"follows_schema": False}
+    malformed_bytes = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
+    # XXX not-zstandard; not msgpack
+    malformed_digest = hashlib.sha256(malformed_bytes).digest()
+    (shards_repository / "noarch" / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(
+        malformed_bytes
+    )
+    fake_shards: ShardsIndex = {
+        "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
+        "repodata_version": 1,
+        "shards": {"fake_package": b"", "malformed": hashlib.sha256(malformed_bytes).digest()},
+        "removed": [],
+    }
+    (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
+        zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
+    )
+    yield from _dummy_http_server(
+        xprocess, name="http_server_auth_none", port=0, auth="none", path=shards_repository
+    )
+
+
+def test_fetch_shards_error(http_server_shards):
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+    found = fetch_shards(subdir_data)
+    assert found
+
+    with pytest.raises(zstandard.ZstdError):
+        # XXX we tried to decompress a 404 response
+        found.fetch_shard("fake_package")
+
+    malo = found.fetch_shard("malformed")
+    assert malo == {"follows_schema": False}  # XXX should we return None or raise
+
+
 def test_shards(conda_no_token: None):
     """
-    Test basic shard fetch etc.
+    Test basic shard fetch.
     """
     channels = [
         Channel.from_url(f"https://conda.anaconda.org/conda-forge-sharded/{subdir}")
