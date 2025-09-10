@@ -27,6 +27,8 @@ from conda.gateways.repodata import (
 from conda.models.records import PackageRecord
 from requests import HTTPError
 
+from .shard_cache import Shard
+
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
@@ -46,13 +48,6 @@ class PackageRecordDict(TypedDict):
     name: str
     sha256: NotRequired[str | bytes]
     md5: NotRequired[str | bytes]
-
-
-# in this style because "packages.conda" is not a Python identifier
-Shard = TypedDict(
-    "Shard",
-    {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
-)
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
