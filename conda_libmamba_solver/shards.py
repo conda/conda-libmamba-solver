@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urljoin
 
-import conda.gateways.repodata as repodata
+import conda.gateways.repodata
 import msgpack
 import zstandard
 from conda.base.context import context
@@ -68,7 +68,7 @@ class ShardsIndex(TypedDict):
     shards: dict[str, bytes]
 
 
-def maybe_unpack_record(record: PackageRecordDict):
+def ensure_hex_hash(record: PackageRecordDict):
     """
     Convert bytes checksums to hex; leave unchanged if already str.
     """
@@ -92,7 +92,7 @@ def shard_mentioned_packages(shard: Shard) -> set[str]:
     for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
         # to go faster, don't use PackageRecord, record.combined_depends, or
         # MatchSpec
-        record = PackageRecord(**maybe_unpack_record(package))
+        record = PackageRecord(**ensure_hex_hash(package))
         mentioned.add(record.name)
         mentioned.update(spec.name for spec in record.combined_depends)
     return mentioned
@@ -345,10 +345,14 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
         return cache.cache_path_shards.read_bytes()
 
     # We no longer add these tags to the large `resp.content` json
-    saved_fields = {repodata.URL_KEY: url}
-    _add_http_value_to_dict(response, "Etag", saved_fields, repodata.ETAG_KEY)
-    _add_http_value_to_dict(response, "Last-Modified", saved_fields, repodata.LAST_MODIFIED_KEY)
-    _add_http_value_to_dict(response, "Cache-Control", saved_fields, repodata.CACHE_CONTROL_KEY)
+    saved_fields = {conda.gateways.repodata.URL_KEY: url}
+    _add_http_value_to_dict(response, "Etag", saved_fields, conda.gateways.repodata.ETAG_KEY)
+    _add_http_value_to_dict(
+        response, "Last-Modified", saved_fields, conda.gateways.repodata.LAST_MODIFIED_KEY
+    )
+    _add_http_value_to_dict(
+        response, "Cache-Control", saved_fields, conda.gateways.repodata.CACHE_CONTROL_KEY
+    )
 
     state.update(saved_fields)
 
@@ -385,11 +389,11 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
             shards = Shards(
                 shards_index,
                 shards_index_url,
-                shard_cache.ShardCache(Path(repodata.create_cache_dir())),
+                shard_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())),
             )
             return shards
 
-        except (HTTPError, repodata.RepodataIsEmpty):
+        except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
             cache.refresh(refresh_ns=1)  # expired but not falsy
