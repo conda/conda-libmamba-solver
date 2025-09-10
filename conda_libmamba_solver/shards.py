@@ -33,21 +33,12 @@ log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import NotRequired
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
     from requests import Response
 
-
-class PackageRecordDict(TypedDict):
-    """
-    Basic package attributes that this module cares about.
-    """
-
-    name: str
-    sha256: NotRequired[str | bytes]
-    md5: NotRequired[str | bytes]
+    from .shard_cache import PackageRecordDict
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
