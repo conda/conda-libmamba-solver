@@ -10,13 +10,14 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, NotRequired, TypedDict
+from typing import TYPE_CHECKING, TypedDict
 
 import msgpack
 import zstandard
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import NotRequired
 
 SHARD_CACHE_NAME = "repodata_shards.db"
 
