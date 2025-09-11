@@ -23,6 +23,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache
+from conda_libmamba_solver.index import LibMambaIndexHelper
 from conda_libmamba_solver.shards import (
     RepodataDict,
     ShardLike,
@@ -310,6 +311,35 @@ def test_shardlike_repr():
     assert shardlike.url == url
 
 
+ROOT_PACKAGES = [
+    "__archspec",
+    "__conda",
+    "__osx",
+    "__unix",
+    "bzip2",
+    "ca-certificates",
+    "expat",
+    "icu",
+    "libexpat",
+    "libffi",
+    "liblzma",
+    "libmpdec",
+    "libsqlite",
+    "libzlib",
+    "ncurses",
+    "openssl",
+    "pip",
+    "python",
+    "python_abi",
+    "readline",
+    "tk",
+    "twine",
+    "tzdata",
+    "xz",
+    "zlib",
+]
+
+
 def test_traverse_shards_3(conda_no_token: None, tmp_path):
     """
     Another go at the dependency traversal algorithm.
@@ -320,33 +350,7 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
     shards_cache.log.setLevel(logging.DEBUG)
 
     # installed, plus what we want to add (twine)
-    root_packages = [
-        "__archspec",
-        "__conda",
-        "__osx",
-        "__unix",
-        "bzip2",
-        "ca-certificates",
-        "expat",
-        "icu",
-        "libexpat",
-        "libffi",
-        "liblzma",
-        "libmpdec",
-        "libsqlite",
-        "libzlib",
-        "ncurses",
-        "openssl",
-        "pip",
-        "python",
-        "python_abi",
-        "readline",
-        "tk",
-        "twine",
-        "tzdata",
-        "xz",
-        "zlib",
-    ]
+    root_packages = ROOT_PACKAGES[:]
 
     channels = list(context.default_channels)
     channels.append(Channel("conda-forge-sharded"))
@@ -369,3 +373,22 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
         channel_names.append("/".join(channel))
 
     print(f"Repodata subset includes {', '.join(channel_names)}")
+
+
+def test_shards_indexhelper(conda_no_token):
+    channels = [*context.default_channels, Channel("conda-forge-sharded")]
+
+    class fake_in_state:
+        installed = {name: name for name in ROOT_PACKAGES}
+
+    # Would eagerly download repodata.json.zst for all channels
+    helper = LibMambaIndexHelper(
+        channels,
+        (),  # subdirs
+        "repodata.json",
+        (),
+        (),  # pkgs_dirs to load packages locally when offline
+        in_state=fake_in_state,  # type: ignore
+    )
+
+    print(helper.repos)

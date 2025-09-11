@@ -75,6 +75,7 @@ from __future__ import annotations
 
 import logging
 import os
+import tempfile
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -107,6 +108,8 @@ from libmambapy.specs import (
     NoArchType,
     PackageInfo,
 )
+
+from conda_libmamba_solver.shards_subset import build_repodata_subset
 
 from .mamba_utils import logger_callback
 
@@ -304,6 +307,15 @@ class LibMambaIndexHelper:
                 url = url.replace(" ", "%20")
             encoded_urls_to_channel[url] = channel
         urls_to_channel = encoded_urls_to_channel
+
+        if self.in_state:
+            # try to make a subset
+            # conda probably already has a suitable temporary directory?
+            self.tmp_path = Path(tempfile.TemporaryDirectory("conda-shards").name)
+            subset, repodata_size = build_repodata_subset(
+                self.tmp_path, self.in_state.installed.values(), encoded_urls_to_channel
+            )
+            # XXX pass the generated files down to self._fetch_repodata_jsons instead of the usual fetch
 
         urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         channel_repo_infos = []
