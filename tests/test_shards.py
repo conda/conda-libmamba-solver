@@ -8,13 +8,10 @@ Test sharded repodata.
 from __future__ import annotations
 
 import hashlib
-import heapq
 import json
 import logging
 import random
-import sys
 import time
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -25,7 +22,7 @@ from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 
-from conda_libmamba_solver import shard_cache, shards
+from conda_libmamba_solver import shards, shards_cache
 from conda_libmamba_solver.shards import (
     RepodataDict,
     ShardLike,
@@ -33,6 +30,7 @@ from conda_libmamba_solver.shards import (
     fetch_shards,
     shard_mentioned_packages,
 )
+from conda_libmamba_solver.shards_subset import build_repodata_subset
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
@@ -41,7 +39,7 @@ if TYPE_CHECKING:
 HERE = Path(__file__).parent
 
 
-def package_names(shard: shard_cache.Shard):
+def package_names(shard: shards_cache.Shard):
     """
     All package names mentioned in a shard (should be a single package name)
     """
@@ -155,10 +153,10 @@ def test_fetch_shards(conda_no_token: None):
 
 
 def test_shard_cache(tmp_path: Path):
-    cache = shard_cache.ShardCache(tmp_path)
+    cache = shards_cache.ShardCache(tmp_path)
 
     fake_shard = {"foo": "bar"}
-    annotated_shard = shard_cache.AnnotatedRawShard(
+    annotated_shard = shards_cache.AnnotatedRawShard(
         "https://foo",
         "foo",
         zstandard.compress(msgpack.dumps(fake_shard)),  # type: ignore
@@ -172,7 +170,7 @@ def test_shard_cache(tmp_path: Path):
     data2 = cache.retrieve("notfound")
     assert data2 is None
 
-    assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
+    assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
 def test_shard_cache_multiple(tmp_path: Path):
@@ -181,13 +179,13 @@ def test_shard_cache_multiple(tmp_path: Path):
     """
     NUM_FAKE_SHARDS = 64
 
-    cache = shard_cache.ShardCache(tmp_path)
+    cache = shards_cache.ShardCache(tmp_path)
     fake_shards = []
 
     compressor = zstandard.ZstdCompressor(level=1)
     for i in range(NUM_FAKE_SHARDS):
         fake_shard = {f"foo{i}": "bar"}
-        annotated_shard = shard_cache.AnnotatedRawShard(
+        annotated_shard = shards_cache.AnnotatedRawShard(
             f"https://foo{i}",
             f"foo{i}",
             compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
@@ -223,7 +221,7 @@ def test_shard_cache_multiple(tmp_path: Path):
             "batch API took longer"
         )
 
-    assert (tmp_path / shard_cache.SHARD_CACHE_NAME).exists()
+    assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
 def test_shard_cache_2():
@@ -233,10 +231,10 @@ def test_shard_cache_2():
     """
     subdir_data = SubdirData(Channel("main/noarch"))
     # accepts directory that cache goes into, not database filename
-    cache = shard_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
+    cache = shards_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
     extant = {}
     for row in cache.conn.execute("SELECT url, package, shard, timestamp FROM shards"):
-        extant[row["url"]] = shard_cache.AnnotatedRawShard(
+        extant[row["url"]] = shards_cache.AnnotatedRawShard(
             url=row["url"], package=row["package"], compressed_shard=row["shard"]
         )
 
@@ -312,77 +310,6 @@ def test_shardlike_repr():
     assert shardlike.url == url
 
 
-@dataclass(order=True)
-class Node:
-    distance: int = sys.maxsize
-    package: str = ""
-    visited: bool = False
-
-
-@dataclass
-class RepodataSubset:
-    nodes: dict[str, Node]
-    shardlikes: list[ShardLike]
-
-    def __init__(self, shardlikes):
-        self.nodes = {}
-        self.shardlikes = shardlikes
-
-    def neighbors(self, node: Node):
-        """
-        All neighbors for node.
-        """
-        discovered = set()
-        for shardlike in self.shardlikes:
-            if node.package in shardlike:
-                # check that we don't fetch the same shard twice...
-                shard = shardlike.fetch_shard(node.package)
-                for package in shard_mentioned_packages(shard):
-                    if package not in self.nodes:
-                        self.nodes[package] = Node(node.distance + 1, package)
-                        # by moving yield up here we try to only visit dependencies
-                        # that no other node already knows about. Doesn't make it faster.
-                        if package not in discovered:  # redundant with not in self.nodes?
-                            print(f"{json.dumps(node.package)} -> {json.dumps(package)};")
-                            yield self.nodes[package]
-                    if package not in discovered:
-                        pass
-                        # dot format valid ids: https://graphviz.org/doc/info/lang.html#ids (or quote string)
-
-                        # we might not require "in self.nodes" neighbors since
-                        # we don't need to find the shortest path
-
-                        # yield self.nodes[package]
-
-                    discovered.add(package)  # also doesn't make it faster
-
-    def outgoing(self, node: Node):
-        """
-        All nodes that can be reached by this node, plus cost.
-        """
-        for n in self.neighbors(node):
-            yield n, 1
-
-    def shortest(self, start_packages):
-        # nodes.visited and nodes.distance should be reset before calling
-        self.nodes = {package: Node(0, package) for package in start_packages}
-        unvisited = [(n.distance, n) for n in self.nodes.values()]
-        while unvisited:
-            original_priority, node = heapq.heappop(unvisited)
-            if (
-                original_priority != node.distance
-            ):  # pragma: no cover; didn't match what's in the heap
-                continue
-            if node.visited:  # pragma: no cover
-                continue
-            node.visited = True
-
-            for next, cost in self.outgoing(node):
-                if not next.visited:
-                    next.distance = min(node.distance + cost, next.distance)
-                    heapq.heappush(unvisited, (next.distance, next))
-
-
 def test_traverse_shards_3(conda_no_token: None, tmp_path):
     """
     Another go at the dependency traversal algorithm.
@@ -390,7 +317,7 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
 
     logging.basicConfig(level=logging.INFO)
     shards.log.setLevel(logging.DEBUG)
-    shard_cache.log.setLevel(logging.DEBUG)
+    shards_cache.log.setLevel(logging.DEBUG)
 
     # installed, plus what we want to add (twine)
     root_packages = [
@@ -424,47 +351,7 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
     channels = list(context.default_channels)
     channels.append(Channel("conda-forge-sharded"))
 
-    channel_data: dict[str, ShardLike] = {}
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data)
-            if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                found = ShardLike(repodata_json, channel_url)  # type: ignore
-            channel_data[channel_url] = found
-
-    channels = list(context.default_channels)
-    print(channels)
-
-    channels.append(Channel("conda-forge-sharded"))
-
-    channel_data: dict[str, ShardLike] = {}
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data)
-            if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                repodata_json = RepodataDict(repodata_json)  # type: ignore
-                found = ShardLike(repodata_json, channel_url)
-            channel_data[channel_url] = found
-
-    print(channel_data)
-
-    subset = RepodataSubset((*channel_data.values(),))
-    subset.shortest(root_packages)
-    print(len(subset.nodes), "package names discovered")
-
-    repodata_size = 0
-    for shardlike in subset.shardlikes:
-        _, *channel = shardlike.url.replace("/repodata_shards.msgpack.zst", "").rsplit("/", 2)
-        repodata = shardlike.build_repodata()
-        repodata_path = tmp_path / ("_".join(channel))
-        # most compact json
-        repodata_text = json.dumps(repodata, indent=0, separators=(",", ":"))
-        repodata_size += len(repodata_text)
-        repodata_path.write_text(repodata_text)
+    subset, repodata_size = build_repodata_subset(tmp_path, root_packages, channels)
 
     print(f"Repodata subset is {repodata_size} bytes")
 

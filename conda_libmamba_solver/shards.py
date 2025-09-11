@@ -28,8 +28,8 @@ from conda.gateways.repodata import (
 from conda.models.records import PackageRecord
 from requests import HTTPError
 
-from . import shard_cache
-from .shard_cache import Shard
+from . import shards_cache
+from .shards_cache import Shard
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from conda.gateways.repodata import RepodataCache
     from requests import Response
 
-    from .shard_cache import PackageRecordDict
+    from .shards_cache import PackageRecordDict
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
@@ -175,7 +175,7 @@ class ShardLike:
 
 
 class Shards(ShardLike):
-    def __init__(self, shards_index: ShardsIndex, url: str, shards_cache: shard_cache.ShardCache):
+    def __init__(self, shards_index: ShardsIndex, url: str, shards_cache: shards_cache.ShardCache):
         """
         Args:
             shards_index: raw parsed msgpack dict
@@ -242,7 +242,7 @@ class Shards(ShardLike):
             data = s.get(url).content
             e1 = time.time_ns()
             log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
-            return shard_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
+            return shards_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
         packages = sorted(list(packages))
         urls_packages = {self.shard_url(package): package for package in packages}
@@ -370,7 +370,7 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
             shards = Shards(
                 shards_index,
                 shards_index_url,
-                shard_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())),
+                shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())),
             )
             return shards
 
