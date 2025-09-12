@@ -301,7 +301,7 @@ class LibMambaIndexHelper:
             self.tmp_dir = tempfile.TemporaryDirectory("conda-shards")
             self.tmp_path = Path(self.tmp_dir.name)
             subset_paths, _ = build_repodata_subset(
-                self.tmp_path, self.in_state.installed.values(), urls_to_channel
+                self.tmp_path, self.in_state.installed.keys(), urls_to_channel
             )
             # the optional RepodataState, which we omit, appears to be used only
             # for libsolv .solv files which we also don't want.

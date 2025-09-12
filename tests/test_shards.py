@@ -375,7 +375,7 @@ def test_shards_indexhelper(conda_no_token):
     channels = [*context.default_channels, Channel("conda-forge-sharded")]
 
     class fake_in_state:
-        installed = {name: name for name in ROOT_PACKAGES}
+        installed = {name: object() for name in ROOT_PACKAGES}
 
     # Would eagerly download repodata.json.zst for all channels
     helper = LibMambaIndexHelper(
