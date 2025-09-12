@@ -61,12 +61,12 @@ def _dummy_http_server(
         if user and password:
             env["TESTPWD"] = f"{user}:{password}"
 
-        def startup_check(self):
+        def startup_check(self):  # type: ignore
             nonlocal xprocess, port
             info = xprocess.getinfo(name)
             loglines: str = info.logpath.read_text(encoding="utf-8")
             for line in reversed(loglines.splitlines()):
-                match = re.search(self.pattern, line)
+                match = re.search(self.pattern, line)  # type: ignore
                 if match:
                     port = int(match.group(1))
                     break
