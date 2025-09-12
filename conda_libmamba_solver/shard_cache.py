@@ -17,11 +17,26 @@ import zstandard
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import NotRequired
 
 SHARD_CACHE_NAME = "repodata_shards.db"
 
 
-Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
+class PackageRecordDict(TypedDict):
+    """
+    Basic package attributes that this module cares about.
+    """
+
+    name: str
+    sha256: NotRequired[str | bytes]
+    md5: NotRequired[str | bytes]
+
+
+# in this style because "packages.conda" is not a Python identifier
+Shard = TypedDict(
+    "Shard",
+    {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
+)
 
 
 @dataclass
