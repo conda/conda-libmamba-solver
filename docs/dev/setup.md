@@ -38,29 +38,29 @@ You can reuse the devcontainer scripts with regular Docker too.
 
    ```bash
    # For defaults-based images, use:
-   $ docker run -it --rm \
-      -v ~/devel/conda:/workspaces/conda \
-      -v ~/devel/mamba:/workspaces/mamba \
-      -v ~/devel/conda-libmamba-solver:/workspaces/conda-libmamba-solver \
-      continuumio/miniconda3:latest \
-      bash
+   docker run -it --rm \
+     -v ~/devel/conda:/workspaces/conda \
+     -v ~/devel/mamba:/workspaces/mamba \
+     -v ~/devel/conda-libmamba-solver:/workspaces/conda-libmamba-solver \
+     continuumio/miniconda3:latest \
+     bash
    # For conda-forge-based images, use the following instead:
-   $ docker run -it --rm \
-      -v ~/devel/conda:/workspaces/conda \
-      -v ~/devel/mamba:/workspaces/mamba \
-      -v ~/devel/conda-libmamba-solver:/workspaces/conda-libmamba-solver \
-      condaforge/miniforge3:latest \
-      bash
+   docker run -it --rm \
+     -v ~/devel/conda:/workspaces/conda \
+     -v ~/devel/mamba:/workspaces/mamba \
+     -v ~/devel/conda-libmamba-solver:/workspaces/conda-libmamba-solver \
+     condaforge/miniforge3:latest \
+     bash
    ```
 3. Run the `post_create` and `post_start` scripts:
    ```bash
-   $ bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh
-   $ bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh
+   bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh
+   bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh
    ```
 4. If you want to develop with mamba in editable mode, run:
    ```bash
-   $ source ~/.bashrc
-   $ develop-mamba
+   source ~/.bashrc
+   develop-mamba
    ```
 
 ## General workflow
@@ -77,23 +77,23 @@ especially when it comes to `shell` initialization!
 2. Fork and clone the `conda-libmamba-solver` repository to your preferred location:
 
 ```bash
-$ git clone "git@github.com:$YOUR_USERNAME/conda-libmamba-solver" "$REPO_LOCATION"
-$ cd "$REPO_LOCATION"
+git clone "git@github.com:$YOUR_USERNAME/conda-libmamba-solver" "$REPO_LOCATION"
+cd "$REPO_LOCATION"
 ```
 
 3. Install the required dependencies for `conda-libmamba-solver`:
 
 ```bash
-$ conda install \
-    --file "$REPO_LOCATION"/dev/requirements.txt \
-    --file "$REPO_LOCATION"/tests/requirements.txt
+conda install \
+  --file "$REPO_LOCATION"/dev/requirements.txt \
+  --file "$REPO_LOCATION"/tests/requirements.txt
 ```
 
 4. Install `conda-libmamba-solver` with `pip`:
 
 ```bash
-$ cd $REPO_LOCATION
-$ python -m pip install --no-deps -e .
+cd $REPO_LOCATION
+python -m pip install --no-deps -e .
 ```
 
 ## Debugging `conda` and `conda-libmamba-solver`
@@ -116,8 +116,8 @@ investigate state.
 2. Fork and clone the `mamba` repository to your preferred location:
 
 ```bash
-$ git clone "git@github.com:$YOUR_USERNAME/mamba" "$REPO_LOCATION"
-$ cd $REPO_LOCATION
+git clone "git@github.com:$YOUR_USERNAME/mamba" "$REPO_LOCATION"
+cd $REPO_LOCATION
 ```
 
 3. Use the Docker image for development suggested above and re-run
