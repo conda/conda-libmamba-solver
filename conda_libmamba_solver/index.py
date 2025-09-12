@@ -115,7 +115,7 @@ from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import Any, Literal
+    from typing import Any, Callable, Literal
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
@@ -186,7 +186,6 @@ class LibMambaIndexHelper:
         self.in_state = in_state
         self.db = self._init_db()
 
-        # XXX needs to be lazy (to not download "classic" repodata eagerly)
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
         if pkgs_dirs:
             self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
@@ -194,22 +193,9 @@ class LibMambaIndexHelper:
             self.repos.append(self._load_installed(installed_records))
         self._set_repo_priorities()
 
-        # support lazy self.repos
+        # These are to support lazy self.repos, but it's not currently lazy.
         self._pkgs_dirs = pkgs_dirs
         self._installed_records = installed_records
-
-    # @property
-    # def repos(self):
-    #     # causes "python not found in repository" e.g. errors
-    #     if not hasattr(self, "_repos"):
-    #         our_repos: list[_ChannelRepoInfo] = self._load_channels()
-    #         if self._pkgs_dirs:
-    #             our_repos.extend(self._load_pkgs_cache(self._pkgs_dirs))
-    #         if self._installed_records:
-    #             our_repos.append(self._load_installed(self._installed_records))
-    #         self._repos = our_repos
-    #         self._set_repo_priorities()
-    #     return self._repos
 
     @classmethod
     def from_platform_aware_channel(cls, channel: Channel) -> LibMambaIndexHelper:
@@ -222,7 +208,7 @@ class LibMambaIndexHelper:
     def n_packages(
         self,
         repos: Iterable[RepoInfo] | None = None,
-        filter_: callable | None = None,
+        filter_: Callable | None = None,
     ) -> int:
         repos = repos or [repo_info.repo for repo_info in self.repos]
         count = 0
@@ -311,13 +297,20 @@ class LibMambaIndexHelper:
         if self.in_state:
             # try to make a subset
             # conda probably already has a suitable temporary directory?
-            self.tmp_path = Path(tempfile.TemporaryDirectory("conda-shards").name)
-            subset, repodata_size = build_repodata_subset(
-                self.tmp_path, self.in_state.installed.values(), encoded_urls_to_channel
+            # keep a reference so GC doesn't delete the directory
+            self.tmp_dir = tempfile.TemporaryDirectory("conda-shards")
+            self.tmp_path = Path(self.tmp_dir.name)
+            subset_paths, _ = build_repodata_subset(
+                self.tmp_path, self.in_state.installed.values(), urls_to_channel
             )
-            # XXX pass the generated files down to self._fetch_repodata_jsons instead of the usual fetch
+            # the optional RepodataState, which we omit, appears to be used only
+            # for libsolv .solv files which we also don't want.
+            urls_to_json_path_and_state = {
+                url: (json_path, None) for url, json_path in subset_paths.items()
+            }
+        else:
+            urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
 
-        urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
         channel_repo_infos = []
         for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
             url_no_token, _ = split_anaconda_token(url_w_cred)
@@ -326,7 +319,7 @@ class LibMambaIndexHelper:
                 json_path,
                 url_no_cred,
                 state,
-                try_solv=try_solv,
+                try_solv=(try_solv and not self.in_state),
             )
             channel_repo_infos.append(
                 _ChannelRepoInfo(
@@ -411,7 +404,7 @@ class LibMambaIndexHelper:
         return url, json_path, state
 
     def _load_repo_info_from_json_path(
-        self, json_path: str, channel_url: str, state: RepodataState, try_solv: bool = True
+        self, json_path: str, channel_url: str, state: RepodataState | None, try_solv: bool = True
     ) -> RepoInfo | None:
         if try_solv and on_win:
             # .solv loading is so slow on Windows is not even worth it. Use JSON instead.

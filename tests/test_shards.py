@@ -12,6 +12,7 @@ import json
 import logging
 import random
 import time
+import urllib.parse
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -367,12 +368,7 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
         f"Versus only noarch and osx-arm64 full repodata: {repodata_size / full_repodata_benchmark:.02f} times as large"
     )
 
-    channel_names = []
-    for shardlike in subset.shardlikes:
-        _, *channel = shardlike.url.replace("/repodata_shards.msgpack.zst", "").rsplit("/", 2)
-        channel_names.append("/".join(channel))
-
-    print(f"Repodata subset includes {', '.join(channel_names)}")
+    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in subset))
 
 
 def test_shards_indexhelper(conda_no_token):

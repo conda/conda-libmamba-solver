@@ -126,13 +126,19 @@ def build_repodata_subset(tmp_path, root_packages, channels):
     subset.shortest(root_packages)
     print(len(subset.nodes), "package names discovered")
 
+    subset_paths = {}
+
     repodata_size = 0
-    for shardlike in subset.shardlikes:
-        _, *channel = shardlike.url.replace("/repodata_shards.msgpack.zst", "").rsplit("/", 2)
+    for channel, shardlike in channel_data.items():
         repodata = shardlike.build_repodata()
-        repodata_path = tmp_path / ("_".join(channel))
+        # XXX not guaranteed unique
+        _, *channel_shortname = channel.rsplit("/", 2)
+        repodata_path = tmp_path / ("_".join(channel_shortname))
         # most compact json
         repodata_text = json.dumps(repodata, indent=0, separators=(",", ":"))
         repodata_size += len(repodata_text)
         repodata_path.write_text(repodata_text)
-    return subset, repodata_size
+
+        subset_paths[channel] = repodata_path
+
+    return subset_paths, repodata_size
