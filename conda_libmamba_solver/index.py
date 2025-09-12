@@ -295,14 +295,13 @@ class LibMambaIndexHelper:
         urls_to_channel = encoded_urls_to_channel
 
         if self.in_state:
-            # try to make a subset
+            # try to make a subset of possible dependencies
             # conda probably already has a suitable temporary directory?
             # keep a reference so GC doesn't delete the directory
             self.tmp_dir = tempfile.TemporaryDirectory("conda-shards")
             self.tmp_path = Path(self.tmp_dir.name)
-            subset_paths, _ = build_repodata_subset(
-                self.tmp_path, self.in_state.installed.keys(), urls_to_channel
-            )
+            root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
+            subset_paths, _ = build_repodata_subset(self.tmp_path, root_packages, urls_to_channel)
             # the optional RepodataState, which we omit, appears to be used only
             # for libsolv .solv files which we also don't want.
             urls_to_json_path_and_state = {

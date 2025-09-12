@@ -104,24 +104,6 @@ def build_repodata_subset(tmp_path, root_packages, channels):
                 found = ShardLike(repodata_json, channel_url)  # type: ignore
             channel_data[channel_url] = found
 
-    channels = list(context.default_channels)
-    print(channels)
-
-    channels.append(Channel("conda-forge-sharded"))
-
-    channel_data: dict[str, ShardLike] = {}
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data)
-            if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                repodata_json = RepodataDict(repodata_json)  # type: ignore
-                found = ShardLike(repodata_json, channel_url)
-            channel_data[channel_url] = found
-
-    print(channel_data)
-
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
     print(len(subset.nodes), "package names discovered")
