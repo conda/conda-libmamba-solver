@@ -8,6 +8,7 @@ after their own sha256 hash.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypedDict
@@ -18,6 +19,8 @@ import zstandard
 if TYPE_CHECKING:
     from pathlib import Path
     from typing import NotRequired
+
+log = logging.getLogger(__name__)
 
 SHARD_CACHE_NAME = "repodata_shards.db"
 

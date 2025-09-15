@@ -12,6 +12,7 @@ import concurrent.futures
 import logging
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict
 from urllib.parse import urljoin
 
@@ -27,18 +28,19 @@ from conda.gateways.repodata import (
 from conda.models.records import PackageRecord
 from requests import HTTPError
 
-from .shard_cache import Shard
+from . import shards_cache
+from .shards_cache import Shard
 
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, KeysView
 
     from conda.core.subdir_data import SubdirData
     from conda.gateways.repodata import RepodataCache
     from requests import Response
 
-    from .shard_cache import PackageRecordDict
+    from .shards_cache import PackageRecordDict
 
 
 class RepodataInfo(TypedDict):  # noqa: F811
@@ -131,8 +133,12 @@ class ShardLike:
         left, right = super().__repr__().split(maxsplit=1)
         return f"{left} {self.url} {right}"
 
+    @property
+    def package_names(self) -> KeysView[str]:
+        return self.shards.keys()
+
     def __contains__(self, package: str) -> bool:
-        return package in self.shards
+        return package in self.package_names
 
     def fetch_shard(self, package: str) -> Shard:
         """
@@ -168,11 +174,8 @@ class ShardLike:
         return repodata
 
 
-FETCHED_THIS_PROCESS = set()
-
-
 class Shards(ShardLike):
-    def __init__(self, shards_index: ShardsIndex, url: str):
+    def __init__(self, shards_index: ShardsIndex, url: str, shards_cache: shards_cache.ShardCache):
         """
         Args:
             shards_index: raw parsed msgpack dict
@@ -180,6 +183,7 @@ class Shards(ShardLike):
         """
         self.shards_index = shards_index
         self.url = url
+        self.shards_cache = shards_cache
 
         self.session = get_session(self.base_url)
 
@@ -190,8 +194,9 @@ class Shards(ShardLike):
         # used to write out repodata subset
         self.visited: dict[str, Shard | None] = {}
 
-    def __contains__(self, package: str) -> bool:
-        return package in self.packages_index
+    @property
+    def package_names(self):
+        return self.packages_index.keys()
 
     @property
     def packages_index(self):
@@ -222,20 +227,8 @@ class Shards(ShardLike):
         Raise KeyError if package is not in the index.
         """
 
-        if package in self.visited:
-            log.debug("Revisit %s %s", self.url, package)
-            shard_or_none = self.visited[package]
-            if shard_or_none is None:
-                raise KeyError(package)
-            return shard_or_none
-
-        shard_url = self.shard_url(package)
-
-        raw_shard = self.session.get(shard_url).content
-        # ensure it is real msgpack+zstd before inserting into cache
-        shard: Shard = msgpack.loads(zstandard.decompress(raw_shard))  # type: ignore
-        self.visited[package] = shard
-        return shard
+        shards = self.fetch_shards((package,))
+        return shards[package]
 
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
         """
@@ -244,18 +237,21 @@ class Shards(ShardLike):
         result = {}
 
         def fetch(s, url, package):
-            if url in FETCHED_THIS_PROCESS:
-                log.debug("Already got %s", url)
-                raise RuntimeError("Can't fetch same url twice")
-            FETCHED_THIS_PROCESS.add(url)
+            # due to cache, the same url won't be fetched twice
             b1 = time.time_ns()
             data = s.get(url).content
             e1 = time.time_ns()
-            log.debug(f"Fetch took {(e1 - b1) / 1e9}s", package, url)
-            return (url, package, data)
+            log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
+            return shards_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
-        packages = sorted(packages)
+        packages = sorted(list(packages))
         urls_packages = {self.shard_url(package): package for package in packages}
+
+        cached = self.shards_cache.retrieve_multiple(sorted(urls_packages))
+        for url, shard in cached.items():
+            package = urls_packages[url]
+            assert not package.startswith(("https://", "http://"))
+            result[package] = shard
 
         # beneficial to have thread pool larger than requests' default 10 max
         # connections per session. There is "context.repodata_threads" but it's
@@ -268,21 +264,24 @@ class Shards(ShardLike):
             }
             # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
             for future in concurrent.futures.as_completed(futures):
-                log.debug(". %r", futures[future])
-                url, package, compressed_shard = future.result()
+                log.debug(". %s", futures[future])
+                fetch_result = future.result()
                 # XXX catch exception / 404 / whatever
-                result[package] = msgpack.loads(zstandard.decompress(compressed_shard))
+                result[fetch_result.package] = msgpack.loads(
+                    zstandard.decompress(fetch_result.compressed_shard)
+                )
                 try:
                     package_names = [
                         p["name"]
                         for p in (
-                            *result[package]["packages"].values(),
-                            *result[package]["packages.conda"].values(),
+                            *result[fetch_result.package]["packages"].values(),
+                            *result[fetch_result.package]["packages.conda"].values(),
                         )
                     ]
-                    log.debug("expected %s actual %s", package, set(package_names))
+                    log.debug("expected %s, actual %s", fetch_result.package, set(package_names))
+                    self.shards_cache.insert(fetch_result)
                 except (AttributeError, KeyError):
-                    log.exception("Error fetching shard")
+                    log.exception("Error fetching shard for %s", fetch_result.package)
 
         self.visited.update(result)
 
@@ -368,7 +367,11 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
 
             # basic parse (move into caller?)
             shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
-            shards = Shards(shards_index, shards_index_url)
+            shards = Shards(
+                shards_index,
+                shards_index_url,
+                shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())),
+            )
             return shards
 
         except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
