@@ -101,7 +101,8 @@ def build_repodata_subset(tmp_path, root_packages, channels):
             found = fetch_shards(subdir_data)
             if not found:
                 repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                found = ShardLike(repodata_json, channel_url)  # type: ignore
+                repodata_json = RepodataDict(repodata_json)  # type: ignore
+                found = ShardLike(repodata_json, channel_url)
             channel_data[channel_url] = found
 
     subset = RepodataSubset((*channel_data.values(),))
