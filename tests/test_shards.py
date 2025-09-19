@@ -90,7 +90,7 @@ def test_fetch_shards_error(http_server_shards):
     assert found
 
     with pytest.raises(zstandard.ZstdError):
-        # XXX we tried to decompress a 404 response
+        # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
 
     malo = found.fetch_shard("malformed")
