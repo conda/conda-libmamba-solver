@@ -13,6 +13,7 @@ import logging
 import random
 import time
 import urllib.parse
+from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -67,16 +68,24 @@ def http_server_shards(xprocess, tmp_path_factory):
     shards_repository = tmp_path_factory.mktemp("sharded_repo")
     (shards_repository / "noarch").mkdir()
     malformed = {"follows_schema": False}
-    malformed_bytes = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
+    bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
     # XXX not-zstandard; not msgpack
-    malformed_digest = hashlib.sha256(malformed_bytes).digest()
-    (shards_repository / "noarch" / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(
-        malformed_bytes
-    )
+    malformed_digest = hashlib.sha256(bad_schema).digest()
+    noarch = shards_repository / "noarch"
+    (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
+    not_zstd = b"not zstd"
+    (noarch / f"{sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
+    not_msgpack = zstandard.compress(b"not msgpack")
+    (noarch / f"{sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
     fake_shards: ShardsIndex = {
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
         "repodata_version": 1,
-        "shards": {"fake_package": b"", "malformed": hashlib.sha256(malformed_bytes).digest()},
+        "shards": {
+            "fake_package": b"",
+            "malformed": hashlib.sha256(bad_schema).digest(),
+            "not_zstd": hashlib.sha256(not_zstd).digest(),
+            "not_msgpack": hashlib.sha256(not_msgpack).digest(),
+        },
         "removed": [],
     }
     (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
@@ -97,8 +106,17 @@ def test_fetch_shards_error(http_server_shards):
         # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
 
+    # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
     malo = found.fetch_shard("malformed")
     assert malo == {"follows_schema": False}  # XXX should we return None or raise
+
+    with pytest.raises(zstandard.ZstdError):
+        found.fetch_shard("not_zstd")
+
+    # unclear if all possible "bad msgpack" errors inherit from a common class
+    # besides ValueError
+    with pytest.raises(ValueError):
+        found.fetch_shard("not_msgpack")
 
 
 def test_shards(conda_no_token: None):
