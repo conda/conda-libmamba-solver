@@ -118,7 +118,7 @@ def build_repodata_subset(tmp_path, root_packages, channels):
         _, *channel_shortname = channel.rsplit("/", 2)
         repodata_path = tmp_path / ("_".join(channel_shortname))
         # most compact json
-        repodata_text = json.dumps(repodata, indent=0, separators=(",", ":"))
+        repodata_text = json.dumps(repodata, indent=0, separators=(",", ":"), sort_keys=True)
         repodata_size += len(repodata_text)
         repodata_path.write_text(repodata_text)
 
