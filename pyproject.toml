@@ -26,6 +26,9 @@ dependencies = [
   "conda >=24.11",
   # "libmambapy >=2",
   "boltons >=23.0.0",
+  "msgpack >=1.1.1",
+  "requests >=2.28.0,<3",
+  "zstandard >=0.15"
 ]
 dynamic = [
   "version"
@@ -117,3 +120,9 @@ flake8-type-checking = {exempt-modules = [], strict = true}
 # include = ["conda_libmamba_solver"]
 # ignore = ["conda_libmamba_solver/*_v1.py"]
 # strict = ["**/"]
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+]

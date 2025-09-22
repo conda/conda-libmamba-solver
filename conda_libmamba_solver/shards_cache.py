@@ -8,6 +8,7 @@ after their own sha256 hash.
 
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypedDict
@@ -17,11 +18,28 @@ import zstandard
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import NotRequired
+
+log = logging.getLogger(__name__)
 
 SHARD_CACHE_NAME = "repodata_shards.db"
 
 
-Shard = TypedDict("Shard", {"packages": dict[str, dict], "packages.conda": dict[str, dict]})
+class PackageRecordDict(TypedDict):
+    """
+    Basic package attributes that this module cares about.
+    """
+
+    name: str
+    sha256: NotRequired[str | bytes]
+    md5: NotRequired[str | bytes]
+
+
+# in this style because "packages.conda" is not a Python identifier
+Shard = TypedDict(
+    "Shard",
+    {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
+)
 
 
 @dataclass
