@@ -118,10 +118,10 @@ class ShardLike:
 
         shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
 
-        for package_group in all_packages:
-            for package, record in all_packages[package_group].items():
+        for group_name, group in all_packages.items():
+            for package, record in group.items():
                 name = record["name"]
-                shards[name][package_group][package] = record
+                shards[name][group_name][package] = record
 
         # defaultdict behavior no longer wanted
         self.shards: dict[str, Shard] = dict(shards)  # type: ignore
