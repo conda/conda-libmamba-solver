@@ -5,7 +5,29 @@
 Sharded repodata subsets.
 
 Traverse dependencies of installed and to-be-installed packages to generate a
-useful subset to send to the solver.
+useful subset for the solver.
+
+In this algorithm we treat a package name as a node, and all its dependencies
+across all channels as edges. We then traverse all edges to discover all
+reachable package names. The solver should be able to find a solution with only
+this subset.
+
+We could treat a (name, channel) tuple as a node, but it's more to keep track
+of.
+
+This subset is overgenerous since the user is unlikely to want to install very
+old packages and their dependencies. If this is too slow, we could deploy
+heuristics that automatically ignore older package versions. We could also allow
+the user to configure minimum versions of common packages and ignore older
+versions and their dependencies, falling back to a full solve if unsatisfiable.
+
+We treat both sharded and monolithic repodata as if they were made up of
+per-package shards, computing a subset of both. This is because it is possible
+for the monolithic repodata to mention packages that exist in the true sharded
+repodata but would not be found by only traversing the shards.
+
+After we have the subset we write it out as monolithic repodata files, where it
+can be used by a shards-unaware solver.
 """
 
 from __future__ import annotations
