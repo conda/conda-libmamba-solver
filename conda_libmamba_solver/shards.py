@@ -185,13 +185,16 @@ class Shards(ShardLike):
         self.url = url
         self.shards_cache = shards_cache
 
-        self.session = get_session(self.base_url)
+        # can we share a session for multiple subdir's of the same channel, or
+        # any time self.shards_base_url is similar to another Shards() instance?
+        self.session = get_session(self.shards_base_url)
 
         self.repodata_no_packages = {
             k: v for k, v in self.shards_index.items() if k not in ("shards",)
         }
 
         # used to write out repodata subset
+        # not used in traversal algorithm
         self.visited: dict[str, Shard | None] = {}
 
     @property
@@ -203,7 +206,7 @@ class Shards(ShardLike):
         return self.shards_index["shards"]
 
     @property
-    def base_url(self) -> str:
+    def shards_base_url(self) -> str:
         """
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
@@ -218,7 +221,7 @@ class Shards(ShardLike):
         """
         shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.base_url, shard_name)
+        return urljoin(self.shards_base_url, shard_name)
 
     def fetch_shard(self, package: str) -> Shard:
         """
@@ -341,7 +344,7 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
     return response_bytes
 
 
-def fetch_shards(sd: SubdirData) -> Shards | None:
+def fetch_shards(sd: SubdirData, cache: shards_cache.ShardCache | None = None) -> Shards | None:
     """
     Check a SubdirData's URL for shards.
     Return shards index bytes from cache or network.
@@ -349,34 +352,33 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
     """
 
     fetch = sd.repo_fetch
-    cache = fetch.repo_cache
+    repo_cache = fetch.repo_cache
     # cache.load_state() will clear the file on JSONDecodeError but cache.load()
     # will raise the exception
-    cache.load_state(binary=True)
-    cache_state = cache.state
+    repo_cache.load_state(binary=True)
+    cache_state = repo_cache.state
+
+    if cache is None:
+        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
     if cache_state.should_check_format("shards"):
         try:
             # look for shards index
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
-            found = repodata_shards(shards_index_url, cache)
+            found = repodata_shards(shards_index_url, repo_cache)
             cache_state.set_has_format("shards", True)
             # this will also set state["refresh_ns"] = time.time_ns(); we could
             # call cache.refresh() if we got a 304 instead:
-            cache.save(found)
+            repo_cache.save(found)
 
             # basic parse (move into caller?)
             shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
-            shards = Shards(
-                shards_index,
-                shards_index_url,
-                shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())),
-            )
+            shards = Shards(shards_index, shards_index_url, cache)
             return shards
 
         except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
-            cache.refresh(refresh_ns=1)  # expired but not falsy
+            repo_cache.refresh(refresh_ns=1)  # expired but not falsy
 
     return None

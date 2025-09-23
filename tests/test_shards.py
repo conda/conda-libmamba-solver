@@ -13,6 +13,7 @@ import logging
 import random
 import time
 import urllib.parse
+from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -27,13 +28,13 @@ from conda.models.channel import Channel
 from conda_libmamba_solver import shards, shards_cache
 from conda_libmamba_solver.index import LibMambaIndexHelper
 from conda_libmamba_solver.shards import (
-    RepodataDict,
     ShardLike,
     Shards,
+    ShardsIndex,
     fetch_shards,
     shard_mentioned_packages,
 )
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+from conda_libmamba_solver.shards_subset import Node, build_repodata_subset, fetch_channels
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
@@ -157,16 +158,7 @@ def test_fetch_shards(conda_no_token: None):
 
     channels.append(Channel("conda-forge-sharded"))
 
-    channel_data: dict[str, ShardLike] = {}
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data)
-            if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                repodata_json = RepodataDict(repodata_json)  # type: ignore
-                found = ShardLike(repodata_json, channel_url)
-            channel_data[channel_url] = found
+    channel_data = fetch_channels(channels)
 
     # at least one should be real shards, not repodata.json presented as shards.
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
@@ -317,6 +309,9 @@ def test_shardlike():
 
 
 def test_shardlike_repr():
+    """
+    Code coverage for ShardLike.__repr__()
+    """
     shardlike = ShardLike(
         {
             "packages": {},
@@ -325,7 +320,7 @@ def test_shardlike_repr():
         },
         "https://conda.anaconda.org/",
     )
-    cls, url, *rest = repr(shardlike).split()
+    cls, url, *_ = repr(shardlike).split()
     assert "ShardLike" in cls
     assert shardlike.url == url
 
@@ -361,7 +356,8 @@ ROOT_PACKAGES = [
 
 def test_traverse_shards_3(conda_no_token: None, tmp_path):
     """
-    Another go at the dependency traversal algorithm.
+    Build repodata subset using the third attempt at a dependency traversal
+    algorithm.
     """
 
     logging.basicConfig(level=logging.INFO)
@@ -390,6 +386,9 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
 
 
 def test_shards_indexhelper(conda_no_token):
+    """
+    Load LibMambaIndexHelper with parameters that will enable sharded repodata.
+    """
     channels = [*context.default_channels, Channel("conda-forge-sharded")]
 
     class fake_in_state:
@@ -407,3 +406,66 @@ def test_shards_indexhelper(conda_no_token):
     )
 
     print(helper.repos)
+
+
+@contextmanager
+def _timer(name: str):
+    begin = time.monotonic_ns()
+    yield
+    end = time.monotonic_ns()
+    print(f"{name} took {(end - begin) / 1e9:0.6f}s")
+
+
+def test_parallel_fetcherator(conda_no_token: None):
+    channels = [*context.default_channels, Channel("conda-forge-sharded")]
+    roots = [
+        Node(distance=0, package="ca-certificates", visited=False),
+        Node(distance=0, package="icu", visited=False),
+        Node(distance=0, package="expat", visited=False),
+        Node(distance=0, package="libexpat", visited=False),
+        Node(distance=0, package="libffi", visited=False),
+        Node(distance=0, package="libmpdec", visited=False),
+        Node(distance=0, package="libzlib", visited=False),
+        Node(distance=0, package="openssl", visited=False),
+        Node(distance=0, package="python", visited=False),
+        Node(distance=0, package="readline", visited=False),
+        Node(distance=0, package="liblzma", visited=False),
+        Node(distance=0, package="xz", visited=False),
+        Node(distance=0, package="libsqlite", visited=False),
+        Node(distance=0, package="tk", visited=False),
+        Node(distance=0, package="ncurses", visited=False),
+        Node(distance=0, package="zlib", visited=False),
+        Node(distance=0, package="pip", visited=False),
+        Node(distance=0, package="twine", visited=False),
+        Node(distance=0, package="python_abi", visited=False),
+        Node(distance=0, package="tzdata", visited=False),
+    ]
+
+    with _timer("repodata.json/shards index fetch"):
+        channel_data = fetch_channels(channels)
+
+    with _timer("Shard fetch"):
+        sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]
+        assert sharded, "No sharded repodata found"
+
+        wanted = []
+        for shard in sharded:
+            for root in roots:
+                if root.package in shard:
+                    wanted.append((shard, root.package, shard.shard_url(root.package)))
+
+        print(len(wanted), "shards to fetch")
+
+        shared_shard_cache = sharded[0].shards_cache
+        from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
+
+        for url, shard_or_none in from_cache.items():
+            if shard_or_none is not None:
+                print(f"Cache hit for {url}")
+
+        # add fetched Shard objects to Shards objects visited dict
+        for shard, package, shard_url in wanted:
+            if from_cache_shard := from_cache.get(shard_url):
+                shard.visited[package] = from_cache_shard
+
+        # XXX don't call everything Shard/Shards

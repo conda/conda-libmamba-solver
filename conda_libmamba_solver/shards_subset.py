@@ -36,10 +36,14 @@ import heapq
 import json
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 
+import conda.gateways.repodata
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
+
+from conda_libmamba_solver import shards_cache
 
 from .shards import RepodataDict, ShardLike, fetch_shards, shard_mentioned_packages
 
@@ -100,6 +104,7 @@ class RepodataSubset:
         self.nodes = {package: Node(0, package) for package in start_packages}
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         while unvisited:
+            # parallel fetch all unvisited shards but don't mark as visited
             original_priority, node = heapq.heappop(unvisited)
             if (
                 original_priority != node.distance
@@ -116,16 +121,7 @@ class RepodataSubset:
 
 
 def build_repodata_subset(tmp_path, root_packages, channels):
-    channel_data: dict[str, ShardLike] = {}
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data)
-            if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                repodata_json = RepodataDict(repodata_json)  # type: ignore
-                found = ShardLike(repodata_json, channel_url)
-            channel_data[channel_url] = found
+    channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
@@ -147,3 +143,21 @@ def build_repodata_subset(tmp_path, root_packages, channels):
         subset_paths[channel] = repodata_path
 
     return subset_paths, repodata_size
+
+
+def fetch_channels(channels):
+    channel_data: dict[str, ShardLike] = {}
+
+    # share single disk cache for all Shards() instances
+    cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
+
+    for channel in channels:
+        for channel_url in Channel(channel).urls(True, context.subdirs):
+            subdir_data = SubdirData(Channel(channel_url))
+            found = fetch_shards(subdir_data, cache)
+            if not found:
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
+                repodata_json = RepodataDict(repodata_json)  # type: ignore
+                found = ShardLike(repodata_json, channel_url)
+            channel_data[channel_url] = found
+    return channel_data
