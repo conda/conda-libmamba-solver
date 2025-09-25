@@ -45,7 +45,7 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards_cache
 
-from .shards import RepodataDict, ShardLike, fetch_shards, shard_mentioned_packages
+from .shards import RepodataDict, ShardLike, fetch_shards_index, shard_mentioned_packages
 
 
 @dataclass(order=True)
@@ -81,6 +81,8 @@ class RepodataSubset:
                         if package not in discovered:  # redundant with not in self.nodes?
                             print(f"{json.dumps(node.package)} -> {json.dumps(package)};")
                             yield self.nodes[package]
+                        else:
+                            assert False, "package already discovered but not in self.nodes"
                     if package not in discovered:
                         pass
                         # dot format valid ids: https://graphviz.org/doc/info/lang.html#ids (or quote string)
@@ -154,7 +156,7 @@ def fetch_channels(channels):
     for channel in channels:
         for channel_url in Channel(channel).urls(True, context.subdirs):
             subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards(subdir_data, cache)
+            found = fetch_shards_index(subdir_data, cache)
             if not found:
                 repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
                 repodata_json = RepodataDict(repodata_json)  # type: ignore

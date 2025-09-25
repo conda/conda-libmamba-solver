@@ -30,21 +30,21 @@ from conda_libmamba_solver.index import LibMambaIndexHelper
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
-    ShardsIndex,
+    ShardsIndexDict,
     batch_retrieve_from_cache,
-    fetch_shards,
+    fetch_shards_index,
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import Node, build_repodata_subset, fetch_channels
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
-    from conda_libmamba_solver.shards import ShardsIndex
+    from conda_libmamba_solver.shards import ShardsIndexDict
 
 HERE = Path(__file__).parent
 
 
-def package_names(shard: shards_cache.Shard):
+def package_names(shard: shards_cache.ShardDict):
     """
     All package names mentioned in a shard (should be a single package name)
     """
@@ -79,7 +79,7 @@ def http_server_shards(xprocess, tmp_path_factory):
     (noarch / f"{sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
     not_msgpack = zstandard.compress(b"not msgpack")
     (noarch / f"{sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
-    fake_shards: ShardsIndex = {
+    fake_shards: ShardsIndexDict = {
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
         "repodata_version": 1,
         "shards": {
@@ -101,7 +101,7 @@ def http_server_shards(xprocess, tmp_path_factory):
 def test_fetch_shards_error(http_server_shards):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    found = fetch_shards(subdir_data)
+    found = fetch_shards_index(subdir_data)
     assert found
 
     with pytest.raises(zstandard.ZstdError):
@@ -131,7 +131,7 @@ def test_shards(conda_no_token: None):
     ]
 
     subdir_data = SubdirData(channels[0])
-    found = fetch_shards(subdir_data)
+    found = fetch_shards_index(subdir_data)
     assert found, f"Shards not found for {channels[0]}"
 
     for package in found.packages_index:

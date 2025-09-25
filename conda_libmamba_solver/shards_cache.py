@@ -36,8 +36,8 @@ class PackageRecordDict(TypedDict):
 
 
 # in this style because "packages.conda" is not a Python identifier
-Shard = TypedDict(
-    "Shard",
+ShardDict = TypedDict(
+    "ShardDict",
     {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
 )
 
@@ -108,24 +108,24 @@ class ShardCache:
                 (raw_shard.url, raw_shard.package, raw_shard.compressed_shard),
             )
 
-    def retrieve(self, url) -> Shard | None:
+    def retrieve(self, url) -> ShardDict | None:
         with self.conn as c:
             row = c.execute("SELECT shard FROM shards WHERE url = ?", (url,)).fetchone()
             return msgpack.loads(zstandard.decompress(row["shard"])) if row else None  # type: ignore
 
-    def retrieve_multiple(self, urls: list[str]) -> dict[str, Shard | None]:
+    def retrieve_multiple(self, urls: list[str]) -> dict[str, ShardDict | None]:
         """
         Query database for cached shard urls.
 
         Return a dict of urls in cache mapping to the Shard or None if not present.
         """
-        # in sqlite, multiple queries are very fast since there is no server.
-        # "with self.conn" may have overhead. nevertheless, try querying
-        # multiple in a single call.
+        # In one test reusing the context saves difference between .006s and .01s
+        dctx = zstandard.ZstdDecompressor()
+
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
         with self.conn as c:
-            result: dict[str, Shard | None] = {
-                row["url"]: msgpack.loads(zstandard.decompress(row["shard"])) if row else None
+            result: dict[str, ShardDict | None] = {
+                row["url"]: msgpack.loads(dctx.decompress(row["shard"])) if row else None
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result
