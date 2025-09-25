@@ -36,6 +36,7 @@ from conda_libmamba_solver.shards import (
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import Node, build_repodata_subset, fetch_channels
+from conda_libmamba_solver.solver import CLS_USE_SHARDS
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
@@ -54,11 +55,13 @@ def package_names(shard: shards_cache.ShardDict):
 
 
 @pytest.fixture
-def conda_no_token(monkeypatch: pytest.MonkeyPatch):
+def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     """
     Reset token to avoid being logged in. e.g. the testing channel doesn't understand them.
+    Enable shards.
     """
     monkeypatch.setenv("CONDA_TOKEN", "")
+    monkeypatch.setenv(CLS_USE_SHARDS, "true")
     reset_context()
 
 
@@ -121,7 +124,7 @@ def test_fetch_shards_error(http_server_shards):
         found.fetch_shard("not_msgpack")
 
 
-def test_shards(conda_no_token: None):
+def test_shards(prepare_shards_test: None):
     """
     Test basic shard fetch.
     """
@@ -150,7 +153,7 @@ def test_shards(conda_no_token: None):
         print(package_names(shard), mentioned_in_shard)
 
 
-def test_fetch_shards(conda_no_token: None):
+def test_fetch_shards(prepare_shards_test: None):
     """
     Test all channels fetch as Shards or ShardLike, depending on availability.
     """
@@ -355,7 +358,7 @@ ROOT_PACKAGES = [
 ]
 
 
-def test_traverse_shards_3(conda_no_token: None, tmp_path):
+def test_traverse_shards_3(prepare_shards_test: None, tmp_path):
     """
     Build repodata subset using the third attempt at a dependency traversal
     algorithm.
@@ -386,7 +389,7 @@ def test_traverse_shards_3(conda_no_token: None, tmp_path):
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in subset))
 
 
-def test_shards_indexhelper(conda_no_token):
+def test_shards_indexhelper(prepare_shards_test):
     """
     Load LibMambaIndexHelper with parameters that will enable sharded repodata.
     """
@@ -417,7 +420,7 @@ def _timer(name: str):
     print(f"{name} took {(end - begin) / 1e9:0.6f}s")
 
 
-def test_parallel_fetcherator(conda_no_token: None):
+def test_parallel_fetcherator(prepare_shards_test: None):
     channels = [*context.default_channels, Channel("conda-forge-sharded")]
     roots = [
         Node(distance=0, package="ca-certificates", visited=False),
