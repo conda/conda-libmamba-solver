@@ -31,6 +31,7 @@ from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
     ShardsIndex,
+    batch_retrieve_from_cache,
     fetch_shards,
     shard_mentioned_packages,
 )
@@ -447,25 +448,7 @@ def test_parallel_fetcherator(conda_no_token: None):
     with _timer("Shard fetch"):
         sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]
         assert sharded, "No sharded repodata found"
+        remaining = batch_retrieve_from_cache(sharded, [node.package for node in roots])
+        print(f"{len(remaining)} shards to fetch from network")
 
-        wanted = []
-        for shard in sharded:
-            for root in roots:
-                if root.package in shard:
-                    wanted.append((shard, root.package, shard.shard_url(root.package)))
-
-        print(len(wanted), "shards to fetch")
-
-        shared_shard_cache = sharded[0].shards_cache
-        from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
-
-        for url, shard_or_none in from_cache.items():
-            if shard_or_none is not None:
-                print(f"Cache hit for {url}")
-
-        # add fetched Shard objects to Shards objects visited dict
-        for shard, package, shard_url in wanted:
-            if from_cache_shard := from_cache.get(shard_url):
-                shard.visited[package] = from_cache_shard
-
-        # XXX don't call everything Shard/Shards
+    # XXX don't call everything Shard/Shards

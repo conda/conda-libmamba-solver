@@ -382,3 +382,34 @@ def fetch_shards(sd: SubdirData, cache: shards_cache.ShardCache | None = None) -
             repo_cache.refresh(refresh_ns=1)  # expired but not falsy
 
     return None
+
+
+def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
+    """
+    Given a list of Shards objects and a list of package names, fetch all URLs
+    from a shared local cache, and update Shards with those per-package shards.
+    Return the remaining URLs that must be fetched from the network.
+    """
+    sharded = [shardlike for shardlike in sharded if isinstance(shardlike, Shards)]
+
+    wanted = []
+    for shard in sharded:
+        for package_name in packages:
+            if package_name in shard:
+                wanted.append((shard, package_name, shard.shard_url(package_name)))
+
+    print(len(wanted), "shards to fetch")
+
+    shared_shard_cache = sharded[0].shards_cache
+    from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
+
+    for url, shard_or_none in from_cache.items():
+        if shard_or_none is not None:
+            print(f"Cache hit for {url}")
+
+    # add fetched Shard objects to Shards objects visited dict
+    for shard, package, shard_url in wanted:
+        if from_cache_shard := from_cache.get(shard_url):
+            shard.visited[package] = from_cache_shard
+
+    return wanted
