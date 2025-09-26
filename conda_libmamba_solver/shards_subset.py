@@ -37,6 +37,7 @@ import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import conda.gateways.repodata
 from conda.base.context import context
@@ -45,7 +46,10 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards_cache
 
-from .shards import RepodataDict, ShardLike, fetch_shards_index, shard_mentioned_packages
+from .shards import ShardLike, fetch_shards_index, shard_mentioned_packages
+
+if TYPE_CHECKING:
+    from .shards_typing import RepodataDict
 
 
 @dataclass(order=True)
@@ -158,8 +162,8 @@ def fetch_channels(channels):
             subdir_data = SubdirData(Channel(channel_url))
             found = fetch_shards_index(subdir_data, cache)
             if not found:
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()
-                repodata_json = RepodataDict(repodata_json)  # type: ignore
+                repodata_json: RepodataDict
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()  # type: ignore[assignment]
                 found = ShardLike(repodata_json, channel_url)
             channel_data[channel_url] = found
     return channel_data

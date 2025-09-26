@@ -30,7 +30,6 @@ from conda_libmamba_solver.index import LibMambaIndexHelper
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
-    ShardsIndexDict,
     batch_retrieve_from_cache,
     fetch_shards_index,
     shard_mentioned_packages,

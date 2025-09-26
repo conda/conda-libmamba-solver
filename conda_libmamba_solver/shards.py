@@ -13,7 +13,7 @@ import logging
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 import conda.gateways.repodata
@@ -29,7 +29,6 @@ from conda.models.records import PackageRecord
 from requests import HTTPError
 
 from . import shards_cache
-from .shards_cache import ShardDict
 
 log = logging.getLogger(__name__)
 
@@ -40,32 +39,9 @@ if TYPE_CHECKING:
     from conda.gateways.repodata import RepodataCache
     from requests import Response
 
-    from .shards_cache import PackageRecordDict
+    from conda_libmamba_solver.shards_typing import RepodataDict, ShardsIndexDict
 
-
-class RepodataInfoDict(TypedDict):  # noqa: F811
-    base_url: str  # where packages are stored
-    shards_base_url: str  # where shards are stored
-    subdir: str
-
-
-class RepodataDict(ShardDict):
-    """
-    Packages plus info.
-    """
-
-    info: RepodataInfoDict
-
-
-class ShardsIndexDict(TypedDict):
-    """
-    Shards index as deserialized from repodata_shards.msgpack.zst
-    """
-
-    info: RepodataInfoDict
-    repodata_version: int
-    removed: list[str]
-    shards: dict[str, bytes]
+    from .shards_typing import PackageRecordDict, ShardDict
 
 
 def ensure_hex_hash(record: PackageRecordDict):
