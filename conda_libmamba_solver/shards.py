@@ -13,7 +13,7 @@ import logging
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
 import conda.gateways.repodata
@@ -29,7 +29,6 @@ from conda.models.records import PackageRecord
 from requests import HTTPError
 
 from . import shards_cache
-from .shards_cache import Shard
 
 log = logging.getLogger(__name__)
 
@@ -40,32 +39,9 @@ if TYPE_CHECKING:
     from conda.gateways.repodata import RepodataCache
     from requests import Response
 
-    from .shards_cache import PackageRecordDict
+    from conda_libmamba_solver.shards_typing import RepodataDict, ShardsIndexDict
 
-
-class RepodataInfo(TypedDict):  # noqa: F811
-    base_url: str  # where packages are stored
-    shards_base_url: str  # where shards are stored
-    subdir: str
-
-
-class RepodataDict(Shard):
-    """
-    Packages plus info.
-    """
-
-    info: RepodataInfo
-
-
-class ShardsIndex(TypedDict):
-    """
-    Shards index as deserialized from repodata_shards.msgpack.zst
-    """
-
-    info: RepodataInfo
-    repodata_version: int
-    removed: list[str]
-    shards: dict[str, bytes]
+    from .shards_typing import PackageRecordDict, ShardDict
 
 
 def ensure_hex_hash(record: PackageRecordDict):
@@ -79,7 +55,7 @@ def ensure_hex_hash(record: PackageRecordDict):
     return record
 
 
-def shard_mentioned_packages(shard: Shard) -> set[str]:
+def shard_mentioned_packages(shard: ShardDict) -> set[str]:
     """
     Return all dependency names mentioned in a shard, including the shard's own
     package name.
@@ -124,10 +100,10 @@ class ShardLike:
                 shards[name][group_name][package] = record
 
         # defaultdict behavior no longer wanted
-        self.shards: dict[str, Shard] = dict(shards)  # type: ignore
+        self.shards: dict[str, ShardDict] = dict(shards)  # type: ignore
 
         # used to write out repodata subset
-        self.visited: dict[str, Shard | None] = {}
+        self.visited: dict[str, ShardDict | None] = {}
 
     def __repr__(self):
         left, right = super().__repr__().split(maxsplit=1)
@@ -140,7 +116,7 @@ class ShardLike:
     def __contains__(self, package: str) -> bool:
         return package in self.package_names
 
-    def fetch_shard(self, package: str) -> Shard:
+    def fetch_shard(self, package: str) -> ShardDict:
         """
         "Fetch" an individual shard.
 
@@ -152,7 +128,7 @@ class ShardLike:
         self.visited[package] = shard
         return shard
 
-    def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
         """
         Fetch multiple shards in one go.
 
@@ -175,7 +151,9 @@ class ShardLike:
 
 
 class Shards(ShardLike):
-    def __init__(self, shards_index: ShardsIndex, url: str, shards_cache: shards_cache.ShardCache):
+    def __init__(
+        self, shards_index: ShardsIndexDict, url: str, shards_cache: shards_cache.ShardCache
+    ):
         """
         Args:
             shards_index: raw parsed msgpack dict
@@ -185,14 +163,17 @@ class Shards(ShardLike):
         self.url = url
         self.shards_cache = shards_cache
 
-        self.session = get_session(self.base_url)
+        # can we share a session for multiple subdir's of the same channel, or
+        # any time self.shards_base_url is similar to another Shards() instance?
+        self.session = get_session(self.shards_base_url)
 
         self.repodata_no_packages = {
             k: v for k, v in self.shards_index.items() if k not in ("shards",)
         }
 
         # used to write out repodata subset
-        self.visited: dict[str, Shard | None] = {}
+        # not used in traversal algorithm
+        self.visited: dict[str, ShardDict | None] = {}
 
     @property
     def package_names(self):
@@ -203,7 +184,7 @@ class Shards(ShardLike):
         return self.shards_index["shards"]
 
     @property
-    def base_url(self) -> str:
+    def shards_base_url(self) -> str:
         """
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
@@ -218,9 +199,9 @@ class Shards(ShardLike):
         """
         shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.base_url, shard_name)
+        return urljoin(self.shards_base_url, shard_name)
 
-    def fetch_shard(self, package: str) -> Shard:
+    def fetch_shard(self, package: str) -> ShardDict:
         """
         Fetch an individual shard.
 
@@ -230,7 +211,7 @@ class Shards(ShardLike):
         shards = self.fetch_shards((package,))
         return shards[package]
 
-    def fetch_shards(self, packages: Iterable[str]) -> dict[str, Shard]:
+    def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
         """
         Return mapping of *package names* to Shard for given packages.
         """
@@ -325,15 +306,16 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
         # mtime
         return cache.cache_path_shards.read_bytes()
 
-    # We no longer add these tags to the large `resp.content` json
     saved_fields = {conda.gateways.repodata.URL_KEY: url}
-    _add_http_value_to_dict(response, "Etag", saved_fields, conda.gateways.repodata.ETAG_KEY)
-    _add_http_value_to_dict(
-        response, "Last-Modified", saved_fields, conda.gateways.repodata.LAST_MODIFIED_KEY
-    )
-    _add_http_value_to_dict(
-        response, "Cache-Control", saved_fields, conda.gateways.repodata.CACHE_CONTROL_KEY
-    )
+    for header, key in (
+        ("Etag", conda.gateways.repodata.ETAG_KEY),
+        (
+            "Last-Modified",
+            conda.gateways.repodata.LAST_MODIFIED_KEY,
+        ),
+        ("Cache-Control", conda.gateways.repodata.CACHE_CONTROL_KEY),
+    ):
+        _add_http_value_to_dict(response, header, saved_fields, key)
 
     state.update(saved_fields)
 
@@ -341,7 +323,9 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
     return response_bytes
 
 
-def fetch_shards(sd: SubdirData) -> Shards | None:
+def fetch_shards_index(
+    sd: SubdirData, cache: shards_cache.ShardCache | None = None
+) -> Shards | None:
     """
     Check a SubdirData's URL for shards.
     Return shards index bytes from cache or network.
@@ -349,34 +333,64 @@ def fetch_shards(sd: SubdirData) -> Shards | None:
     """
 
     fetch = sd.repo_fetch
-    cache = fetch.repo_cache
+    repo_cache = fetch.repo_cache
     # cache.load_state() will clear the file on JSONDecodeError but cache.load()
     # will raise the exception
-    cache.load_state(binary=True)
-    cache_state = cache.state
+    repo_cache.load_state(binary=True)
+    cache_state = repo_cache.state
+
+    if cache is None:
+        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
     if cache_state.should_check_format("shards"):
         try:
             # look for shards index
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
-            found = repodata_shards(shards_index_url, cache)
+            found = repodata_shards(shards_index_url, repo_cache)
             cache_state.set_has_format("shards", True)
             # this will also set state["refresh_ns"] = time.time_ns(); we could
             # call cache.refresh() if we got a 304 instead:
-            cache.save(found)
+            repo_cache.save(found)
 
             # basic parse (move into caller?)
-            shards_index: ShardsIndex = msgpack.loads(zstandard.decompress(found))  # type: ignore
-            shards = Shards(
-                shards_index,
-                shards_index_url,
-                shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())),
-            )
+            shards_index: ShardsIndexDict = msgpack.loads(zstandard.decompress(found))  # type: ignore
+            shards = Shards(shards_index, shards_index_url, cache)
             return shards
 
         except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
-            cache.refresh(refresh_ns=1)  # expired but not falsy
+            repo_cache.refresh(refresh_ns=1)  # expired but not falsy
 
     return None
+
+
+def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
+    """
+    Given a list of Shards objects and a list of package names, fetch all URLs
+    from a shared local cache, and update Shards with those per-package shards.
+    Return the remaining URLs that must be fetched from the network.
+    """
+    sharded = [shardlike for shardlike in sharded if isinstance(shardlike, Shards)]
+
+    wanted = []
+    for shard in sharded:
+        for package_name in packages:
+            if package_name in shard:
+                wanted.append((shard, package_name, shard.shard_url(package_name)))
+
+    print(len(wanted), "shards to fetch")
+
+    shared_shard_cache = sharded[0].shards_cache
+    from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
+
+    for url, shard_or_none in from_cache.items():
+        if shard_or_none is not None:
+            print(f"Cache hit for {url}")
+
+    # add fetched Shard objects to Shards objects visited dict
+    for shard, package, shard_url in wanted:
+        if from_cache_shard := from_cache.get(shard_url):
+            shard.visited[package] = from_cache_shard
+
+    return wanted
