@@ -616,7 +616,7 @@ class LibMambaIndexHelper:
         result = Query.whoneeds(self.db, query, tree)
         return self._process_query_result(result, return_type)
 
-    def explicit_pool(self, specs: Iterable[MatchSpec]) -> tuple[str]:
+    def explicit_pool(self, specs: Iterable[MatchSpec]) -> tuple[str, ...]:
         """
         Returns all the package names that (might) depend on the passed specs
         """
