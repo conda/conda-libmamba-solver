@@ -103,7 +103,11 @@ class ShardCache:
 
         Return a dict of urls in cache mapping to the Shard or None if not present.
         """
+        if not urls:
+            return {}  # this optimization does not save a noticeable amount of time.
+
         # In one test reusing the context saves difference between .006s and .01s
+        # We could make this a threadlocal.
         dctx = zstandard.ZstdDecompressor()
 
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
