@@ -294,7 +294,7 @@ class LibMambaIndexHelper:
             encoded_urls_to_channel[url] = channel
         urls_to_channel = encoded_urls_to_channel
 
-        if self.in_state:
+        if self.in_state and context.plugins.use_sharded_repodata is True:  # type: ignore
             # try to make a subset of possible dependencies
             # conda probably already has a suitable temporary directory?
             # keep a reference so GC doesn't delete the directory

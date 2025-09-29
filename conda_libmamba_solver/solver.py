@@ -76,9 +76,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(f"conda.{__name__}")
 
 
-CLS_USE_SHARDS = "CONDA_LIBMAMBA_SOLVER_USE_SHARDS"
-
-
 class LibMambaSolver(Solver):
     MAX_SOLVER_ATTEMPTS_CAP = 10
     _uses_ssc = False
@@ -264,13 +261,8 @@ class LibMambaSolver(Solver):
         channels: Iterable[Channel],
         conda_build_channels: Iterable[Channel],
         subdirs: Iterable[str],
-        in_state: SolverInputState,
+        in_state: SolverInputState | None,
     ) -> LibMambaIndexHelper:
-        if os.environ.get(CLS_USE_SHARDS, "").lower() not in ("1", "true", "yes"):
-            # Doesn't use shards if in_state, which gives the starting packages,
-            # is not passed.
-            in_state = None  # type: ignore
-
         index = LibMambaIndexHelper(
             channels=[*conda_build_channels, *channels],
             subdirs=subdirs,

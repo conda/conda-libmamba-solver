@@ -36,7 +36,6 @@ from conda_libmamba_solver.shards import (
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import Node, build_repodata_subset, fetch_channels
-from conda_libmamba_solver.solver import CLS_USE_SHARDS
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
@@ -69,8 +68,9 @@ def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     Enable shards.
     """
     monkeypatch.setenv("CONDA_TOKEN", "")
-    monkeypatch.setenv(CLS_USE_SHARDS, "true")
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
     reset_context()
+    assert context.plugins.use_sharded_repodata is True  # type: ignore
 
 
 @pytest.fixture
@@ -401,6 +401,9 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 def test_shards_indexhelper(prepare_shards_test):
     """
     Load LibMambaIndexHelper with parameters that will enable sharded repodata.
+
+    This will include a build_repodata_subset() call redundant with
+    test_build_repodata_subset().
     """
     channels = [*context.default_channels, Channel("conda-forge-sharded")]
 
