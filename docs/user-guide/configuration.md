@@ -11,3 +11,18 @@ We do not recomment using these options in production environments. Their behavi
 
 * `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS`: Maximum number of attempts to find a solution. By default, this is set to the number of installed packages in the environment. In commands that involve a large number of changes in a large environment, it can take a bit to relax the constraints enough to find a solution. This option can be used to reduce the number of attempts and "give up" earlier.
 * `CONDA_LIBMAMBA_SOLVER_DEBUG_LIBSOLV`: Enable verbose logging from `libsolv`. Only has an effect if combined with `-vvv` in the CLI. Note that this will incur a big performance overhead. Only use when debugging solver issues.
+
+## Sharded Repodata
+
+Sharded repodata is an experimental feature that enables faster repodata fetching. It is currently
+in beta testing. To enable this feature, run the following command:
+
+```shell
+conda config --set plugins.enable_sharded_repodata true
+```
+
+Alternatively, you can enable this via an environment variable:
+
+```shell
+export CONDA_PLUGINS_ENABLE_SHARDED_REPODATA=true
+```
