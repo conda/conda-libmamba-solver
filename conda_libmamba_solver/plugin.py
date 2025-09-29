@@ -40,7 +40,7 @@ def conda_settings():
     Define all settings specific to the conda-libmamba-solver plugin.
     """
     yield CondaSetting(
-        name="enable_sharded_repodata",
+        name="use_sharded_repodata",
         description="Enable use of sharded repodata when available.",
         parameter=PrimitiveParameter(False, element_type=bool),
     )

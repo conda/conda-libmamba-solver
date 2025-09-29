@@ -2,7 +2,7 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 """
-Ensure plugins are function as expected
+Ensure configuration plugin functions as expected
 """
 
 import pytest
@@ -17,36 +17,36 @@ def always_reset_context():
 
 def test_enabled_sharded_repodata():
     """
-    Ensure that the setting `plugins.enable_sharded_repodata` exists and is set
+    Ensure that the setting `plugins.use_sharded_repodata` exists and is set
     to the correct default value.
     """
-    assert not context.plugins.enable_sharded_repodata
+    assert not context.plugins.use_sharded_repodata
 
 
 def test_enabled_sharded_repodata_environment_variable(monkeypatch):
     """
-    Ensure that the setting `plugins.enable_sharded_repodata_environment_variable`
+    Ensure that the setting `plugins.use_sharded_repodata_environment_variable`
     is set correctly when set as an environment variable.
     """
-    monkeypatch.setenv("CONDA_PLUGINS_ENABLE_SHARDED_REPODATA", "true")
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "true")
     context.__init__()
 
-    assert context.plugins.enable_sharded_repodata
+    assert context.plugins.use_sharded_repodata
 
 
 def test_enabled_sharded_repodata_condarc(tmp_path):
     """
-    Ensure that the setting `plugins.enable_sharded_repodata_environment_variable`
+    Ensure that the setting `plugins.use_sharded_repodata_environment_variable`
     is set correctly when set in a condarc file.
     """
     condarc_file = tmp_path / "conda.yml"
     with condarc_file.open("w") as f:
         condarc_yml = dals("""
             plugins:
-              enable_sharded_repodata: true
+              use_sharded_repodata: true
         """)
         f.write(condarc_yml)
 
     context.__init__(search_path=(str(condarc_file),))
 
-    assert context.plugins.enable_sharded_repodata
+    assert context.plugins.use_sharded_repodata
