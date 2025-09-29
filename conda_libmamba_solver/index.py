@@ -364,7 +364,7 @@ class LibMambaIndexHelper:
                     seen_noauth.add(url)
         return urls
 
-    def _fetch_repodata_jsons(self, urls: dict[str, str]) -> dict[str, tuple[str, RepodataState]]:
+    def _fetch_repodata_jsons(self, urls: Iterable[str]) -> dict[str, tuple[str, RepodataState]]:
         Executor = (
             DummyExecutor
             if context.debug or context.repodata_threads == 1
