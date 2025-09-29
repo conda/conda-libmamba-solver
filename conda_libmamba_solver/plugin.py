@@ -5,8 +5,9 @@
 Entry points for the conda plugin system
 """
 
+from conda.common.configuration import PrimitiveParameter
 from conda.plugins import hookimpl
-from conda.plugins.types import CondaSolver, CondaSubcommand
+from conda.plugins.types import CondaSetting, CondaSolver, CondaSubcommand
 
 from .repoquery import configure_parser, repoquery
 from .solver import LibMambaSolver
@@ -30,4 +31,16 @@ def conda_subcommands():
         summary="Advanced search for repodata.",
         action=repoquery,
         configure_parser=configure_parser,
+    )
+
+
+@hookimpl
+def conda_settings():
+    """
+    Define all settings specific to the conda-libmamba-solver plugin.
+    """
+    yield CondaSetting(
+        name="enable_sharded_repodata",
+        description="Enable use of sharded repodata when available.",
+        parameter=PrimitiveParameter(False, element_type=bool),
     )
