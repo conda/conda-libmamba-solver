@@ -46,7 +46,13 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards_cache
 
-from .shards import ShardLike, fetch_shards_index, shard_mentioned_packages
+from .shards import (
+    ShardLike,
+    Shards,
+    batch_retrieve_from_cache,
+    fetch_shards_index,
+    shard_mentioned_packages,
+)
 
 if TYPE_CHECKING:
     from .shards_typing import RepodataDict
@@ -109,8 +115,17 @@ class RepodataSubset:
         # nodes.visited and nodes.distance should be reset before calling
         self.nodes = {package: Node(0, package) for package in start_packages}
         unvisited = [(n.distance, n) for n in self.nodes.values()]
+        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
+        to_retrieve: set[str] = set()
+        retrieved: set[str] = set()
         while unvisited:
             # parallel fetch all unvisited shards but don't mark as visited
+            if to_retrieve:
+                # can we get stuck looking for unavailable packages repeatedly?
+                batch_retrieve_from_cache(sharded, sorted(to_retrieve))
+            retrieved.update(to_retrieve)  # not necessary
+            to_retrieve.clear()
+
             original_priority, node = heapq.heappop(unvisited)
             if (
                 original_priority != node.distance
@@ -123,6 +138,7 @@ class RepodataSubset:
             for next, cost in self.outgoing(node):
                 if not next.visited:
                     next.distance = min(node.distance + cost, next.distance)
+                    to_retrieve.add(next.package)
                     heapq.heappush(unvisited, (next.distance, next))
 
 

@@ -151,6 +151,10 @@ class ShardLike:
 
 
 class Shards(ShardLike):
+    """
+    Handle repodata_shards.msgpack.zst and individual per-package shards.
+    """
+
     def __init__(
         self, shards_index: ShardsIndexDict, url: str, shards_cache: shards_cache.ShardCache
     ):
@@ -214,19 +218,28 @@ class Shards(ShardLike):
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
         """
         Return mapping of *package names* to Shard for given packages.
+
+        If a shard is already in self.visited, it is not fetched again.
         """
         result = {}
 
         def fetch(s, url, package):
             # due to cache, the same url won't be fetched twice
             b1 = time.time_ns()
-            data = s.get(url).content
+            response = s.get(url)
+            response.raise_for_status()
+            data = response.content
             e1 = time.time_ns()
             log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
             return shards_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
         packages = sorted(list(packages))
-        urls_packages = {self.shard_url(package): package for package in packages}
+        urls_packages = {}
+        for package in packages:
+            if package in self.visited:
+                result[package] = self.visited[package]
+            else:
+                urls_packages[self.shard_url(package)] = package
 
         cached = self.shards_cache.retrieve_multiple(sorted(urls_packages))
         for url, shard in cached.items():
@@ -246,8 +259,8 @@ class Shards(ShardLike):
             # May be inconvenient to cancel a large number of futures. Also, ctrl-C doesn't work reliably out of the box.
             for future in concurrent.futures.as_completed(futures):
                 log.debug(". %s", futures[future])
+                # XXX future.result can raise HTTPError etc.
                 fetch_result = future.result()
-                # XXX catch exception / 404 / whatever
                 result[fetch_result.package] = msgpack.loads(
                     zstandard.decompress(fetch_result.compressed_shard)
                 )
@@ -383,10 +396,6 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
 
     shared_shard_cache = sharded[0].shards_cache
     from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
-
-    for url, shard_or_none in from_cache.items():
-        if shard_or_none is not None:
-            print(f"Cache hit for {url}")
 
     # add fetched Shard objects to Shards objects visited dict
     for shard, package, shard_url in wanted:

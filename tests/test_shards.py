@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING
 
 import msgpack
 import pytest
+import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
@@ -51,6 +52,14 @@ def package_names(shard: shards_cache.ShardDict):
     return set(package["name"] for package in shard["packages"].values()) | set(
         package["name"] for package in shard["packages.conda"].values()
     )
+
+
+@contextmanager
+def _timer(name: str):
+    begin = time.monotonic_ns()
+    yield
+    end = time.monotonic_ns()
+    print(f"{name} took {(end - begin) / 1e9:0.6f}s")
 
 
 @pytest.fixture
@@ -106,7 +115,7 @@ def test_fetch_shards_error(http_server_shards):
     found = fetch_shards_index(subdir_data)
     assert found
 
-    with pytest.raises(zstandard.ZstdError):
+    with pytest.raises(requests.exceptions.HTTPError):
         # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
 
@@ -357,7 +366,7 @@ ROOT_PACKAGES = [
 ]
 
 
-def test_traverse_shards_3(prepare_shards_test: None, tmp_path):
+def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     """
     Build repodata subset using the third attempt at a dependency traversal
     algorithm.
@@ -373,7 +382,8 @@ def test_traverse_shards_3(prepare_shards_test: None, tmp_path):
     channels = list(context.default_channels)
     channels.append(Channel("conda-forge-sharded"))
 
-    subset, repodata_size = build_repodata_subset(tmp_path, root_packages, channels)
+    with _timer("build_repodata_subset()"):
+        subset, repodata_size = build_repodata_subset(tmp_path, root_packages, channels)
 
     print(f"Repodata subset is {repodata_size} bytes")
 
@@ -411,15 +421,10 @@ def test_shards_indexhelper(prepare_shards_test):
     print(helper.repos)
 
 
-@contextmanager
-def _timer(name: str):
-    begin = time.monotonic_ns()
-    yield
-    end = time.monotonic_ns()
-    print(f"{name} took {(end - begin) / 1e9:0.6f}s")
-
-
-def test_parallel_fetcherator(prepare_shards_test: None):
+def test_batch_retrieve_from_cache(prepare_shards_test: None):
+    """
+    Test single database query to fetch cached shard URLs in a batch.
+    """
     channels = [*context.default_channels, Channel("conda-forge-sharded")]
     roots = [
         Node(distance=0, package="ca-certificates", visited=False),
