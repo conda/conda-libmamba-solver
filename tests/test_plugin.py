@@ -17,27 +17,25 @@ def always_reset_context():
 
 def test_enabled_sharded_repodata():
     """
-    Ensure that the setting `plugins.use_sharded_repodata` exists and is set
+    Ensure that the setting `plugins.enable_sharded_repodata` exists and is set
     to the correct default value.
     """
-    assert not context.plugins.use_sharded_repodata
+    assert not context.plugins.use_sharded_repodata  # type: ignore
 
 
 def test_enabled_sharded_repodata_environment_variable(monkeypatch):
     """
-    Ensure that the setting `plugins.use_sharded_repodata_environment_variable`
-    is set correctly when set as an environment variable.
+    Ensure that the sharded repodata flag can be controlled by its corresponding environment variable.
     """
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "true")
     context.__init__()
 
-    assert context.plugins.use_sharded_repodata
+    assert context.plugins.use_sharded_repodata  # type: ignore
 
 
 def test_enabled_sharded_repodata_condarc(tmp_path):
     """
-    Ensure that the setting `plugins.use_sharded_repodata_environment_variable`
-    is set correctly when set in a condarc file.
+    Ensure that the sharded repodata flag can be controlled by a condarc file.
     """
     condarc_file = tmp_path / "conda.yml"
     with condarc_file.open("w") as f:
@@ -49,4 +47,4 @@ def test_enabled_sharded_repodata_condarc(tmp_path):
 
     context.__init__(search_path=(str(condarc_file),))
 
-    assert context.plugins.use_sharded_repodata
+    assert context.plugins.use_sharded_repodata  # type: ignore
