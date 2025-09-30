@@ -4,8 +4,9 @@
 """
 TypedDict declarations for shards.
 
-These are helpful for auto-complete, but do not validate at runtime. They are
-intentionally not shared with another project (conda) to reduce coupling.
+These are helpful for auto-complete, but do not validate at runtime and are not
+normative. They are intentionally not shared with another project (conda) to
+reduce coupling.
 """
 
 from __future__ import annotations
@@ -24,6 +25,8 @@ class PackageRecordDict(TypedDict):
     name: str
     sha256: NotRequired[str | bytes]
     md5: NotRequired[str | bytes]
+    depends: list[str]
+    constrains: NotRequired[list[str]]
 
 
 # in this style because "packages.conda" is not a Python identifier

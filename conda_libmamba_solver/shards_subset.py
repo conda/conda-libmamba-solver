@@ -51,7 +51,7 @@ from .shards import (
     Shards,
     batch_retrieve_from_cache,
     fetch_shards_index,
-    shard_mentioned_packages,
+    shard_mentioned_packages_2,
 )
 
 if TYPE_CHECKING:
@@ -83,7 +83,7 @@ class RepodataSubset:
             if node.package in shardlike:
                 # check that we don't fetch the same shard twice...
                 shard = shardlike.fetch_shard(node.package)
-                for package in shard_mentioned_packages(shard):
+                for package in shard_mentioned_packages_2(shard):
                     if package not in self.nodes:
                         self.nodes[package] = Node(node.distance + 1, package)
                         # by moving yield up here we try to only visit dependencies

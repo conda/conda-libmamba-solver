@@ -34,8 +34,10 @@ from conda_libmamba_solver.shards import (
     batch_retrieve_from_cache,
     fetch_shards_index,
     shard_mentioned_packages,
+    shard_mentioned_packages_2,
 )
 from conda_libmamba_solver.shards_subset import Node, build_repodata_subset, fetch_channels
+from conda_libmamba_solver.shards_typing import ShardDict
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
@@ -159,6 +161,31 @@ def test_shards(prepare_shards_test: None):
             package in mentioned_in_shard
         )  # the package's own name is mentioned, as well as any dependencies.
         print(package_names(shard), mentioned_in_shard)
+
+
+def test_shard_mentioned_packages_2():
+    shard: ShardDict = {
+        "packages": {"foo": {"name": "foo", "depends": ["bar", "baz"]}},
+        "packages.conda": {
+            "foo": {
+                "name": "foo",
+                "depends": ["quux", "warble"],
+                "constrains": ["splat<3"],
+                "sha256": hashlib.sha256().digest(),
+            }
+        },
+    }
+
+    assert sorted(set(shard_mentioned_packages_2(shard))) == [
+        "bar",
+        "baz",
+        "quux",
+        "splat",
+        "warble",
+    ]
+
+    # check that the bytes hash was converted to hex
+    assert shard["packages.conda"]["foo"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
 
 
 def test_fetch_shards(prepare_shards_test: None):

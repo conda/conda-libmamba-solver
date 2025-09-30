@@ -26,6 +26,7 @@ from conda.gateways.repodata import (
     conda_http_errors,
 )
 from conda.models.records import PackageRecord
+from libmambapy.bindings import specs
 from requests import HTTPError
 
 from . import shards_cache
@@ -72,6 +73,23 @@ def shard_mentioned_packages(shard: ShardDict) -> set[str]:
         mentioned.add(record.name)
         mentioned.update(spec.name for spec in record.combined_depends)
     return mentioned
+
+
+def shard_mentioned_packages_2(shard: ShardDict) -> Iterable[str]:
+    """
+    Return all dependency names mentioned in a shard, not including the shard's
+    own package name.
+    """
+    unique_specs = set()
+    for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
+        ensure_hex_hash(package)  # otherwise we could do this at serialization
+        for spec in (*package.get("depends", ()), *package.get("constrains", ())):
+            if spec in unique_specs:
+                continue
+            unique_specs.add(spec)
+            parsed_spec = specs.MatchSpec.parse(spec)
+            name = str(parsed_spec.name)
+            yield name  # not much improvement from only yielding unique names
 
 
 class ShardLike:
@@ -349,8 +367,10 @@ def fetch_shards_index(
     repo_cache = fetch.repo_cache
     # cache.load_state() will clear the file on JSONDecodeError but cache.load()
     # will raise the exception
-    repo_cache.load_state(binary=True)
-    cache_state = repo_cache.state
+    repo_cache.load_state(
+        binary=True
+    )  # won't succeed when .msgpack.zst is missing as it wants to compare the timestamp (returns empty state)
+    cache_state = repo_cache.state  # not actually loaded?
 
     if cache is None:
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
@@ -373,7 +393,7 @@ def fetch_shards_index(
         except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
             # fetch repodata.json / repodata.json.zst instead
             cache_state.set_has_format("shards", False)
-            repo_cache.refresh(refresh_ns=1)  # expired but not falsy
+            repo_cache.refresh()
 
     return None
 
