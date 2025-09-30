@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import heapq
 import json
+import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -53,6 +54,8 @@ from .shards import (
     fetch_shards_index,
     shard_mentioned_packages_2,
 )
+
+log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from .shards_typing import RepodataDict
@@ -89,7 +92,7 @@ class RepodataSubset:
                         # by moving yield up here we try to only visit dependencies
                         # that no other node already knows about. Doesn't make it faster.
                         if package not in discovered:  # redundant with not in self.nodes?
-                            print(f"{json.dumps(node.package)} -> {json.dumps(package)};")
+                            log.debug(f"{json.dumps(node.package)} -> {json.dumps(package)};")
                             yield self.nodes[package]
                         else:
                             assert False, "package already discovered but not in self.nodes"
@@ -147,7 +150,7 @@ def build_repodata_subset(root_packages, channels):
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
-    print(len(subset.nodes), "package names discovered")
+    log.debug("%d package names discovered", len(subset.nodes))
 
     return channel_data
 

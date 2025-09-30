@@ -9,6 +9,7 @@ repodata.
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
 import time
 from collections import defaultdict
@@ -290,7 +291,10 @@ class Shards(ShardLike):
                             *result[fetch_result.package]["packages.conda"].values(),
                         )
                     ]
-                    log.debug("expected %s, actual %s", fetch_result.package, set(package_names))
+                    if set((fetch_result.package,)) != set(package_names):
+                        log.debug(
+                            "expected %s, actual %s", fetch_result.package, set(package_names)
+                        )
                     self.shards_cache.insert(fetch_result)
                 except (AttributeError, KeyError):
                     log.exception("Error fetching shard for %s", fetch_result.package)
@@ -365,17 +369,34 @@ def fetch_shards_index(
 
     fetch = sd.repo_fetch
     repo_cache = fetch.repo_cache
+
     # cache.load_state() will clear the file on JSONDecodeError but cache.load()
-    # will raise the exception
-    repo_cache.load_state(
-        binary=True
-    )  # won't succeed when .msgpack.zst is missing as it wants to compare the timestamp (returns empty state)
-    cache_state = repo_cache.state  # not actually loaded?
+    # will raise the exception.
+    # repo_cache.load_state(
+    #     binary=True
+    # )  # won't succeed when .msgpack.zst is missing as it wants to compare the timestamp (returns empty state)
+
+    # Load state ourselves to avoid clearing when binary cached data is missing.
+    # If we fall back to monolithic repodata.json, the standard fetch code will
+    # load the state again in text mode.
+    try:
+        # by using read_bytes, a possible UnicodeDecodeError should be converted
+        # to a JSONDecodeError. But a valid json that is not a dict will fail on
+        # .update().
+        repo_cache.state.update(json.loads(repo_cache.cache_path_state.read_bytes()))
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    cache_state = repo_cache.state
 
     if cache is None:
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
     if cache_state.should_check_format("shards"):
+        if not repo_cache.cache_path_shards.exists():
+            # avoid 304 not modified if we don't have the file
+            cache_state.etag = ""
+            cache_state.mod = ""
         try:
             # look for shards index
             shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
@@ -412,7 +433,7 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
             if package_name in shard:
                 wanted.append((shard, package_name, shard.shard_url(package_name)))
 
-    print(len(wanted), "shards to fetch")
+    log.debug("%d shards to fetch", len(wanted))
 
     shared_shard_cache = sharded[0].shards_cache
     from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])

@@ -26,7 +26,7 @@ from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 
-from conda_libmamba_solver import shards, shards_cache
+from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.shards import (
     ShardLike,
@@ -406,8 +406,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     """
 
     logging.basicConfig(level=logging.INFO)
-    shards.log.setLevel(logging.DEBUG)
-    shards_cache.log.setLevel(logging.DEBUG)
+    for module in (shards, shards_cache, shards_subset):
+        module.log.setLevel(logging.DEBUG)
 
     # installed, plus what we want to add (twine)
     root_packages = ROOT_PACKAGES[:]
