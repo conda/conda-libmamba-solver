@@ -435,6 +435,10 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
 
     log.debug("%d shards to fetch", len(wanted))
 
+    if not sharded:
+        log.debug("No sharded channels found.")
+        return wanted
+
     shared_shard_cache = sharded[0].shards_cache
     from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
 
