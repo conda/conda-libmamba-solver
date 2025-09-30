@@ -142,13 +142,17 @@ class RepodataSubset:
                     heapq.heappush(unvisited, (next.distance, next))
 
 
-def build_repodata_subset(tmp_path, root_packages, channels):
+def build_repodata_subset(root_packages, channels):
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
     print(len(subset.nodes), "package names discovered")
 
+    return channel_data
+
+
+def write_repodata_subset(tmp_path, channel_data):
     subset_paths = {}
 
     repodata_size = 0

@@ -109,7 +109,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+from conda_libmamba_solver.shards_subset import build_repodata_subset, write_repodata_subset
 
 from .mamba_utils import logger_callback
 
@@ -301,7 +301,8 @@ class LibMambaIndexHelper:
             self.tmp_dir = tempfile.TemporaryDirectory("conda-shards")
             self.tmp_path = Path(self.tmp_dir.name)
             root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-            subset_paths, _ = build_repodata_subset(self.tmp_path, root_packages, urls_to_channel)
+            channel_data = build_repodata_subset(root_packages, urls_to_channel)
+            subset_paths = write_repodata_subset(self.tmp_path, channel_data)
             # the optional RepodataState, which we omit, appears to be used only
             # for libsolv .solv files which we also don't want.
             urls_to_json_path_and_state = {

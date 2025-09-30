@@ -36,12 +36,16 @@ from conda_libmamba_solver.shards import (
     shard_mentioned_packages,
     shard_mentioned_packages_2,
 )
-from conda_libmamba_solver.shards_subset import Node, build_repodata_subset, fetch_channels
-from conda_libmamba_solver.shards_typing import ShardDict
+from conda_libmamba_solver.shards_subset import (
+    Node,
+    build_repodata_subset,
+    fetch_channels,
+    write_repodata_subset,
+)
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
-    from conda_libmamba_solver.shards import ShardsIndexDict
+    from conda_libmamba_solver.shards_typing import ShardDict, ShardsIndexDict
 
 HERE = Path(__file__).parent
 
@@ -176,13 +180,15 @@ def test_shard_mentioned_packages_2():
         },
     }
 
-    assert sorted(set(shard_mentioned_packages_2(shard))) == [
-        "bar",
-        "baz",
-        "quux",
-        "splat",
-        "warble",
-    ]
+    assert set(shard_mentioned_packages_2(shard)) == set(
+        (
+            "bar",
+            "baz",
+            "quux",
+            "splat",
+            "warble",
+        )
+    )
 
     # check that the bytes hash was converted to hex
     assert shard["packages.conda"]["foo"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
@@ -410,8 +416,10 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     channels.append(Channel("conda-forge-sharded"))
 
     with _timer("build_repodata_subset()"):
-        subset, repodata_size = build_repodata_subset(tmp_path, root_packages, channels)
+        channel_data = build_repodata_subset(root_packages, channels)
 
+    with _timer("write_repodata_subset()"):
+        _, repodata_size = write_repodata_subset(tmp_path, channel_data)
     print(f"Repodata subset is {repodata_size} bytes")
 
     # e.g. this for noarch and osx-arm64
@@ -422,7 +430,7 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
         f"Versus only noarch and osx-arm64 full repodata: {repodata_size / full_repodata_benchmark:.02f} times as large"
     )
 
-    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in subset))
+    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
 
 
 def test_shards_indexhelper(prepare_shards_test):
