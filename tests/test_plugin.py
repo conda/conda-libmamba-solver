@@ -25,7 +25,7 @@ def test_enabled_sharded_repodata():
 
 def test_enabled_sharded_repodata_environment_variable(monkeypatch):
     """
-    Ensure that the sharded repodata flag can be controlled by its corresponding environment variable. 
+    Ensure that the sharded repodata flag can be controlled by its corresponding environment variable.
     """
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "true")
     context.__init__()
@@ -35,7 +35,7 @@ def test_enabled_sharded_repodata_environment_variable(monkeypatch):
 
 def test_enabled_sharded_repodata_condarc(tmp_path):
     """
-        Ensure that the sharded repodata flag can be controlled by a condarc file.
+    Ensure that the sharded repodata flag can be controlled by a condarc file.
     """
     condarc_file = tmp_path / "conda.yml"
     with condarc_file.open("w") as f:
