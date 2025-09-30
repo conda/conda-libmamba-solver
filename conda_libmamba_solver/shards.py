@@ -84,7 +84,7 @@ def shard_mentioned_packages_2(shard: ShardDict) -> Iterable[str]:
     unique_specs = set()
     for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
         ensure_hex_hash(package)  # otherwise we could do this at serialization
-        for spec in (*package.get("depends", ()), *package.get("constrains", ())):
+        for spec in (*package.get("depends", ()),):  # , *package.get("constrains", ())):
             if spec in unique_specs:
                 continue
             unique_specs.add(spec)
