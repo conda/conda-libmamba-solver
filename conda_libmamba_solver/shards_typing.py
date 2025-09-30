@@ -36,7 +36,10 @@ class PackageRecordDict(TypedDict):
 # in this style because "packages.conda" is not a Python identifier
 ShardDict = TypedDict(
     "ShardDict",
-    {"packages": dict[str, PackageRecordDict], "packages.conda": dict[str, PackageRecordDict]},
+    {
+        "packages": NotRequired[dict[str, PackageRecordDict]],
+        "packages.conda": NotRequired[dict[str, PackageRecordDict]],
+    },
 )
 
 
