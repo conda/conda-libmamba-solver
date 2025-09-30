@@ -122,6 +122,7 @@ if TYPE_CHECKING:
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
+    from .shards_typing import PackageRecordDict
     from .state import SolverInputState
 
 
@@ -152,6 +153,49 @@ def _is_sharded_repodata_enabled():
     Flag to see whether we should check for sharded repodata.
     """
     return context.plugins.use_sharded_repodata is True  # type: ignore
+
+
+def _package_info_from_package_dict(record: PackageRecordDict) -> PackageInfo:
+    """
+    Build libmamba PackageInfo from an unprocessed repodata "packages", "packages.conda" entry.
+    """
+    if (noarch := record.get("noarch")) in ("python", "generic"):
+        noarch = NoArchType(noarch.title())
+    else:
+        noarch = NoArchType("No")
+    # include the python_site_packages_path attribute if libmambapy includes support
+    if hasattr(PackageInfo, "python_site_packages_path"):
+        extra = {
+            "python_site_packages_path": record.get("python_site_packages_path") or "",
+        }
+    else:
+        extra = {}
+    # the dict has not been "enriched" with channel, subdir, url, filename
+    return PackageInfo(
+        name=record["name"],
+        version=record["version"],
+        build_string=record.get("build", ""),
+        build_number=record.get("build_number", 0),
+        # channel=str(record["channel"]),
+        # package_url=record.get("url") or "",
+        # platform=record["subdir"],
+        # filename=record.fn or f"{record.name}-{record.version}-{record.build or ''}",
+        license=record.get("license") or "",  # does the solver use this?
+        md5=record.get("md5") or "",
+        sha256=record.get("sha256") or "",
+        signatures=record.get("signatures") or "",
+        # conda can have list or tuple, but libmamba only accepts lists
+        track_features=list(record.get("track_features") or []),
+        depends=list(record.get("depends") or []),
+        constrains=list(record.get("constrains") or []),
+        defaulted_keys=list(record.get("defaulted_keys") or []),
+        noarch=noarch,
+        size=record.get("size") or 0,
+        timestamp=int(
+            (record.get("timestamp") or 0) * 1000
+        ),  # XXX packages may have either seconds or milliseconds timestamps, see convert-if-out-of-range code in conda
+        **extra,
+    )
 
 
 class LibMambaIndexHelper:

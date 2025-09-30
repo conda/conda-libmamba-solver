@@ -23,10 +23,14 @@ class PackageRecordDict(TypedDict):
     """
 
     name: str
+    version: str
+    build: str
+    build_number: int
     sha256: NotRequired[str | bytes]
     md5: NotRequired[str | bytes]
     depends: list[str]
     constrains: NotRequired[list[str]]
+    noarch: NotRequired[str]
 
 
 # in this style because "packages.conda" is not a Python identifier
