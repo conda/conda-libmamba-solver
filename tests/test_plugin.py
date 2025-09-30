@@ -30,7 +30,7 @@ def test_enabled_sharded_repodata_environment_variable(monkeypatch):
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "true")
     context.__init__()
 
-    assert context.plugins.enable_sharded_repodata
+    assert context.plugins.use_sharded_repodata
 
 
 def test_enabled_sharded_repodata_condarc(tmp_path):
