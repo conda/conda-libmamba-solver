@@ -309,7 +309,7 @@ class LibMambaIndexHelper:
             self.tmp_path = Path(self.tmp_dir.name)
             root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
             channel_data = build_repodata_subset(root_packages, urls_to_channel)
-            subset_paths = write_repodata_subset(self.tmp_path, channel_data)
+            subset_paths, _ = write_repodata_subset(self.tmp_path, channel_data)
             # the optional RepodataState, which we omit, appears to be used only
             # for libsolv .solv files which we also don't want.
             urls_to_json_path_and_state = {
