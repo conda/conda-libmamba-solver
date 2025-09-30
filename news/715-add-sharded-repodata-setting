@@ -1,6 +1,6 @@
 ### Enhancements
 
-* Adds a new setting for enabling and disabling sharded repodata fetching (#715 via #722)
+* Add a new setting to control sharded repodata fetching (#715 via #722)
 
 ### Bug fixes
 
