@@ -147,6 +147,13 @@ class _ChannelRepoInfo:
         return url_parts[-1]
 
 
+def _is_sharded_repodata_enabled():
+    """
+    Flag to see whether we should check for sharded repodata.
+    """
+    return context.plugins.use_sharded_repodata is True  # type: ignore
+
+
 class LibMambaIndexHelper:
     """
     Interface between conda and libmamba for the purpose of building the "index".
@@ -294,7 +301,7 @@ class LibMambaIndexHelper:
             encoded_urls_to_channel[url] = channel
         urls_to_channel = encoded_urls_to_channel
 
-        if self.in_state and context.plugins.use_sharded_repodata is True:  # type: ignore
+        if self.in_state and _is_sharded_repodata_enabled():
             # try to make a subset of possible dependencies
             # conda probably already has a suitable temporary directory?
             # keep a reference so GC doesn't delete the directory

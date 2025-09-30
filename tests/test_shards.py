@@ -27,7 +27,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache
-from conda_libmamba_solver.index import LibMambaIndexHelper
+from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
@@ -76,7 +76,7 @@ def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CONDA_TOKEN", "")
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
     reset_context()
-    assert context.plugins.use_sharded_repodata is True  # type: ignore
+    assert _is_sharded_repodata_enabled()
 
 
 @pytest.fixture
