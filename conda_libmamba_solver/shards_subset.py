@@ -111,6 +111,11 @@ class RepodataSubset:
         """
         All nodes that can be reached by this node, plus cost.
         """
+        # If we set a greater cost for sharded repodata than the repodata that
+        # is already in memory and tracked nodes as (channel, package) tuples,
+        # we might be able to find more shards-to-fetch-in-parallel more
+        # quickly. On the other hand our goal is that the big channels will all
+        # be sharded.
         for n in self.neighbors(node):
             yield n, 1
 
