@@ -126,6 +126,16 @@ class ShardLike:
         # used to write out repodata subset
         self.visited: dict[str, ShardDict | None] = {}
 
+        # alternate location for packages, if not self.url
+        try:
+            base_url = self.repodata_no_packages["info"]["base_url"]
+            if not isinstance(base_url, str):
+                log.warning(f'repodata["info"]["base_url"] was not a str, got {type(base_url)}')
+                raise TypeError()
+            self._base_url = base_url
+        except (KeyError, TypeError):
+            self._base_url = ""
+
     def __repr__(self):
         left, right = super().__repr__().split(maxsplit=1)
         return f"{left} {self.url} {right}"
@@ -133,6 +143,16 @@ class ShardLike:
     @property
     def package_names(self) -> KeysView[str]:
         return self.shards.keys()
+
+    @property
+    def base_url(self) -> str:
+        """
+        Return self.url joined with base_url from repodata, or self.url if no
+        base_url was present. Packages are found here.
+
+        Note base_url can be a relative or an absolute url.
+        """
+        return urljoin(self.url, self._base_url)
 
     def __contains__(self, package: str) -> bool:
         return package in self.package_names
@@ -199,6 +219,11 @@ class Shards(ShardLike):
         # used to write out repodata subset
         # not used in traversal algorithm
         self.visited: dict[str, ShardDict | None] = {}
+
+        # https://github.com/conda/conda-index/pull/209 ensures that sharded
+        # repodata will always include base_url, even if it an empty string;
+        # this is also necessary for compatibility.
+        self._base_url = shards_index["info"]["base_url"]
 
     @property
     def package_names(self):

@@ -80,6 +80,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urljoin
 
 from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
@@ -600,14 +601,18 @@ class LibMambaIndexHelper:
             # part of fetch:
             channel_object = Channel(channel)
             channel_id = str(channel_object)
-            packages = []
+            base_url = shardlike.base_url
+            assert base_url.endswith(("repodata.json", "repodata_shards.msgpack.zst")), (
+                "Unexpected shardlike base_url"
+            )
 
+            packages = []
             for package_group in ("packages", "packages.conda"):
                 for filename, record in repodata.get(package_group, {}).items():
                     package = _package_info_from_package_dict(
                         record,
                         filename,
-                        url=shardlike.url,  # XXX urljoin base_url, subdir?, filename
+                        url=urljoin(base_url, filename),
                         channel_id=channel_id,
                     )
                     packages.append(package)
