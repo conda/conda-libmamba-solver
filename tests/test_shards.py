@@ -185,7 +185,7 @@ def test_shard_mentioned_packages_2():
             "bar",
             "baz",
             "quux",
-            "splat",
+            # "splat", # omit constrains
             "warble",
         )
     )
