@@ -191,11 +191,12 @@ def fetch_channels(channels):
             found = fetch_shards_index(subdir_data, cache)
             if not found:
                 repodata_json: RepodataDict
-                repodata_json, repodata_state = subdir_data.repo_fetch.fetch_latest_parsed()  # type: ignore[assignment]
+                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()  # type: ignore[assignment]
+
                 # not strictly true, since we could have fetched the same data
                 # from repodata.json.zst; but makes the urljoin consistent with
-                # shards which include repodata_shards.msgpack.zst in their url:
-                url = f"{channel_url}/{repodata_state['repodata_fn']}"
+                # shards which end with /repodata_shards.msgpack.zst
+                url = f"{channel_url}/repodata.json"
                 found = ShardLike(repodata_json, url)
             channel_data[channel_url] = found
     return channel_data
