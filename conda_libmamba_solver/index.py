@@ -365,25 +365,13 @@ class LibMambaIndexHelper:
         urls_to_channel = encoded_urls_to_channel
 
         if self.in_state and _is_sharded_repodata_enabled():
-            # try to make a subset of possible dependencies
-            # conda probably already has a suitable temporary directory?
-            # keep a reference so GC doesn't delete the directory
+            # make a subset of possible dependencies
             root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
             channel_data = build_repodata_subset(root_packages, urls_to_channel)
             begin = time.monotonic_ns()
-            # XXX use this instead of urls_to_json_path_and_state; append directly to channel_repo_infos?
             channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
             end = time.monotonic_ns()
-            log.debug("In-memory strategy takes %d ms", (end - begin) / 1e6)
-            # begin = time.monotonic_ns()
-            # subset_paths, _ = write_repodata_subset(self.tmp_path, channel_data)
-            # end = time.monotonic_ns()
-            # log.debug("Write to disk (without read) takes %d ms", (end - begin) / 1e6)
-            # the optional RepodataState, which we omit, appears to be used only
-            # for libsolv .solv files which we also don't want.
-            # urls_to_json_path_and_state = {
-            #     url: (json_path, None) for url, json_path in subset_paths.items()
-            # }
+            log.debug("%d ms to load repodata subset to libmamba-solver", (end - begin) / 1e6)
         else:
             urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
 
