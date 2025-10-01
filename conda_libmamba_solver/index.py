@@ -76,6 +76,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -122,6 +123,8 @@ if TYPE_CHECKING:
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
+    from conda_libmamba_solver.shards_typing import ShardLike
+
     from .shards_typing import PackageRecordDict
     from .state import SolverInputState
 
@@ -155,7 +158,12 @@ def _is_sharded_repodata_enabled():
     return context.plugins.use_sharded_repodata is True  # type: ignore
 
 
-def _package_info_from_package_dict(record: PackageRecordDict) -> PackageInfo:
+_SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
+
+
+def _package_info_from_package_dict(
+    record: PackageRecordDict, filename: str, url: str, channel: Channel
+) -> PackageInfo:
     """
     Build libmamba PackageInfo from an unprocessed repodata "packages", "packages.conda" entry.
     """
@@ -164,22 +172,33 @@ def _package_info_from_package_dict(record: PackageRecordDict) -> PackageInfo:
     else:
         noarch = NoArchType("No")
     # include the python_site_packages_path attribute if libmambapy includes support
-    if hasattr(PackageInfo, "python_site_packages_path"):
+    if _SUPPORTS_PYTHON_SITE_PACKAGES:
         extra = {
             "python_site_packages_path": record.get("python_site_packages_path") or "",
         }
     else:
         extra = {}
+
     # the dict has not been "enriched" with channel, subdir, url, filename
+
+    # channel examples
+    # 'https://repo.anaconda.com/pkgs/main'
+    # Channel("pkgs/main"), Channel('@')
+
+    # package_url examples, full URL to package or "" for a virtual package,
+    # possibly a local package
+
+    # filename, the key from repodata
+
     return PackageInfo(
         name=record["name"],
         version=record["version"],
         build_string=record.get("build", ""),
         build_number=record.get("build_number", 0),
-        # channel=str(record["channel"]),
-        # package_url=record.get("url") or "",
-        # platform=record["subdir"],
-        # filename=record.fn or f"{record.name}-{record.version}-{record.build or ''}",
+        channel=str(channel),
+        package_url=url,
+        platform=record.get("subdir") or "",
+        filename=filename,
         license=record.get("license") or "",  # does the solver use this?
         md5=record.get("md5") or "",
         sha256=record.get("sha256") or "",
@@ -353,7 +372,15 @@ class LibMambaIndexHelper:
             self.tmp_path = Path(self.tmp_dir.name)
             root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
             channel_data = build_repodata_subset(root_packages, urls_to_channel)
+            begin = time.monotonic_ns()
+            # XXX use this instead of urls_to_json_path_and_state; append directly to channel_repo_infos?
+            _subset_infos = self._load_repo_info_from_repodata_dict(channel_data)
+            end = time.monotonic_ns()
+            log.debug("In-memory strategy takes %d ms", (end - begin) / 1e6)
+            begin = time.monotonic_ns()
             subset_paths, _ = write_repodata_subset(self.tmp_path, channel_data)
+            end = time.monotonic_ns()
+            log.debug("Write to disk (without read) takes %d ms", (end - begin) / 1e6)
             # the optional RepodataState, which we omit, appears to be used only
             # for libsolv .solv files which we also don't want.
             urls_to_json_path_and_state = {
@@ -560,18 +587,54 @@ class LibMambaIndexHelper:
             )
         return repos
 
+    def _load_repo_info_from_repodata_dict(
+        self, repodata_subset: dict[str, ShardLike]
+    ) -> list[_ChannelRepoInfo]:
+        """
+        Load repository information from deserialized repodata.json-like
+        structures.
+        """
+        repos = []
+        for channel, shardlike in repodata_subset.items():
+            repodata = shardlike.build_repodata()
+            # Don't like going back and forth between channel objects and URLs;
+            # build_repodata_subset() expands channels into per-subdir URLs as
+            # part of fetch:
+            channel_object = Channel(channel)
+            packages = []
+
+            for package_group in ("packages", "packages.conda"):
+                for filename, record in repodata.get(package_group, {}).items():
+                    package = _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=shardlike.url,  # XXX urljoin base_url, subdir?, filename
+                        channel=channel_object,
+                    )
+                    packages.append(package)
+
+            repo = self.db.add_repo_from_packages(packages=packages, name=channel)
+            repos.append(
+                _ChannelRepoInfo(
+                    channel=channel_object, repo=repo, url_w_cred=channel, url_no_cred=channel
+                )
+            )
+
+        return repos
+
     def _package_info_from_package_record(self, record: PackageRecord) -> PackageInfo:
         if record.get("noarch", None) and record.noarch.value in ("python", "generic"):
             noarch = NoArchType(record.noarch.value.title())
         else:
             noarch = NoArchType("No")
         # include the python_site_packages_path attribute if libmambapy includes support
-        if hasattr(PackageInfo, "python_site_packages_path"):
+        if _SUPPORTS_PYTHON_SITE_PACKAGES:
             extra = {
                 "python_site_packages_path": record.get("python_site_packages_path") or "",
             }
         else:
             extra = {}
+
         return PackageInfo(
             name=record.name,
             version=record.version,

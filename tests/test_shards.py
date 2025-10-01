@@ -27,7 +27,11 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
-from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
+from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
+    _is_sharded_repodata_enabled,
+    _package_info_from_package_dict,
+)
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
@@ -418,6 +422,24 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     with _timer("build_repodata_subset()"):
         channel_data = build_repodata_subset(root_packages, channels)
 
+    # convert to PackageInfo for libmamba
+    for channel, shardlike in channel_data.items():
+        repodata = shardlike.build_repodata()
+        # Don't like going back and forth between channel objects and URLs;
+        # build_repodata_subset() expands channels into per-subdir URLs as
+        # part of fetch:
+        channel_object = Channel(channel)
+
+        for package_group in ("packages", "packages.conda"):
+            for filename, record in repodata.get(package_group, {}).items():
+                package = _package_info_from_package_dict(
+                    record,
+                    filename,
+                    url=shardlike.url,
+                    channel=channel_object,
+                )
+                print(package)
+
     with _timer("write_repodata_subset()"):
         _, repodata_size = write_repodata_subset(tmp_path, channel_data)
     print(f"Repodata subset is {repodata_size} bytes")
@@ -495,5 +517,9 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
         assert sharded, "No sharded repodata found"
         remaining = batch_retrieve_from_cache(sharded, [node.package for node in roots])
         print(f"{len(remaining)} shards to fetch from network")
+
+    # execute "no sharded channels" branch
+    remaining = batch_retrieve_from_cache([], ["python"])
+    assert remaining == []
 
     # XXX don't call everything Shard/Shards
