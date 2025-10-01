@@ -102,13 +102,15 @@ class ShardLike:
         """
         url: affects the repr but not the functionality of this class.
         """
-        all_packages = {
-            "packages": repodata["packages"],
-            "packages.conda": repodata["packages.conda"],
+        self.repodata_no_packages: RepodataDict = {
+            **repodata,
+            "packages": {},
+            "packages.conda": {},
         }
-        repodata.pop("packages")
-        repodata.pop("packages.conda")
-        self.repodata_no_packages = repodata  # without packages, packages.conda
+        all_packages = {
+            "packages": repodata.get("packages", {}),
+            "packages.conda": repodata.get("packages.conda", {}),
+        }
         self.url = url
 
         shards = defaultdict(lambda: {"packages": {}, "packages.conda": {}})
