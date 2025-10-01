@@ -422,21 +422,22 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     with _timer("build_repodata_subset()"):
         channel_data = build_repodata_subset(root_packages, channels)
 
-    # convert to PackageInfo for libmamba
+    # convert to PackageInfo for libmamba (switching to this strategy instead of
+    # write_repodata_subset())
     for channel, shardlike in channel_data.items():
         repodata = shardlike.build_repodata()
         # Don't like going back and forth between channel objects and URLs;
         # build_repodata_subset() expands channels into per-subdir URLs as
         # part of fetch:
         channel_object = Channel(channel)
-
+        channel_id = str(channel_object)
         for package_group in ("packages", "packages.conda"):
             for filename, record in repodata.get(package_group, {}).items():
                 package = _package_info_from_package_dict(
                     record,
                     filename,
                     url=shardlike.url,
-                    channel=channel_object,
+                    channel_id=channel_id,
                 )
                 print(package)
 

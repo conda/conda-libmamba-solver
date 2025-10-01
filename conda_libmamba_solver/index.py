@@ -75,7 +75,6 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
 import time
 from dataclasses import dataclass
 from functools import partial
@@ -110,7 +109,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset, write_repodata_subset
+from conda_libmamba_solver.shards_subset import build_repodata_subset
 
 from .mamba_utils import logger_callback
 
@@ -162,7 +161,7 @@ _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path
 
 
 def _package_info_from_package_dict(
-    record: PackageRecordDict, filename: str, url: str, channel: Channel
+    record: PackageRecordDict, filename: str, url: str, channel_id: str
 ) -> PackageInfo:
     """
     Build libmamba PackageInfo from an unprocessed repodata "packages", "packages.conda" entry.
@@ -195,7 +194,7 @@ def _package_info_from_package_dict(
         version=record["version"],
         build_string=record.get("build", ""),
         build_number=record.get("build_number", 0),
-        channel=str(channel),
+        channel=channel_id,
         package_url=url,
         platform=record.get("subdir") or "",
         filename=filename,
@@ -368,45 +367,44 @@ class LibMambaIndexHelper:
             # try to make a subset of possible dependencies
             # conda probably already has a suitable temporary directory?
             # keep a reference so GC doesn't delete the directory
-            self.tmp_dir = tempfile.TemporaryDirectory("conda-shards")
-            self.tmp_path = Path(self.tmp_dir.name)
             root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
             channel_data = build_repodata_subset(root_packages, urls_to_channel)
             begin = time.monotonic_ns()
             # XXX use this instead of urls_to_json_path_and_state; append directly to channel_repo_infos?
-            _subset_infos = self._load_repo_info_from_repodata_dict(channel_data)
+            channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
             end = time.monotonic_ns()
             log.debug("In-memory strategy takes %d ms", (end - begin) / 1e6)
-            begin = time.monotonic_ns()
-            subset_paths, _ = write_repodata_subset(self.tmp_path, channel_data)
-            end = time.monotonic_ns()
-            log.debug("Write to disk (without read) takes %d ms", (end - begin) / 1e6)
+            # begin = time.monotonic_ns()
+            # subset_paths, _ = write_repodata_subset(self.tmp_path, channel_data)
+            # end = time.monotonic_ns()
+            # log.debug("Write to disk (without read) takes %d ms", (end - begin) / 1e6)
             # the optional RepodataState, which we omit, appears to be used only
             # for libsolv .solv files which we also don't want.
-            urls_to_json_path_and_state = {
-                url: (json_path, None) for url, json_path in subset_paths.items()
-            }
+            # urls_to_json_path_and_state = {
+            #     url: (json_path, None) for url, json_path in subset_paths.items()
+            # }
         else:
             urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
 
-        channel_repo_infos = []
-        for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
-            url_no_token, _ = split_anaconda_token(url_w_cred)
-            url_no_cred = remove_auth(url_no_token)
-            repo = self._load_repo_info_from_json_path(
-                json_path,
-                url_no_cred,
-                state,
-                try_solv=(try_solv and not self.in_state),
-            )
-            channel_repo_infos.append(
-                _ChannelRepoInfo(
-                    channel=urls_to_channel[url_w_cred],
-                    repo=repo,
-                    url_w_cred=url_w_cred,
-                    url_no_cred=url_no_cred,
+            channel_repo_infos = []
+            for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
+                url_no_token, _ = split_anaconda_token(url_w_cred)
+                url_no_cred = remove_auth(url_no_token)
+                repo = self._load_repo_info_from_json_path(
+                    json_path,
+                    url_no_cred,
+                    state,
+                    try_solv=(try_solv and not self.in_state),
                 )
-            )
+                channel_repo_infos.append(
+                    _ChannelRepoInfo(
+                        channel=urls_to_channel[url_w_cred],
+                        repo=repo,
+                        url_w_cred=url_w_cred,
+                        url_no_cred=url_no_cred,
+                    )
+                )
+
         return channel_repo_infos
 
     def _channel_urls(self) -> dict[str, Channel]:
@@ -601,6 +599,7 @@ class LibMambaIndexHelper:
             # build_repodata_subset() expands channels into per-subdir URLs as
             # part of fetch:
             channel_object = Channel(channel)
+            channel_id = str(channel_object)
             packages = []
 
             for package_group in ("packages", "packages.conda"):
@@ -609,7 +608,7 @@ class LibMambaIndexHelper:
                         record,
                         filename,
                         url=shardlike.url,  # XXX urljoin base_url, subdir?, filename
-                        channel=channel_object,
+                        channel_id=channel_id,
                     )
                     packages.append(package)
 
