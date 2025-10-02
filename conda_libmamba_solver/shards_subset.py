@@ -37,28 +37,21 @@ import json
 import logging
 import sys
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING
 
-import conda.gateways.repodata
-from conda.base.context import context
-from conda.core.subdir_data import SubdirData
-from conda.models.channel import Channel
-
-from conda_libmamba_solver import shards_cache
-
 from .shards import (
-    ShardLike,
     Shards,
     batch_retrieve_from_cache,
-    fetch_shards_index,
+    fetch_channels,
     shard_mentioned_packages_2,
 )
 
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .shards_typing import RepodataDict
+    from .shards import (
+        ShardLike,
+    )
 
 
 @dataclass(order=True)
@@ -157,27 +150,4 @@ def build_repodata_subset(root_packages, channels):
     subset.shortest(root_packages)
     log.debug("%d package names discovered", len(subset.nodes))
 
-    return channel_data
-
-
-def fetch_channels(channels):
-    channel_data: dict[str, ShardLike] = {}
-
-    # share single disk cache for all Shards() instances
-    cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
-
-    for channel in channels:
-        for channel_url in Channel(channel).urls(True, context.subdirs):
-            subdir_data = SubdirData(Channel(channel_url))
-            found = fetch_shards_index(subdir_data, cache)
-            if not found:
-                repodata_json: RepodataDict
-                repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()  # type: ignore[assignment]
-
-                # not strictly true, since we could have fetched the same data
-                # from repodata.json.zst; but makes the urljoin consistent with
-                # shards which end with /repodata_shards.msgpack.zst
-                url = f"{channel_url}/repodata.json"
-                found = ShardLike(repodata_json, url)
-            channel_data[channel_url] = found
     return channel_data

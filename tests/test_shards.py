@@ -91,6 +91,10 @@ def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     Reset token to avoid being logged in. e.g. the testing channel doesn't understand them.
     Enable shards.
     """
+    logging.basicConfig(level=logging.INFO)
+    for module in (shards, shards_cache, shards_subset):
+        module.log.setLevel(logging.DEBUG)
+
     monkeypatch.setenv("CONDA_TOKEN", "")
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
     reset_context()
@@ -187,10 +191,21 @@ def test_shards(prepare_shards_test: None):
 
 def test_shard_mentioned_packages_2():
     shard: ShardDict = {
-        "packages": {"foo": {"name": "foo", "depends": ["bar", "baz"]}},
+        "packages": {
+            "foo": {
+                "name": "foo",
+                "version": "1",
+                "build": "0_a",
+                "build_number": 0,
+                "depends": ["bar", "baz"],
+            }
+        },
         "packages.conda": {
             "foo": {
                 "name": "foo",
+                "version": "1",
+                "build": "0_a",
+                "build_number": 0,
                 "depends": ["quux", "warble"],
                 "constrains": ["splat<3"],
                 "sha256": hashlib.sha256().digest(),
@@ -423,10 +438,6 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     algorithm.
     """
 
-    logging.basicConfig(level=logging.INFO)
-    for module in (shards, shards_cache, shards_subset):
-        module.log.setLevel(logging.DEBUG)
-
     # installed, plus what we want to add (twine)
     root_packages = ROOT_PACKAGES[:]
 
@@ -480,11 +491,11 @@ def test_shards_indexhelper(prepare_shards_test):
     This will include a build_repodata_subset() call redundant with
     test_build_repodata_subset().
     """
-    channels = [*context.default_channels, Channel("conda-forge-sharded")]
+    channels = [Channel("conda-forge-sharded")]
 
     class fake_in_state:
         installed = {name: object() for name in ROOT_PACKAGES}
-        requested = ("twine",)
+        requested = ("vaex",)
 
     # Would eagerly download repodata.json.zst for all channels
     helper = LibMambaIndexHelper(
