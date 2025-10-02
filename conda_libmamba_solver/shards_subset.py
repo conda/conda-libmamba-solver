@@ -42,6 +42,7 @@ from typing import TYPE_CHECKING
 from .shards import (
     Shards,
     batch_retrieve_from_cache,
+    batch_retrieve_from_network,
     fetch_channels,
     shard_mentioned_packages_2,
 )
@@ -117,13 +118,14 @@ class RepodataSubset:
         self.nodes = {package: Node(0, package) for package in start_packages}
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        to_retrieve: set[str] = set()
+        to_retrieve: set[str] = set(self.nodes)
         retrieved: set[str] = set()
         while unvisited:
             # parallel fetch all unvisited shards but don't mark as visited
             if to_retrieve:
                 # can we get stuck looking for unavailable packages repeatedly?
-                batch_retrieve_from_cache(sharded, sorted(to_retrieve))
+                not_in_cache = batch_retrieve_from_cache(sharded, sorted(to_retrieve))
+                batch_retrieve_from_network(not_in_cache)
             retrieved.update(to_retrieve)  # not necessary
             to_retrieve.clear()
 

@@ -221,6 +221,7 @@ class Shards(ShardLike):
 
         # used to write out repodata subset
         # not used in traversal algorithm
+        # XXX rename to working_set, loaded, haz, ...
         self.visited: dict[str, ShardDict | None] = {}
 
         # https://github.com/conda/conda-index/pull/209 ensures that sharded
@@ -464,7 +465,7 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
     wanted = []
     for shard in sharded:
         for package_name in packages:
-            if package_name in shard:
+            if package_name in shard:  # and not package_name in shard.visited
                 wanted.append((shard, package_name, shard.shard_url(package_name)))
 
     log.debug("%d shards to fetch", len(wanted))
@@ -482,6 +483,27 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
             shard.visited[package] = from_cache_shard
 
     return wanted
+
+
+def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
+    """
+    Given a list of (Shards, package name, shard URL) tuples, group by Shards and call fetch_shards with a list of all urls for that Shard.
+    """
+    if not wanted:
+        return
+
+    shard_packages: dict[Shards, list[str]] = defaultdict(list)
+    for shard, package, _ in wanted:
+        shard_packages[shard].append(package)
+
+    # XXX it might be better to pull networking and Session() out of Shards(),
+    # so that we can e.g. use the same session for a Channel(); typically a
+    # noarch+arch pair of subdirs.
+    # Could we share a ThreadPoolExecutor and see better session utilization?
+    for shard, packages in shard_packages.items():
+        # this function also checks the database again, though we should have
+        # just called batch_retrieve_from_cache:
+        shard.fetch_shards(packages)
 
 
 def fetch_channels(channels):
