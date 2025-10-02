@@ -592,15 +592,16 @@ class LibMambaIndexHelper:
             base_url = shardlike.base_url
             assert base_url.endswith(("repodata.json", "repodata_shards.msgpack.zst")), (
                 "Unexpected shardlike base_url"
-            )
-
+            )  # XXX can there be ?parameters
+            # avoid calling urljoin many times
+            base_url_concat = base_url.rsplit("/", 1)[0]
             packages = []
             for package_group in ("packages", "packages.conda"):
                 for filename, record in repodata.get(package_group, {}).items():
                     package = _package_info_from_package_dict(
                         record,
                         filename,
-                        url=urljoin(base_url, filename),
+                        url=f"{base_url_concat}/{filename}",
                         channel_id=channel_id,
                     )
                     packages.append(package)
