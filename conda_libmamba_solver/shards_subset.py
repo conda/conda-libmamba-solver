@@ -160,25 +160,6 @@ def build_repodata_subset(root_packages, channels):
     return channel_data
 
 
-def write_repodata_subset(tmp_path, channel_data):
-    subset_paths = {}
-
-    repodata_size = 0
-    for channel, shardlike in channel_data.items():
-        repodata = shardlike.build_repodata()
-        # XXX not guaranteed unique
-        _, *channel_shortname = channel.rsplit("/", 2)
-        repodata_path = tmp_path / ("_".join(channel_shortname))
-        # most compact json
-        repodata_text = json.dumps(repodata, indent=0, separators=(",", ":"), sort_keys=True)
-        repodata_size += len(repodata_text)
-        repodata_path.write_text(repodata_text)
-
-        subset_paths[channel] = repodata_path
-
-    return subset_paths, repodata_size
-
-
 def fetch_channels(channels):
     channel_data: dict[str, ShardLike] = {}
 

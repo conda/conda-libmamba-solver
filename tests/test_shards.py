@@ -44,7 +44,6 @@ from conda_libmamba_solver.shards_subset import (
     Node,
     build_repodata_subset,
     fetch_channels,
-    write_repodata_subset,
 )
 from tests.channel_testing.helpers import _dummy_http_server
 
@@ -61,6 +60,21 @@ def package_names(shard: shards_cache.ShardDict):
     return set(package["name"] for package in shard["packages"].values()) | set(
         package["name"] for package in shard["packages.conda"].values()
     )
+
+
+def repodata_subset_size(channel_data):
+    """
+    Measure the size of a repodata subset as serialized to JSON. Discard data.
+    """
+    repodata_size = 0
+    for _, shardlike in channel_data.items():
+        repodata = shardlike.build_repodata()
+        repodata_text = json.dumps(
+            repodata, indent=0, separators=(",", ":"), sort_keys=True, ensure_ascii=False
+        )
+        repodata_size += len(repodata_text.encode("utf-8"))
+
+    return repodata_size
 
 
 @contextmanager
@@ -422,8 +436,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     with _timer("build_repodata_subset()"):
         channel_data = build_repodata_subset(root_packages, channels)
 
-    # convert to PackageInfo for libmamba (switching to this strategy instead of
-    # write_repodata_subset())
+    # convert to PackageInfo for libmamba, without temporary files
+    package_info = []
     for channel, shardlike in channel_data.items():
         repodata = shardlike.build_repodata()
         # Don't like going back and forth between channel objects and URLs;
@@ -433,17 +447,20 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
         channel_id = str(channel_object)
         for package_group in ("packages", "packages.conda"):
             for filename, record in repodata.get(package_group, {}).items():
-                package = _package_info_from_package_dict(
-                    record,
-                    filename,
-                    url=shardlike.url,
-                    channel_id=channel_id,
+                package_info.append(
+                    _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=shardlike.url,
+                        channel_id=channel_id,
+                    )
                 )
-                print(package)
+
+    assert len(package_info), "no packages in subset"
 
     with _timer("write_repodata_subset()"):
-        _, repodata_size = write_repodata_subset(tmp_path, channel_data)
-    print(f"Repodata subset is {repodata_size} bytes")
+        repodata_size = repodata_subset_size(channel_data)
+    print(f"Repodata subset would be {repodata_size} bytes as json")
 
     # e.g. this for noarch and osx-arm64
     # % curl https://conda.anaconda.org/conda-forge-sharded/noarch/repodata.json.zst | zstd -d | wc
