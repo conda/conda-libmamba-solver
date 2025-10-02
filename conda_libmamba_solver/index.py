@@ -482,13 +482,7 @@ class LibMambaIndexHelper:
         else:
             repodata_origin = None
         channel = Channel(channel_url)
-        channel_id = channel.canonical_name
-        if channel_id in context.custom_multichannels:
-            # In multichannels, the canonical name of a "subchannel" is the multichannel name
-            # which makes it ambiguous for `channel::specs`. In those cases, take the channel
-            # regular name; e.g. for repo.anaconda.com/pkgs/main, do not take defaults, but
-            # pkgs/main instead.
-            channel_id = channel.name
+        channel_id = self._channel_to_id(channel)
         if try_solv and repodata_origin:
             try:
                 log.debug(
@@ -542,6 +536,16 @@ class LibMambaIndexHelper:
                 log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
 
+    def _channel_to_id(self, channel: Channel):
+        channel_id = channel.canonical_name
+        if channel_id in context.custom_multichannels:
+            # In multichannels, the canonical name of a "subchannel" is the multichannel name
+            # which makes it ambiguous for `channel::specs`. In those cases, take the channel
+            # regular name; e.g. for repo.anaconda.com/pkgs/main, do not take defaults, but
+            # pkgs/main instead.
+            channel_id = channel.name
+        return channel_id
+
     def _load_installed(self, records: Iterable[PackageRecord]) -> _ChannelRepoInfo:
         packages = [self._package_info_from_package_record(record) for record in records]
         repo = self.db.add_repo_from_packages(
@@ -581,13 +585,13 @@ class LibMambaIndexHelper:
         structures.
         """
         repos = []
-        for channel, shardlike in repodata_subset.items():
+        for channel_url, shardlike in repodata_subset.items():
             repodata = shardlike.build_repodata()
             # Don't like going back and forth between channel objects and URLs;
             # build_repodata_subset() expands channels into per-subdir URLs as
             # part of fetch:
-            channel_object = Channel(channel)
-            channel_id = str(channel_object)
+            channel_object = Channel(channel_url)
+            channel_id = self._channel_to_id(channel_object)
             base_url = shardlike.base_url
             assert base_url.endswith(("repodata.json", "repodata_shards.msgpack.zst")), (
                 "Unexpected shardlike base_url"
@@ -605,10 +609,13 @@ class LibMambaIndexHelper:
                     )
                     packages.append(package)
 
-            repo = self.db.add_repo_from_packages(packages=packages, name=channel)
+            repo = self.db.add_repo_from_packages(packages=packages, name=channel_url)
             repos.append(
                 _ChannelRepoInfo(
-                    channel=channel_object, repo=repo, url_w_cred=channel, url_no_cred=channel
+                    channel=channel_object,
+                    repo=repo,
+                    url_w_cred=channel_url,
+                    url_no_cred=channel_url,
                 )
             )
 
