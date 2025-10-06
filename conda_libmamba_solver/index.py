@@ -75,7 +75,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -84,7 +83,7 @@ from typing import TYPE_CHECKING
 from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
 from conda.common.compat import on_win
-from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
@@ -367,10 +366,7 @@ class LibMambaIndexHelper:
             # make a subset of possible dependencies
             root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
             channel_data = build_repodata_subset(root_packages, urls_to_channel)
-            begin = time.monotonic_ns()
             channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
-            end = time.monotonic_ns()
-            log.debug("%d ms to load repodata subset to libmamba-solver", (end - begin) / 1e6)
         else:
             urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
 
@@ -577,6 +573,7 @@ class LibMambaIndexHelper:
             )
         return repos
 
+    @time_recorder(module_name=__name__)
     def _load_repo_info_from_repodata_dict(
         self, repodata_subset: dict[str, ShardLike]
     ) -> list[_ChannelRepoInfo]:

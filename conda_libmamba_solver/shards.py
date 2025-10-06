@@ -11,7 +11,6 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import logging
-import time
 from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -275,12 +274,9 @@ class Shards(ShardLike):
 
         def fetch(s, url, package):
             # due to cache, the same url won't be fetched twice
-            b1 = time.time_ns()
             response = s.get(url)
             response.raise_for_status()
             data = response.content
-            e1 = time.time_ns()
-            log.debug(f"Fetch took {(e1 - b1) / 1e9}s %s %s", package, url)
             return shards_cache.AnnotatedRawShard(url=url, package=package, compressed_shard=data)
 
         packages = sorted(list(packages))
