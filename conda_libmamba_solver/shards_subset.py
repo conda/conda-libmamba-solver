@@ -81,15 +81,17 @@ class RepodataSubset:
                 # check that we don't fetch the same shard twice...
                 shard = shardlike.fetch_shard(node.package)
                 for package in shard_mentioned_packages_2(shard):
+                    # shard_mentioned_packages_2 doesn't include the shard's own
+                    # package name. Do we need to broadcast node.package across
+                    # channels, or will the incoming node have already taken
+                    # care of it for us?
                     if package not in self.nodes:
                         self.nodes[package] = Node(node.distance + 1, package)
                         # by moving yield up here we try to only visit dependencies
                         # that no other node already knows about. Doesn't make it faster.
                         if package not in discovered:  # redundant with not in self.nodes?
                             log.debug(f"{json.dumps(node.package)} -> {json.dumps(package)};")
-                            yield self.nodes[package]
-                        else:
-                            assert False, "package already discovered but not in self.nodes"
+                        yield self.nodes[package]
                     if package not in discovered:
                         pass
                         # dot format valid ids: https://graphviz.org/doc/info/lang.html#ids (or quote string)

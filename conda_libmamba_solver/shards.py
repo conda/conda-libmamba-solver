@@ -27,7 +27,6 @@ from conda.gateways.repodata import (
     conda_http_errors,
 )
 from conda.models.channel import Channel
-from conda.models.records import PackageRecord
 from libmambapy.bindings import specs
 from requests import HTTPError
 
@@ -57,25 +56,6 @@ def ensure_hex_hash(record: PackageRecordDict):
             if isinstance(hash_value, bytes):
                 record[hash_type] = hash_value.hex()
     return record
-
-
-def shard_mentioned_packages(shard: ShardDict) -> set[str]:
-    """
-    Return all dependency names mentioned in a shard, including the shard's own
-    package name.
-
-    Includes virtual packages.
-    """
-    # XXX filter by package name for the possibility of a shard with multiple
-    # (small) packages
-    mentioned = set()
-    for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
-        # to go faster, don't use PackageRecord, record.combined_depends, or
-        # MatchSpec
-        record = PackageRecord(**ensure_hex_hash(package))
-        mentioned.add(record.name)
-        mentioned.update(spec.name for spec in record.combined_depends)
-    return mentioned
 
 
 def shard_mentioned_packages_2(shard: ShardDict) -> Iterable[str]:
@@ -135,7 +115,7 @@ class ShardLike:
                 log.warning(f'repodata["info"]["base_url"] was not a str, got {type(base_url)}')
                 raise TypeError()
             self._base_url = base_url
-        except (KeyError, TypeError):
+        except KeyError:
             self._base_url = ""
 
     def __repr__(self):
@@ -220,7 +200,6 @@ class Shards(ShardLike):
 
         # used to write out repodata subset
         # not used in traversal algorithm
-        # XXX rename to working_set, loaded, haz, ...
         self.visited: dict[str, ShardDict | None] = {}
 
         # https://github.com/conda/conda-index/pull/209 ensures that sharded

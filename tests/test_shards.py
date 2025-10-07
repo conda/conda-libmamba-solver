@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import random
 import time
 import urllib.parse
 from contextlib import contextmanager
@@ -37,7 +36,6 @@ from conda_libmamba_solver.shards import (
     Shards,
     batch_retrieve_from_cache,
     fetch_shards_index,
-    shard_mentioned_packages,
     shard_mentioned_packages_2,
 )
 from conda_libmamba_solver.shards_subset import (
@@ -158,35 +156,6 @@ def test_fetch_shards_error(http_server_shards):
     # besides ValueError
     with pytest.raises(ValueError):
         found.fetch_shard("not_msgpack")
-
-
-def test_shards(prepare_shards_test: None):
-    """
-    Test basic shard fetch.
-    """
-    channels = [
-        Channel.from_url(f"https://conda.anaconda.org/conda-forge-sharded/{subdir}")
-        for subdir in context.subdirs
-    ]
-
-    subdir_data = SubdirData(channels[0])
-    found = fetch_shards_index(subdir_data)
-    assert found, f"Shards not found for {channels[0]}"
-
-    for package in found.packages_index:
-        shard_url = found.shard_url(package)
-        assert shard_url.startswith("http")  # or channel url or shards_base_url
-
-    # download or fetch-from-cache a random set of shards
-
-    for package in random.choices([*found.packages_index.keys()], k=16):
-        shard = found.fetch_shard(package)
-
-        mentioned_in_shard = shard_mentioned_packages(shard)
-        assert (
-            package in mentioned_in_shard
-        )  # the package's own name is mentioned, as well as any dependencies.
-        print(package_names(shard), mentioned_in_shard)
 
 
 def test_shard_mentioned_packages_2():
@@ -350,6 +319,11 @@ def test_shardlike():
     repodata = json.loads(
         (Path(__file__).parent / "data" / "mamba_repo" / "noarch" / "repodata.json").read_text()
     )
+
+    bad_repodata = repodata.copy()
+    bad_repodata["info"] = {**bad_repodata["info"], "base_url": 4}
+    with pytest.raises(TypeError):
+        ShardLike(bad_repodata)
 
     # make fake packages
     for n in range(10):
