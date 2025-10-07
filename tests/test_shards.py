@@ -99,18 +99,48 @@ def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     assert _is_sharded_repodata_enabled()
 
 
+FAKE_SHARD: ShardDict = {
+    "packages": {
+        "foo": {
+            "name": "foo",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["bar", "baz"],
+        }
+    },
+    "packages.conda": {
+        "foo": {
+            "name": "foo",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["quux", "warble"],
+            "constrains": ["splat<3"],
+            "sha256": hashlib.sha256().digest(),
+        }
+    },
+}
+
+
 @pytest.fixture
 def http_server_shards(xprocess, tmp_path_factory):
     """
     A shard repository with a difference.
     """
     shards_repository = tmp_path_factory.mktemp("sharded_repo")
-    (shards_repository / "noarch").mkdir()
+    noarch = shards_repository / "noarch"
+    noarch.mkdir()
+
+    foo_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
+    foo_shard_digest = hashlib.sha256(foo_shard).digest()
+    (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
+
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
     # XXX not-zstandard; not msgpack
     malformed_digest = hashlib.sha256(bad_schema).digest()
-    noarch = shards_repository / "noarch"
+
     (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
     not_zstd = b"not zstd"
     (noarch / f"{sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
@@ -120,6 +150,8 @@ def http_server_shards(xprocess, tmp_path_factory):
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
         "repodata_version": 1,
         "shards": {
+            "foo": foo_shard_digest,
+            "wrong_package_name": foo_shard_digest,
             "fake_package": b"",
             "malformed": hashlib.sha256(bad_schema).digest(),
             "not_zstd": hashlib.sha256(not_zstd).digest(),
@@ -141,6 +173,22 @@ def test_fetch_shards_error(http_server_shards):
     found = fetch_shards_index(subdir_data)
     assert found
 
+    not_found = fetch_shards_index(SubdirData(Channel.from_url(f"{http_server_shards}/linux-64")))
+    assert not not_found
+
+    # cover "unexpected package name in shard" branch
+    found.visited.clear()
+    assert "packages" in found.fetch_shard("wrong_package_name")
+
+    # one non-error shard
+    shard_a = found.fetch_shard("foo")
+    shard_b = found.fetch_shard("foo")
+    assert shard_a is shard_b
+    found.visited.clear()  # force sqlite3 cache usage
+    shard_c = found.fetch_shard("foo")
+    assert shard_a is not shard_c
+    assert shard_a == shard_c
+
     with pytest.raises(requests.exceptions.HTTPError):
         # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
@@ -159,30 +207,7 @@ def test_fetch_shards_error(http_server_shards):
 
 
 def test_shard_mentioned_packages_2():
-    shard: ShardDict = {
-        "packages": {
-            "foo": {
-                "name": "foo",
-                "version": "1",
-                "build": "0_a",
-                "build_number": 0,
-                "depends": ["bar", "baz"],
-            }
-        },
-        "packages.conda": {
-            "foo": {
-                "name": "foo",
-                "version": "1",
-                "build": "0_a",
-                "build_number": 0,
-                "depends": ["quux", "warble"],
-                "constrains": ["splat<3"],
-                "sha256": hashlib.sha256().digest(),
-            }
-        },
-    }
-
-    assert set(shard_mentioned_packages_2(shard)) == set(
+    assert set(shard_mentioned_packages_2(FAKE_SHARD)) == set(
         (
             "bar",
             "baz",
@@ -193,10 +218,10 @@ def test_shard_mentioned_packages_2():
     )
 
     # check that the bytes hash was converted to hex
-    assert shard["packages.conda"]["foo"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
+    assert FAKE_SHARD["packages.conda"]["foo"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
 
 
-def test_fetch_shards(prepare_shards_test: None):
+def test_fetch_shards_channels(prepare_shards_test: None):
     """
     Test all channels fetch as Shards or ShardLike, depending on availability.
     """
@@ -302,13 +327,11 @@ def test_shard_cache_2():
         if shard := cache.retrieve(url):
             assert "://" in extant[url].url
             assert "://" not in extant[url].package
-            assert all(
-                package["name"] == extant[url].package for package in shard["packages"].values()
-            )
-            assert all(
-                package["name"] == extant[url].package
-                for package in shard["packages.conda"].values()
-            )
+            for group in ("packages", "packages.conda"):
+                assert all(
+                    extant[url].package in (package["name"], "wrong_package_name")
+                    for package in shard[group].values()
+                ), f"Bad package name {extant[url].package}"
 
 
 def test_shardlike():
