@@ -68,6 +68,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
             "--solver=libmamba",
             "--override-channels",
             "--channel=conda-forge",
+            "--yes",
             "python=3.9",
         )
         check_call([pip, "--version"])
