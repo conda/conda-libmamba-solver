@@ -64,7 +64,7 @@ def test_channels_prefixdata(tmp_env: TmpEnvFixture) -> None:
 
     See https://github.com/conda/conda/issues/11790
     """
-    with tmp_env("conda-forge::xz", "python", "--solver=libmamba") as prefix:
+    with tmp_env("conda-forge::xz", "python=3.13", "--solver=libmamba") as prefix:
         p = conda_subprocess(
             "install",
             "-yp",
