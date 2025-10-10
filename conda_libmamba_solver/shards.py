@@ -82,7 +82,7 @@ class ShardLike:
 
     def __init__(self, repodata: RepodataDict, url: str = ""):
         """
-        url: affects the repr but not the functionality of this class.
+        url: must be unique for all ShardLike used together.
         """
         self.repodata_no_packages: RepodataDict = {
             **repodata,
@@ -165,7 +165,7 @@ class ShardLike:
         """
         repodata = self.repodata_no_packages.copy()
         repodata.update({"packages": {}, "packages.conda": {}})
-        for package, shard in self.visited.items():
+        for _, shard in self.visited.items():
             if shard is None:
                 continue  # recorded visited but not available shards
             for package_group in ("packages", "packages.conda"):
@@ -487,65 +487,47 @@ def fetch_channels(channels):
     # share single disk cache for all Shards() instances
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
-    if False:
-        for channel in channels:
-            for channel_url in Channel(channel).urls(True, context.subdirs):
-                subdir_data = SubdirData(Channel(channel_url))
-                found = fetch_shards_index(subdir_data, cache)
-                if not found:
-                    repodata_json: RepodataDict
-                    repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()  # type: ignore[assignment]
+    # The parallel version may reorder channels, does this matter?
 
-                    # not strictly true, since we could have fetched the same data
-                    # from repodata.json.zst; but makes the urljoin consistent with
-                    # shards which end with /repodata_shards.msgpack.zst
-                    url = f"{channel_url}/repodata.json"
-                    found = ShardLike(repodata_json, url)
+    # beneficial to have thread pool larger than requests' default 10 max
+    # connections per session. There is "context.repodata_threads" but it's
+    # None in the REPL. For channels, we would usually be limited by the
+    # number of channels but not for individual shards elsewhere in this code.
+    max_workers = (
+        context.repodata_threads
+        if context.repodata_threads is not None
+        else REPODATA_THREADS_DEFAULT
+    )
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(
+                fetch_shards_index, SubdirData(Channel(channel_url)), cache
+            ): channel_url
+            for channel in channels
+            for channel_url in Channel(channel).urls(True, context.subdirs)
+        }
+        futures_non_sharded = {}
+        for future in concurrent.futures.as_completed(futures):
+            channel_url = futures[future]
+            found = future.result()
+            if found:
                 channel_data[channel_url] = found
-        return channel_data
+            else:
+                futures_non_sharded[
+                    executor.submit(
+                        SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed
+                    )
+                ] = channel_url
 
-    else:
-        # The parallel version may reorder channels, does this matter?
-
-        # beneficial to have thread pool larger than requests' default 10 max
-        # connections per session. There is "context.repodata_threads" but it's
-        # None in the REPL. For channels, we would usually be limited by the
-        # number of channels but not for individual shards elsewhere in this code.
-        max_workers = (
-            context.repodata_threads
-            if context.repodata_threads is not None
-            else REPODATA_THREADS_DEFAULT
-        )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(
-                    fetch_shards_index, SubdirData(Channel(channel_url)), cache
-                ): channel_url
-                for channel in channels
-                for channel_url in Channel(channel).urls(True, context.subdirs)
-            }
-            futures_non_sharded = {}
-            for future in concurrent.futures.as_completed(futures):
-                channel_url = futures[future]
-                found = future.result()
-                if found:
-                    channel_data[channel_url] = found
-                else:
-                    futures_non_sharded[
-                        executor.submit(
-                            SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed
-                        )
-                    ] = channel_url
-
-            for future in concurrent.futures.as_completed(futures_non_sharded):
-                channel_url = futures_non_sharded[future]
-                repodata_json, _ = future.result()
-                # the filename is not strictly repodata.json since we could have
-                # fetched the same data from repodata.json.zst; but makes the
-                # urljoin consistent with shards which end with
-                # /repodata_shards.msgpack.zst
-                url = f"{channel_url}/repodata.json"
-                found = ShardLike(repodata_json, url)
-                channel_data[channel_url] = found
+        for future in concurrent.futures.as_completed(futures_non_sharded):
+            channel_url = futures_non_sharded[future]
+            repodata_json, _ = future.result()
+            # the filename is not strictly repodata.json since we could have
+            # fetched the same data from repodata.json.zst; but makes the
+            # urljoin consistent with shards which end with
+            # /repodata_shards.msgpack.zst
+            url = f"{channel_url}/repodata.json"
+            found = ShardLike(repodata_json, url)
+            channel_data[channel_url] = found
 
     return channel_data

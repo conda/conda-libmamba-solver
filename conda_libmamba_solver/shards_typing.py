@@ -11,7 +11,10 @@ reduce coupling.
 
 from __future__ import annotations
 
-from typing import NotRequired, TypedDict
+from typing import TYPE_CHECKING, TypedDict
+
+if TYPE_CHECKING:
+    from typing import NotRequired
 
 
 class PackageRecordDict(TypedDict):
@@ -34,8 +37,8 @@ class PackageRecordDict(TypedDict):
 ShardDict = TypedDict(
     "ShardDict",
     {
-        "packages": NotRequired[dict[str, PackageRecordDict]],
-        "packages.conda": NotRequired[dict[str, PackageRecordDict]],
+        "packages": dict[str, PackageRecordDict],
+        "packages.conda": dict[str, PackageRecordDict],
     },
 )
 
