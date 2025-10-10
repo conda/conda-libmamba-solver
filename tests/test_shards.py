@@ -466,6 +466,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 
     assert len(package_info), "no packages in subset"
 
+    print(f"{len(package_info)} packages in subset")
+
     with _timer("write_repodata_subset()"):
         repodata_size = repodata_subset_size(channel_data)
     print(f"Repodata subset would be {repodata_size} bytes as json")
