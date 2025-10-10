@@ -571,12 +571,12 @@ def test_prune_existing_env_dependencies_are_solved(
             channels:
             - conda-forge
             dependencies:
-            - python=3.12
-            - numpy=2.1.2
+            - python=3.13
+            - numpy=2.2.2
             """
         )
     )
-    with tmp_env("python=3.12") as prefix:
+    with tmp_env("python=3.13") as prefix:
         out, err, rc = conda_cli(
             "env",
             "update",
@@ -589,7 +589,7 @@ def test_prune_existing_env_dependencies_are_solved(
         print(err, file=sys.stderr)
         assert rc == 0
         PrefixData._cache_.clear()
-        assert PrefixData(prefix).get("python").version.startswith("3.12")
+        assert PrefixData(prefix).get("python").version.startswith("3.13")
         assert PrefixData(prefix).get("numpy")
         out, err, rc = conda_cli("run", f"--prefix={prefix}", "python", "-c", "import numpy")
         print(out)

@@ -2,7 +2,7 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 """
-Ensure plugins function as expected
+Ensure configuration plugin functions as expected
 """
 
 import pytest
@@ -20,7 +20,7 @@ def test_enabled_sharded_repodata():
     Ensure that the setting `plugins.enable_sharded_repodata` exists and is set
     to the correct default value.
     """
-    assert not context.plugins.use_sharded_repodata
+    assert not context.plugins.use_sharded_repodata  # type: ignore
 
 
 def test_enabled_sharded_repodata_environment_variable(monkeypatch):
@@ -30,7 +30,7 @@ def test_enabled_sharded_repodata_environment_variable(monkeypatch):
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "true")
     context.__init__()
 
-    assert context.plugins.use_sharded_repodata
+    assert context.plugins.use_sharded_repodata  # type: ignore
 
 
 def test_enabled_sharded_repodata_condarc(tmp_path):
@@ -47,4 +47,4 @@ def test_enabled_sharded_repodata_condarc(tmp_path):
 
     context.__init__(search_path=(str(condarc_file),))
 
-    assert context.plugins.use_sharded_repodata
+    assert context.plugins.use_sharded_repodata  # type: ignore

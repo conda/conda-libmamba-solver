@@ -83,7 +83,7 @@ from typing import TYPE_CHECKING
 from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
 from conda.common.compat import on_win
-from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor
+from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
@@ -108,16 +108,23 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
+from conda_libmamba_solver.shards_subset import build_repodata_subset
+
 from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from typing import Any, Literal
+    from typing import Any, Callable, Literal
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
+
+    from conda_libmamba_solver.shards_typing import ShardLike
+
+    from .shards_typing import PackageRecordDict
+    from .state import SolverInputState
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -142,6 +149,72 @@ class _ChannelRepoInfo:
         return url_parts[-1]
 
 
+def _is_sharded_repodata_enabled():
+    """
+    Flag to see whether we should check for sharded repodata.
+    """
+    return context.plugins.use_sharded_repodata is True  # type: ignore
+
+
+_SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
+
+
+def _package_info_from_package_dict(
+    record: PackageRecordDict, filename: str, url: str, channel_id: str
+) -> PackageInfo:
+    """
+    Build libmamba PackageInfo from an unprocessed repodata "packages", "packages.conda" entry.
+    """
+    if (noarch := record.get("noarch")) in ("python", "generic"):
+        noarch = NoArchType(noarch.title())
+    else:
+        noarch = NoArchType("No")
+    # include the python_site_packages_path attribute if libmambapy includes support
+    if _SUPPORTS_PYTHON_SITE_PACKAGES:
+        extra = {
+            "python_site_packages_path": record.get("python_site_packages_path") or "",
+        }
+    else:
+        extra = {}
+
+    # the dict has not been "enriched" with channel, subdir, url, filename
+
+    # channel examples
+    # 'https://repo.anaconda.com/pkgs/main'
+    # Channel("pkgs/main"), Channel('@')
+
+    # package_url examples, full URL to package or "" for a virtual package,
+    # possibly a local package
+
+    # filename, the key from repodata
+
+    return PackageInfo(
+        name=record["name"],
+        version=record["version"],
+        build_string=record.get("build", ""),
+        build_number=record.get("build_number", 0),
+        channel=channel_id,
+        package_url=url,
+        platform=record.get("subdir") or "",
+        filename=filename,
+        license=record.get("license") or "",  # does the solver use this?
+        md5=record.get("md5") or "",
+        sha256=record.get("sha256") or "",
+        signatures=record.get("signatures") or "",
+        # conda can have list or tuple, but libmamba only accepts lists
+        track_features=list(record.get("track_features") or []),
+        depends=list(record.get("depends") or []),
+        constrains=list(record.get("constrains") or []),
+        defaulted_keys=list(record.get("defaulted_keys") or []),
+        noarch=noarch,
+        size=record.get("size") or 0,
+        timestamp=int(
+            (record.get("timestamp") or 0) * 1000
+        ),  # XXX packages may have either seconds or milliseconds timestamps, see convert-if-out-of-range code in conda
+        **extra,
+    )
+
+
 class LibMambaIndexHelper:
     """
     Interface between conda and libmamba for the purpose of building the "index".
@@ -160,6 +233,7 @@ class LibMambaIndexHelper:
         repodata_fn: str = REPODATA_FN,
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
+        in_state: SolverInputState | None = None,
     ):
         platform_less_channels = []
         for channel in channels:
@@ -177,13 +251,19 @@ class LibMambaIndexHelper:
         self.channels = platform_less_channels
         self.subdirs = subdirs or context.subdirs
         self.repodata_fn = repodata_fn
+        self.in_state = in_state
         self.db = self._init_db()
+
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
         if pkgs_dirs:
             self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
         if installed_records:
             self.repos.append(self._load_installed(installed_records))
         self._set_repo_priorities()
+
+        # These are to support lazy self.repos, but it's not currently lazy.
+        self._pkgs_dirs = pkgs_dirs
+        self._installed_records = installed_records
 
     @classmethod
     def from_platform_aware_channel(cls, channel: Channel) -> LibMambaIndexHelper:
@@ -196,7 +276,7 @@ class LibMambaIndexHelper:
     def n_packages(
         self,
         repos: Iterable[RepoInfo] | None = None,
-        filter_: callable | None = None,
+        filter_: Callable | None = None,
     ) -> int:
         repos = repos or [repo_info.repo for repo_info in self.repos]
         count = 0
@@ -282,25 +362,33 @@ class LibMambaIndexHelper:
             encoded_urls_to_channel[url] = channel
         urls_to_channel = encoded_urls_to_channel
 
-        urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
-        channel_repo_infos = []
-        for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
-            url_no_token, _ = split_anaconda_token(url_w_cred)
-            url_no_cred = remove_auth(url_no_token)
-            repo = self._load_repo_info_from_json_path(
-                json_path,
-                url_no_cred,
-                state,
-                try_solv=try_solv,
-            )
-            channel_repo_infos.append(
-                _ChannelRepoInfo(
-                    channel=urls_to_channel[url_w_cred],
-                    repo=repo,
-                    url_w_cred=url_w_cred,
-                    url_no_cred=url_no_cred,
+        if self.in_state and _is_sharded_repodata_enabled():
+            # make a subset of possible dependencies
+            root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
+            channel_data = build_repodata_subset(root_packages, urls_to_channel)
+            channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
+        else:
+            urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
+
+            channel_repo_infos = []
+            for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
+                url_no_token, _ = split_anaconda_token(url_w_cred)
+                url_no_cred = remove_auth(url_no_token)
+                repo = self._load_repo_info_from_json_path(
+                    json_path,
+                    url_no_cred,
+                    state,
+                    try_solv=(try_solv and not self.in_state),
                 )
-            )
+                channel_repo_infos.append(
+                    _ChannelRepoInfo(
+                        channel=urls_to_channel[url_w_cred],
+                        repo=repo,
+                        url_w_cred=url_w_cred,
+                        url_no_cred=url_no_cred,
+                    )
+                )
+
         return channel_repo_infos
 
     def _channel_urls(self) -> dict[str, Channel]:
@@ -337,7 +425,7 @@ class LibMambaIndexHelper:
                     seen_noauth.add(url)
         return urls
 
-    def _fetch_repodata_jsons(self, urls: dict[str, str]) -> dict[str, tuple[str, RepodataState]]:
+    def _fetch_repodata_jsons(self, urls: Iterable[str]) -> dict[str, tuple[str, RepodataState]]:
         Executor = (
             DummyExecutor
             if context.debug or context.repodata_threads == 1
@@ -376,7 +464,7 @@ class LibMambaIndexHelper:
         return url, json_path, state
 
     def _load_repo_info_from_json_path(
-        self, json_path: str, channel_url: str, state: RepodataState, try_solv: bool = True
+        self, json_path: str, channel_url: str, state: RepodataState | None, try_solv: bool = True
     ) -> RepoInfo | None:
         if try_solv and on_win:
             # .solv loading is so slow on Windows is not even worth it. Use JSON instead.
@@ -390,13 +478,7 @@ class LibMambaIndexHelper:
         else:
             repodata_origin = None
         channel = Channel(channel_url)
-        channel_id = channel.canonical_name
-        if channel_id in context.custom_multichannels:
-            # In multichannels, the canonical name of a "subchannel" is the multichannel name
-            # which makes it ambiguous for `channel::specs`. In those cases, take the channel
-            # regular name; e.g. for repo.anaconda.com/pkgs/main, do not take defaults, but
-            # pkgs/main instead.
-            channel_id = channel.name
+        channel_id = self._channel_to_id(channel)
         if try_solv and repodata_origin:
             try:
                 log.debug(
@@ -450,6 +532,16 @@ class LibMambaIndexHelper:
                 log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
 
+    def _channel_to_id(self, channel: Channel):
+        channel_id = channel.canonical_name
+        if channel_id in context.custom_multichannels:
+            # In multichannels, the canonical name of a "subchannel" is the multichannel name
+            # which makes it ambiguous for `channel::specs`. In those cases, take the channel
+            # regular name; e.g. for repo.anaconda.com/pkgs/main, do not take defaults, but
+            # pkgs/main instead.
+            channel_id = channel.name
+        return channel_id
+
     def _load_installed(self, records: Iterable[PackageRecord]) -> _ChannelRepoInfo:
         packages = [self._package_info_from_package_record(record) for record in records]
         repo = self.db.add_repo_from_packages(
@@ -481,18 +573,64 @@ class LibMambaIndexHelper:
             )
         return repos
 
+    @time_recorder(module_name=__name__)
+    def _load_repo_info_from_repodata_dict(
+        self, repodata_subset: dict[str, ShardLike]
+    ) -> list[_ChannelRepoInfo]:
+        """
+        Load repository information from deserialized repodata.json-like
+        structures.
+        """
+        repos = []
+        for channel_url, shardlike in repodata_subset.items():
+            repodata = shardlike.build_repodata()
+            # Don't like going back and forth between channel objects and URLs;
+            # build_repodata_subset() expands channels into per-subdir URLs as
+            # part of fetch:
+            channel_object = Channel(channel_url)
+            channel_id = self._channel_to_id(channel_object)
+            base_url = shardlike.base_url
+            assert base_url.endswith(("repodata.json", "repodata_shards.msgpack.zst")), (
+                "Unexpected shardlike base_url"
+            )  # XXX can there be ?parameters
+            # avoid calling urljoin many times
+            base_url_concat = base_url.rsplit("/", 1)[0]
+            packages = []
+            for package_group in ("packages", "packages.conda"):
+                for filename, record in repodata.get(package_group, {}).items():
+                    package = _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=f"{base_url_concat}/{filename}",
+                        channel_id=channel_id,
+                    )
+                    packages.append(package)
+
+            repo = self.db.add_repo_from_packages(packages=packages, name=channel_url)
+            repos.append(
+                _ChannelRepoInfo(
+                    channel=channel_object,
+                    repo=repo,
+                    url_w_cred=channel_url,
+                    url_no_cred=channel_url,
+                )
+            )
+
+        return repos
+
     def _package_info_from_package_record(self, record: PackageRecord) -> PackageInfo:
         if record.get("noarch", None) and record.noarch.value in ("python", "generic"):
             noarch = NoArchType(record.noarch.value.title())
         else:
             noarch = NoArchType("No")
         # include the python_site_packages_path attribute if libmambapy includes support
-        if hasattr(PackageInfo, "python_site_packages_path"):
+        if _SUPPORTS_PYTHON_SITE_PACKAGES:
             extra = {
                 "python_site_packages_path": record.get("python_site_packages_path") or "",
             }
         else:
             extra = {}
+
         return PackageInfo(
             name=record.name,
             version=record.version,
@@ -589,7 +727,7 @@ class LibMambaIndexHelper:
         result = Query.whoneeds(self.db, query, tree)
         return self._process_query_result(result, return_type)
 
-    def explicit_pool(self, specs: Iterable[MatchSpec]) -> tuple[str]:
+    def explicit_pool(self, specs: Iterable[MatchSpec]) -> tuple[str, ...]:
         """
         Returns all the package names that (might) depend on the passed specs
         """

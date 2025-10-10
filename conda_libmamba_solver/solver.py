@@ -163,6 +163,7 @@ class LibMambaSolver(Solver):
         with get_spinner(
             self._collect_all_metadata_spinner_message(channels, conda_build_channels),
         ):
+            # only called here by c-l-s
             index = self._collect_all_metadata(
                 channels=channels,
                 conda_build_channels=conda_build_channels,
@@ -260,7 +261,7 @@ class LibMambaSolver(Solver):
         channels: Iterable[Channel],
         conda_build_channels: Iterable[Channel],
         subdirs: Iterable[str],
-        in_state: SolverInputState,
+        in_state: SolverInputState | None,
     ) -> LibMambaIndexHelper:
         index = LibMambaIndexHelper(
             channels=[*conda_build_channels, *channels],
@@ -271,6 +272,7 @@ class LibMambaSolver(Solver):
                 *in_state.virtual.values(),
             ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
+            in_state=in_state,
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)
