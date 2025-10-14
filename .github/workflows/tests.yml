@@ -106,11 +106,12 @@ jobs:
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
 
     steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Checkout agriyakhetarpal/conda # CONDA-LIBMAMBA-SOLVER CHANGE
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: agriyakhetarpal/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          ref: better-channel-comparisons # https://github.com/conda/conda/pull/15296
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -262,12 +263,13 @@ jobs:
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Checkout agriyakhetarpal/conda # CONDA-LIBMAMBA-SOLVER CHANGE
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: agriyakhetarpal/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          ref: better-channel-comparisons # https://github.com/conda/conda/pull/15296
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -543,11 +545,11 @@ jobs:
       REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
+      - name: Checkout agriyakhetarpal/conda # CONDA-LIBMAMBA-SOLVER CHANGE
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: agriyakhetarpal/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
