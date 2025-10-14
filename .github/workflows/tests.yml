@@ -551,6 +551,7 @@ jobs:
           fetch-depth: 0
           repository: agriyakhetarpal/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          ref: better-channel-comparisons # https://github.com/conda/conda/pull/15296
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
