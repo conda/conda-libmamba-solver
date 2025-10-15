@@ -35,8 +35,11 @@ from __future__ import annotations
 import heapq
 import json
 import logging
+import queue
 import sys
+from contextlib import suppress
 from dataclasses import dataclass
+from threading import Thread
 from typing import TYPE_CHECKING
 
 from .shards import (
@@ -50,9 +53,12 @@ from .shards import (
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from queue import SimpleQueue as Queue
+
     from .shards import (
         ShardLike,
     )
+    from .shards_typing import ShardDict
 
 
 @dataclass(order=True)
@@ -79,6 +85,61 @@ class NodeId:
 
     def in_shard(self, shardlike: ShardLike):
         return self.channel == shardlike.url
+
+
+def cache_fetch_thread(
+    in_queue: Queue[NodeId],
+    shard_out_queue: Queue[(ShardLike, ShardDict)],
+    network_out_queue: Queue,
+):
+    """
+    in_queue contains (channel, package) tuples to fetch from cache if possible.
+    While the in_queue has not received a sentinel None, empty everything from
+    the queue. Check the cache for all of them. Cached shards go to
+    shard_out_queue. NodeId's that are not in the cache go to network_out_queue.
+
+    Some ShardLike are repodata.json, in which case everything is already in
+    memory. Decide whether to resolve those here or before calling this
+    function.
+
+    Decide whether to check the visited cache here for any shards that have
+    already been loaded from sqlite3. (Ideally we don't have to worry about
+    duplicate requests to the sqlite3 cache because we have a visited set.
+    Threading delays may complicate this.)
+    """
+    while (item := in_queue.get()) is not None:
+        items = [item]
+        with suppress(queue.Empty):
+            while True:
+                items.append(in_queue.get_nowait())
+
+        ...
+        # generate url's for all items
+        # call ShardCache.retrieve_multiple(self, urls: list[str]) -> dict[str, ShardDict | None]:
+        # all cached shards go to shard_out_queue (do we need a Node that includes the ShardLike() (i.e. channel)?
+        # all need-to-fetch-over-http NodeId's go to network_out_queue
+
+
+def network_fetch_thread(
+    in_queue: Queue[NodeId],
+    shard_out_queue: Queue[(ShardLike, ShardDict)],
+):
+    """
+    in_queue contains (channel, package) tuples to fetch over the network.
+    While the in_queue has not received a sentinel None, empty everything from
+    the queue. Fetch all of them over the network. Fetched shards go to
+    shard_out_queue.
+    """
+    while (item := in_queue.get()) is not None:
+        items = [item]
+        with suppress(queue.Empty):
+            while True:
+                items.append(in_queue.get_nowait())
+
+        ...
+        # generate url's for all items
+        # call Shards.batch_retrieve_from_network(not_in_cache)
+        # all fetched shards go to shard_out_queue (do we need a Node that includes the ShardLike() (i.e. channel)?
 
 
 @dataclass
