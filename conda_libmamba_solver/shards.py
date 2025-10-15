@@ -34,7 +34,6 @@ from . import shards_cache
 
 log = logging.getLogger(__name__)
 
-REPODATA_THREADS_DEFAULT = 20
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, KeysView
@@ -45,6 +44,33 @@ if TYPE_CHECKING:
     from conda_libmamba_solver.shards_typing import RepodataDict, ShardsIndexDict
 
     from .shards_typing import PackageRecordDict, ShardDict
+
+SHARDS_CONNECTIONS_DEFAULT = 10
+
+
+def _shards_connections() -> int:
+    """
+    If context.repodata_threads is not set, find the size of the connection pool
+    in a typical https:// session. This should significantly reduce dropped
+    connections. This will usually be requests' default 10.
+
+    Is this shared between all sessions? Or do we get a different pool for a
+    different get_session(url)?
+
+    Other adapters (file://, s3://) used in conda would have different
+    concurrency behavior;  we are not prepared to have separate threadpools per
+    connection type.
+    """
+    if context.repodata_threads is not None:
+        return context.repodata_threads
+    session = get_session("https://repo.anaconda.com/pkgs/main")
+    adapter = session.get_adapter("https://")
+    if poolmanager := getattr(adapter, "poolmanager"):
+        try:
+            return int(poolmanager.connection_pool_kw["maxsize"])
+        except (KeyError, ValueError, AttributeError):
+            pass
+    return SHARDS_CONNECTIONS_DEFAULT
 
 
 def ensure_hex_hash(record: PackageRecordDict):
@@ -272,15 +298,7 @@ class Shards(ShardLike):
             assert not package.startswith(("https://", "http://"))
             result[package] = shard
 
-        # beneficial to have thread pool larger than requests' default 10 max
-        # connections per session. There is "context.repodata_threads" but it's
-        # None in the REPL.
-        max_workers = (
-            context.repodata_threads
-            if context.repodata_threads is not None
-            else REPODATA_THREADS_DEFAULT
-        )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
             futures = {
                 executor.submit(fetch, self.session, url, package): (url, package)
                 for url, package in urls_packages.items()
@@ -489,16 +507,7 @@ def fetch_channels(channels):
 
     # The parallel version may reorder channels, does this matter?
 
-    # beneficial to have thread pool larger than requests' default 10 max
-    # connections per session. There is "context.repodata_threads" but it's
-    # None in the REPL. For channels, we would usually be limited by the
-    # number of channels but not for individual shards elsewhere in this code.
-    max_workers = (
-        context.repodata_threads
-        if context.repodata_threads is not None
-        else REPODATA_THREADS_DEFAULT
-    )
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         futures = {
             executor.submit(
                 fetch_shards_index, SubdirData(Channel(channel_url)), cache
