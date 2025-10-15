@@ -456,6 +456,8 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
     sharded = [shardlike for shardlike in sharded if isinstance(shardlike, Shards)]
 
     wanted = []
+    # XXX update batch_retrieve_from_cache to work with (Shards, package name)
+    # tuples instead of broadcasting across shards itself.
     for shard in sharded:
         for package_name in packages:
             if package_name in shard:  # and not package_name in shard.visited
