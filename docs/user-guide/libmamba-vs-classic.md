@@ -307,17 +307,26 @@ the expense of an older `python`, and `conda-libmamba-solver` will prefer having
 even if it means going all the way down to `pydantic 0.18.2` (which was packaged as `noarch`) and
 thus compatible with _any_ Python version.
 
+## Historical issues related to solver differences (resolved)
+
+This section documents solver behaviour differences that existed in the past but have since been
+resolved. These are kept for historical reference, and to help users understand the evolution of
+the `conda-libmamba-solver`.
+
 ### cudatoolkit present in a `cpuonly` environment
 
 > Originally reported in [issue #131](https://github.com/conda/conda-libmamba-solver/issues/131)
 
-This is an example of a [known limitation in how `libsolv` processes the `track_features`
+**Status**: Resolved as of 15th October, 2025
+
+This was an example of a [known limitation in how `libsolv` processes the `track_features`
 metadata](https://mamba.readthedocs.io/en/latest/advanced_usage/package_resolution.html). `libsolv`
-will only "see" the first level of `track_features`, which down-prioritize packages. If you depend
+would only "see" the first level of `track_features`, which down-prioritize packages. If you depended
 on 2nd-order dependencies to track prioritized variants (which conda `classic` successfully
-processes), you will get mixed results. This can be solved at the packaging level, where all the
-variants rely on the package _mutex_ directly, instead of relying on packages that depend on the
-mutex.
+processed), you would get mixed results.
+
+As of recent updates to libsolv/libmamba, this issue has been resolved and `cpuonly` environments
+now correctly exclude `cudatoolkit` packages, matching the behavior of the classic solver.
 
 ## More information
 
