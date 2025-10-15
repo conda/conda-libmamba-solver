@@ -311,7 +311,7 @@ thus compatible with _any_ Python version.
 
 This section documents solver behavior differences that existed in the past but have since been
 resolved. These are kept for historical reference, and to help users understand the evolution of
-the `conda-libmamba-solver`.
+`conda-libmamba-solver`.
 
 ### cudatoolkit present in a `cpuonly` environment
 
