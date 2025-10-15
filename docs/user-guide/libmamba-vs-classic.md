@@ -309,7 +309,7 @@ thus compatible with _any_ Python version.
 
 ## Historical issues related to solver differences (resolved)
 
-This section documents solver behaviour differences that existed in the past but have since been
+This section documents solver behavior differences that existed in the past but have since been
 resolved. These are kept for historical reference, and to help users understand the evolution of
 the `conda-libmamba-solver`.
 
