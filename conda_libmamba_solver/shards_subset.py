@@ -112,7 +112,7 @@ class RepodataSubset:
 
                     if package not in discovered:
                         # now this is per package name, not per (name, channel) tuple
-                        log.debug(f"{json.dumps(node.package)} -> {json.dumps(package)};")
+                        log.debug("%s -> %s;", json.dumps(node.package, json.dumps(package))
                         discovered.add(package)
 
     def outgoing(self, node: Node):
