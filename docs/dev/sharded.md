@@ -43,15 +43,16 @@ objects.
 
 ### shards.py
 
-`shards.py` provides an interface to treat sharded repodata, and monolithic
-`repodata.json`, in the same way. It checks a channel for sharded repodata,
+`shards.py` provides an interface to treat sharded repodata and monolithic
+`repodata.json` in the same way. It checks a channel for sharded repodata,
 returning an object that implements the `ShardLike` interface.
 
 ### shards_subset.py
 
 `shards_subset.py` accepts a list of `ShardLike` instances and a list of initial
-packages to compute a repodata subset. It treats sharded or classic channels the
-same way thanks to the `ShardLike` interface.
+packages to compute a repodata subset. The traversal is simplified thanks to the
+`ShardLike` interface, so the algorithm doesn't have to worry too much about the
+type of each channel.
 
 ### shards_cache.py
 
