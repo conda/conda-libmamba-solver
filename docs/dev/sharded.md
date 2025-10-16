@@ -1,0 +1,106 @@
+# Sharded repodata implementation
+
+This document provides an overview on how `conda-libmamba-solver` implements
+[CEP-16 Sharded Repodata](https://conda.org/learn/ceps/cep-0016).
+
+Sharded Repodata splits repodata.json into an index of package names
+`repodata_shards.msgpack.zst` to shard hashes. A shard contains repodata for
+every package file with a given name. Since shards are named after a hash of
+their contents, they can be cached without having to check the server for
+freshness. Individual shards only need to change when an individual package has
+changed, so only the much smaller `repodata_shards.msgpack.zst` is fetched
+repeatedly.
+
+## Sharded Repodata in conda-libmamba-solver
+
+For `conda-libmamba-solver`, we wanted a way to implement sharded repodata in
+Python without having to touch the C++ `libmamba`.
+
+We do this by treating all repodata as if it was sharded repodata. Starting with
+a list of installed packages and to-be-installed packages, we gather all
+repodata for those packages, and look for all package names listed in their
+dependencies. We repeat the process for every discovered package name that we
+have not already visited, fetching repodata shards or examining all artifacts
+with that package name found in a monolithic `repodata.json`. This process
+gathers all versions of all packages that we might depend on. We do not consider
+package versions at this stage; that's the solver's job.
+
+As of this writing, `conda create -c conda-forge --dry-run python` finds 35
+package names; `conda` 137 package names, and `vaex`, a dataframe library with a
+complex dependency tree, 678 package names. That's a lot less than the 31k
+packages total according to https://conda-forge.org/, and a manageable number to
+pre-process in Python before doing a solve inside `libmamba`. As long as we can
+fetch those packages quickly enough, from cache or from the network, we will
+save RAM, disk space, bandwidth and time compared to parsing every package on
+the channel every time.
+
+## Source code
+
+The source code is split up into `shards.py`, `shards_cache.py`,
+`shards_subset.py` and `shards_typing.py` in `conda_libmamba_solver/`.
+Additional code in `conda_libmamba_solver/index.py` calls
+`build_repodata_subset()` and converts the resulting repodata to `libmamba`
+objects.
+
+### shards.py
+
+`shards.py` provides an interface to treat sharded repodata, and monolithic
+repodata.json in the same way. It checks a channel for sharded repodata,
+returning an object that implements the `ShardLike` interface.
+
+### shards_subset.py
+
+`shards_subset.py` accepts a list of `ShardLike` instances and a list of initial
+packages to compute a repodata subset. It treats sharded or classic channels the
+same way thanks to the `ShardLike` interface.
+
+### shards_cache.py
+
+`shards_cache.py` implements a sqlite3 cache used to store individual shards.
+When traversing shards, the cache is checked before making a network request.
+The shards cache is a single database for all channels in
+`$CONDA_PREFIX/pkgs/cache/repodata_shards.db`.
+
+The shards index `repodata_shards.msgpack.zst` is cached in the same way as
+`repodata.json`, in individual files in `$CONDA_PREFIX/pkgs/cache/` named after
+URL hashes. A `has_<format>` remembers if a channel has shards, or not. If
+`has_shards` is `false` then we wait 7 days after `last_checked` to make another
+request looking for `repodata_shards.msgpack.zst`. The same system remembers
+whether a channel provides `repodata.json.zst`, and stores the `ETag` used to
+refresh the cache.
+
+```
+"has_shards": {
+    "last_checked": "2025-10-15T17:19:44.408989Z",
+    "value": true
+},
+```
+
+## shards_typing.py
+
+`shards_typing.py` provides type hints for data structures used in sharded
+repodata.
+
+## tests/test_shards.py
+
+The sharded repodata tests maintain 100% code coverage of the shards-related code
+`shards*.py`.
+
+## Example dependency graph for Python
+
+This is what Python's dependencies look like on `conda-forge` as of this writing.
+
+If sharded repodata is asked to install Python, we fetch `python`. The `python`
+shard tells us we can fetch `bzip2`, `libffi`, `...` in parallel, discovering a
+third layer including `icu`, `ca-certificates`, and others. `ca-certificates`
+also depends on some virtual packages, but the traversal quickly determine that
+these packages don't appear in any channel by checking the
+`repodata_shards.msgpack.zst` index. The solver will let us know if these
+missing packages are a problem, virtual or no.
+
+The first draft of sharded repodata in `conda-libmamba-solver` literally
+generated classic `repodata.json` with only those packages to load in the
+solver, but now we convert each record into `libmamba` `PackageInfo` objects in
+memory instead.
+
+:::{mermaid} shards_python.mmd
