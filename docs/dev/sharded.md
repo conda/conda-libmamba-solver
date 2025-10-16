@@ -17,7 +17,7 @@ Python without having to touch the C++ `libmamba`.
 
 We do this by treating all repodata as if it was sharded repodata. Starting with
 a list of installed packages and to-be-installed packages, we gather all
-repodata for those packages, and look for all package names listed in their
+repodata for those packages and look for all package names listed in their
 dependencies. We repeat the process for every discovered package name that we
 have not already visited, fetching repodata shards or examining all artifacts
 with that package name as found in monolithic `repodata.json`. This process
