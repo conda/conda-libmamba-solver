@@ -101,9 +101,8 @@ checking the `repodata_shards.msgpack.zst` index. The solver will let us know if
 these missing packages are a problem, virtual or no.
 
 The first draft of sharded repodata in `conda-libmamba-solver` literally
-generated classic `repodata.json` with only those packages to load in the
-solver, but now we convert each record into `libmamba` `PackageInfo` objects in
-memory instead.
+generated classic `repodata.json` with package subsets to load into the solver,
+but now we convert each record into `libmamba` `PackageInfo` objects in memory.
 
 By giving `libmamba` every possible dependency for a specific request, it has
 enough information to produce a solution.
