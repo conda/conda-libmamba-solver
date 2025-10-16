@@ -82,6 +82,12 @@ which logs its own changes for better debugging and developer experience while a
 * `.mamba_utils`, which contains utility functions borrowed and adapted from `mamba` itself.
   Its main usage is the initialization of the `libmamba.Context` options from `conda`'s `Context`.
 
+### Sharded Repodata
+
+Sharded repodata is implemented by building a repodata subset in Python, and
+then sending that subset to the solver. See [sharded repodata
+implementation](sharded).
+
 ## Integrations with `conda`
 
 ### With the plugin system

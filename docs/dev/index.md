@@ -8,6 +8,7 @@ the following pages:
 setup
 workflows
 implementation
+sharded
 future-work
 code-of-conduct
 changelog
