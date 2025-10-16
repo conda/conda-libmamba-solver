@@ -62,10 +62,10 @@ class Node:
     channel: str = ""
     visited: bool = False
 
-    def to_id(self):
+    def to_id(self) -> NodeId:
         return NodeId(self.package, self.channel)
 
-    def in_shard(self, shardlike: ShardLike):
+    def in_shard(self, shardlike: ShardLike) -> bool:
         return self.channel == shardlike.url
 
 

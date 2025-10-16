@@ -68,7 +68,7 @@ def _shards_connections() -> int:
     if poolmanager := getattr(adapter, "poolmanager"):
         try:
             return int(poolmanager.connection_pool_kw["maxsize"])
-        except (KeyError, ValueError, AttributeError):
+        except (KeyError, ValueError, AttributeError, TypeError):
             pass
     return SHARDS_CONNECTIONS_DEFAULT
 
