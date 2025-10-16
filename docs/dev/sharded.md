@@ -3,9 +3,9 @@
 This document provides an overview on how `conda-libmamba-solver` implements
 [CEP-16 Sharded Repodata](https://conda.org/learn/ceps/cep-0016).
 
-Sharded Repodata splits repodata.json into an index of package names to shard
-hashes, in `repodata_shards.msgpack.zst`. A shard contains repodata for every
-package file with a given name. Since shards are named after a hash of their
+Sharded Repodata splits `repodata.json` into an index of package names to shard
+hashes in `repodata_shards.msgpack.zst`. A shard contains repodata for every
+package with a given name. Since shards are named after a hash of their
 contents, they can be cached without having to check the server for freshness.
 Individual shards only need to change when an individual package has changed, so
 only the much smaller index has to be re-fetched often.
