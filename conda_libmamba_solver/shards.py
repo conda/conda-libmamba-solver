@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from .shards_typing import PackageRecordDict, ShardDict
 
 SHARDS_CONNECTIONS_DEFAULT = 10
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # zstandard output buffer
 
 
 def _shards_connections() -> int:
@@ -309,7 +310,9 @@ class Shards(ShardLike):
                 # XXX future.result can raise HTTPError etc.
                 fetch_result = future.result()
                 result[fetch_result.package] = msgpack.loads(
-                    zstandard.decompress(fetch_result.compressed_shard)
+                    zstandard.decompress(
+                        fetch_result.compressed_shard, max_output_size=ZSTD_MAX_SHARD_SIZE
+                    )
                 )
                 try:
                     package_names = [
@@ -435,7 +438,9 @@ def fetch_shards_index(
             repo_cache.save(found)
 
             # basic parse (move into caller?)
-            shards_index: ShardsIndexDict = msgpack.loads(zstandard.decompress(found))  # type: ignore
+            shards_index: ShardsIndexDict = msgpack.loads(
+                zstandard.decompress(found, max_output_size=ZSTD_MAX_SHARD_SIZE)
+            )  # type: ignore
             shards = Shards(shards_index, shards_index_url, cache)
             return shards
 
