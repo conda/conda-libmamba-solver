@@ -21,7 +21,7 @@ import msgpack
 import zstandard
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import get_session
+from conda.gateways.connection.session import CondaSession, get_session
 from conda.gateways.repodata import (
     _add_http_value_to_dict,
     conda_http_errors,
@@ -63,7 +63,7 @@ def _shards_connections() -> int:
     """
     if context.repodata_threads is not None:
         return context.repodata_threads
-    session = get_session("https://repo.anaconda.com/pkgs/main")
+    session = CondaSession()
     adapter = session.get_adapter("https://")
     if poolmanager := getattr(adapter, "poolmanager"):
         try:
