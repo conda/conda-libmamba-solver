@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from .shards_typing import PackageRecordDict, ShardDict
 
 SHARDS_CONNECTIONS_DEFAULT = 10
-ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # zstandard output buffer
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
 
 
 def _shards_connections() -> int:
