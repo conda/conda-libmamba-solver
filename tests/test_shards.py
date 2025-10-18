@@ -147,7 +147,7 @@ def http_server_shards(xprocess, tmp_path_factory):
     (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
     fake_shards: ShardsIndexDict = {
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
-        "repodata_version": 1,
+        "version": 1,
         "shards": {
             "foo": foo_shard_digest,
             "wrong_package_name": foo_shard_digest,
@@ -156,7 +156,6 @@ def http_server_shards(xprocess, tmp_path_factory):
             "not_zstd": hashlib.sha256(not_zstd).digest(),
             "not_msgpack": hashlib.sha256(not_msgpack).digest(),
         },
-        "removed": [],
     }
     (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
         zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
@@ -203,6 +202,33 @@ def test_fetch_shards_error(http_server_shards):
     # besides ValueError
     with pytest.raises(ValueError):
         found.fetch_shard("not_msgpack")
+
+
+def test_shards_base_url():
+    shards = Shards(
+        {
+            "info": {
+                "subdir": "noarch",
+                "base_url": "",
+                "shards_base_url": "https://shards.example.com/channel-name",
+            },
+            "version": 1,
+            "shards": {"fake_package": b""},
+        },
+        "https://conda.anaconda.org/channel-name/noarch/",
+        None,  # type: ignore
+    )
+
+    assert (
+        shards.shard_url("fake_package") == "https://shards.example.com/channel-name/.msgpack.zst"
+    )
+
+    shards.shards_index["info"]["shards_base_url"] = ""
+
+    assert (
+        shards.shard_url("fake_package")
+        == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
+    )
 
 
 def test_shard_mentioned_packages_2():
