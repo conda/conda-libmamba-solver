@@ -248,7 +248,13 @@ class Shards(ShardLike):
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
         """
-        return urljoin(self.url, self.shards_index["info"]["shards_base_url"])
+        base_url = self.shards_index["info"].get("shards_base_url", "")
+        # IMO shards_base_url should end with a /, to match HTML "base url =
+        # https://example.com/index.html; look for resources under
+        # example.com/<file>". Append / for compatibility.
+        if base_url and not base_url.endswith("/"):
+            base_url += "/"
+        return urljoin(self.url, base_url)
 
     def shard_url(self, package: str) -> str:
         """
