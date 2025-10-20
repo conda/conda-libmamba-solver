@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 SHARD_CACHE_NAME = "repodata_shards.db"
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
 
 
 @dataclass

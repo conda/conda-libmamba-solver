@@ -46,6 +46,8 @@ if TYPE_CHECKING:
 
     from .shards_typing import PackageRecordDict, ShardDict
 
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
+
 
 def ensure_hex_hash(record: PackageRecordDict):
     """
