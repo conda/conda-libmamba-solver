@@ -18,3 +18,4 @@
 
 * Support sharded repodata with hash as `list(bytes)` as created by some
   versions of rattler-index (#748)
+* Append / to base_url, shards_base_url if missing. (#748)
