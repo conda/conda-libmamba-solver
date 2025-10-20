@@ -41,20 +41,20 @@ Additional code in `conda_libmamba_solver/index.py` calls
 `build_repodata_subset()` and converts the resulting repodata to `libmamba`
 objects.
 
-### shards.py
+### `shards.py`
 
 `shards.py` provides an interface to treat sharded repodata and monolithic
 `repodata.json` in the same way. It checks a channel for sharded repodata,
 returning an object that implements the `ShardLike` interface.
 
-### shards_subset.py
+### `shards_subset.py`
 
 `shards_subset.py` accepts a list of `ShardLike` instances and a list of initial
 packages to compute a repodata subset. The traversal is simplified thanks to the
 `ShardLike` interface, so the algorithm doesn't have to worry too much about the
 type of each channel.
 
-### shards_cache.py
+### `shards_cache.py`
 
 `shards_cache.py` implements a sqlite3 cache used to store individual shards.
 When traversing shards, the cache is checked before making a network request.
@@ -77,13 +77,13 @@ whether a channel provides `repodata.json.zst`, and stores `ETag` and
 },
 ```
 
-## shards_typing.py
+## `shards_typing.py`
 
 `shards_typing.py` provides type hints for data structures used in sharded
 repodata, but it is not normative; it only includes fields used by the sharded
 repodata system.
 
-## tests/test_shards.py
+## `tests/test_shards.py`
 
 The sharded repodata tests maintain 100% code coverage of the shards-related code
 `shards*.py`.
