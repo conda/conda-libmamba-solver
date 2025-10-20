@@ -222,7 +222,10 @@ class Shards(ShardLike):
         self.session = get_session(self.shards_base_url)
 
         self.repodata_no_packages = {
-            k: v for k, v in self.shards_index.items() if k not in ("shards",)
+            "info": shards_index["info"],
+            "packages": {},
+            "packages.conda": {},
+            "repodata_version": 2,
         }
 
         # used to write out repodata subset

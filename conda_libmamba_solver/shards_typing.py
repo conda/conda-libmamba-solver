@@ -55,6 +55,7 @@ class RepodataDict(ShardDict):
     """
 
     info: RepodataInfoDict
+    repodata_version: int
 
 
 class ShardsIndexDict(TypedDict):
