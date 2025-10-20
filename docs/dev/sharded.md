@@ -77,13 +77,13 @@ whether a channel provides `repodata.json.zst`, and stores `ETag` and
 },
 ```
 
-## `shards_typing.py`
+### `shards_typing.py`
 
 `shards_typing.py` provides type hints for data structures used in sharded
 repodata, but it is not normative; it only includes fields used by the sharded
 repodata system.
 
-## `tests/test_shards.py`
+### `tests/test_shards.py`
 
 The sharded repodata tests maintain 100% code coverage of the shards-related code
 `shards*.py`.
