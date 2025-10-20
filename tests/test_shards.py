@@ -13,7 +13,6 @@ import logging
 import time
 import urllib.parse
 from contextlib import contextmanager
-from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -143,9 +142,9 @@ def http_server_shards(xprocess, tmp_path_factory):
 
     (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
     not_zstd = b"not zstd"
-    (noarch / f"{sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
+    (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
     not_msgpack = zstandard.compress(b"not msgpack")
-    (noarch / f"{sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
+    (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
     fake_shards: ShardsIndexDict = {
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
         "repodata_version": 1,
@@ -398,6 +397,59 @@ def test_shardlike_repr():
     cls, url, *_ = repr(shardlike).split()
     assert "ShardLike" in cls
     assert shardlike.url == url
+
+
+def test_shard_hash_as_array():
+    """
+    Test that shard hashes can be bytes or list[int], for rattler compatibility.
+    """
+    name = "package"
+    fake_shard: ShardsIndexDict = {
+        "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
+        "repodata_version": 1,
+        "shards": {
+            name: list(hashlib.sha256().digest()),  # type: ignore
+        },
+    }
+
+    fake_shard_2 = fake_shard.copy()
+    fake_shard_2["shards"] = fake_shard["shards"].copy()
+    fake_shard_2["shards"][name] = hashlib.sha256().digest()
+
+    assert isinstance(fake_shard["shards"][name], list)
+    assert isinstance(fake_shard_2["shards"][name], bytes)
+
+    index = Shards(fake_shard, "", None)  # type: ignore
+    index_2 = Shards(fake_shard_2, "", None)  # type: ignore
+
+    shard_url = index.shard_url(name)
+    shard_url_2 = index_2.shard_url(name)
+    assert shard_url == shard_url_2
+
+
+def test_ensure_hex_hash_in_record():
+    """
+    Test that ensure_hex_hash_in_record() converts bytes to hex strings.
+    """
+    name = "package"
+    sha256_hash = hashlib.sha256()
+    md5_hash = hashlib.md5()
+    for sha, md5 in [
+        (sha256_hash.digest(), md5_hash.digest()),
+        (list(sha256_hash.digest()), list(md5_hash.digest())),
+        (sha256_hash.hexdigest(), md5_hash.hexdigest()),
+    ]:
+        record = {
+            "name": name,
+            "sha256": sha,
+            "md5": md5,
+        }
+
+        updated = shards.ensure_hex_hash(record)  # type: ignore
+        assert isinstance(updated["sha256"], str)  # type: ignore
+        assert updated["sha256"] == sha256_hash.hexdigest()  # type: ignore
+        assert isinstance(updated["md5"], str)  # type: ignore
+        assert updated["md5"] == md5_hash.hexdigest()  # type: ignore
 
 
 ROOT_PACKAGES = [

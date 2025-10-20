@@ -53,8 +53,8 @@ def ensure_hex_hash(record: PackageRecordDict):
     """
     for hash_type in "sha256", "md5":
         if hash_value := record.get(hash_type):
-            if isinstance(hash_value, bytes):
-                record[hash_type] = hash_value.hex()
+            if not isinstance(hash_value, str):
+                record[hash_type] = bytes(hash_value).hex()
     return record
 
 
@@ -229,7 +229,7 @@ class Shards(ShardLike):
 
         Raise KeyError if package is not in the index.
         """
-        shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
+        shard_name = f"{bytes(self.packages_index[package]).hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return urljoin(self.shards_base_url, shard_name)
 
