@@ -230,6 +230,23 @@ def test_shards_base_url():
         == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
     )
 
+    # no-trailing-/ example from prefix.dev metadata
+    shards.url = "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst"
+    shards.shards_index["info"]["base_url"] = "https://prefix.dev/conda-forge/osx-arm64"
+    # shards_base_url should be suitable for string concatenation
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/"
+    assert (
+        shards.shard_url("fake_package") == "https://prefix.dev/conda-forge/osx-arm64/.msgpack.zst"
+    )
+
+    # relative shards_base_url
+    shards.shards_index["info"]["shards_base_url"] = "./shards/"
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/shards/"
+
+    # relative shards_base_url, with parent directory (not likely in the wild)
+    shards.shards_index["info"]["shards_base_url"] = "../shards"
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/shards/"
+
 
 def test_shard_mentioned_packages_2():
     assert set(shard_mentioned_packages_2(FAKE_SHARD)) == set(

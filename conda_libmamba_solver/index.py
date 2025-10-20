@@ -590,9 +590,7 @@ class LibMambaIndexHelper:
             channel_object = Channel(channel_url)
             channel_id = self._channel_to_id(channel_object)
             base_url = shardlike.base_url
-            assert base_url.endswith(("repodata.json", "repodata_shards.msgpack.zst")), (
-                "Unexpected shardlike base_url"
-            )  # XXX can there be ?parameters
+
             # avoid calling urljoin many times
             base_url_concat = base_url.rsplit("/", 1)[0]
             packages = []
