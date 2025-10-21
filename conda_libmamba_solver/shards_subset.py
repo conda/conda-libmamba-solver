@@ -175,7 +175,9 @@ class RepodataSubset:
                 continue
 
             # check that we don't fetch the same shard twice...
-            shard = shardlike.fetch_shard(node.package)
+            shard = shardlike.fetch_shard(
+                node.package
+            )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
 
             for package in shard_mentioned_packages_2(shard):
                 node_id = NodeId(package, shardlike.url)
@@ -215,7 +217,7 @@ class RepodataSubset:
         self.nodes = dict(initial_nodes())
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        to_retrieve = set(self.nodes)
+        to_retrieve = set(self.nodes)  # XXX below, it expects set[str]
         retrieved: set[NodeId] = set()
         while unvisited:
             # parallel fetch all unvisited shards but don't mark as visited
