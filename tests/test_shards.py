@@ -10,11 +10,13 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 import time
 import urllib.parse
 from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
+from queue import SimpleQueue
 from typing import TYPE_CHECKING
 
 import msgpack
@@ -285,12 +287,16 @@ def test_shard_cache(tmp_path: Path):
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
-def test_shard_cache_multiple(tmp_path: Path):
-    """
-    Test that retrieve_multiple() is equivalent to several retrieve() calls.
-    """
-    NUM_FAKE_SHARDS = 64
+NUM_FAKE_SHARDS = 64
 
+
+@pytest.fixture
+def shard_cache_with_data(
+    tmp_path: Path,
+) -> tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]]:
+    """
+    ShardCache with some data already inserted.
+    """
     cache = shards_cache.ShardCache(tmp_path)
     fake_shards = []
 
@@ -304,6 +310,18 @@ def test_shard_cache_multiple(tmp_path: Path):
         )
         cache.insert(annotated_shard)
         fake_shards.append(annotated_shard)
+
+    return cache, fake_shards
+
+
+def test_shard_cache_multiple(
+    tmp_path: Path,
+    shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
+):
+    """
+    Test that retrieve_multiple() is equivalent to several retrieve() calls.
+    """
+    cache, fake_shards = shard_cache_with_data
 
     start_multiple = time.monotonic_ns()
     retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
@@ -598,3 +616,52 @@ def test_shards_connections(monkeypatch):
 
     monkeypatch.setattr(context, "_repodata_threads", 4)
     assert _shards_connections() == 4
+
+
+# region pipeline
+
+
+def test_sqlite3_thread(
+    shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
+):
+    """
+    Test sqlite3 retrieval thread.
+    """
+    cache, fake_shards = shard_cache_with_data
+    in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
+    shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
+    network_out_queue: SimpleQueue[list[str]] = SimpleQueue()
+
+    # this kind of thread can crash, and we don't hear back without our own
+    # handling.
+    cache_thread = threading.Thread(
+        target=shards_subset.cache_fetch_thread,
+        args=(in_queue, shard_out_queue, network_out_queue, cache),
+        daemon=False,
+    )
+
+    fake_shards_urls = [shard.url for shard in fake_shards]
+
+    # several batches, then None "finish thread" sentinel
+    in_queue.put(fake_shards_urls[:1])
+    in_queue.put(["https://example.com/notfound"])
+    in_queue.put(fake_shards_urls[1:3])
+    in_queue.put(["https://example.com/notfound2", "https://example.com/notfound3"])
+    in_queue.put(fake_shards_urls[3:])
+    in_queue.put(None)
+
+    cache_thread.start()
+
+    while batch := shard_out_queue.get(timeout=1):
+        for url, shard in batch:
+            assert url in fake_shards_urls
+            assert shard == cache.retrieve(url)
+
+    while notfound := network_out_queue.get(timeout=1):
+        for url in notfound:
+            assert url.startswith("https://example.com/notfound")
+
+    cache_thread.join(5)
+
+
+# endregion
