@@ -310,6 +310,9 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+
+      - name: Fix .xonshrc
+        run: python conda_libmamba_solver/dev/scripts/fix_xonshrc.py
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -324,7 +327,7 @@ jobs:
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
-        run: sudo apt update && sudo apt install ash csh fish tcsh zsh # CONDA-LIBMAMBA-SOLVER CHANGE (omit xonsh)
+        run: sudo apt update && sudo apt install ash csh fish tcsh xonsh zsh
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -595,6 +598,9 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+
+      - name: Fix .xonshrc
+        run: python conda_libmamba_solver/dev/scripts/fix_xonshrc.py
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -609,7 +615,7 @@ jobs:
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
-        run: brew update && brew install fish  # CONDA-LIBMAMBA-SOLVER CHANGE (omit xonsh)
+        run: brew update && brew install fish xonsh
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
