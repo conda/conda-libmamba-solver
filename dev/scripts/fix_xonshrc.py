@@ -1,3 +1,6 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Fix .xonshrc to work around an indentation bug related to
 https://github.com/conda-incubator/setup-miniconda/blame/f77e237980e9445f93e2033f0c4a695a697a967a/src/conda.ts#L387-L397
