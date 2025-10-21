@@ -324,7 +324,7 @@ jobs:
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
-        run: sudo apt update && sudo apt install ash csh fish tcsh xonsh zsh
+        run: sudo apt update && sudo apt install ash csh fish tcsh zsh # CONDA-LIBMAMBA-SOLVER CHANGE (omit xonsh)
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -609,7 +609,7 @@ jobs:
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
-        run: brew update && brew install fish xonsh
+        run: brew update && brew install fish  # CONDA-LIBMAMBA-SOLVER CHANGE (omit xonsh)
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE

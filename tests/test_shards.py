@@ -644,11 +644,3 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     assert remaining == []
 
     # XXX don't call everything Shard/Shards
-
-
-def test_print_xonshrc():
-    xonshrc = Path("/home/runner/.xonshrc")
-    if xonshrc.exists():
-        print("xonshrc:")
-        print(xonshrc.read_text())
-    assert False, "Deliberate failure to see xonshrc contents"
