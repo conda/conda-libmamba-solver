@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 
     from .shards_typing import PackageRecordDict, ShardDict
 
-ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data has no size header
 # For reference, the largest shard "conda-forge/linux-64/vim" is 2608283 bytes
 # or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
 # decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
