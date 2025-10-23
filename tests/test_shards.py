@@ -658,7 +658,7 @@ def test_shards_connections(monkeypatch):
     assert _shards_connections() == 10  # requests' default
 
     poolmanager = (
-        get_session("https://repo.anaconda.com/pkgs/main").get_adapter("https://").poolmanager
+        CondaSession().get_adapter("https://").poolmanager
     )  # type: ignore
     monkeypatch.setattr(poolmanager, "connection_pool_kw", {"no_maxsize": 0})
 
