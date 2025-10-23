@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     from .shards_typing import PackageRecordDict, ShardDict
 
 SHARDS_CONNECTIONS_DEFAULT = 10
-ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data has no size header
 # For reference, the largest shard "conda-forge/linux-64/vim" is 2608283 bytes
 # or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
 # decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
@@ -83,8 +83,8 @@ def ensure_hex_hash(record: PackageRecordDict):
     """
     for hash_type in "sha256", "md5":
         if hash_value := record.get(hash_type):
-            if isinstance(hash_value, bytes):
-                record[hash_type] = hash_value.hex()
+            if not isinstance(hash_value, str):
+                record[hash_type] = bytes(hash_value).hex()
     return record
 
 
@@ -164,7 +164,9 @@ class ShardLike:
 
         Note base_url can be a relative or an absolute url.
         """
-        return urljoin(self.url, self._base_url)
+        return urljoin(
+            urljoin(self.url, self._base_url), "."
+        )  # TODO do not call urljoin() when url, _base_url are unchanged
 
     def __contains__(self, package: str) -> bool:
         return package in self.package_names
@@ -201,6 +203,16 @@ class ShardLike:
             for package_group in ("packages", "packages.conda"):
                 repodata[package_group].update(shard[package_group])
         return repodata
+
+
+def _shards_base_url(url, shards_base_url) -> str:
+    """
+    Return shards_base_url joined with base_url and url.
+    Note shards_base_url can be a relative or an absolute url.
+    """
+    if shards_base_url and not shards_base_url.endswith("/"):
+        shards_base_url += "/"
+    return urljoin(urljoin(url, shards_base_url), ".")
 
 
 class Shards(ShardLike):
@@ -254,13 +266,8 @@ class Shards(ShardLike):
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
         """
-        base_url = self.shards_index["info"].get("shards_base_url", "")
-        # IMO shards_base_url should end with a /, to match HTML "base url =
-        # https://example.com/index.html; look for resources under
-        # example.com/<file>". Append / for compatibility.
-        if base_url and not base_url.endswith("/"):
-            base_url += "/"
-        return urljoin(self.url, base_url)
+        shards_base_url_ = self.shards_index["info"].get("shards_base_url", "")
+        return _shards_base_url(self.url, shards_base_url_)
 
     def shard_url(self, package: str) -> str:
         """
@@ -268,9 +275,9 @@ class Shards(ShardLike):
 
         Raise KeyError if package is not in the index.
         """
-        shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
+        shard_name = f"{bytes(self.packages_index[package]).hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.shards_base_url, shard_name)
+        return f"{self.shards_base_url}{shard_name}"
 
     def fetch_shard(self, package: str) -> ShardDict:
         """
