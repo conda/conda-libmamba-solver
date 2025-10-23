@@ -575,7 +575,7 @@ jobs:
           run-post: false  # skip post cleanup
           # conda not preinstalled in arm64 runners
           miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
-          miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-arm64') && 'latest' || null }}
+          miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
 
       - name: Conda Install
