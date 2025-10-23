@@ -8,8 +8,7 @@
 
 ### Deprecations
 
-* Remove osx-64 from test matrix, as osx-64 dependencies are no longer being
-  built. (#729)
+* <news item>
 
 ### Docs
 
@@ -17,4 +16,4 @@
 
 ### Other
 
-* <news item>
+* Test osx-64 with `conda-forge`, and osx-arm64 with `defaults`, since Anaconda does not build osx-64 dependencies anymore. (#729, #747)
