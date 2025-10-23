@@ -55,7 +55,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
         "pip",
         "python=3.11",
     ) as prefix:
-        assert PrefixData(prefix).get("python").version.startswith("3.10")
+        assert PrefixData(prefix).get("python").version.startswith("3.11")
         if on_win:
             pip = str(prefix / "Scripts" / "pip.exe")
         else:
@@ -71,6 +71,8 @@ def test_python_downgrade_reinstalls_noarch_packages(
             "--yes",
             "python=3.10",
         )
+        PrefixData._cache_.clear()
+        assert PrefixData(prefix).get("python").version.startswith("3.10")
         check_call([pip, "--version"])
 
 
