@@ -22,6 +22,7 @@ import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
+from conda.gateways.connection.session import CondaSession
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
@@ -33,6 +34,7 @@ from conda_libmamba_solver.index import (
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
+    _shards_connections,
     batch_retrieve_from_cache,
     fetch_shards_index,
     shard_mentioned_packages_2,
@@ -137,7 +139,6 @@ def http_server_shards(xprocess, tmp_path_factory):
 
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
-    # XXX not-zstandard; not msgpack
     malformed_digest = hashlib.sha256(bad_schema).digest()
 
     (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
@@ -188,7 +189,6 @@ def test_fetch_shards_error(http_server_shards):
     assert shard_a == shard_c
 
     with pytest.raises(requests.exceptions.HTTPError):
-        # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
 
     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
@@ -561,6 +561,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 
     assert len(package_info), "no packages in subset"
 
+    print(f"{len(package_info)} packages in subset")
+
     with _timer("write_repodata_subset()"):
         repodata_size = repodata_subset_size(channel_data)
     print(f"Repodata subset would be {repodata_size} bytes as json")
@@ -644,3 +646,20 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     assert remaining == []
 
     # XXX don't call everything Shard/Shards
+
+
+def test_shards_connections(monkeypatch):
+    """
+    Test _shards_connections() and execute all its code.
+    """
+    assert context.repodata_threads is None
+    assert _shards_connections() == 10  # requests' default
+
+    poolmanager = CondaSession().get_adapter("https://").poolmanager  # type: ignore
+    monkeypatch.setattr(poolmanager, "connection_pool_kw", {"no_maxsize": 0})
+
+    monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
+    assert _shards_connections() == 7
+
+    monkeypatch.setattr(context, "_repodata_threads", 4)
+    assert _shards_connections() == 4

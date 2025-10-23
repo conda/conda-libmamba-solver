@@ -59,12 +59,31 @@ if TYPE_CHECKING:
 class Node:
     distance: int = sys.maxsize
     package: str = ""
+    channel: str = ""
     visited: bool = False
+
+    def to_id(self) -> NodeId:
+        return NodeId(self.package, self.channel)
+
+    def in_shard(self, shardlike: ShardLike) -> bool:
+        return self.channel == shardlike.url
+
+
+@dataclass(order=True, eq=True, frozen=True)
+class NodeId:
+    package: str
+    channel: str
+
+    def __hash__(self):
+        return hash((self.package, self.channel))
+
+    def in_shard(self, shardlike: ShardLike):
+        return self.channel == shardlike.url
 
 
 @dataclass
 class RepodataSubset:
-    nodes: dict[str, Node]
+    nodes: dict[NodeId, Node]
     shardlikes: list[ShardLike]
 
     def __init__(self, shardlikes):
@@ -76,32 +95,25 @@ class RepodataSubset:
         All neighbors for node.
         """
         discovered = set()
+
         for shardlike in self.shardlikes:
-            if node.package in shardlike:
-                # check that we don't fetch the same shard twice...
-                shard = shardlike.fetch_shard(node.package)
-                for package in shard_mentioned_packages_2(shard):
-                    # shard_mentioned_packages_2 doesn't include the shard's own
-                    # package name. Do we need to broadcast node.package across
-                    # channels, or will the incoming node have already taken
-                    # care of it for us?
-                    if package not in self.nodes:
-                        self.nodes[package] = Node(node.distance + 1, package)
-                        # by moving yield up here we try to only visit dependencies
-                        # that no other node already knows about. Doesn't make it faster.
-                        if package not in discovered:  # redundant with not in self.nodes?
-                            log.debug(f"{json.dumps(node.package)} -> {json.dumps(package)};")
-                        yield self.nodes[package]
+            if node.package not in shardlike:
+                continue
+
+            # check that we don't fetch the same shard twice...
+            shard = shardlike.fetch_shard(node.package)
+
+            for package in shard_mentioned_packages_2(shard):
+                node_id = NodeId(package, shardlike.url)
+
+                if node_id not in self.nodes:
+                    self.nodes[node_id] = Node(node.distance + 1, package, shardlike.url)
+                    yield self.nodes[node_id]
+
                     if package not in discovered:
-                        pass
-                        # dot format valid ids: https://graphviz.org/doc/info/lang.html#ids (or quote string)
-
-                        # we might not require "in self.nodes" neighbors since
-                        # we don't need to find the shortest path
-
-                        # yield self.nodes[package]
-
-                    discovered.add(package)  # also doesn't make it faster
+                        # now this is per package name, not per (name, channel) tuple
+                        log.debug("%s -> %s;", json.dumps(node.package), json.dumps(package))
+                        discovered.add(package)
 
     def outgoing(self, node: Node):
         """
@@ -117,11 +129,20 @@ class RepodataSubset:
 
     def shortest(self, start_packages):
         # nodes.visited and nodes.distance should be reset before calling
-        self.nodes = {package: Node(0, package) for package in start_packages}
+
+        def initial_nodes():
+            for package in start_packages:
+                for shardlike in self.shardlikes:
+                    if package in shardlike:
+                        node = Node(0, package, shardlike.url)
+                        node_id = node.to_id()
+                        yield (node_id, node)
+
+        self.nodes = dict(initial_nodes())
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        to_retrieve: set[str] = set(self.nodes)
-        retrieved: set[str] = set()
+        to_retrieve = set(self.nodes)
+        retrieved: set[NodeId] = set()
         while unvisited:
             # parallel fetch all unvisited shards but don't mark as visited
             if to_retrieve:
