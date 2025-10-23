@@ -470,7 +470,7 @@ def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -
                 *solver,
                 "--dry-run",
                 "--json",
-                "python=3.10",
+                "python=3.9",
                 env=env,
                 check=False,
             )
@@ -480,7 +480,7 @@ def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -
             assert data.get("dry_run")
             link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}
             unlink_dict = {pkg["name"]: pkg for pkg in data["actions"]["UNLINK"]}
-            assert link_dict["python"]["version"].startswith("3.10.")
+            assert link_dict["python"]["version"].startswith("3.9.")
             assert "truststore" in unlink_dict
             if pin:
                 # shouldn't have changed!
