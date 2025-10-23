@@ -1,15 +1,17 @@
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """
 Profile shard fetch components
 """
 
 from pathlib import Path
 
-import pytest
 import msgpack
+import pytest
 import zstandard
 
 from conda_libmamba_solver import shards_cache
-
 
 
 @pytest.mark.benchmark
