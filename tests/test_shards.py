@@ -138,7 +138,6 @@ def http_server_shards(xprocess, tmp_path_factory):
 
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
-    # XXX not-zstandard; not msgpack
     malformed_digest = hashlib.sha256(bad_schema).digest()
 
     (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
@@ -189,7 +188,6 @@ def test_fetch_shards_error(http_server_shards):
     assert shard_a == shard_c
 
     with pytest.raises(requests.exceptions.HTTPError):
-        # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
 
     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
