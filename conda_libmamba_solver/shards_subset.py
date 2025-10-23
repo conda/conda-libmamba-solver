@@ -154,7 +154,6 @@ def network_fetch_thread(
     running = True
 
     def fetch(s, url):
-        # due to cache, the same url won't be fetched twice
         response = s.get(url)
         response.raise_for_status()
         # This needs to be decompressed and parsed, and go into the cache as raw
