@@ -52,6 +52,7 @@ class RepodataDict(ShardDict):
     """
 
     info: RepodataInfoDict
+    repodata_version: int
 
 
 class ShardsIndexDict(TypedDict):
@@ -60,6 +61,5 @@ class ShardsIndexDict(TypedDict):
     """
 
     info: RepodataInfoDict
-    repodata_version: int
-    removed: list[str]
+    version: int  # TODO conda-index currently uses 'repodata_version' here
     shards: dict[str, bytes]
