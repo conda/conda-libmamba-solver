@@ -644,3 +644,48 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     assert remaining == []
 
     # XXX don't call everything Shard/Shards
+
+
+@pytest.fixture()
+def cache(tmp_path: Path):
+    """
+    Setup a shard cache that will be used by multiple benchmark tests.
+    """
+    cache = shards_cache.ShardCache(tmp_path)
+    yield cache
+    cache.clear_cache()
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("retrieval_type", ["retrieve_multiple", "retrieve_single"])
+def test_shard_cache_multiple_profile(retrieval_type, cache: cache.ShardCache):
+    """
+    Measure the difference between `shards_cache.retrieve_multiple` and `shards_cache.retrieve`.
+
+    `shards_cache.retrieve_multiple should be faster than `shards_cache.retrieve`.
+    """
+    NUM_FAKE_SHARDS = 64
+    fake_shards = []
+
+    compressor = zstandard.ZstdCompressor(level=1)
+    for i in range(NUM_FAKE_SHARDS):
+        fake_shard = {f"foo{i}": "bar"}
+        annotated_shard = shards_cache.AnnotatedRawShard(
+            f"https://foo{i}",
+            f"foo{i}",
+            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
+        )
+        cache.insert(annotated_shard)
+        fake_shards.append(annotated_shard)
+
+    if retrieval_type == "retrieve_multiple":
+        retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
+        assert len(retrieved) == NUM_FAKE_SHARDS
+
+    elif retrieval_type == "retrieve_single":
+        retrieved = {}
+        for i, url in enumerate([shard.url for shard in fake_shards]):
+            single = cache.retrieve(url)
+            retrieved[url] = single
+
+        assert len(retrieved) == NUM_FAKE_SHARDS
