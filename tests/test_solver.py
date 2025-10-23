@@ -69,7 +69,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
             "--override-channels",
             "--channel=conda-forge",
             "--yes",
-            "python=3.9",
+            "python=3.10",
         )
         check_call([pip, "--version"])
 
@@ -300,7 +300,7 @@ def test_pinned_with_cli_build_string(tmp_env: TmpEnvFixture) -> None:
 
 def test_constraining_pin_and_requested():
     env = os.environ.copy()
-    env["CONDA_PINNED_PACKAGES"] = "python=3.9"
+    env["CONDA_PINNED_PACKAGES"] = "python=3.10"
 
     # This should fail because it contradicts the pinned packages
     p = conda_subprocess(
@@ -470,7 +470,7 @@ def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -
                 *solver,
                 "--dry-run",
                 "--json",
-                "python=3.9",
+                "python=3.10",
                 env=env,
                 check=False,
             )
@@ -480,7 +480,7 @@ def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -
             assert data.get("dry_run")
             link_dict = {pkg["name"]: pkg for pkg in data["actions"]["LINK"]}
             unlink_dict = {pkg["name"]: pkg for pkg in data["actions"]["UNLINK"]}
-            assert link_dict["python"]["version"].startswith("3.9.")
+            assert link_dict["python"]["version"].startswith("3.10.")
             assert "truststore" in unlink_dict
             if pin:
                 # shouldn't have changed!
