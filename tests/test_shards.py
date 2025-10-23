@@ -22,6 +22,7 @@ import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
+from conda.gateways.connection.session import CondaSession
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
