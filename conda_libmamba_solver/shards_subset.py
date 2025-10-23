@@ -32,6 +32,7 @@ can be used by a shards-unaware solver.
 
 from __future__ import annotations
 
+import concurrent.futures
 import heapq
 import json
 import logging
@@ -41,8 +42,11 @@ from contextlib import suppress
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import requests.exceptions  # XXX conda gateway import instead?
+
 from .shards import (
     Shards,
+    _shards_connections,
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
@@ -134,25 +138,59 @@ def cache_fetch_thread(
 
 
 def network_fetch_thread(
-    in_queue: Queue[NodeId],
-    shard_out_queue: Queue[tuple[ShardLike, ShardDict]],
+    in_queue: Queue[list[str] | None],
+    shard_out_queue: Queue[list[tuple[str, bytes]] | None],
+    # how to communicate errors?
+    session,
 ):
     """
-    in_queue contains (channel, package) tuples to fetch over the network.
+    in_queue contains urls to fetch over the network.
     While the in_queue has not received a sentinel None, empty everything from
     the queue. Fetch all of them over the network. Fetched shards go to
     shard_out_queue.
     """
-    while (item := in_queue.get()) is not None:
-        items = [item]
-        with suppress(queue.Empty):
-            while True:
-                items.append(in_queue.get_nowait())
+    running = True
 
-        ...
-        # generate url's for all items
-        # call Shards.batch_retrieve_from_network(not_in_cache)
-        # all fetched shards go to shard_out_queue (do we need a Node that includes the ShardLike() (i.e. channel)?
+    def fetch(s, url):
+        # due to cache, the same url won't be fetched twice
+        response = s.get(url)
+        response.raise_for_status()
+        # This needs to be decompressed and parsed, and go into the cache as raw
+        # content if it was really .msgpack.zst. shard_out_queue for
+        # cache_fetch_thread produces ShardDict but this produces bytes; would
+        # be better if they produced the same type.
+        shard_out_queue.put([(url, response.content)])
+        data = response.content
+        return (url, data)  # needs to be
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        while running and (batch := in_queue.get()) is not None:
+            shard_urls = batch[:]
+            with suppress(queue.Empty):
+                while running:
+                    batch = in_queue.get_nowait()
+                    if batch is None:
+                        # do the work but then quit
+                        running = False
+                        break
+                    shard_urls.extend(batch)
+                    futures = [executor.submit(fetch, session, url) for url in shard_urls]
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            url, data = future.result()
+                            log.debug("Fetch thread got", url, len(data))
+                        except requests.exceptions.RequestException as e:
+                            log.error("Error fetching shard", e)
+
+                        # This will drain the http threadpool before loading another
+                        # batch. Instead, we might want to get_nowait() and
+                        # executor.submit() here after each future has been
+                        # retired to make sure we always have
+                        # _shards_connections() in flight. Or we could use
+                        # future "on completion" callbacks instead of relying so
+                        # much on as_completed().
+
+    shard_out_queue.put(None)
 
 
 @dataclass
@@ -203,11 +241,11 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
-    def shortest(self, start_packages):
+    def shortest(self, root_packages):
         # nodes.visited and nodes.distance should be reset before calling
 
         def initial_nodes():
-            for package in start_packages:
+            for package in root_packages:
                 for shardlike in self.shardlikes:
                     if package in shardlike:
                         node = Node(0, package, shardlike.url)
@@ -242,6 +280,24 @@ class RepodataSubset:
                     next.distance = min(node.distance + cost, next.distance)
                     to_retrieve.add(next.package)
                     heapq.heappush(unvisited, (next.distance, next))
+
+    def shortest_threaded(self, root_packages):
+        """
+        Build repodata subset using a main thread, a thread to fetch from
+        sqlite3 and another threadpool to fetch http.
+        """
+
+        def initial_nodes():
+            for package in root_packages:
+                for shardlike in self.shardlikes:
+                    if package in shardlike:
+                        node = Node(0, package, shardlike.url)
+                        node_id = node.to_id()
+                        yield (node_id, node)
+
+        self.nodes = dict(initial_nodes())
+
+        # see test_*_thread in test_shards.py for how to set up the workers
 
 
 def build_repodata_subset(root_packages, channels):

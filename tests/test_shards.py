@@ -664,4 +664,42 @@ def test_sqlite3_thread(
     cache_thread.join(5)
 
 
+def test_shards_network_thread(http_server_shards):
+    """
+    Test network retrieval thread, meant to be chained after the sqlite3 thread
+    by having network_in_queue = sqlite3 thread's network_out_queue.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+    found = fetch_shards_index(subdir_data)
+    assert found
+
+    network_in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
+    shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
+
+    # this kind of thread can crash, and we don't hear back without our own
+    # handling.
+    network_thread = threading.Thread(
+        target=shards_subset.network_fetch_thread,
+        args=(network_in_queue, shard_out_queue, found.session),
+        daemon=False,
+    )
+
+    shards_urls = list(found.shard_url(package) for package in found.shards_index["shards"])
+
+    # several batches, then None "finish thread" sentinel
+    network_in_queue.put(shards_urls[:1])
+    network_in_queue.put(["https://example.com/notfound"])
+    network_in_queue.put(shards_urls[1:])
+    network_in_queue.put(None)
+
+    network_thread.start()
+
+    while batch := shard_out_queue.get(timeout=1):
+        for url, shard in batch:
+            print(url, type(shard))
+
+    network_thread.join(5)
+
+
 # endregion
