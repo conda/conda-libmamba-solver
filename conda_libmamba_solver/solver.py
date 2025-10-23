@@ -1028,18 +1028,46 @@ class LibMambaSolver(Solver):
         # manually check base prefix since `PrefixData(...).get("conda", None) is expensive
         # once prefix data is lazy this might be a different situation
         current_conda_prefix_rec = None
+        conda_self_installed = False
+        conda_frozen_file_found = False
         conda_meta_prefix_directory = os.path.join(context.conda_prefix, "conda-meta")
         with suppress(OSError, ValueError):
             if os.path.lexists(conda_meta_prefix_directory):
                 for entry in os.scandir(conda_meta_prefix_directory):
-                    if (
-                        entry.is_file()
-                        and entry.name.endswith(".json")
-                        and entry.name.rsplit("-", 2)[0] == "conda"
-                    ):
-                        with open(entry.path) as f:
-                            current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
-                        break
+                    # check if the current conda has been found yet
+                    if current_conda_prefix_rec is None:
+                        if (
+                            entry.is_file()
+                            and entry.name.endswith(".json")
+                            and entry.name.rsplit("-", 2)[0] == "conda"
+                        ):
+                            with open(entry.path) as f:
+                                current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
+                            continue
+                    # check if conda-self is installed
+                    if not conda_self_installed:
+                        if (
+                            entry.is_file()
+                            and entry.name.endswith(".json")
+                            and entry.name.rsplit("-", 2)[0] == "conda-self"
+                        ):
+                            conda_self_installed = True
+                            # check if current conda has been found
+                            if current_conda_prefix_rec is None:
+                                continue
+                            else:
+                                # current conda already found and conda-self is installed
+                                # no more information is needed
+                                break
+                    if not conda_frozen_file_found:
+                        if (
+                            entry.is_file()
+                            and entry.name == "frozen"
+                        ):
+                            # frozen maker file found in conda-meta directory
+                            conda_frozen_file_found = True
+                            continue
+
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
             # running from. Unless something is really wrong, this should never happen.
@@ -1072,21 +1100,56 @@ class LibMambaSolver(Solver):
         # print instructions to stderr if we found a newer conda
         if conda_newer_records:
             newest = max(conda_newer_records, key=lambda x: VersionOrder(x.version))
-            print(
-                dedent(
-                    f"""
+            if conda_self_installed:
+                print(
+                    dedent(
+                        f"""
 
-                    ==> WARNING: A newer version of conda exists. <==
-                        current version: {_conda_version}
-                        latest version: {newest.version}
+                        ==> WARNING: A newer version of conda exists. <==
+                            current version: {_conda_version}
+                            latest version: {newest.version}
 
-                    Please update conda by running
+                        Please update conda by running
 
-                        $ conda update -n base -c {channel_name} conda
+                            $ conda self update
 
-                    """
-                ),
-                file=sys.stderr,
-            )
+                        """
+                    ),
+                    file=sys.stderr,
+                )
+            elif conda_frozen_file_found:
+                print(
+                    dedent(
+                        f"""
+
+                        ==> WARNING: A newer version of conda exists. <==
+                            current version: {_conda_version}
+                            latest version: {newest.version}
+
+                        Please update conda by running
+
+                            $ conda update -n base -c {channel_name} conda --override-frozen
+
+                        """
+                    ),
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    dedent(
+                        f"""
+
+                        ==> WARNING: A newer version of conda exists. <==
+                            current version: {_conda_version}
+                            latest version: {newest.version}
+
+                        Please update conda by running
+
+                            $ conda update -n base -c {channel_name} conda
+
+                        """
+                    ),
+                    file=sys.stderr,
+                )
 
     # endregion
