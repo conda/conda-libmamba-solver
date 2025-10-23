@@ -53,7 +53,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
         "--channel=conda-forge",
         "--solver=libmamba",
         "pip",
-        "python=3.10",
+        "python=3.11",
     ) as prefix:
         assert PrefixData(prefix).get("python").version.startswith("3.10")
         if on_win:
@@ -309,7 +309,7 @@ def test_constraining_pin_and_requested():
         "unused",
         "--dry-run",
         "--json",
-        "python=3.10",
+        "python=3.11",
         "--override-channels",
         "-c",
         "conda-forge",
