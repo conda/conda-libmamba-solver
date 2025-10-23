@@ -117,7 +117,7 @@ def test_install_vaex_from_conda_forge_and_defaults(conda_cli: CondaCLIFixture) 
         "create",
         "--dry-run",
         *_channels_as_args(["conda-forge", "defaults"]),
-        "python=3.10",
+        "python=3.9",
         "vaex",
         raises=DryRunExit,
     )

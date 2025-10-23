@@ -46,7 +46,7 @@ def test_channel_matchspec(conda_cli: CondaCLIFixture, path_factory: PathFactory
         "--override-channels",
         "--channel=defaults",
         "conda-forge::libblas=*=*openblas",
-        "python=3.10",
+        "python=3.9",
     )
     result = json.loads(stdout)
     assert result["success"] is True
