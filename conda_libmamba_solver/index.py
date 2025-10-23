@@ -113,8 +113,8 @@ from conda_libmamba_solver.shards_subset import build_repodata_subset
 from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-    from typing import Any, Callable, Literal
+    from collections.abc import Callable, Iterable
+    from typing import Any, Literal
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
