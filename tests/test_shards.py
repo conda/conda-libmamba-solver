@@ -22,7 +22,6 @@ import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import get_session
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
@@ -657,9 +656,7 @@ def test_shards_connections(monkeypatch):
     assert context.repodata_threads is None
     assert _shards_connections() == 10  # requests' default
 
-    poolmanager = (
-        CondaSession().get_adapter("https://").poolmanager
-    )  # type: ignore
+    poolmanager = CondaSession().get_adapter("https://").poolmanager  # type: ignore
     monkeypatch.setattr(poolmanager, "connection_pool_kw", {"no_maxsize": 0})
 
     monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
