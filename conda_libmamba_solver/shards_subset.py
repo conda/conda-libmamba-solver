@@ -38,8 +38,10 @@ import json
 import logging
 import queue
 import sys
+import threading
 from contextlib import suppress
 from dataclasses import dataclass
+from queue import SimpleQueue
 from typing import TYPE_CHECKING
 
 import requests.exceptions  # XXX conda gateway import instead?
@@ -193,6 +195,18 @@ def network_fetch_thread(
     shard_out_queue.put(None)
 
 
+def _nodes_from_packages(root_packages: list[str], shardlikes: list[ShardLike]):
+    """
+    Yield (NodeId, Node) for all root packages found in shardlikes.
+    """
+    for package in root_packages:
+        for shardlike in shardlikes:
+            if package in shardlike:
+                node = Node(0, package, shardlike.url)
+                node_id = node.to_id()
+                yield (node_id, node)
+
+
 @dataclass
 class RepodataSubset:
     nodes: dict[NodeId, Node]
@@ -244,15 +258,8 @@ class RepodataSubset:
     def shortest(self, root_packages):
         # nodes.visited and nodes.distance should be reset before calling
 
-        def initial_nodes():
-            for package in root_packages:
-                for shardlike in self.shardlikes:
-                    if package in shardlike:
-                        node = Node(0, package, shardlike.url)
-                        node_id = node.to_id()
-                        yield (node_id, node)
+        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
-        self.nodes = dict(initial_nodes())
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
         to_retrieve = set(self.nodes)  # XXX below, it expects set[str]
@@ -281,23 +288,67 @@ class RepodataSubset:
                     to_retrieve.add(next.package)
                     heapq.heappush(unvisited, (next.distance, next))
 
-    def shortest_threaded(self, root_packages):
+    def shortest_pipelined(self, root_packages):
         """
         Build repodata subset using a main thread, a thread to fetch from
         sqlite3 and another threadpool to fetch http.
         """
 
-        def initial_nodes():
-            for package in root_packages:
-                for shardlike in self.shardlikes:
-                    if package in shardlike:
-                        node = Node(0, package, shardlike.url)
-                        node_id = node.to_id()
-                        yield (node_id, node)
+        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
-        self.nodes = dict(initial_nodes())
+        # if sharded is empty, we could skip everything related to threads.
+        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
+        cache = sharded[0].shards_cache if sharded else None
+        session = sharded[0].session if sharded else None
+
+        in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
+        shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
+        cache_miss_queue: SimpleQueue[list[str]] = SimpleQueue()
+
+        # this kind of thread can crash, and we don't hear back without our own
+        # handling.
+        cache_thread = threading.Thread(
+            target=cache_fetch_thread,
+            args=(in_queue, shard_out_queue, cache_miss_queue, cache),
+            daemon=False,
+        )
+
+        # this kind of thread can crash, and we don't hear back without our own
+        # handling.
+        network_thread = threading.Thread(
+            target=network_fetch_thread,
+            args=(cache_miss_queue, shard_out_queue, session),
+            daemon=False,
+        )
+
+        # or after populating initial URLs queue
+        cache_thread.start()
+        network_thread.start()
 
         # see test_*_thread in test_shards.py for how to set up the workers
+
+        pending = set()
+
+        while pending:
+            # in_queue.put(list of URLs to fetch)
+            new_shards = shard_out_queue.get()  # with a timeout to detect dead threads?
+            for shard in new_shards:
+                pass  # XXX add algorithm here
+            # for shard in new_shards:
+            #    decompress and cache if needed (or do that in the fetch threads)
+            #    call shard_mentioned_packages_2(shard)
+            #    for channel in shardlikes:
+            #        if mentioned package in channel
+            #             add node to pending if not visited
+            #             update distances
+            #             if new nodes added, add their shard URLs to in_queue
+            #             if new node is a ShardLike, process right away or push that shard to
+            #             shard_out_queue right away.
+
+        in_queue.put(None)
+
+        cache_thread.join()
+        network_thread.join()
 
 
 def build_repodata_subset(root_packages, channels):
@@ -305,6 +356,6 @@ def build_repodata_subset(root_packages, channels):
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.shortest(root_packages)
-    log.debug("%d package names discovered", len(subset.nodes))
+    log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
