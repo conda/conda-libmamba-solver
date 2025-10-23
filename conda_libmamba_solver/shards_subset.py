@@ -341,6 +341,11 @@ class RepodataSubset:
             #             add node to pending if not visited
             #             update distances
             #             if new nodes added, add their shard URLs to in_queue
+            #
+            #             associate each URL with a list of node ids that are
+            #             waiting for it, because we imagine a future
+            #             optimization of multiple packages in a single shard.
+            #
             #             if new node is a ShardLike, process right away or push that shard to
             #             shard_out_queue right away.
 
