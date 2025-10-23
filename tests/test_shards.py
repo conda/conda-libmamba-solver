@@ -758,7 +758,7 @@ def test_shards_network_thread(http_server_shards):
 
     # several batches, then None "finish thread" sentinel
     network_in_queue.put(shards_urls[:1])
-    network_in_queue.put(["https://example.com/notfound"])
+    network_in_queue.put([f"{http_server_shards}/noarch/notfound.html"])
     network_in_queue.put(shards_urls[1:])
     network_in_queue.put(None)
 

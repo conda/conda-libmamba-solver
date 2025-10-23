@@ -180,7 +180,7 @@ def network_fetch_thread(
                             url, data = future.result()
                             log.debug("Fetch thread got", url, len(data))
                         except requests.exceptions.RequestException as e:
-                            log.error("Error fetching shard", e)
+                            log.error("Error fetching shard. %s", e)
 
                         # This will drain the http threadpool before loading another
                         # batch. Instead, we might want to get_nowait() and
