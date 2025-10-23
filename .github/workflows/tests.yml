@@ -310,6 +310,13 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+
+      - name: Find fix .xonshrc
+        run: find . -name fix_xonshrc.py
+
+      - name: Fix .xonshrc
+        working-directory: conda-libmamba-solver
+        run: python ./dev/scripts/fix_xonshrc.py
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -595,6 +602,13 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+
+      - name: Find fix .xonshrc
+        run: find . -name fix_xonshrc.py
+
+      - name: Fix .xonshrc
+        working-directory: conda-libmamba-solver
+        run: python ./dev/scripts/fix_xonshrc.py
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
