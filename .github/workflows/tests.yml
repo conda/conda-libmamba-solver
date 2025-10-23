@@ -374,12 +374,8 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
-    # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
-    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -439,6 +435,7 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: $CONDA/envs/test/bin/pytest --codspeed
+          mode: instrumentation
 
   # linux-qemu test suite
   linux-qemu:
