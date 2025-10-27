@@ -1,24 +1,29 @@
-{% set version = "0.17.2" %}
+{% set name = "jedi" %}
+{% set version = "0.19.2" %}
 
 package:
-  name: jedi
+  name: {{ name }}
   version: {{ version }}
 
 source:
-  url: https://pypi.io/packages/source/j/jedi/jedi-{{ version }}.tar.gz
-  sha256: 86ed7d9b750603e4ba582ea8edc678657fb4007894a12bcf6f4bb97892f31d20
+  url: https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz
+  sha256: 4770dc3de41bde3966b02eb84fbcf557fb33cce26ad23da12c742fb50ecb11f0
 
 build:
-  number: 1
-  script: {{ PYTHON }} -m pip install . --no-deps
+  number: 0
+  script: {{ PYTHON }} -m pip install . --no-deps --no-build-isolation --ignore-installed --no-cache-dir -vv
+  # the minimal version of python supported is 3.6
+  skip: true  # [py<36]
 
 requirements:
   host:
     - python
     - pip
+    - setuptools
+    - wheel
   run:
     - python
-    - parso >=0.7.0,<0.8.0
+    - parso >=0.8.4,<0.9.0
 
 test:
   imports:
