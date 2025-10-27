@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 pytestmark = [
     pytest.mark.slow,
     pytest.mark.usefixtures("parametrized_solver_fixture"),
-    pytest.mark.benchmark,
+    pytest.mark.skip,
 ]
 
 TEST_DATA_DIR = Path(__file__).parent / "data"

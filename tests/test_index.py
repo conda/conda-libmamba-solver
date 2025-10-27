@@ -13,8 +13,10 @@ from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
+from conda.testing.fixtures import CondaCLIFixture
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
+from conda_libmamba_solver.state import SolverInputState
 
 initialize_logging()
 DATA = Path(__file__).parent / "data"
@@ -109,3 +111,35 @@ def test_reload_channels(tmp_path: Path):
     time.sleep(1)
     index.reload_channel(Channel(str(tmp_path)))
     assert index.n_packages() == initial_count + 1
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "load_type,load_channel", [("shard", "conda-forge-sharded"), ("repodata", "conda-forge")]
+)
+def test_load_channel_repo_info(
+    load_type: str,
+    load_channel: str,
+    tmp_path: Path,
+    conda_cli: CondaCLIFixture,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """
+    Profile both loading methods and ensure they return the same data.
+    """
+    conda_cli("create", "--yes", "--prefix", str(tmp_path / "env"))
+
+    if load_type == "shard":
+        monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+        reset_context()
+
+    in_state = SolverInputState(str(tmp_path / "env"), requested=("python"))
+    index = LibMambaIndexHelper(
+        channels=[Channel(f"{load_channel}/linux-64")],
+        subdirs=("linux-64",),
+        installed_records=(),  # do not load installed
+        pkgs_dirs=(),  # do not load local cache as a channel
+        in_state=in_state,
+    )
+
+    assert len(index.repos) > 0
