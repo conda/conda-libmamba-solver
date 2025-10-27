@@ -21,7 +21,7 @@ import msgpack
 import zstandard
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import get_session
+from conda.gateways.connection.session import CondaSession, get_session
 from conda.gateways.repodata import (
     _add_http_value_to_dict,
     conda_http_errors,
@@ -34,7 +34,6 @@ from . import shards_cache
 
 log = logging.getLogger(__name__)
 
-REPODATA_THREADS_DEFAULT = 20
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, KeysView
@@ -46,6 +45,37 @@ if TYPE_CHECKING:
 
     from .shards_typing import PackageRecordDict, ShardDict
 
+SHARDS_CONNECTIONS_DEFAULT = 10
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data has no size header
+# For reference, the largest shard "conda-forge/linux-64/vim" is 2608283 bytes
+# or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
+# decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
+
+
+def _shards_connections() -> int:
+    """
+    If context.repodata_threads is not set, find the size of the connection pool
+    in a typical https:// session. This should significantly reduce dropped
+    connections. This will usually be requests' default 10.
+
+    Is this shared between all sessions? Or do we get a different pool for a
+    different get_session(url)?
+
+    Other adapters (file://, s3://) used in conda would have different
+    concurrency behavior;  we are not prepared to have separate threadpools per
+    connection type.
+    """
+    if context.repodata_threads is not None:
+        return context.repodata_threads
+    session = CondaSession()
+    adapter = session.get_adapter("https://")
+    if poolmanager := getattr(adapter, "poolmanager"):
+        try:
+            return int(poolmanager.connection_pool_kw["maxsize"])
+        except (KeyError, ValueError, AttributeError, TypeError):
+            pass
+    return SHARDS_CONNECTIONS_DEFAULT
+
 
 def ensure_hex_hash(record: PackageRecordDict):
     """
@@ -53,8 +83,8 @@ def ensure_hex_hash(record: PackageRecordDict):
     """
     for hash_type in "sha256", "md5":
         if hash_value := record.get(hash_type):
-            if isinstance(hash_value, bytes):
-                record[hash_type] = hash_value.hex()
+            if not isinstance(hash_value, str):
+                record[hash_type] = bytes(hash_value).hex()
     return record
 
 
@@ -82,7 +112,7 @@ class ShardLike:
 
     def __init__(self, repodata: RepodataDict, url: str = ""):
         """
-        url: affects the repr but not the functionality of this class.
+        url: must be unique for all ShardLike used together.
         """
         self.repodata_no_packages: RepodataDict = {
             **repodata,
@@ -134,7 +164,9 @@ class ShardLike:
 
         Note base_url can be a relative or an absolute url.
         """
-        return urljoin(self.url, self._base_url)
+        return urljoin(
+            urljoin(self.url, self._base_url), "."
+        )  # TODO do not call urljoin() when url, _base_url are unchanged
 
     def __contains__(self, package: str) -> bool:
         return package in self.package_names
@@ -165,12 +197,22 @@ class ShardLike:
         """
         repodata = self.repodata_no_packages.copy()
         repodata.update({"packages": {}, "packages.conda": {}})
-        for package, shard in self.visited.items():
+        for _, shard in self.visited.items():
             if shard is None:
                 continue  # recorded visited but not available shards
             for package_group in ("packages", "packages.conda"):
                 repodata[package_group].update(shard[package_group])
         return repodata
+
+
+def _shards_base_url(url, shards_base_url) -> str:
+    """
+    Return shards_base_url joined with base_url and url.
+    Note shards_base_url can be a relative or an absolute url.
+    """
+    if shards_base_url and not shards_base_url.endswith("/"):
+        shards_base_url += "/"
+    return urljoin(urljoin(url, shards_base_url), ".")
 
 
 class Shards(ShardLike):
@@ -195,7 +237,10 @@ class Shards(ShardLike):
         self.session = get_session(self.shards_base_url)
 
         self.repodata_no_packages = {
-            k: v for k, v in self.shards_index.items() if k not in ("shards",)
+            "info": shards_index["info"],
+            "packages": {},
+            "packages.conda": {},
+            "repodata_version": 2,
         }
 
         # used to write out repodata subset
@@ -221,7 +266,8 @@ class Shards(ShardLike):
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
         """
-        return urljoin(self.url, self.shards_index["info"]["shards_base_url"])
+        shards_base_url_ = self.shards_index["info"].get("shards_base_url", "")
+        return _shards_base_url(self.url, shards_base_url_)
 
     def shard_url(self, package: str) -> str:
         """
@@ -229,9 +275,9 @@ class Shards(ShardLike):
 
         Raise KeyError if package is not in the index.
         """
-        shard_name = f"{self.packages_index[package].hex()}.msgpack.zst"
+        shard_name = f"{bytes(self.packages_index[package]).hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
-        return urljoin(self.shards_base_url, shard_name)
+        return f"{self.shards_base_url}{shard_name}"
 
     def fetch_shard(self, package: str) -> ShardDict:
         """
@@ -272,15 +318,7 @@ class Shards(ShardLike):
             assert not package.startswith(("https://", "http://"))
             result[package] = shard
 
-        # beneficial to have thread pool larger than requests' default 10 max
-        # connections per session. There is "context.repodata_threads" but it's
-        # None in the REPL.
-        max_workers = (
-            context.repodata_threads
-            if context.repodata_threads is not None
-            else REPODATA_THREADS_DEFAULT
-        )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
             futures = {
                 executor.submit(fetch, self.session, url, package): (url, package)
                 for url, package in urls_packages.items()
@@ -291,7 +329,9 @@ class Shards(ShardLike):
                 # XXX future.result can raise HTTPError etc.
                 fetch_result = future.result()
                 result[fetch_result.package] = msgpack.loads(
-                    zstandard.decompress(fetch_result.compressed_shard)
+                    zstandard.decompress(
+                        fetch_result.compressed_shard, max_output_size=ZSTD_MAX_SHARD_SIZE
+                    )
                 )
                 try:
                     package_names = [
@@ -417,7 +457,9 @@ def fetch_shards_index(
             repo_cache.save(found)
 
             # basic parse (move into caller?)
-            shards_index: ShardsIndexDict = msgpack.loads(zstandard.decompress(found))  # type: ignore
+            shards_index: ShardsIndexDict = msgpack.loads(
+                zstandard.decompress(found, max_output_size=ZSTD_MAX_SHARD_SIZE)
+            )  # type: ignore
             shards = Shards(shards_index, shards_index_url, cache)
             return shards
 
@@ -438,6 +480,8 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
     sharded = [shardlike for shardlike in sharded if isinstance(shardlike, Shards)]
 
     wanted = []
+    # XXX update batch_retrieve_from_cache to work with (Shards, package name)
+    # tuples instead of broadcasting across shards itself.
     for shard in sharded:
         for package_name in packages:
             if package_name in shard:  # and not package_name in shard.visited
@@ -487,65 +531,38 @@ def fetch_channels(channels):
     # share single disk cache for all Shards() instances
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
-    if False:
-        for channel in channels:
-            for channel_url in Channel(channel).urls(True, context.subdirs):
-                subdir_data = SubdirData(Channel(channel_url))
-                found = fetch_shards_index(subdir_data, cache)
-                if not found:
-                    repodata_json: RepodataDict
-                    repodata_json, _ = subdir_data.repo_fetch.fetch_latest_parsed()  # type: ignore[assignment]
+    # The parallel version may reorder channels, does this matter?
 
-                    # not strictly true, since we could have fetched the same data
-                    # from repodata.json.zst; but makes the urljoin consistent with
-                    # shards which end with /repodata_shards.msgpack.zst
-                    url = f"{channel_url}/repodata.json"
-                    found = ShardLike(repodata_json, url)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        futures = {
+            executor.submit(
+                fetch_shards_index, SubdirData(Channel(channel_url)), cache
+            ): channel_url
+            for channel in channels
+            for channel_url in Channel(channel).urls(True, context.subdirs)
+        }
+        futures_non_sharded = {}
+        for future in concurrent.futures.as_completed(futures):
+            channel_url = futures[future]
+            found = future.result()
+            if found:
                 channel_data[channel_url] = found
-        return channel_data
+            else:
+                futures_non_sharded[
+                    executor.submit(
+                        SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed
+                    )
+                ] = channel_url
 
-    else:
-        # The parallel version may reorder channels, does this matter?
-
-        # beneficial to have thread pool larger than requests' default 10 max
-        # connections per session. There is "context.repodata_threads" but it's
-        # None in the REPL. For channels, we would usually be limited by the
-        # number of channels but not for individual shards elsewhere in this code.
-        max_workers = (
-            context.repodata_threads
-            if context.repodata_threads is not None
-            else REPODATA_THREADS_DEFAULT
-        )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {
-                executor.submit(
-                    fetch_shards_index, SubdirData(Channel(channel_url)), cache
-                ): channel_url
-                for channel in channels
-                for channel_url in Channel(channel).urls(True, context.subdirs)
-            }
-            futures_non_sharded = {}
-            for future in concurrent.futures.as_completed(futures):
-                channel_url = futures[future]
-                found = future.result()
-                if found:
-                    channel_data[channel_url] = found
-                else:
-                    futures_non_sharded[
-                        executor.submit(
-                            SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed
-                        )
-                    ] = channel_url
-
-            for future in concurrent.futures.as_completed(futures_non_sharded):
-                channel_url = futures_non_sharded[future]
-                repodata_json, _ = future.result()
-                # the filename is not strictly repodata.json since we could have
-                # fetched the same data from repodata.json.zst; but makes the
-                # urljoin consistent with shards which end with
-                # /repodata_shards.msgpack.zst
-                url = f"{channel_url}/repodata.json"
-                found = ShardLike(repodata_json, url)
-                channel_data[channel_url] = found
+        for future in concurrent.futures.as_completed(futures_non_sharded):
+            channel_url = futures_non_sharded[future]
+            repodata_json, _ = future.result()
+            # the filename is not strictly repodata.json since we could have
+            # fetched the same data from repodata.json.zst; but makes the
+            # urljoin consistent with shards which end with
+            # /repodata_shards.msgpack.zst
+            url = f"{channel_url}/repodata.json"
+            found = ShardLike(repodata_json, url)
+            channel_data[channel_url] = found
 
     return channel_data

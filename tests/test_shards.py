@@ -13,7 +13,6 @@ import logging
 import time
 import urllib.parse
 from contextlib import contextmanager
-from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,6 +22,7 @@ import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
+from conda.gateways.connection.session import CondaSession
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
@@ -34,6 +34,7 @@ from conda_libmamba_solver.index import (
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
+    _shards_connections,
     batch_retrieve_from_cache,
     fetch_shards_index,
     shard_mentioned_packages_2,
@@ -138,17 +139,16 @@ def http_server_shards(xprocess, tmp_path_factory):
 
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
-    # XXX not-zstandard; not msgpack
     malformed_digest = hashlib.sha256(bad_schema).digest()
 
     (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
     not_zstd = b"not zstd"
-    (noarch / f"{sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
+    (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
     not_msgpack = zstandard.compress(b"not msgpack")
-    (noarch / f"{sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
+    (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
     fake_shards: ShardsIndexDict = {
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
-        "repodata_version": 1,
+        "version": 1,
         "shards": {
             "foo": foo_shard_digest,
             "wrong_package_name": foo_shard_digest,
@@ -157,7 +157,6 @@ def http_server_shards(xprocess, tmp_path_factory):
             "not_zstd": hashlib.sha256(not_zstd).digest(),
             "not_msgpack": hashlib.sha256(not_msgpack).digest(),
         },
-        "removed": [],
     }
     (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
         zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
@@ -190,7 +189,6 @@ def test_fetch_shards_error(http_server_shards):
     assert shard_a == shard_c
 
     with pytest.raises(requests.exceptions.HTTPError):
-        # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
         found.fetch_shard("fake_package")
 
     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
@@ -204,6 +202,50 @@ def test_fetch_shards_error(http_server_shards):
     # besides ValueError
     with pytest.raises(ValueError):
         found.fetch_shard("not_msgpack")
+
+
+def test_shards_base_url():
+    shards = Shards(
+        {
+            "info": {
+                "subdir": "noarch",
+                "base_url": "",
+                "shards_base_url": "https://shards.example.com/channel-name",
+            },
+            "version": 1,
+            "shards": {"fake_package": b""},
+        },
+        "https://conda.anaconda.org/channel-name/noarch/",
+        None,  # type: ignore
+    )
+
+    assert (
+        shards.shard_url("fake_package") == "https://shards.example.com/channel-name/.msgpack.zst"
+    )
+
+    shards.shards_index["info"]["shards_base_url"] = ""
+
+    assert (
+        shards.shard_url("fake_package")
+        == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
+    )
+
+    # no-trailing-/ example from prefix.dev metadata
+    shards.url = "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst"
+    shards.shards_index["info"]["base_url"] = "https://prefix.dev/conda-forge/osx-arm64"
+    # shards_base_url should be suitable for string concatenation
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/"
+    assert (
+        shards.shard_url("fake_package") == "https://prefix.dev/conda-forge/osx-arm64/.msgpack.zst"
+    )
+
+    # relative shards_base_url
+    shards.shards_index["info"]["shards_base_url"] = "./shards/"
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/shards/"
+
+    # relative shards_base_url, with parent directory (not likely in the wild)
+    shards.shards_index["info"]["shards_base_url"] = "../shards"
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/shards/"
 
 
 def test_shard_mentioned_packages_2():
@@ -400,6 +442,59 @@ def test_shardlike_repr():
     assert shardlike.url == url
 
 
+def test_shard_hash_as_array():
+    """
+    Test that shard hashes can be bytes or list[int], for rattler compatibility.
+    """
+    name = "package"
+    fake_shard: ShardsIndexDict = {
+        "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
+        "repodata_version": 1,
+        "shards": {
+            name: list(hashlib.sha256().digest()),  # type: ignore
+        },
+    }
+
+    fake_shard_2 = fake_shard.copy()
+    fake_shard_2["shards"] = fake_shard["shards"].copy()
+    fake_shard_2["shards"][name] = hashlib.sha256().digest()
+
+    assert isinstance(fake_shard["shards"][name], list)
+    assert isinstance(fake_shard_2["shards"][name], bytes)
+
+    index = Shards(fake_shard, "", None)  # type: ignore
+    index_2 = Shards(fake_shard_2, "", None)  # type: ignore
+
+    shard_url = index.shard_url(name)
+    shard_url_2 = index_2.shard_url(name)
+    assert shard_url == shard_url_2
+
+
+def test_ensure_hex_hash_in_record():
+    """
+    Test that ensure_hex_hash_in_record() converts bytes to hex strings.
+    """
+    name = "package"
+    sha256_hash = hashlib.sha256()
+    md5_hash = hashlib.md5()
+    for sha, md5 in [
+        (sha256_hash.digest(), md5_hash.digest()),
+        (list(sha256_hash.digest()), list(md5_hash.digest())),
+        (sha256_hash.hexdigest(), md5_hash.hexdigest()),
+    ]:
+        record = {
+            "name": name,
+            "sha256": sha,
+            "md5": md5,
+        }
+
+        updated = shards.ensure_hex_hash(record)  # type: ignore
+        assert isinstance(updated["sha256"], str)  # type: ignore
+        assert updated["sha256"] == sha256_hash.hexdigest()  # type: ignore
+        assert isinstance(updated["md5"], str)  # type: ignore
+        assert updated["md5"] == md5_hash.hexdigest()  # type: ignore
+
+
 ROOT_PACKAGES = [
     "__archspec",
     "__conda",
@@ -465,6 +560,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
                 )
 
     assert len(package_info), "no packages in subset"
+
+    print(f"{len(package_info)} packages in subset")
 
     with _timer("write_repodata_subset()"):
         repodata_size = repodata_subset_size(channel_data)
@@ -549,3 +646,20 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     assert remaining == []
 
     # XXX don't call everything Shard/Shards
+
+
+def test_shards_connections(monkeypatch):
+    """
+    Test _shards_connections() and execute all its code.
+    """
+    assert context.repodata_threads is None
+    assert _shards_connections() == 10  # requests' default
+
+    poolmanager = CondaSession().get_adapter("https://").poolmanager  # type: ignore
+    monkeypatch.setattr(poolmanager, "connection_pool_kw", {"no_maxsize": 0})
+
+    monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
+    assert _shards_connections() == 7
+
+    monkeypatch.setattr(context, "_repodata_threads", 4)
+    assert _shards_connections() == 4
