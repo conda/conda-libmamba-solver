@@ -20,3 +20,5 @@ import pytest
 def test_new_feature():
     """Ensure feature performs well"""
 ```
+
+See the official [codspeed documentation](https://codspeed.io/docs) for more information.
