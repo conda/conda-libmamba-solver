@@ -128,6 +128,9 @@ def test_load_channel_repo_info(
     Profile both loading methods and ensure they return the same data.
     """
     conda_cli("create", "--yes", "--prefix", str(tmp_path / "env"))
+    _, stderr, _ = conda_cli("clean", "--all", "--yes")
+
+    assert not stderr
 
     if load_type == "shard":
         monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
