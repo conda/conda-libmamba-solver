@@ -1044,9 +1044,6 @@ class LibMambaSolver(Solver):
                         ):
                             with open(entry.path) as f:
                                 current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
-                            if conda_self_installed:
-                                break
-                            continue
                     # check if conda-self is installed
                     if not conda_self_installed:
                         if (
@@ -1055,13 +1052,10 @@ class LibMambaSolver(Solver):
                             and entry.name.rsplit("-", 2)[0] == "conda-self"
                         ):
                             conda_self_installed = True
-                            # check if current conda has been found
-                            if current_conda_prefix_rec is None:
-                                continue
-                            else:
-                                # current conda already found and conda-self is installed
-                                # no more information is needed
-                                break
+
+                    if conda_self_installed and current_conda_prefix_rec is not None:
+                        # conda-self is installed and current conda has been found, no more information needed
+                        break
 
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
