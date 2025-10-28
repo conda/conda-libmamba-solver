@@ -1030,32 +1030,23 @@ class LibMambaSolver(Solver):
         # once prefix data is lazy this might be a different situation
         current_conda_prefix_rec = None
         conda_self_installed = False
-        conda_frozen_file_found = True if os.path.exists(os.path.join(context.conda_prefix, PREFIX_FROZEN_FILE)) else False
+        conda_frozen_file_found = os.path.exists(os.path.join(context.conda_prefix, PREFIX_FROZEN_FILE))
         conda_meta_prefix_directory = os.path.join(context.conda_prefix, "conda-meta")
         with suppress(OSError, ValueError):
             if os.path.lexists(conda_meta_prefix_directory):
                 for entry in os.scandir(conda_meta_prefix_directory):
-                    # check if the current conda has been found yet
-                    if current_conda_prefix_rec is None:
-                        if (
-                            entry.is_file()
-                            and entry.name.endswith(".json")
-                            and entry.name.rsplit("-", 2)[0] == "conda"
-                        ):
+                    if entry.is_file() and entry.name.endswith(".json"):
+                        package_name = entry.name.rsplit("-", 2)[0]
+                        if package_name == "conda":
                             with open(entry.path) as f:
                                 current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
-                    # check if conda-self is installed
-                    if not conda_self_installed:
-                        if (
-                            entry.is_file()
-                            and entry.name.endswith(".json")
-                            and entry.name.rsplit("-", 2)[0] == "conda-self"
-                        ):
+                            continue
+                        if package_name == "conda-self":
                             conda_self_installed = True
-
-                    if conda_self_installed and current_conda_prefix_rec is not None:
-                        # conda-self is installed and current conda has been found, no more information needed
-                        break
+                            continue
+                        if conda_self_installed and current_conda_prefix_rec is not None:
+                            # conda-self is installed and current conda has been found, no more information needed
+                            break
 
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
@@ -1105,9 +1096,9 @@ class LibMambaSolver(Solver):
                         latest version: {newest.version}
 
                     Please update conda by running
-                    
+
                         $ {conda_update_message}
-                    
+
                     """
                 ),
                 file=sys.stderr,
