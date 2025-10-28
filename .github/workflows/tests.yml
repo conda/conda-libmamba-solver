@@ -372,12 +372,8 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
-    # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
-    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -406,19 +402,11 @@ jobs:
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
-        with:
-          condarc-file: .github/condarc-defaults
-          run-post: false  # skip post cleanup
 
       - name: Conda Install
         run: conda install
           --yes
           --file tests/requirements.txt
-          --file tests/requirements-${{ runner.os }}.txt
-          --file tests/requirements-ci.txt
-          --file tests/requirements-s3.txt
-          --file tests/requirements-benchmarks.txt
-          --file tests/requirements-truststore.txt
           python=${{ matrix.python-version }}
 
       - name: Conda Info
@@ -435,6 +423,7 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: $CONDA/envs/test/bin/pytest --codspeed
+          mode: instrumentation
 
   # linux-qemu test suite
   linux-qemu:
