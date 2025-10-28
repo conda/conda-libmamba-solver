@@ -295,6 +295,12 @@ class Shards(ShardLike):
 
         If a shard is already in self.visited, it is not fetched again.
         """
+        # XXX with the newest traversal strategy, we may be able to take all
+        # cache, network fetch out of the Shards class. Instead, a common cache
+        # and network fetcher can populate a dict of immediately available
+        # Shards.shards, and fetch_shard() or a new visit_shard() moves that
+        # into visited. The caller would make sure to pre-populate before
+        # visiting nodes.
         result = {}
 
         def fetch(s, url, package):
