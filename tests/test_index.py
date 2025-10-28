@@ -123,9 +123,13 @@ def test_load_channel_repo_info(
     tmp_path: Path,
     conda_cli: CondaCLIFixture,
     monkeypatch: pytest.MonkeyPatch,
+    benchmark,
 ):
     """
     Profile both loading methods and ensure they return the same data.
+
+    TODO: This test should eventually switch to just using conda-forge when that channel
+          supports shards and not the `conda-forge-sharded` channel.
     """
     conda_cli("create", "--yes", "--prefix", str(tmp_path / "env"))
     _, stderr, _ = conda_cli("clean", "--all", "--yes")
@@ -136,13 +140,16 @@ def test_load_channel_repo_info(
         monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
         reset_context()
 
-    in_state = SolverInputState(str(tmp_path / "env"), requested=("python"))
-    index = LibMambaIndexHelper(
-        channels=[Channel(f"{load_channel}/linux-64")],
-        subdirs=("linux-64",),
-        installed_records=(),  # do not load installed
-        pkgs_dirs=(),  # do not load local cache as a channel
-        in_state=in_state,
-    )
+    in_state = SolverInputState(str(tmp_path / "env"), requested=("python",))
+
+    @benchmark
+    def index():
+        return LibMambaIndexHelper(
+            channels=[Channel(f"{load_channel}/linux-64")],
+            subdirs=("linux-64",),
+            installed_records=(),  # do not load installed
+            pkgs_dirs=(),  # do not load local cache as a channel
+            in_state=in_state,
+        )
 
     assert len(index.repos) > 0

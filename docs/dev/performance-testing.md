@@ -1,10 +1,12 @@
-# Profiling
+# Performance testing
 
-Profiling for this project can be found on codspeed here:
+## Codspeed
+
+Performance testing for this project can be found on codspeed here:
 
 - https://codspeed.io/conda/conda-libmamba-solver
 
-To run profiling tests locally, run the following command in the root of the project:
+To run performance tests locally, run the following command in the root of the project:
 
 ```shell
 pytest --codspeed
