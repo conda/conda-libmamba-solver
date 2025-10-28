@@ -113,7 +113,6 @@ def test_reload_channels(tmp_path: Path):
     assert index.n_packages() == initial_count + 1
 
 
-@pytest.mark.benchmark
 @pytest.mark.parametrize(
     "load_type,load_channel", [("shard", "conda-forge-sharded"), ("repodata", "conda-forge")]
 )
