@@ -16,7 +16,7 @@ import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 from queue import SimpleQueue
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import msgpack
 import pytest
@@ -50,6 +50,8 @@ from conda_libmamba_solver.shards_subset import (
 from tests.channel_testing.helpers import _dummy_http_server
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from conda_libmamba_solver.shards_typing import ShardDict, ShardsIndexDict
 
 HERE = Path(__file__).parent
@@ -687,6 +689,63 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     assert remaining == []
 
     # XXX don't call everything Shard/Shards
+
+
+class MockCache(NamedTuple):
+    """
+    Contain all the elements needed to be returned by the `mock_cache` fixture
+    """
+
+    num_shards: int
+    shards: list[shards_cache.AnnotatedRawShard]
+    cache: shards_cache.ShardCache
+
+
+@pytest.fixture()
+def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
+    """
+    Set up a mock shard cache that will be used by multiple benchmark tests.
+    """
+    cache = shards_cache.ShardCache(tmp_path)
+
+    NUM_FAKE_SHARDS = 64
+    fake_shards = []
+
+    compressor = zstandard.ZstdCompressor(level=1)
+    for i in range(NUM_FAKE_SHARDS):
+        fake_shard = {f"foo{i}": "bar"}
+        annotated_shard = shards_cache.AnnotatedRawShard(
+            f"https://foo{i}",
+            f"foo{i}",
+            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
+        )
+        cache.insert(annotated_shard)
+        fake_shards.append(annotated_shard)
+
+    yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
+
+    cache.clear_cache()
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("retrieval_type", ["retrieve_multiple", "retrieve_single"])
+def test_shard_cache_multiple_profile(retrieval_type, mock_cache: MockCache):
+    """
+    Measure the difference between `shards_cache.retrieve_multiple` and `shards_cache.retrieve`.
+
+    `shards_cache.retrieve_multiple should be faster than `shards_cache.retrieve`.
+    """
+    if retrieval_type == "retrieve_multiple":
+        retrieved = mock_cache.cache.retrieve_multiple([shard.url for shard in mock_cache.shards])
+        assert len(retrieved) == mock_cache.num_shards
+
+    elif retrieval_type == "retrieve_single":
+        retrieved = {}
+        for i, url in enumerate([shard.url for shard in mock_cache.shards]):
+            single = mock_cache.cache.retrieve(url)
+            retrieved[url] = single
+
+        assert len(retrieved) == mock_cache.num_shards
 
 
 def test_shards_connections(monkeypatch):

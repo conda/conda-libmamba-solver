@@ -82,17 +82,13 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.9', '3.11', '3.12']  # CONDA-LIBMAMBA-SOLVER CHANGE
+        python-version: ['3.10', '3.13']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
-            python-version: '3.9'
-          - default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
-            python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - default-channel: conda-forge  # CONDA-LIBMAMBA-SOLVER CHANGE
-            python-version: '3.12'  # CONDA-LIBMAMBA-SOLVER CHANGE
+            python-version: '3.10'
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -103,8 +99,6 @@ jobs:
       ErrorActionPreference: Stop  # powershell exit immediately on error
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
-      REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests\requirements-truststore.txt' || '' }}
-
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -148,9 +142,9 @@ jobs:
           --file tests\requirements-${{ runner.os }}.txt
           --file tests\requirements-ci.txt
           --file tests\requirements-s3.txt
+          --file tests\requirements-truststore.txt
           --file ..\conda-libmamba-solver\dev\requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ..\\conda-libmamba-solver\\tests\\requirements.txt' || '' }}
-          ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -228,7 +222,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs-on }}
     defaults:
       run:
         # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
@@ -237,21 +231,26 @@ jobs:
       fail-fast: false
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        runs-on: [ubuntu-latest, ubuntu-24.04-arm]
+        python-version: ['3.10', '3.11', '3.12', '3.13']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
-          - python-version: '3.9'
-            default-channel: conda-forge
           - python-version: '3.10'
             default-channel: conda-forge
-          - python-version: '3.11'  # CONDA-LIBMAMBA-SOLVER CHANGE
-            default-channel: defaults  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - python-version: '3.11'
+            default-channel: conda-forge
           - python-version: '3.12'
             default-channel: conda-forge
           - test-type: unit
             test-group: 3
+          - runs-on: ubuntu-24.04-arm
+            python-version: '3.10'
+          - runs-on: ubuntu-24.04-arm
+            python-version: '3.11'
+          - runs-on: ubuntu-24.04-arm
+            python-version: '3.12'
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -259,7 +258,6 @@ jobs:
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
-      REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -302,9 +300,9 @@ jobs:
           --file tests/requirements-${{ runner.os }}.txt
           --file tests/requirements-ci.txt
           --file tests/requirements-s3.txt
+          --file tests/requirements-truststore.txt
           --file ../conda-libmamba-solver/dev/requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
-          ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -374,12 +372,8 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
-    # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
-    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -390,8 +384,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12']
-    env:
-      REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
       - name: Checkout Source
@@ -410,19 +402,11 @@ jobs:
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
-        with:
-          condarc-file: .github/condarc-defaults
-          run-post: false  # skip post cleanup
 
       - name: Conda Install
         run: conda install
           --yes
           --file tests/requirements.txt
-          --file tests/requirements-${{ runner.os }}.txt
-          --file tests/requirements-ci.txt
-          --file tests/requirements-s3.txt
-          --file tests/requirements-benchmarks.txt
-          ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
       - name: Conda Info
@@ -439,6 +423,7 @@ jobs:
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: $CONDA/envs/test/bin/pytest --codspeed
+          mode: instrumentation
 
   # linux-qemu test suite
   linux-qemu:
@@ -509,7 +494,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
 
-    runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-13') || 'macos-14' }}
+    runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-15-intel') || 'macos-latest' }}
     defaults:
       run:
         # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
@@ -517,23 +502,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # test lower version (w/ osx-64 & defaults & unit tests) and upper version (w/ osx-arm64 & conda-forge & integration tests)
-        arch: [osx-arm64]
-        python-version: ['3.9', '3.12']
+        # test lower version (w/ osx-64 & conda-forge & unit tests) and upper version (w/ osx-arm64 & defaults & integration tests)
+        arch: [osx-64, osx-arm64]
+        python-version: ['3.10', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
         exclude:
           - arch: osx-64
-            python-version: '3.12'
+            python-version: '3.13'
           - arch: osx-64
-            default-channel: conda-forge
+            default-channel: defaults
           - arch: osx-64
             test-type: integration
           - arch: osx-arm64
-            python-version: '3.9'
+            python-version: '3.10'
           - arch: osx-arm64
-            default-channel: defaults
+            default-channel: conda-forge
           - arch: osx-arm64
             test-type: unit
           - arch: osx-arm64  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -547,7 +532,6 @@ jobs:
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
-      REQUIREMENTS_TRUSTSTORE: ${{ contains('3.10|3.11|3.12', matrix.python-version) && '--file tests/requirements-truststore.txt' || '' }}
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -582,7 +566,7 @@ jobs:
           run-post: false  # skip post cleanup
           # conda not preinstalled in arm64 runners
           miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
-          miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-arm64') && 'latest' || null }}
+          miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
 
       - name: Conda Install
@@ -594,9 +578,9 @@ jobs:
           --file tests/requirements.txt
           --file tests/requirements-ci.txt
           --file tests/requirements-s3.txt
+          --file tests/requirements-truststore.txt
           --file ../conda-libmamba-solver/dev/requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
-          ${{ env.REQUIREMENTS_TRUSTSTORE }}
           python=${{ matrix.python-version }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE

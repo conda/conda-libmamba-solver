@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import msgpack
 import zstandard
+from conda.gateways.disk.delete import unlink_or_rename_to_trash
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -134,3 +135,16 @@ class ShardCache:
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result
+
+    def clear_cache(self):
+        """
+        Truncate the database by removing all rows from tables
+        """
+        with self.conn as c:
+            c.execute("DELETE FROM shards")
+
+    def remove_cache(self):
+        """
+        Remove the sharded cache database.
+        """
+        unlink_or_rename_to_trash(self.base / SHARD_CACHE_NAME)

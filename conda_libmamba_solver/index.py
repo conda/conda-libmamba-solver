@@ -113,8 +113,8 @@ from conda_libmamba_solver.shards_subset import build_repodata_subset
 from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
-    from typing import Any, Callable, Literal
+    from collections.abc import Callable, Iterable
+    from typing import Any, Literal
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
@@ -362,33 +362,52 @@ class LibMambaIndexHelper:
             encoded_urls_to_channel[url] = channel
         urls_to_channel = encoded_urls_to_channel
 
+        # Prefer sharded repodata loading if it's enabled
         if self.in_state and _is_sharded_repodata_enabled():
-            # make a subset of possible dependencies
-            root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-            channel_data = build_repodata_subset(root_packages, urls_to_channel)
-            channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
-        else:
-            urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
+            return self._load_channel_repo_info_shards(urls_to_channel)
 
-            channel_repo_infos = []
-            for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
-                url_no_token, _ = split_anaconda_token(url_w_cred)
-                url_no_cred = remove_auth(url_no_token)
-                repo = self._load_repo_info_from_json_path(
-                    json_path,
-                    url_no_cred,
-                    state,
-                    try_solv=(try_solv and not self.in_state),
-                )
-                channel_repo_infos.append(
-                    _ChannelRepoInfo(
-                        channel=urls_to_channel[url_w_cred],
-                        repo=repo,
-                        url_w_cred=url_w_cred,
-                        url_no_cred=url_no_cred,
-                    )
-                )
+        # Fallback to repodata.json loading
+        return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
+    def _load_channel_repo_info_shards(
+        self, urls_to_channel: dict[str, str]
+    ) -> list[_ChannelRepoInfo]:
+        """
+        Load repository information from sharded repodata cache.
+        """
+        # make a subset of possible dependencies
+        root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
+        channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
+
+        return channel_repo_infos
+
+    def _load_channel_repo_info_json(
+        self, urls_to_channel: dict[str, Channel], try_solv: bool
+    ) -> list[_ChannelRepoInfo]:
+        """
+        Load repository information from repodata.json files.
+        """
+        urls_to_json_path_and_state = self._fetch_repodata_jsons(tuple(urls_to_channel.keys()))
+
+        channel_repo_infos = []
+        for url_w_cred, (json_path, state) in urls_to_json_path_and_state.items():
+            url_no_token, _ = split_anaconda_token(url_w_cred)
+            url_no_cred = remove_auth(url_no_token)
+            repo = self._load_repo_info_from_json_path(
+                json_path,
+                url_no_cred,
+                state,
+                try_solv=(try_solv and not self.in_state),
+            )
+            channel_repo_infos.append(
+                _ChannelRepoInfo(
+                    channel=urls_to_channel[url_w_cred],
+                    repo=repo,
+                    url_w_cred=url_w_cred,
+                    url_no_cred=url_no_cred,
+                )
+            )
         return channel_repo_infos
 
     def _channel_urls(self) -> dict[str, Channel]:
