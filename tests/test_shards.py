@@ -10,12 +10,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import threading
 import time
 import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
-from queue import SimpleQueue
 from typing import TYPE_CHECKING, NamedTuple
 
 import msgpack
@@ -43,7 +41,6 @@ from conda_libmamba_solver.shards import (
 )
 from conda_libmamba_solver.shards_subset import (
     Node,
-    RepodataSubset,
     build_repodata_subset,
     fetch_channels,
 )
@@ -599,28 +596,6 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
 
 
-def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
-    """
-    Build repodata subset using the third attempt at a dependency traversal
-    algorithm.
-    """
-
-    # installed, plus what we want to add (twine)
-    root_packages = ROOT_PACKAGES[:]
-
-    channels = list(context.default_channels)
-    channels.append(Channel("conda-forge-sharded"))
-
-    with _timer("build_repodata_subset()"):
-        channel_data = fetch_channels(channels)
-
-        subset = RepodataSubset((*channel_data.values(),))
-        subset.shortest_pipelined(root_packages)
-        print(f"{len(subset.nodes)} (channel, package) nodes discovered")
-
-    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
-
-
 def test_shards_indexhelper(prepare_shards_test):
     """
     Load LibMambaIndexHelper with parameters that will enable sharded repodata.
@@ -763,90 +738,3 @@ def test_shards_connections(monkeypatch):
 
     monkeypatch.setattr(context, "_repodata_threads", 4)
     assert _shards_connections() == 4
-
-
-# region pipeline
-
-
-def test_sqlite3_thread(
-    shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
-):
-    """
-    Test sqlite3 retrieval thread.
-    """
-    cache, fake_shards = shard_cache_with_data
-    in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
-    shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
-    network_out_queue: SimpleQueue[list[str]] = SimpleQueue()
-
-    # this kind of thread can crash, and we don't hear back without our own
-    # handling.
-    cache_thread = threading.Thread(
-        target=shards_subset.cache_fetch_thread,
-        args=(in_queue, shard_out_queue, network_out_queue, cache),
-        daemon=False,
-    )
-
-    fake_shards_urls = [shard.url for shard in fake_shards]
-
-    # several batches, then None "finish thread" sentinel
-    in_queue.put(fake_shards_urls[:1])
-    in_queue.put(["https://example.com/notfound"])
-    in_queue.put(fake_shards_urls[1:3])
-    in_queue.put(["https://example.com/notfound2", "https://example.com/notfound3"])
-    in_queue.put(fake_shards_urls[3:])
-    in_queue.put(None)
-
-    cache_thread.start()
-
-    while batch := shard_out_queue.get(timeout=1):
-        for url, shard in batch:
-            assert url in fake_shards_urls
-            assert shard == cache.retrieve(url)
-
-    while notfound := network_out_queue.get(timeout=1):
-        for url in notfound:
-            assert url.startswith("https://example.com/notfound")
-
-    cache_thread.join(5)
-
-
-def test_shards_network_thread(http_server_shards):
-    """
-    Test network retrieval thread, meant to be chained after the sqlite3 thread
-    by having network_in_queue = sqlite3 thread's network_out_queue.
-    """
-    channel = Channel.from_url(f"{http_server_shards}/noarch")
-    subdir_data = SubdirData(channel)
-    found = fetch_shards_index(subdir_data)
-    assert found
-
-    network_in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
-    shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
-
-    # this kind of thread can crash, and we don't hear back without our own
-    # handling.
-    network_thread = threading.Thread(
-        target=shards_subset.network_fetch_thread,
-        args=(network_in_queue, shard_out_queue, found.session),
-        daemon=False,
-    )
-
-    shards_urls = list(found.shard_url(package) for package in found.shards_index["shards"])
-
-    # several batches, then None "finish thread" sentinel
-    network_in_queue.put(shards_urls[:1])
-    network_in_queue.put([f"{http_server_shards}/noarch/notfound.html"])
-    network_in_queue.put(shards_urls[1:])
-    network_in_queue.put(None)
-
-    network_thread.start()
-
-    while batch := shard_out_queue.get(timeout=1):
-        for url, shard in batch:
-            print(url, type(shard))
-
-    network_thread.join(5)
-
-
-# endregion
