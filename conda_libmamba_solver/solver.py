@@ -24,9 +24,9 @@ from typing import TYPE_CHECKING
 
 from conda import __version__ as _conda_version
 from conda.base.constants import (
+    PREFIX_FROZEN_FILE,
     REPODATA_FN,
     UNKNOWN_CHANNEL,
-    PREFIX_FROZEN_FILE,
     ChannelPriority,
 )
 from conda.base.context import context
