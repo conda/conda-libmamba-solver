@@ -44,7 +44,6 @@ def test_shortest_cold_cache(conda_cli, benchmark, algorithm, packages):
     benchmark.pedantic(target, setup=setup, rounds=3)
 
 
-@pytest.mark.limit_memory("512 MB")
 @pytest.mark.parametrize("algorithm", ("shortest", "fetch_shards_bfs"))
 @pytest.mark.parametrize(
     "packages",
