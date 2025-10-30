@@ -53,7 +53,6 @@ for url, shardlike in channel_data.items():
 
 from __future__ import annotations
 
-import concurrent.futures
 import heapq
 import logging
 import sys
@@ -73,6 +72,7 @@ log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+    from typing import Literal
 
     from .shards import (
         ShardBase,
@@ -208,10 +208,13 @@ class RepodataSubset:
                     to_retrieve.add(next_node.package)
                     heapq.heappush(unvisited, (next_node.distance, next_node))
 
-    def fetch_shards_bfs(self, root_packages):
+    def shortest_bfs(self, root_packages):
         """
         Fetch all root packages represented as `self.nodes` using the "breadth-first search"
         algorithm.
+
+        This method updates associated `self.shardlikes` to contain enough data
+        to build a repodata subset.
         """
         self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
@@ -238,107 +241,26 @@ class RepodataSubset:
                         next_node.distance = node.distance + 1
                         node_queue.append(next_node)
 
-    def fetch_shards_bfs_threadpool(self, root_packages):
-        """
-        Fetch all root packages using BFS with prefetching via ThreadPoolExecutor.
-
-        This implementation prefetches level N+1 while processing level N, overlapping
-        network I/O with CPU work for better performance when network latency dominates.
-
-        Note: Cache operations are done in the main thread due to SQLite thread-safety
-        constraints. Only network fetching is parallelized.
-        """
-        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
-
-        node_queue = deque(self.nodes.values())
-        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-
-        if not sharded:
-            # Fall back to simple BFS if no sharded channels
-            return self.fetch_shards_bfs(root_packages)
-
-        def fetch_from_cache(packages: set[str]) -> list:
-            """
-            Fetch from cache in main thread (SQLite thread-safe).
-            Returns list of cache misses to fetch from network.
-            """
-            not_in_cache = batch_retrieve_from_cache(sharded, list(packages))
-            return not_in_cache
-
-        def fetch_from_network(not_in_cache: list):
-            """Fetch from network in worker thread (thread-safe)."""
-            batch_retrieve_from_network(not_in_cache)
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            prefetch_future = None
-
-            while node_queue:
-                level_size = len(node_queue)
-
-                # Collect packages for current level
-                current_level_packages = {
-                    node.package for node in list(node_queue)[:level_size] if not node.visited
-                }
-
-                # Wait for prefetch to complete if one is running
-                if prefetch_future is not None:
-                    try:
-                        prefetch_future.result(timeout=30.0)
-                    except concurrent.futures.TimeoutError:
-                        log.warning("Prefetch timeout - falling back to synchronous fetch")
-                        # Fetch synchronously as fallback
-                        if current_level_packages:
-                            not_in_cache = fetch_from_cache(current_level_packages)
-                            fetch_from_network(not_in_cache)
-                    except Exception as e:
-                        log.error("Prefetch error: %s - falling back to synchronous fetch", e)
-                        # Fetch synchronously as fallback
-                        if current_level_packages:
-                            not_in_cache = fetch_from_cache(current_level_packages)
-                            fetch_from_network(not_in_cache)
-                else:
-                    # First iteration - fetch synchronously
-                    if current_level_packages:
-                        not_in_cache = fetch_from_cache(current_level_packages)
-                        fetch_from_network(not_in_cache)
-
-                # Process current level and collect next level packages
-                next_level_packages = set()
-
-                for _ in range(level_size):
-                    node = node_queue.popleft()
-                    if node.visited:
-                        continue
-                    node.visited = True
-
-                    for next_node, _ in self.outgoing(node):
-                        if not next_node.visited:
-                            next_node.distance = node.distance + 1
-                            node_queue.append(next_node)
-                            next_level_packages.add(next_node.package)
-
-                # Start prefetching next level in background
-                # Cache check happens in main thread, then network fetch in worker
-                if next_level_packages:
-                    not_in_cache = fetch_from_cache(next_level_packages)
-                    if not_in_cache:
-                        prefetch_future = executor.submit(fetch_from_network, not_in_cache)
-                    else:
-                        prefetch_future = None
-                else:
-                    prefetch_future = None
-
 
 def build_repodata_subset(
-    root_packages: Iterable[str], channels: Iterable[str]
+    root_packages: Iterable[str],
+    channels: Iterable[str],
+    algorithm: Literal["shortest", "shortest_bfs"] = "shortest_bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
+
+    Params:
+        root_packages: iterable of root package names
+        channels: iterable of channel URLs
+        algorithm: one of "shortest", "shortest_bfs
+
+    TODO: Remove `algorithm` parameter once we've made a firm decision on which to use.
     """
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
-    subset.fetch_shards_bfs(root_packages)
+    getattr(subset, algorithm)(root_packages)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data

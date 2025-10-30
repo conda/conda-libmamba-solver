@@ -1,0 +1,46 @@
+{
+  "scenarios": [
+    {
+      "name": "python",
+      "packages": ["python"],
+      "prefetch_packages": [],
+      "channel": "conda-forge-sharded",
+      "platform": "linux-64"
+    },
+    {
+      "name": "data-science-basic",
+      "packages": ["numpy", "pandas", "matplotlib"],
+      "prefetch_packages": ["python"],
+      "channel": "conda-forge-sharded",
+      "platform": "linux-64"
+    },
+    {
+      "name": "data-science-ml",
+      "packages": ["scikit-learn", "matplotlib"],
+      "prefetch_packages": ["python", "numpy"],
+      "channel": "conda-forge-sharded",
+      "platform": "linux-64"
+    },
+    {
+      "name": "web-development",
+      "packages": ["django", "celery"],
+      "prefetch_packages": ["python","requests"],
+      "channel": "conda-forge-sharded",
+      "platform": "linux-64"
+    },
+    {
+      "name": "scientific-computing",
+      "packages": ["scipy", "sympy", "pytorch"],
+      "prefetch_packages": ["python", "numpy", "pandas"],
+      "channel": "conda-forge-sharded",
+      "platform": "linux-64"
+    },
+    {
+      "name": "devops-automation",
+      "packages": ["ansible", "pyyaml", "jinja2"],
+      "prefetch_packages": ["python"],
+      "channel": "conda-forge-sharded",
+      "platform": "linux-64"
+    }
+  ]
+}
