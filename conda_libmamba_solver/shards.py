@@ -132,6 +132,9 @@ class ShardBase(abc.ABC):
         base_url was present. Packages are found here.
 
         Note base_url can be a relative or an absolute url.
+        The double urljoin ensures proper URL normalization:
+        first join with _base_url, then with "." to add trailing slash
+        if needed.
         """
         return urljoin(urljoin(self.url, self._base_url), ".")
 
@@ -139,14 +142,17 @@ class ShardBase(abc.ABC):
         """Check if a package is available in this shard collection."""
         return package in self.package_names
 
-    @abc.abstractmethod
     def fetch_shard(self, package: str) -> ShardDict:
         """
         Fetch an individual shard for the given package.
 
+        Default implementation calls fetch_shards() with a single package.
+        Subclasses may override for more efficient single-fetch operations.
+
         Raise KeyError if package is not in the index.
         """
-        ...
+        return self.fetch_shards([package])[package]
+
 
     @abc.abstractmethod
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
