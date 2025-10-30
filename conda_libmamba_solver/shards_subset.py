@@ -43,7 +43,7 @@ channel = Channel("conda-forge-sharded/linux-64")
 channel_data = build_repodata_subset(["python", "pandas"], [channel.url()])
 repodata = {}
 
-for url, shardlike in channel_data.items():
+for url in channel_data:
     repodata[url] = channel_data.build_repodata()
 
 # ... this is what's fed to the solver
@@ -168,7 +168,7 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
-    def shortest(self, root_packages):
+    def shortest_dijkstra(self, root_packages):
         """
         Fetch all root packages represented as `self.nodes`.
 

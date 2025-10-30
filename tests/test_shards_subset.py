@@ -59,7 +59,7 @@ BASIC_FETCHING_SCENARIOS = load_scenarios("sharded_fetching_scenarios_basic.json
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
-@pytest.mark.parametrize("algorithm", ("shortest", "shortest_bfs"))
+@pytest.mark.parametrize("algorithm", ("shortest_dijkstra", "shortest_bfs"))
 @pytest.mark.parametrize(
     "scenario",
     (*BASIC_FETCHING_SCENARIOS,),

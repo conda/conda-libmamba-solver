@@ -540,7 +540,6 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
     Given a list of (Shards, package name, shard URL) tuples, group by Shards and call fetch_shards
     with a list of all URLs for that Shard.
     """
-    print(f"batch retrieve from network: {len(wanted)}")
     if not wanted:
         return
 
