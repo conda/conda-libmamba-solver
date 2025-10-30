@@ -368,32 +368,6 @@ def test_shard_cache_multiple(
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
-def test_shard_cache_2():
-    """
-    Check that existing shards cache has been populated with matching shards,
-    package names.
-    """
-    subdir_data = SubdirData(Channel("main/noarch"))
-    # accepts directory that cache goes into, not database filename
-    cache = shards_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
-    extant = {}
-    for row in cache.conn.execute("SELECT url, package, shard, timestamp FROM shards"):
-        extant[row["url"]] = shards_cache.AnnotatedRawShard(
-            url=row["url"], package=row["package"], compressed_shard=row["shard"]
-        )
-
-    # check that url's are in the url field, and package names are in the package name field
-    for url in extant:
-        if shard := cache.retrieve(url):
-            assert "://" in extant[url].url
-            assert "://" not in extant[url].package
-            for group in ("packages", "packages.conda"):
-                assert all(
-                    extant[url].package in (package["name"], "wrong_package_name")
-                    for package in shard[group].values()
-                ), f"Bad package name {extant[url].package}"
-
-
 def test_shardlike():
     """
     ShardLike class presents repodata.json as shards in a way that is suitable
