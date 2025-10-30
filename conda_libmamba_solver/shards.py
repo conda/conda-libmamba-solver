@@ -153,7 +153,6 @@ class ShardBase(abc.ABC):
         """
         return self.fetch_shards([package])[package]
 
-
     @abc.abstractmethod
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
         """
@@ -320,16 +319,6 @@ class Shards(ShardBase):
         shard_name = f"{bytes(self.packages_index[package]).hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return f"{self.shards_base_url}{shard_name}"
-
-    def fetch_shard(self, package: str) -> ShardDict:
-        """
-        Fetch an individual shard.
-
-        Raise KeyError if package is not in the index.
-        """
-
-        shards = self.fetch_shards((package,))
-        return shards[package]
 
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
         """
