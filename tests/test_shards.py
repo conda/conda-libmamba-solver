@@ -16,9 +16,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
+import conda.gateways.repodata
 import msgpack
 import pytest
-import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
@@ -190,7 +190,7 @@ def test_fetch_shards_error(http_server_shards):
     assert shard_a is not shard_c
     assert shard_a == shard_c
 
-    with pytest.raises(requests.exceptions.HTTPError):
+    with pytest.raises(conda.gateways.repodata.RepodataIsEmpty):
         found.fetch_shard("fake_package")
 
     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack

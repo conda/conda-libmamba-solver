@@ -75,7 +75,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
     from .shards import (
-        ShardLike,
+        ShardBase,
     )
 
 
@@ -89,7 +89,7 @@ class Node:
     def to_id(self) -> NodeId:
         return NodeId(self.package, self.channel)
 
-    def in_shard(self, shardlike: ShardLike) -> bool:
+    def in_shard(self, shardlike: ShardBase) -> bool:
         return self.channel == shardlike.url
 
 
@@ -101,12 +101,12 @@ class NodeId:
     def __hash__(self):
         return hash((self.package, self.channel))
 
-    def in_shard(self, shardlike: ShardLike):
+    def in_shard(self, shardlike: ShardBase) -> bool:
         return self.channel == shardlike.url
 
 
 def _nodes_from_packages(
-    root_packages: list[str], shardlikes: Iterable[ShardLike]
+    root_packages: list[str], shardlikes: Iterable[ShardBase]
 ) -> Iterator[tuple[NodeId, Node]]:
     """
     Yield (NodeId, Node) for all root packages found in shardlikes.
@@ -122,9 +122,9 @@ def _nodes_from_packages(
 @dataclass
 class RepodataSubset:
     nodes: dict[NodeId, Node]
-    shardlikes: Iterable[ShardLike]
+    shardlikes: Iterable[ShardBase]
 
-    def __init__(self, shardlikes: Iterable[ShardLike]):
+    def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
         self.shardlikes = shardlikes
 
@@ -331,7 +331,7 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str], channels: Iterable[str]
-) -> dict[str, ShardLike]:
+) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
     """
