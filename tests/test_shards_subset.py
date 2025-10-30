@@ -2,16 +2,26 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 import pytest
+import pytest_codspeed
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.shards import fetch_channels
 from conda_libmamba_solver.shards_subset import RepodataSubset
 
 
-def test_shortest_pipeline():
-    pass
+def codspeed_supported():
+    """
+    TODO: temporary measure to skip these tests if we do not have pytest-codspeed >=4
+    """
+    try:
+        major, minor, bug = pytest_codspeed.__version__.split(".")
+        return int(major) >= 4
+    except (ValueError, AttributeError):
+        # If this fails, it means we want to skip this test
+        return False
 
 
+@pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed")
 @pytest.mark.parametrize("algorithm", ("shortest", "fetch_shards_bfs"))
 @pytest.mark.parametrize(
     "packages",
@@ -44,6 +54,7 @@ def test_shortest_cold_cache(conda_cli, benchmark, algorithm, packages):
     benchmark.pedantic(target, setup=setup, rounds=3)
 
 
+@pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed")
 @pytest.mark.parametrize("algorithm", ("shortest", "fetch_shards_bfs"))
 @pytest.mark.parametrize(
     "packages",
