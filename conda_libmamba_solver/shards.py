@@ -555,14 +555,14 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-def fetch_channels(channels) -> dict[str, ShardLike]:
+def fetch_channels(channels) -> dict[str, ShardBase]:
     """
     Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
 
     Attempt to fetch the sharded index first and then fall back to retrieving
     a traditional `repodata.json` file.
     """
-    channel_data: dict[str, ShardLike] = {}
+    channel_data: dict[str, ShardBase] = {}
 
     # share single disk cache for all Shards() instances
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
