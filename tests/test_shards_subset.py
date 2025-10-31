@@ -123,15 +123,15 @@ def test_traversal_algorithms_match(conda_cli, scenario: Scenario):
     channel = Channel(f"{scenario.channel}/{scenario.platform}")
 
     repodata_algorithm_map = {
-        "shortest": build_repodata_subset(
-            scenario.packages, [channel.url()], algorithm="shortest"
+        "shortest_dijkstra": build_repodata_subset(
+            scenario.packages, [channel.url()], algorithm="shortest_dijkstra"
         ),
         "shortest_bfs": build_repodata_subset(
             scenario.packages, [channel.url()], algorithm="shortest_bfs"
         ),
     }
 
-    for subdir in repodata_algorithm_map["shortest"].keys():
+    for subdir in repodata_algorithm_map["shortest_dijkstra"].keys():
         repodatas = []
 
         for algorithm, repodata_subset in repodata_algorithm_map.items():

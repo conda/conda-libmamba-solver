@@ -245,7 +245,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[str],
-    algorithm: Literal["shortest", "shortest_bfs"] = "shortest_bfs",
+    algorithm: Literal["shortest_dijkstra", "shortest_bfs"] = "shortest_bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
