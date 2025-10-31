@@ -8,6 +8,7 @@ from typing import NamedTuple
 
 import pytest
 import pytest_codspeed
+from conda.common.compat import on_win
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.shards import fetch_channels
@@ -54,6 +55,18 @@ def codspeed_supported():
         return False
 
 
+def clean_cache(conda_cli):
+    """
+    Clean cache and assert it completed without error except on Windows
+    """
+    out, err, _ = conda_cli("clean", "--yes", "--all")
+
+    # Windows CI runners cannot reliably remove this file, so we don't care about
+    # this assertion on that platform
+    if not on_win:
+        assert not err
+
+
 BASIC_FETCHING_SCENARIOS = load_scenarios("sharded_fetching_scenarios_basic.json")
 
 
@@ -83,14 +96,12 @@ def test_traversal_algorithm_benchmarks(
     """
     if cache_state == "warm":
         # Clean cache just once for "warm"
-        out, err, _ = conda_cli("clean", "--yes", "--all")
-        assert not err
+        clean_cache(conda_cli)
 
     def setup():
         if cache_state != "warm":
             # For "cold" and "lukewarm", we want to clean cache before each round of benchmarking
-            out, err, _ = conda_cli("clean", "--yes", "--all")
-            assert not err
+            clean_cache(conda_cli)
 
         channel = Channel(f"{scenario.channel}/{scenario.platform}")
         channel_data = fetch_channels([channel.url()])
