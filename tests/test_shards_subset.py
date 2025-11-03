@@ -1,11 +1,6 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
-import json
-from functools import cache
-from pathlib import Path
-from typing import NamedTuple
-
 import pytest
 import pytest_codspeed
 from conda.common.compat import on_win
@@ -14,33 +9,50 @@ from conda.models.channel import Channel
 from conda_libmamba_solver.shards import fetch_channels
 from conda_libmamba_solver.shards_subset import RepodataSubset, build_repodata_subset
 
-
-class Scenario(NamedTuple):
-    """
-    Testing scenario representing packages to fetch and what settings to use
-    """
-
-    #: Unique identifier for the testing scenario
-    name: str
-
-    #: Packages to fetch
-    packages: list[str]
-
-    platform: str  # e.g. linux-64
-    channel: str  # e.g. conda-forge
-
-    #: Packages to fetch before benchmarks are run
-    prefetch_packages: list[str]
-
-
-@cache
-def load_scenarios(scenario_filename: str) -> list[Scenario]:
-    """Load scenarios from tests/data folder and load them as `Scenario` objects."""
-    scenarios_file = Path(__file__).parent / "data" / scenario_filename
-
-    scenarios_raw = json.loads(scenarios_file.read_text())
-
-    return [Scenario(**scenario) for scenario in scenarios_raw.get("scenarios", [])]
+TESTING_SCENARIOS = [
+    {
+        "name": "python",
+        "packages": ["python"],
+        "prefetch_packages": [],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
+    {
+        "name": "data-science-basic",
+        "packages": ["numpy", "pandas", "matplotlib"],
+        "prefetch_packages": ["python"],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
+    {
+        "name": "data-science-ml",
+        "packages": ["scikit-learn", "matplotlib"],
+        "prefetch_packages": ["python", "numpy"],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
+    {
+        "name": "web-development",
+        "packages": ["django", "celery"],
+        "prefetch_packages": ["python", "requests"],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
+    {
+        "name": "scientific-computing",
+        "packages": ["scipy", "sympy", "pytorch"],
+        "prefetch_packages": ["python", "numpy", "pandas"],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
+    {
+        "name": "devops-automation",
+        "packages": ["ansible", "pyyaml", "jinja2"],
+        "prefetch_packages": ["python"],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
+]
 
 
 def codspeed_supported():
@@ -67,19 +79,16 @@ def clean_cache(conda_cli):
         assert not err
 
 
-BASIC_FETCHING_SCENARIOS = load_scenarios("sharded_fetching_scenarios_basic.json")
-
-
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
 @pytest.mark.parametrize("algorithm", ("shortest_dijkstra", "shortest_bfs"))
 @pytest.mark.parametrize(
     "scenario",
-    (*BASIC_FETCHING_SCENARIOS,),
-    ids=[scenario.name for scenario in BASIC_FETCHING_SCENARIOS],
+    TESTING_SCENARIOS,
+    ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
 def test_traversal_algorithm_benchmarks(
-    conda_cli, benchmark, cache_state: str, algorithm: str, scenario: Scenario
+    conda_cli, benchmark, cache_state: str, algorithm: str, scenario: dict
 ):
     """
     Benchmark multiple traversal algorithms for retrieving repodata shards with
@@ -103,7 +112,7 @@ def test_traversal_algorithm_benchmarks(
             # For "cold" and "lukewarm", we want to clean cache before each round of benchmarking
             clean_cache(conda_cli)
 
-        channel = Channel(f"{scenario.channel}/{scenario.platform}")
+        channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
         channel_data = fetch_channels([channel.url()])
 
         assert len(channel_data) == 2
@@ -112,33 +121,33 @@ def test_traversal_algorithm_benchmarks(
 
         if cache_state == "lukewarm":
             # Collect pre-fetch packages
-            getattr(subset, algorithm)(scenario.prefetch_packages)
+            getattr(subset, algorithm)(scenario["prefetch_packages"])
 
         return (subset,), {}
 
     def target(subset):
-        getattr(subset, algorithm)(scenario.packages)
+        getattr(subset, algorithm)(scenario["packages"])
 
     benchmark.pedantic(target, setup=setup, rounds=3)
 
 
 @pytest.mark.parametrize(
     "scenario",
-    (*BASIC_FETCHING_SCENARIOS,),
-    ids=[scenario.name for scenario in BASIC_FETCHING_SCENARIOS],
+    TESTING_SCENARIOS,
+    ids=[scenario["name"] for scenario in TESTING_SCENARIOS],
 )
-def test_traversal_algorithms_match(conda_cli, scenario: Scenario):
+def test_traversal_algorithms_match(conda_cli, scenario: dict):
     """
     Ensure that all traversal algorithms return the same repodata subset.
     """
-    channel = Channel(f"{scenario.channel}/{scenario.platform}")
+    channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
 
     repodata_algorithm_map = {
         "shortest_dijkstra": build_repodata_subset(
-            scenario.packages, [channel.url()], algorithm="shortest_dijkstra"
+            scenario["packages"], [channel.url()], algorithm="shortest_dijkstra"
         ),
         "shortest_bfs": build_repodata_subset(
-            scenario.packages, [channel.url()], algorithm="shortest_bfs"
+            scenario["packages"], [channel.url()], algorithm="shortest_bfs"
         ),
     }
 

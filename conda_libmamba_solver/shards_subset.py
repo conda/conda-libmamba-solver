@@ -89,9 +89,6 @@ class Node:
     def to_id(self) -> NodeId:
         return NodeId(self.package, self.channel)
 
-    def in_shard(self, shardlike: ShardBase) -> bool:
-        return self.channel == shardlike.url
-
 
 @dataclass(order=True, eq=True, frozen=True)
 class NodeId:
@@ -100,9 +97,6 @@ class NodeId:
 
     def __hash__(self):
         return hash((self.package, self.channel))
-
-    def in_shard(self, shardlike: ShardBase) -> bool:
-        return self.channel == shardlike.url
 
 
 def _nodes_from_packages(
@@ -238,7 +232,6 @@ class RepodataSubset:
 
                 for next_node, _ in self.outgoing(node):
                     if not next_node.visited:
-                        next_node.distance = node.distance + 1
                         node_queue.append(next_node)
 
 
