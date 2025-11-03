@@ -22,9 +22,6 @@ from conda_libmamba_solver.shards_subset import (
 from tests.test_shards import (
     ROOT_PACKAGES,
     _timer,
-    http_server_shards,  # linter doesn't like it but it allows pytest to find the fixtures
-    prepare_shards_test,
-    shard_cache_with_data,
 )
 
 if TYPE_CHECKING:

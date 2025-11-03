@@ -7,3 +7,11 @@ pytest_plugins = (
     "conda.testing",
     "conda.testing.fixtures",
 )
+
+# Allow fixtures from test_shards to be available globally, specifically in
+# test_shards_subset:
+from .test_shards import (  # noqa: F401
+    http_server_shards,
+    prepare_shards_test,
+    shard_cache_with_data,
+)
