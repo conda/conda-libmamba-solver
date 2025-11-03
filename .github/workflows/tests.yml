@@ -78,10 +78,10 @@ jobs:
     if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Testing with branch: reusable-test-workflow
+    # Pinned to commit: 1ca8113c5d5aecaff86c994ddfd367dff91f2400 (reusable-test-workflow branch)
     # TODO: Update to a specific tag when conda releases a versioned tag
     # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@reusable-test-workflow
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@1ca8113c5d5aecaff86c994ddfd367dff91f2400
     strategy:
       fail-fast: false
       matrix:
@@ -133,9 +133,9 @@ jobs:
     # needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Testing with branch: reusable-test-workflow
+    # Pinned to commit: 1ca8113c5d5aecaff86c994ddfd367dff91f2400 (reusable-test-workflow branch)
     # TODO: Update to a specific tag when conda releases a versioned tag
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@reusable-test-workflow
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@1ca8113c5d5aecaff86c994ddfd367dff91f2400
     strategy:
       fail-fast: false
       matrix:
@@ -318,9 +318,9 @@ jobs:
     # needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Testing with branch: reusable-test-workflow
+    # Pinned to commit: 1ca8113c5d5aecaff86c994ddfd367dff91f2400 (reusable-test-workflow branch)
     # TODO: Update to a specific tag when conda releases a versioned tag
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@reusable-test-workflow
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@1ca8113c5d5aecaff86c994ddfd367dff91f2400
     strategy:
       fail-fast: false
       matrix:
