@@ -68,6 +68,12 @@ class ShardCache:
         self.base = base
         self.connect()
 
+    def copy(self):
+        """
+        Copy cache with new connection. Useful for threads.
+        """
+        return ShardCache(self.base)
+
     def connect(self):
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)

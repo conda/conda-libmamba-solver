@@ -53,15 +53,23 @@ for url in channel_data:
 
 from __future__ import annotations
 
+import concurrent.futures
 import heapq
 import logging
+import queue
 import sys
+import threading
 from collections import deque
+from contextlib import suppress
 from dataclasses import dataclass
+from queue import SimpleQueue
 from typing import TYPE_CHECKING
+
+import requests.exceptions
 
 from .shards import (
     Shards,
+    _shards_connections,
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
@@ -72,7 +80,11 @@ log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
+    from queue import SimpleQueue as Queue
     from typing import Literal
+
+    from conda_libmamba_solver.shards_cache import ShardCache
+    from conda_libmamba_solver.shards_typing import ShardDict
 
     from .shards import (
         ShardBase,
@@ -234,6 +246,73 @@ class RepodataSubset:
                     if not next_node.visited:
                         node_queue.append(next_node)
 
+    def shortest_pipelined(self, root_packages):
+        """
+        Build repodata subset using a main thread, a thread to fetch from
+        sqlite3 and another threadpool to fetch http.
+        """
+
+        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
+
+        # if sharded is empty, we could skip everything related to threads.
+        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
+        cache = sharded[0].shards_cache if sharded else None
+        session = sharded[0].session if sharded else None
+
+        in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
+        shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
+        cache_miss_queue: SimpleQueue[list[str]] = SimpleQueue()
+
+        # this kind of thread can crash, and we don't hear back without our own
+        # handling.
+        cache_thread = threading.Thread(
+            target=cache_fetch_thread,
+            args=(in_queue, shard_out_queue, cache_miss_queue, cache),
+            daemon=False,
+        )
+
+        # this kind of thread can crash, and we don't hear back without our own
+        # handling.
+        network_thread = threading.Thread(
+            target=network_fetch_thread,
+            args=(cache_miss_queue, shard_out_queue, session),
+            daemon=False,
+        )
+
+        # or after populating initial URLs queue
+        cache_thread.start()
+        network_thread.start()
+
+        # see test_*_thread in test_shards.py for how to set up the workers
+
+        pending = set()
+
+        while pending:
+            # in_queue.put(list of URLs to fetch)
+            new_shards = shard_out_queue.get()  # with a timeout to detect dead threads?
+            for shard in new_shards:
+                pass  # XXX add algorithm here
+            # for shard in new_shards:
+            #    decompress and cache if needed (or do that in the fetch threads)
+            #    call shard_mentioned_packages_2(shard)
+            #    for channel in shardlikes:
+            #        if mentioned package in channel
+            #             add node to pending if not visited
+            #             update distances
+            #             if new nodes added, add their shard URLs to in_queue
+            #
+            #             associate each URL with a list of node ids that are
+            #             waiting for it, because we imagine a future
+            #             optimization of multiple packages in a single shard.
+            #
+            #             if new node is a ShardLike, process right away or push that shard to
+            #             shard_out_queue right away.
+
+        in_queue.put(None)
+
+        cache_thread.join()
+        network_thread.join()
+
 
 def build_repodata_subset(
     root_packages: Iterable[str],
@@ -257,3 +336,109 @@ def build_repodata_subset(
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
+
+
+# region workers
+
+
+def cache_fetch_thread(
+    in_queue: Queue[list[str] | None],
+    shard_out_queue: Queue[list[tuple[str, ShardDict]] | None],
+    network_out_queue: Queue[list[str] | None],
+    cache: ShardCache,
+):
+    """
+    Fetch batches of shards from cache until in_queue sees None. Enqueue found
+    shards to shard_out_queue, and not found shards to network_out_queue.
+
+    When we see None on in_queue, we send None to both out queues and exit.
+    """
+    cache = cache.copy()
+
+    # should we send None to out_queues when done? Or just return?
+    running = True
+    while running and (batch := in_queue.get()) is not None:
+        shard_urls = batch[:]
+        with suppress(queue.Empty):
+            while running:
+                batch = in_queue.get_nowait()
+                if batch is None:
+                    # do the work but then quit
+                    running = False
+                    break
+                shard_urls.extend(batch)
+
+        cached = cache.retrieve_multiple(shard_urls)
+
+        found = []
+        not_found = []
+        for url, shard in cached.items():
+            if shard:
+                found.append((url, shard))
+            else:
+                not_found.append(url)
+
+        # Might wake up the network thread by calling it first:
+        network_out_queue.put(not_found)
+        shard_out_queue.put(found)
+
+    network_out_queue.put(None)
+    shard_out_queue.put(None)
+
+
+def network_fetch_thread(
+    in_queue: Queue[list[str] | None],
+    shard_out_queue: Queue[list[tuple[str, bytes]] | None],
+    # how to communicate errors?
+    session,
+):
+    """
+    in_queue contains urls to fetch over the network.
+    While the in_queue has not received a sentinel None, empty everything from
+    the queue. Fetch all of them over the network. Fetched shards go to
+    shard_out_queue.
+    """
+    running = True
+
+    def fetch(s, url):
+        response = s.get(url)
+        response.raise_for_status()
+        # This needs to be decompressed and parsed, and go into the cache as raw
+        # content if it was really .msgpack.zst. shard_out_queue for
+        # cache_fetch_thread produces ShardDict but this produces bytes; would
+        # be better if they produced the same type.
+        shard_out_queue.put([(url, response.content)])
+        data = response.content
+        return (url, data)  # needs to be
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        while running and (batch := in_queue.get()) is not None:
+            shard_urls = batch[:]
+            with suppress(queue.Empty):
+                while running:
+                    batch = in_queue.get_nowait()
+                    if batch is None:
+                        # do the work but then quit
+                        running = False
+                        break
+                    shard_urls.extend(batch)
+                    futures = [executor.submit(fetch, session, url) for url in shard_urls]
+                    for future in concurrent.futures.as_completed(futures):
+                        try:
+                            url, data = future.result()
+                            log.debug("Fetch thread got", url, len(data))
+                        except requests.exceptions.RequestException as e:
+                            log.error("Error fetching shard. %s", e)
+
+                        # This will drain the http threadpool before loading another
+                        # batch. Instead, we might want to get_nowait() and
+                        # executor.submit() here after each future has been
+                        # retired to make sure we always have
+                        # _shards_connections() in flight. Or we could use
+                        # future "on completion" callbacks instead of relying so
+                        # much on as_completed().
+
+    shard_out_queue.put(None)
+
+
+# endregion
