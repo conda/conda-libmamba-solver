@@ -279,7 +279,7 @@ def test_shards_network_thread(http_server_shards):
 
     while batch := shard_out_queue.get(timeout=1):
         for url, shard in batch:
-            print(url, type(shard))
+            print(url, len(shard), "bytes")
 
     network_thread.join(5)
 

@@ -426,7 +426,7 @@ def network_fetch_thread(
                     for future in concurrent.futures.as_completed(futures):
                         try:
                             url, data = future.result()
-                            log.debug("Fetch thread got", url, len(data))
+                            log.debug("Fetch thread got %s (%s bytes)", url, len(data))
                         except requests.exceptions.RequestException as e:
                             log.error("Error fetching shard. %s", e)
 
