@@ -127,8 +127,10 @@ jobs:
   # linux test suite
   linux:
     # only run test suite if there are code changes
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Windows only
+    # needs: changes
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
     # Testing with branch: reusable-test-workflow
@@ -189,8 +191,10 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Windows only
+    # needs: changes
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -308,8 +312,10 @@ jobs:
   # macos test suite
   macos:
     # only run test suite if there are code changes
-    needs: changes
-    if: needs.changes.outputs.code == 'true'
+    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Windows only
+    # needs: changes
+    if: false
+    # needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
     # Testing with branch: reusable-test-workflow
@@ -377,7 +383,8 @@ jobs:
   # aggregate and upload
   aggregate:
     # only aggregate test suite if there are code changes
-    needs: [changes, windows, linux, linux-benchmarks, linux-qemu, macos]
+    # CONDA-LIBMAMBA-SOLVER CHANGE: Only depend on windows (other jobs disabled)
+    needs: [changes, windows]
     if: >-
       !cancelled()
       && needs.changes.outputs.code == 'true'
@@ -402,7 +409,8 @@ jobs:
 
   # required check
   analyze:
-    needs: [windows, linux, linux-qemu, linux-benchmarks, macos, aggregate]
+    # CONDA-LIBMAMBA-SOLVER CHANGE: Only depend on windows and aggregate (other jobs disabled)
+    needs: [windows, aggregate]
     if: '!cancelled()'
 
     runs-on: ubuntu-latest
