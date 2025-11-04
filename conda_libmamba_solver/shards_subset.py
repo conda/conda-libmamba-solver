@@ -404,6 +404,26 @@ def build_repodata_subset(
 # region workers
 
 
+def combine_batches_until_none(
+    in_queue: Queue[list[NodeId] | None],
+) -> Iterator[list[NodeId]]:
+    """
+    Combine lists from in_queue until we see None. Yield combined lists.
+    """
+    running = True
+    while running and (batch := in_queue.get()) is not None:
+        node_ids = batch[:]
+        with suppress(queue.Empty):
+            while running:
+                batch = in_queue.get_nowait()
+                if batch is None:
+                    # do the work but then quit
+                    running = False
+                else:
+                    node_ids.extend(batch)
+        yield node_ids
+
+
 def cache_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
@@ -419,18 +439,17 @@ def cache_fetch_thread(
     cache = cache.copy()
 
     # should we send None to out_queues when done? Or just return?
-    running = True
-    while running and (batch := in_queue.get()) is not None:
-        node_ids = batch[:]
-        with suppress(queue.Empty):
-            while running:
-                batch = in_queue.get_nowait()
-                if batch is None:
-                    # do the work but then quit
-                    running = False
-                else:
-                    node_ids.extend(batch)
-
+    for node_ids in combine_batches_until_none(in_queue):
+        if (
+            NodeId(
+                package="urllib3",
+                channel="https://conda.anaconda.org/conda-forge-sharded/noarch/repodata_shards.msgpack.zst",
+                shard_url="https://conda.anaconda.org/conda-forge-sharded/noarch/327b08b5834b3e06210a902498f80a85c9c3a02a9f44fade7b69e0f35b08c38d.msgpack.zst",
+            )
+            in node_ids
+        ):
+            print("urllib3 suspicious node")
+            print(len(set(node_ids)) == len(node_ids))
         urls = [node_id.shard_url for node_id in node_ids]
         if (
             "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
@@ -473,7 +492,6 @@ def network_fetch_thread(
     """
     cache = cache.copy()
     dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
-    running = True
 
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
@@ -485,17 +503,7 @@ def network_fetch_thread(
         return (url, node_id, data)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
-        while running and (batch := in_queue.get()) is not None:
-            node_ids = batch[:]
-            with suppress(queue.Empty):
-                while running:
-                    batch = in_queue.get_nowait()
-                    if batch is None:
-                        # do the work but then quit
-                        running = False
-                    else:
-                        node_ids.extend(batch)
-
+        for node_ids in combine_batches_until_none(in_queue):
             futures = []
             for node_id in node_ids:
                 if (
