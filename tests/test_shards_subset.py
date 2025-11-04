@@ -250,11 +250,12 @@ def test_sqlite3_thread(
     cache_thread.join(5)
 
 
-def test_shards_network_thread(http_server_shards):
+def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     """
     Test network retrieval thread, meant to be chained after the sqlite3 thread
     by having network_in_queue = sqlite3 thread's network_out_queue.
     """
+    cache, fake_shards = shard_cache_with_data
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
     found = fetch_shards_index(subdir_data)
@@ -267,7 +268,7 @@ def test_shards_network_thread(http_server_shards):
     # handling.
     network_thread = threading.Thread(
         target=shards_subset.network_fetch_thread,
-        args=(network_in_queue, shard_out_queue, found.session),
+        args=(network_in_queue, shard_out_queue, found.session, cache),
         daemon=False,
     )
 

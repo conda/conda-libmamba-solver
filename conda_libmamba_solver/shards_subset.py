@@ -65,9 +65,14 @@ from dataclasses import dataclass
 from queue import SimpleQueue
 from typing import TYPE_CHECKING
 
+import msgpack
 import requests.exceptions
+import zstandard
+
+from conda_libmamba_solver.shards_cache import AnnotatedRawShard
 
 from .shards import (
+    ZSTD_MAX_SHARD_SIZE,
     Shards,
     _shards_connections,
     batch_retrieve_from_cache,
@@ -388,9 +393,10 @@ def cache_fetch_thread(
 
 def network_fetch_thread(
     in_queue: Queue[list[str] | None],
-    shard_out_queue: Queue[list[tuple[str, bytes]] | None],
+    shard_out_queue: Queue[list[tuple[str, ShardDict]] | None],
     # how to communicate errors?
     session,
+    cache: ShardCache,
 ):
     """
     in_queue contains urls to fetch over the network.
@@ -398,16 +404,13 @@ def network_fetch_thread(
     the queue. Fetch all of them over the network. Fetched shards go to
     shard_out_queue.
     """
+    cache = cache.copy()
+    dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
     running = True
 
     def fetch(s, url):
         response = s.get(url)
         response.raise_for_status()
-        # This needs to be decompressed and parsed, and go into the cache as raw
-        # content if it was really .msgpack.zst. shard_out_queue for
-        # cache_fetch_thread produces ShardDict but this produces bytes; would
-        # be better if they produced the same type.
-        shard_out_queue.put([(url, response.content)])
         data = response.content
         return (url, data)  # needs to be
 
@@ -427,8 +430,21 @@ def network_fetch_thread(
                         try:
                             url, data = future.result()
                             log.debug("Fetch thread got %s (%s bytes)", url, len(data))
+
+                            # Decompress and parse. If it decodes as
+                            # msgpack.zst, insert into cache. Then put "know
+                            # good" shard into out queue.
+                            shard: ShardDict = msgpack.loads(
+                                dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
+                            )  # type: ignore[assign]
+                            cache.insert(AnnotatedRawShard(url, "", data))
+                            shard_out_queue.put([(url, shard)])
+
                         except requests.exceptions.RequestException as e:
                             log.error("Error fetching shard. %s", e)
+                        except Exception as e:
+                            # raises ZstdError for b"not zstd" test data e.g.
+                            log.exception("Unhandled exception in network thread", exc_info=e)
 
                         # This will drain the http threadpool before loading another
                         # batch. Instead, we might want to get_nowait() and
