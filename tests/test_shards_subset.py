@@ -17,6 +17,7 @@ from conda.testing.fixtures import CondaCLIFixture
 from conda_libmamba_solver import shards_cache, shards_subset
 from conda_libmamba_solver.shards import fetch_channels, fetch_shards_index
 from conda_libmamba_solver.shards_subset import (
+    NodeId,
     RepodataSubset,
     build_repodata_subset,
 )
@@ -207,16 +208,16 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
 
 
-def test_sqlite3_thread(
+def test_shards_cache_thread(
     shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
 ):
     """
     Test sqlite3 retrieval thread.
     """
     cache, fake_shards = shard_cache_with_data
-    in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
-    shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
-    network_out_queue: SimpleQueue[list[str]] = SimpleQueue()
+    in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+    shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+    network_out_queue: SimpleQueue[list[NodeId]] = SimpleQueue()
 
     # this kind of thread can crash, and we don't hear back without our own
     # handling.
@@ -226,26 +227,31 @@ def test_sqlite3_thread(
         daemon=False,
     )
 
-    fake_shards_urls = [shard.url for shard in fake_shards]
+    fake_nodes = [NodeId(shard.package, channel="", shard_url=shard.url) for shard in fake_shards]
 
     # several batches, then None "finish thread" sentinel
-    in_queue.put(fake_shards_urls[:1])
-    in_queue.put(["https://example.com/notfound"])
-    in_queue.put(fake_shards_urls[1:3])
-    in_queue.put(["https://example.com/notfound2", "https://example.com/notfound3"])
-    in_queue.put(fake_shards_urls[3:])
+    in_queue.put(fake_nodes[:1])
+    in_queue.put([NodeId("notfound", channel="", shard_url="https://example.com/notfound")])
+    in_queue.put(fake_nodes[1:3])
+    in_queue.put(
+        [
+            NodeId("notfound2", channel="", shard_url="https://example.com/notfound2"),
+            NodeId("notfound3", channel="", shard_url="https://example.com/notfound3"),
+        ]
+    )
+    in_queue.put(fake_nodes[3:])
     in_queue.put(None)
 
     cache_thread.start()
 
     while batch := shard_out_queue.get(timeout=1):
-        for url, shard in batch:
-            assert url in fake_shards_urls
-            assert shard == cache.retrieve(url)
+        for node_id, shard in batch:
+            assert node_id in fake_nodes
+            assert shard == cache.retrieve(node_id.shard_url)
 
     while notfound := network_out_queue.get(timeout=1):
-        for url in notfound:
-            assert url.startswith("https://example.com/notfound")
+        for node_id in notfound:
+            assert node_id.shard_url.startswith("https://example.com/notfound")
 
     cache_thread.join(5)
 
@@ -261,23 +267,22 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     found = fetch_shards_index(subdir_data)
     assert found
 
-    network_in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
-    shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
+    network_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+    shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
 
     # this kind of thread can crash, and we don't hear back without our own
     # handling.
     network_thread = threading.Thread(
         target=shards_subset.network_fetch_thread,
-        args=(network_in_queue, shard_out_queue, found.session, cache),
+        args=(network_in_queue, shard_out_queue, cache, [found]),
         daemon=False,
     )
 
-    shards_urls = list(found.shard_url(package) for package in found.shards_index["shards"])
+    node_ids = [NodeId(package, found.url) for package in found.package_names]
 
     # several batches, then None "finish thread" sentinel
-    network_in_queue.put(shards_urls[:1])
-    network_in_queue.put([f"{http_server_shards}/noarch/notfound.html"])
-    network_in_queue.put(shards_urls[1:])
+    network_in_queue.put([node_ids[0]])
+    network_in_queue.put(node_ids[1:])
     network_in_queue.put(None)
 
     network_thread.start()

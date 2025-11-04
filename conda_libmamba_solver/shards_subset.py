@@ -102,15 +102,17 @@ class Node:
     package: str = ""
     channel: str = ""
     visited: bool = False
+    shard_url: str = ""
 
     def to_id(self) -> NodeId:
-        return NodeId(self.package, self.channel)
+        return NodeId(self.package, self.channel, self.shard_url)
 
 
 @dataclass(order=True, eq=True, frozen=True)
 class NodeId:
     package: str
     channel: str
+    shard_url: str = ""
 
     def __hash__(self):
         return hash((self.package, self.channel))
@@ -262,11 +264,10 @@ class RepodataSubset:
         # if sharded is empty, we could skip everything related to threads.
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
         cache = sharded[0].shards_cache if sharded else None
-        session = sharded[0].session if sharded else None
 
-        in_queue: SimpleQueue[list[str] | None] = SimpleQueue()
-        shard_out_queue: SimpleQueue[list[tuple[str, ShardDict]]] = SimpleQueue()
-        cache_miss_queue: SimpleQueue[list[str]] = SimpleQueue()
+        in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+        shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+        cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
 
         # this kind of thread can crash, and we don't hear back without our own
         # handling.
@@ -280,7 +281,7 @@ class RepodataSubset:
         # handling.
         network_thread = threading.Thread(
             target=network_fetch_thread,
-            args=(cache_miss_queue, shard_out_queue, session),
+            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
             daemon=False,
         )
 
@@ -290,7 +291,11 @@ class RepodataSubset:
 
         # see test_*_thread in test_shards.py for how to set up the workers
 
+        shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending = set(self.nodes)
+        pending_urls = set()
+        for node_id in pending:
+            pending_urls.add(shardlikes_by_url[node_id.channel].shard_url(node_id.package))
 
         while pending:
             # in_queue.put(list of URLs to fetch)
@@ -304,20 +309,9 @@ class RepodataSubset:
                         if package in channel:
                             node_id = NodeId(package, channel.url)
                             if node_id not in self.nodes:
-                                node = Node(distance=0, package=package, channel=channel.url)
-                                self.nodes[node_id] = node
+                                node_id = Node(distance=0, package=package, channel=channel.url)
+                                self.nodes[node_id] = node_id
                                 pending.add(node_id)
-
-                        # add node to pending if not visited
-                        # update distances
-                        # if new nodes added, add their shard URLs to in_queue
-
-                        # associate each URL with a list of node ids that are
-                        # waiting for it, because we imagine a future
-                        # optimization of multiple packages in a single shard.
-
-                        # if new node is a ShardLike, process right away or push that shard to
-                        # shard_out_queue right away.
 
         in_queue.put(None)
 
@@ -353,9 +347,9 @@ def build_repodata_subset(
 
 
 def cache_fetch_thread(
-    in_queue: Queue[list[str] | None],
-    shard_out_queue: Queue[list[tuple[str, ShardDict]] | None],
-    network_out_queue: Queue[list[str] | None],
+    in_queue: Queue[list[NodeId] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
+    network_out_queue: Queue[list[NodeId] | None],
     cache: ShardCache,
 ):
     """
@@ -369,7 +363,7 @@ def cache_fetch_thread(
     # should we send None to out_queues when done? Or just return?
     running = True
     while running and (batch := in_queue.get()) is not None:
-        shard_urls = batch[:]
+        node_ids = batch[:]
         with suppress(queue.Empty):
             while running:
                 batch = in_queue.get_nowait()
@@ -377,17 +371,18 @@ def cache_fetch_thread(
                     # do the work but then quit
                     running = False
                     break
-                shard_urls.extend(batch)
+                node_ids.extend(batch)
 
-        cached = cache.retrieve_multiple(shard_urls)
+        cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
+        url_to_nodeid = {node_id.shard_url: node_id for node_id in node_ids}
         found = []
         not_found = []
         for url, shard in cached.items():
             if shard:
-                found.append((url, shard))
+                found.append((url_to_nodeid[url], shard))
             else:
-                not_found.append(url)
+                not_found.append(url_to_nodeid[url])
 
         # Might wake up the network thread by calling it first:
         network_out_queue.put(not_found)
@@ -398,11 +393,11 @@ def cache_fetch_thread(
 
 
 def network_fetch_thread(
-    in_queue: Queue[list[str] | None],
-    shard_out_queue: Queue[list[tuple[str, ShardDict]] | None],
+    in_queue: Queue[list[NodeId] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
     # how to communicate errors?
-    session,
     cache: ShardCache,
+    shardlikes: list[ShardBase],
 ):
     """
     in_queue contains urls to fetch over the network.
@@ -414,15 +409,17 @@ def network_fetch_thread(
     dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
     running = True
 
-    def fetch(s, url):
+    shardlikes_by_url = {s.url: s for s in shardlikes}
+
+    def fetch(s, url: str, node_id: NodeId):
         response = s.get(url)
         response.raise_for_status()
         data = response.content
-        return (url, data)  # needs to be
+        return (url, node_id, data)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         while running and (batch := in_queue.get()) is not None:
-            shard_urls = batch[:]
+            node_ids = batch[:]
             with suppress(queue.Empty):
                 while running:
                     batch = in_queue.get_nowait()
@@ -430,22 +427,29 @@ def network_fetch_thread(
                         # do the work but then quit
                         running = False
                         break
-                    shard_urls.extend(batch)
-                    futures = [executor.submit(fetch, session, url) for url in shard_urls]
+                    node_ids.extend(batch)
+
+                    futures = []
+                    for node_id in node_ids:
+                        # this worker should only recieve network node_id's:
+                        session = shardlikes_by_url[node_id.channel].session
+                        url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
+                        futures.append(executor.submit(fetch, session, url, node_id))
+
                     for future in concurrent.futures.as_completed(futures):
                         try:
-                            url, data = future.result()
+                            url, node_id, data = future.result()
                             log.debug("Fetch thread got %s (%s bytes)", url, len(data))
 
                             # Decompress and parse. If it decodes as
-                            # msgpack.zst, insert into cache. Then put "know
+                            # msgpack.zst, insert into cache. Then put "known
                             # good" shard into out queue.
                             shard: ShardDict = msgpack.loads(
                                 dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
                             )  # type: ignore[assign]
                             # we don't track the unnecessary shard package name here:
-                            cache.insert(AnnotatedRawShard(url, "", data))
-                            shard_out_queue.put([(url, shard)])
+                            cache.insert(AnnotatedRawShard(url, node_id.package, data))
+                            shard_out_queue.put([(node_id, shard)])
 
                         except requests.exceptions.RequestException as e:
                             log.error("Error fetching shard. %s", e)

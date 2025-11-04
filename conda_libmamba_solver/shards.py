@@ -143,6 +143,16 @@ class ShardBase(abc.ABC):
         return package in self.package_names
 
     @abc.abstractmethod
+    def shard_url(self, package: str) -> str:
+        """
+        Return shard URL for a given package. For monolithic repodata, should
+        not be fetched but is a unique identifier.
+
+        Raise KeyError if package is not in the index.
+        """
+        ...
+
+    @abc.abstractmethod
     def fetch_shard(self, package: str) -> ShardDict:
         """
         Fetch an individual shard for the given package.
@@ -227,6 +237,21 @@ class ShardLike(ShardBase):
     @property
     def package_names(self) -> KeysView[str]:
         return self.shards.keys()
+
+    def shard_url(self, package: str) -> str:
+        """
+        Return shard URL for a given package.
+
+        Raise KeyError if package is not in the index.
+        """
+        self.shards[package]
+        return f"{self.url}#{package}"
+
+    def visit_shard(self, package: str) -> ShardDict | None:
+        """
+        Return a shard that is already in memory and mark as visited.
+        """
+        return self.fetch_shard(package)
 
     def fetch_shard(self, package: str) -> ShardDict:
         """
@@ -320,6 +345,12 @@ class Shards(ShardBase):
         shard_name = f"{bytes(self.packages_index[package]).hex()}.msgpack.zst"
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return f"{self.shards_base_url}{shard_name}"
+
+    def visit_shard(self, package: str) -> ShardDict | None:
+        """
+        Return a shard that is already in memory and mark as visited.
+        """
+        return self.visited[package]
 
     def fetch_shard(self, package: str) -> ShardDict:
         """
