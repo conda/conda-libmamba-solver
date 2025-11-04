@@ -426,6 +426,7 @@ def test_shardlike_repr():
             "packages": {},
             "packages.conda": {},
             "info": {"base_url": "", "shards_base_url": "", "subdir": "noarch"},
+            "repodata_version": 1,
         },
         "https://conda.anaconda.org/",
     )
