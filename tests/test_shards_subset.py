@@ -197,9 +197,10 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     channels = list(context.default_channels)
     channels.append(Channel("conda-forge-sharded"))
 
-    with _timer("build_repodata_subset()"):
+    with _timer("fetch_channels()"):
         channel_data = fetch_channels(channels)
 
+    with _timer("RepodataSubset.shortest_pipelined()"):
         subset = RepodataSubset((*channel_data.values(),))
         subset.shortest_pipelined(root_packages)
         print(f"{len(subset.nodes)} (channel, package) nodes discovered")

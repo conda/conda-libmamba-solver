@@ -298,7 +298,11 @@ class RepodataSubset:
         processed = set()  # received from shard_out_queue
 
         def enqueue_pending():
-            log.info("Enqueue %s pending", sorted(node_id.package for node_id in pending))
+            log.info(
+                "Enqueue %s pending %s",
+                len(pending),
+                sorted(node_id.package for node_id in pending),
+            )
             shard_out_batch = []
             shard_in_batch = []
             # enqueue all pending nodes
@@ -331,6 +335,7 @@ class RepodataSubset:
                 print(f"Pending {len(pending)}, Submitted {len(submitted)}")
                 if all([x in self.nodes for x in submitted]):
                     print("Done but submitted not empty")
+                    print("\n".join(str(x) for x in submitted))
                     running = False
                 timeouts += 1
                 # if timeouts > 10:
@@ -488,8 +493,8 @@ def network_fetch_thread(
                     if batch is None:
                         # do the work but then quit
                         running = False
-                        break
-                    node_ids.extend(batch)
+                    else:
+                        node_ids.extend(batch)
 
                     futures = []
                     for node_id in node_ids:
