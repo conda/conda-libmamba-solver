@@ -259,6 +259,7 @@ class RepodataSubset:
         sqlite3 and another threadpool to fetch http.
         """
 
+        # these are in self.nodes but we still need the shards
         self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
         # if sharded is empty, we could skip everything related to threads.
@@ -294,6 +295,7 @@ class RepodataSubset:
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending = set(self.nodes)  # to be sent to in_queue
         submitted = set()  # sent to in_queue, not received from shard_out_queue
+        processed = set()  # received from shard_out_queue
 
         def enqueue_pending():
             log.info("Enqueue %s pending", sorted(node_id.package for node_id in pending))
@@ -301,6 +303,9 @@ class RepodataSubset:
             shard_in_batch = []
             # enqueue all pending nodes
             for node_id in pending:
+                if node_id in submitted or node_id in processed:
+                    print("Skip duplicate", node_id)
+                    continue
                 # we could wind up sending duplicate node_id here?
                 shardlike = shardlikes_by_url[node_id.channel]
                 if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
@@ -324,10 +329,13 @@ class RepodataSubset:
                 new_shards = shard_out_queue.get(timeout=1)
             except queue.Empty:
                 print(f"Pending {len(pending)}, Submitted {len(submitted)}")
+                if all([x in self.nodes for x in submitted]):
+                    print("Done but submitted not empty")
+                    running = False
                 timeouts += 1
-                if timeouts > 10:
-                    log.error("Timeout waiting for shard_out_queue")
-                    raise TimeoutError("Timeout waiting for shard_out_queue")
+                # if timeouts > 10:
+                #    log.error("Timeout waiting for shard_out_queue")
+                #    raise TimeoutError("Timeout waiting for shard_out_queue")
                 continue
             if new_shards is None:
                 running = False
@@ -335,6 +343,7 @@ class RepodataSubset:
             for node_id, shard in new_shards:
                 # add shard to appropriate ShardLike
                 submitted.remove(node_id)
+                processed.add(node_id)
                 shardlike = shardlikes_by_url[node_id.channel]
                 shardlike.visited[node_id.package] = shard
                 mentioned_packages = list(shard_mentioned_packages_2(shard))
@@ -435,8 +444,10 @@ def cache_fetch_thread(
                 not_found.append(url_to_nodeid[url])
 
         # Might wake up the network thread by calling it first:
-        network_out_queue.put(not_found)
-        shard_out_queue.put(found)
+        if not_found:
+            network_out_queue.put(not_found)
+        if found:
+            shard_out_queue.put(found)
 
     network_out_queue.put(None)
     shard_out_queue.put(None)
