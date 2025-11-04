@@ -127,7 +127,7 @@ def _nodes_from_packages(
     for package in root_packages:
         for shardlike in shardlikes:
             if package in shardlike:
-                node = Node(0, package, shardlike.url)
+                node = Node(0, package, shardlike.url, shard_url=shardlike.shard_url(package))
                 node_id = node.to_id()
                 yield node_id, node
 
@@ -292,32 +292,70 @@ class RepodataSubset:
         # see test_*_thread in test_shards.py for how to set up the workers
 
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
-        pending = set(self.nodes)
+        pending = set(self.nodes)  # to be sent to in_queue
+        submitted = set()  # sent to in_queue, not received from shard_out_queue
 
-        while pending:  # and shard_out_queue hasn't returned None
+        def enqueue_pending():
+            log.info("Enqueue %s pending", sorted(node_id.package for node_id in pending))
+            shard_out_batch = []
+            shard_in_batch = []
             # enqueue all pending nodes
             for node_id in pending:
+                # we could wind up sending duplicate node_id here?
                 shardlike = shardlikes_by_url[node_id.channel]
                 if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
-                    shard = shardlike.visit_shard(node_id.package)
-                    shard_out_queue.put([(node_id, shard)])
+                    shard_out_batch.append((node_id, shardlike.visit_shard(node_id.package)))
                 else:
-                    in_queue.put([node_id])
+                    shard_in_batch.append(node_id)
+                submitted.add(node_id)  # tracks everything not yet read from shard_out_batch
+            if shard_out_batch:
+                shard_out_queue.put(shard_out_batch)
+            if shard_in_batch:
+                in_queue.put(shard_in_batch)
             pending.clear()
 
-            new_shards = shard_out_queue.get()  # with a timeout to detect dead threads?
-            for url, shard in new_shards:
+        enqueue_pending()  # initial batch
+
+        timeouts = 0
+
+        running = True
+        while running:
+            try:
+                new_shards = shard_out_queue.get(timeout=1)
+            except queue.Empty:
+                print(f"Pending {pending}, Submitted {submitted}")
+                timeouts += 1
+                if timeouts > 5:
+                    log.error("Timeout waiting for shard_out_queue")
+                    raise TimeoutError("Timeout waiting for shard_out_queue")
+                continue
+            if new_shards is None:
+                running = False
+                new_shards = []
+            for node_id, shard in new_shards:
                 # add shard to appropriate ShardLike
+                submitted.remove(node_id)
+                shardlike = shardlikes_by_url[node_id.channel]
+                shardlike.visited[node_id.package] = shard
                 mentioned_packages = list(shard_mentioned_packages_2(shard))
 
-                for channel in self.shardlikes:
+                for shardlike in self.shardlikes:
                     for package in mentioned_packages:
-                        if package in channel:
-                            node_id = NodeId(package, channel.url, channel.shard_url(package))
+                        if package in shardlike:
+                            node_id = NodeId(package, shardlike.url, shardlike.shard_url(package))
                             if node_id not in self.nodes:
-                                node_id = Node(distance=0, package=package, channel=channel.url)
-                                self.nodes[node_id] = node_id
+                                node = Node(
+                                    distance=0,
+                                    package=package,
+                                    channel=shardlike.url,
+                                    shard_url=shardlike.shard_url(package),
+                                )
+                                self.nodes[node_id] = node
                                 pending.add(node_id)
+
+            enqueue_pending()
+            if not submitted:
+                break
 
         in_queue.put(None)
 
@@ -379,6 +417,12 @@ def cache_fetch_thread(
                     break
                 node_ids.extend(batch)
 
+        urls = [node_id.shard_url for node_id in node_ids]
+        if (
+            "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
+            in urls
+        ):
+            print("Fetch dbus from cache?")
         cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
         url_to_nodeid = {node_id.shard_url: node_id for node_id in node_ids}
@@ -437,6 +481,12 @@ def network_fetch_thread(
 
                     futures = []
                     for node_id in node_ids:
+                        if (
+                            node_id.shard_url
+                            == "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
+                            or node_id.package == "dbus"
+                        ):
+                            print("Fetch dbus from network?", node_id)
                         # this worker should only recieve network node_id's:
                         session = shardlikes_by_url[node_id.channel].session
                         url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
