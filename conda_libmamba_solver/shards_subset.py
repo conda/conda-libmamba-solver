@@ -290,28 +290,34 @@ class RepodataSubset:
 
         # see test_*_thread in test_shards.py for how to set up the workers
 
-        pending = set()
+        pending = set(self.nodes)
 
         while pending:
             # in_queue.put(list of URLs to fetch)
             new_shards = shard_out_queue.get()  # with a timeout to detect dead threads?
-            for shard in new_shards:
-                pass  # XXX add algorithm here
-            # for shard in new_shards:
-            #    decompress and cache if needed (or do that in the fetch threads)
-            #    call shard_mentioned_packages_2(shard)
-            #    for channel in shardlikes:
-            #        if mentioned package in channel
-            #             add node to pending if not visited
-            #             update distances
-            #             if new nodes added, add their shard URLs to in_queue
-            #
-            #             associate each URL with a list of node ids that are
-            #             waiting for it, because we imagine a future
-            #             optimization of multiple packages in a single shard.
-            #
-            #             if new node is a ShardLike, process right away or push that shard to
-            #             shard_out_queue right away.
+            for url, shard in new_shards:
+                # add shard to appropriate ShardLike
+                mentioned_packages = list(shard_mentioned_packages_2(shard))
+
+                for channel in self.shardlikes:
+                    for package in mentioned_packages:
+                        if package in channel:
+                            node_id = NodeId(package, channel.url)
+                            if node_id not in self.nodes:
+                                node = Node(distance=0, package=package, channel=channel.url)
+                                self.nodes[node_id] = node
+                                pending.add(node_id)
+
+                        # add node to pending if not visited
+                        # update distances
+                        # if new nodes added, add their shard URLs to in_queue
+
+                        # associate each URL with a list of node ids that are
+                        # waiting for it, because we imagine a future
+                        # optimization of multiple packages in a single shard.
+
+                        # if new node is a ShardLike, process right away or push that shard to
+                        # shard_out_queue right away.
 
         in_queue.put(None)
 
@@ -437,6 +443,7 @@ def network_fetch_thread(
                             shard: ShardDict = msgpack.loads(
                                 dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
                             )  # type: ignore[assign]
+                            # we don't track the unnecessary shard package name here:
                             cache.insert(AnnotatedRawShard(url, "", data))
                             shard_out_queue.put([(url, shard)])
 
