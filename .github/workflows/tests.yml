@@ -78,10 +78,10 @@ jobs:
     if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Pinned to commit: 1ca8113c5d5aecaff86c994ddfd367dff91f2400 (reusable-test-workflow branch)
+    # Pinned to commit: 43a5fa94decb3ff7606978d95dfa54c66c24cea2 (reusable-test-workflow branch) - includes enhanced Windows CONDA cleanup
     # TODO: Update to a specific tag when conda releases a versioned tag
     # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@1ca8113c5d5aecaff86c994ddfd367dff91f2400
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@43a5fa94decb3ff7606978d95dfa54c66c24cea2
     strategy:
       fail-fast: false
       matrix:
