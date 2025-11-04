@@ -323,9 +323,9 @@ class RepodataSubset:
             try:
                 new_shards = shard_out_queue.get(timeout=1)
             except queue.Empty:
-                print(f"Pending {pending}, Submitted {submitted}")
+                print(f"Pending {len(pending)}, Submitted {len(submitted)}")
                 timeouts += 1
-                if timeouts > 5:
+                if timeouts > 10:
                     log.error("Timeout waiting for shard_out_queue")
                     raise TimeoutError("Timeout waiting for shard_out_queue")
                 continue
@@ -462,6 +462,7 @@ def network_fetch_thread(
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
+        print("Get", url)
         response = s.get(url)
         response.raise_for_status()
         data = response.content
