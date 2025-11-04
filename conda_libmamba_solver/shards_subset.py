@@ -115,7 +115,7 @@ class NodeId:
     shard_url: str = ""
 
     def __hash__(self):
-        return hash((self.package, self.channel))
+        return hash((self.package, self.channel, self.shard_url))
 
 
 def _nodes_from_packages(
@@ -293,12 +293,18 @@ class RepodataSubset:
 
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending = set(self.nodes)
-        pending_urls = set()
-        for node_id in pending:
-            pending_urls.add(shardlikes_by_url[node_id.channel].shard_url(node_id.package))
 
-        while pending:
-            # in_queue.put(list of URLs to fetch)
+        while pending:  # and shard_out_queue hasn't returned None
+            # enqueue all pending nodes
+            for node_id in pending:
+                shardlike = shardlikes_by_url[node_id.channel]
+                if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
+                    shard = shardlike.visit_shard(node_id.package)
+                    shard_out_queue.put([(node_id, shard)])
+                else:
+                    in_queue.put([node_id])
+            pending.clear()
+
             new_shards = shard_out_queue.get()  # with a timeout to detect dead threads?
             for url, shard in new_shards:
                 # add shard to appropriate ShardLike
@@ -307,7 +313,7 @@ class RepodataSubset:
                 for channel in self.shardlikes:
                     for package in mentioned_packages:
                         if package in channel:
-                            node_id = NodeId(package, channel.url)
+                            node_id = NodeId(package, channel.url, channel.shard_url(package))
                             if node_id not in self.nodes:
                                 node_id = Node(distance=0, package=package, channel=channel.url)
                                 self.nodes[node_id] = node_id

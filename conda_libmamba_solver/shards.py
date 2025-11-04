@@ -153,6 +153,19 @@ class ShardBase(abc.ABC):
         ...
 
     @abc.abstractmethod
+    def shard_in_memory(self, package: str) -> bool:
+        """
+        Return True if the given package's shard is in memory.
+        """
+        ...
+
+    def visit_shard(self, package: str) -> ShardDict:
+        """
+        Return a shard that is already in memory and mark as visited.
+        """
+        ...
+
+    @abc.abstractmethod
     def fetch_shard(self, package: str) -> ShardDict:
         """
         Fetch an individual shard for the given package.
@@ -247,11 +260,19 @@ class ShardLike(ShardBase):
         self.shards[package]
         return f"{self.url}#{package}"
 
-    def visit_shard(self, package: str) -> ShardDict | None:
+    def shard_in_memory(self, package: str) -> bool:
+        """
+        Return True if the given package's shard is in memory.
+        """
+        return package in self.shards
+
+    def visit_shard(self, package: str) -> ShardDict:
         """
         Return a shard that is already in memory and mark as visited.
         """
-        return self.fetch_shard(package)
+        shard = self.fetch_shard(package)
+        assert shard is not None
+        return shard
 
     def fetch_shard(self, package: str) -> ShardDict:
         """
@@ -346,11 +367,19 @@ class Shards(ShardBase):
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return f"{self.shards_base_url}{shard_name}"
 
-    def visit_shard(self, package: str) -> ShardDict | None:
+    def shard_in_memory(self, package: str) -> bool:
+        """
+        Return True if the given package's shard is in memory.
+        """
+        return package in self.visited
+
+    def visit_shard(self, package: str) -> ShardDict:
         """
         Return a shard that is already in memory and mark as visited.
         """
-        return self.visited[package]
+        shard = self.visited[package]
+        assert shard is not None
+        return shard
 
     def fetch_shard(self, package: str) -> ShardDict:
         """
