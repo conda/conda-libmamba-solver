@@ -5,6 +5,7 @@ import pytest
 import pytest_codspeed
 from conda.common.compat import on_win
 from conda.models.channel import Channel
+from conda.testing.fixtures import CondaCLIFixture
 
 from conda_libmamba_solver.shards import fetch_channels
 from conda_libmamba_solver.shards_subset import RepodataSubset, build_repodata_subset
@@ -67,16 +68,19 @@ def codspeed_supported():
         return False
 
 
-def clean_cache(conda_cli):
+def clean_cache(conda_cli: CondaCLIFixture):
     """
     Clean cache and assert it completed without error except on Windows
     """
-    out, err, _ = conda_cli("clean", "--yes", "--all")
+    out, err, return_code = conda_cli("clean", "--yes", "--all")
 
-    # Windows CI runners cannot reliably remove this file, so we don't care about
-    # this assertion on that platform
+    # Windows CI runners cannot reliably remove this file, so we don't care
+    # about this assertion on that platform.
+
+    # "err" will include log.debug output on certain test runners, so we can't
+    # check it to determine whether there was an error.
     if not on_win:
-        assert not err
+        assert not return_code, "conda clean returned {return_code} != 0"
 
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
@@ -88,7 +92,7 @@ def clean_cache(conda_cli):
     ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
 def test_traversal_algorithm_benchmarks(
-    conda_cli, benchmark, cache_state: str, algorithm: str, scenario: dict
+    conda_cli: CondaCLIFixture, benchmark, cache_state: str, algorithm: str, scenario: dict
 ):
     """
     Benchmark multiple traversal algorithms for retrieving repodata shards with
