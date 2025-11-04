@@ -428,8 +428,8 @@ def cache_fetch_thread(
                 if batch is None:
                     # do the work but then quit
                     running = False
-                    break
-                node_ids.extend(batch)
+                else:
+                    node_ids.extend(batch)
 
         urls = [node_id.shard_url for node_id in node_ids]
         if (
@@ -496,47 +496,47 @@ def network_fetch_thread(
                     else:
                         node_ids.extend(batch)
 
-                    futures = []
-                    for node_id in node_ids:
-                        if (
-                            node_id.shard_url
-                            == "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
-                            or node_id.package == "dbus"
-                        ):
-                            print("Fetch dbus from network?", node_id)
-                        # this worker should only recieve network node_id's:
-                        session = shardlikes_by_url[node_id.channel].session
-                        url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
-                        futures.append(executor.submit(fetch, session, url, node_id))
+            futures = []
+            for node_id in node_ids:
+                if (
+                    node_id.shard_url
+                    == "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
+                    or node_id.package == "dbus"
+                ):
+                    print("Fetch dbus from network?", node_id)
+                # this worker should only recieve network node_id's:
+                session = shardlikes_by_url[node_id.channel].session
+                url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
+                futures.append(executor.submit(fetch, session, url, node_id))
 
-                    for future in concurrent.futures.as_completed(futures):
-                        try:
-                            url, node_id, data = future.result()
-                            log.debug("Fetch thread got %s (%s bytes)", url, len(data))
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    url, node_id, data = future.result()
+                    log.debug("Fetch thread got %s (%s bytes)", url, len(data))
 
-                            # Decompress and parse. If it decodes as
-                            # msgpack.zst, insert into cache. Then put "known
-                            # good" shard into out queue.
-                            shard: ShardDict = msgpack.loads(
-                                dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
-                            )  # type: ignore[assign]
-                            # we don't track the unnecessary shard package name here:
-                            cache.insert(AnnotatedRawShard(url, node_id.package, data))
-                            shard_out_queue.put([(node_id, shard)])
+                    # Decompress and parse. If it decodes as
+                    # msgpack.zst, insert into cache. Then put "known
+                    # good" shard into out queue.
+                    shard: ShardDict = msgpack.loads(
+                        dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
+                    )  # type: ignore[assign]
+                    # we don't track the unnecessary shard package name here:
+                    cache.insert(AnnotatedRawShard(url, node_id.package, data))
+                    shard_out_queue.put([(node_id, shard)])
 
-                        except requests.exceptions.RequestException as e:
-                            log.error("Error fetching shard. %s", e)
-                        except Exception as e:
-                            # raises ZstdError for b"not zstd" test data e.g.
-                            log.exception("Unhandled exception in network thread", exc_info=e)
+                except requests.exceptions.RequestException as e:
+                    log.error("Error fetching shard. %s", e)
+                except Exception as e:
+                    # raises ZstdError for b"not zstd" test data e.g.
+                    log.exception("Unhandled exception in network thread", exc_info=e)
 
-                        # This will drain the http threadpool before loading another
-                        # batch. Instead, we might want to get_nowait() and
-                        # executor.submit() here after each future has been
-                        # retired to make sure we always have
-                        # _shards_connections() in flight. Or we could use
-                        # future "on completion" callbacks instead of relying so
-                        # much on as_completed().
+                # This will drain the http threadpool before loading another
+                # batch. Instead, we might want to get_nowait() and
+                # executor.submit() here after each future has been
+                # retired to make sure we always have
+                # _shards_connections() in flight. Or we could use
+                # future "on completion" callbacks instead of relying so
+                # much on as_completed().
 
     shard_out_queue.put(None)
 
