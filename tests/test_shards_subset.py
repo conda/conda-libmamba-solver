@@ -192,8 +192,7 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
 
 def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     """
-    Build repodata subset using the third attempt at a dependency traversal
-    algorithm.
+    Build repodata subset using a worker threads dependency traversal algorithm.
     """
     # installed, plus what we want to add (twine)
     root_packages = ROOT_PACKAGES[:]
