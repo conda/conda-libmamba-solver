@@ -291,13 +291,10 @@ jobs:
           bash -lc
           ". /opt/conda/etc/profile.d/conda.sh
           && set -x
-          && conda create
-            --name test
-            --yes
-            --file tests/requirements.txt
-            --file tests/requirements-${{ runner.os }}.txt
-            --file tests/requirements-ci.txt
-            python=${{ matrix.python-version }}
+          && REQ_ARGS='--file tests/requirements.txt'
+          && [ -f tests/requirements-${{ runner.os }}.txt ] && REQ_ARGS=\"\$REQ_ARGS --file tests/requirements-${{ runner.os }}.txt\" || true
+          && [ -f tests/requirements-ci.txt ] && REQ_ARGS=\"\$REQ_ARGS --file tests/requirements-ci.txt\" || true
+          && conda create --name test --yes \$REQ_ARGS python=${{ matrix.python-version }}
           && conda activate test
           && python -m conda info --verbose
           && conda config --show-sources
