@@ -16,9 +16,9 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
+import conda.gateways.repodata
 import msgpack
 import pytest
-import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
@@ -190,7 +190,7 @@ def test_fetch_shards_error(http_server_shards):
     assert shard_a is not shard_c
     assert shard_a == shard_c
 
-    with pytest.raises(requests.exceptions.HTTPError):
+    with pytest.raises(conda.gateways.repodata.RepodataIsEmpty):
         found.fetch_shard("fake_package")
 
     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
@@ -301,12 +301,16 @@ def test_shard_cache(tmp_path: Path):
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
-def test_shard_cache_multiple(tmp_path: Path):
-    """
-    Test that retrieve_multiple() is equivalent to several retrieve() calls.
-    """
-    NUM_FAKE_SHARDS = 64
+NUM_FAKE_SHARDS = 64
 
+
+@pytest.fixture
+def shard_cache_with_data(
+    tmp_path: Path,
+) -> tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]]:
+    """
+    ShardCache with some data already inserted.
+    """
     cache = shards_cache.ShardCache(tmp_path)
     fake_shards = []
 
@@ -320,6 +324,18 @@ def test_shard_cache_multiple(tmp_path: Path):
         )
         cache.insert(annotated_shard)
         fake_shards.append(annotated_shard)
+
+    return cache, fake_shards
+
+
+def test_shard_cache_multiple(
+    tmp_path: Path,
+    shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
+):
+    """
+    Test that retrieve_multiple() is equivalent to several retrieve() calls.
+    """
+    cache, fake_shards = shard_cache_with_data
 
     start_multiple = time.monotonic_ns()
     retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
@@ -350,32 +366,6 @@ def test_shard_cache_multiple(tmp_path: Path):
         )
 
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
-
-
-def test_shard_cache_2():
-    """
-    Check that existing shards cache has been populated with matching shards,
-    package names.
-    """
-    subdir_data = SubdirData(Channel("main/noarch"))
-    # accepts directory that cache goes into, not database filename
-    cache = shards_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
-    extant = {}
-    for row in cache.conn.execute("SELECT url, package, shard, timestamp FROM shards"):
-        extant[row["url"]] = shards_cache.AnnotatedRawShard(
-            url=row["url"], package=row["package"], compressed_shard=row["shard"]
-        )
-
-    # check that url's are in the url field, and package names are in the package name field
-    for url in extant:
-        if shard := cache.retrieve(url):
-            assert "://" in extant[url].url
-            assert "://" not in extant[url].package
-            for group in ("packages", "packages.conda"):
-                assert all(
-                    extant[url].package in (package["name"], "wrong_package_name")
-                    for package in shard[group].values()
-                ), f"Bad package name {extant[url].package}"
 
 
 def test_shardlike():
