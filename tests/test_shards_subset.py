@@ -104,7 +104,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
-@pytest.mark.parametrize("algorithm", ("shortest_dijkstra", "shortest_bfs"))
+@pytest.mark.parametrize("algorithm", ("shortest_dijkstra", "shortest_bfs", "shortest_pipelined"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
@@ -149,7 +149,8 @@ def test_traversal_algorithm_benchmarks(
         return (subset,), {}
 
     def target(subset):
-        getattr(subset, algorithm)(scenario["packages"])
+        with _timer(f"RepodataSubset.{algorithm}({scenario.get('name')})"):
+            getattr(subset, algorithm)(scenario["packages"])
 
     benchmark.pedantic(target, setup=setup, rounds=3)
 
@@ -171,6 +172,9 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
         ),
         "shortest_bfs": build_repodata_subset(
             scenario["packages"], [channel.url()], algorithm="shortest_bfs"
+        ),
+        "shortest_pipelined": build_repodata_subset(
+            scenario["packages"], [channel.url()], algorithm="shortest_pipelined"
         ),
     }
 

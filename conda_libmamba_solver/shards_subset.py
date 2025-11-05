@@ -308,7 +308,7 @@ class RepodataSubset:
             # enqueue all pending nodes
             for node_id in pending:
                 if node_id in submitted or node_id in processed:
-                    print("Skip duplicate", node_id)
+                    # skip already submitted or processed
                     continue
                 # we could wind up sending duplicate node_id here?
                 shardlike = shardlikes_by_url[node_id.channel]
@@ -332,9 +332,9 @@ class RepodataSubset:
             try:
                 new_shards = shard_out_queue.get(timeout=1)
             except queue.Empty:
-                print(f"Pending {len(pending)}, Submitted {len(submitted)}")
+                # print(f"Pending {len(pending)}, Submitted {len(submitted)}")
                 if all([x in self.nodes for x in submitted]):
-                    print("Done but submitted not empty")
+                    # print("Done but submitted not empty")
                     running = False
                 timeouts += 1
                 # if timeouts > 10:
@@ -383,7 +383,7 @@ class RepodataSubset:
                             channel=new_node_id.channel,
                             shard_url=new_node_id.shard_url,
                         )
-                        print(new_node.package, "d", new_node.distance)
+                        # print(new_node.package, "d", new_node.distance)
                         self.nodes[new_node_id] = new_node
 
                         pending.add(new_node_id)
@@ -491,7 +491,6 @@ def network_fetch_thread(
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
-        print("Get", url)
         response = s.get(url)
         response.raise_for_status()
         data = response.content
