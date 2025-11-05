@@ -298,7 +298,7 @@ class RepodataSubset:
         processed = set()  # received from shard_out_queue
 
         def enqueue_pending():
-            log.info(
+            log.debug(
                 "Enqueue %s pending %s",
                 len(pending),
                 sorted(node_id.package for node_id in pending),
@@ -376,14 +376,12 @@ class RepodataSubset:
                 if package in shardlike:
                     new_node_id = NodeId(package, shardlike.url, shardlike.shard_url(package))
                     if new_node_id not in self.nodes:
-                        # not tracking parent nodes to track distance
                         new_node = Node(
                             distance=parent_node.distance + 1,
                             package=new_node_id.package,
                             channel=new_node_id.channel,
                             shard_url=new_node_id.shard_url,
                         )
-                        # print(new_node.package, "d", new_node.distance)
                         self.nodes[new_node_id] = new_node
 
                         pending.add(new_node_id)
