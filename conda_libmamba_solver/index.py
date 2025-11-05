@@ -391,8 +391,7 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        algorithm = f"shortest_{_sharded_repodata_strategy()}"
-        print("Using", algorithm)
+        algorithm = _sharded_repodata_strategy()
         channel_data = build_repodata_subset(
             root_packages,
             urls_to_channel,

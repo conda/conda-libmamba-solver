@@ -48,5 +48,5 @@ def conda_settings():
     yield CondaSetting(
         name="sharded_repodata_strategy",
         description="Strategy for collecting sharded repodata.",
-        parameter=PrimitiveParameter("auto", element_type=str),
+        parameter=PrimitiveParameter("bfs", element_type=str),
     )

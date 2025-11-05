@@ -390,7 +390,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel],
-    algorithm: Literal["shortest_dijkstra", "shortest_bfs", "shortest_pipelined"] = "shortest_bfs",
+    algorithm: Literal["dijkstra", "bfs", "pipelined"] = "bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
@@ -405,7 +405,7 @@ def build_repodata_subset(
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
-    getattr(subset, algorithm)(root_packages)
+    getattr(subset, f"shortest_{algorithm}")(root_packages)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
