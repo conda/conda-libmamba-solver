@@ -422,11 +422,12 @@ def combine_batches_until_none(
     while running and (batch := in_queue.get()) is not None:
         node_ids = batch[:]
         with suppress(queue.Empty):
-            while running:
+            while True:  # loop exits with break or queue.Empty exception
                 batch = in_queue.get_nowait()
                 if batch is None:
                     # do the work but then quit
                     running = False
+                    break
                 else:
                     node_ids.extend(batch)
         yield node_ids
