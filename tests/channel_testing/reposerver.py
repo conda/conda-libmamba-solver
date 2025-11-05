@@ -349,7 +349,12 @@ else:
 
 PORT = args.port
 
-server = HTTPServer(("", PORT), handler)
+
+class HTTPServerBigQueue(HTTPServer):
+    request_queue_size = 128
+
+
+server = HTTPServerBigQueue(("", PORT), handler)
 print("Server started at localhost:" + str(server.server_port))
 try:
     server.serve_forever()
