@@ -290,8 +290,6 @@ class RepodataSubset:
         cache_thread.start()
         network_thread.start()
 
-        # see test_*_thread in test_shards.py for how to set up the workers
-
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending = set(self.nodes)  # to be sent to in_queue
         submitted = set()  # sent to in_queue, not received from shard_out_queue
