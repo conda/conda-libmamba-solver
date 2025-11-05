@@ -156,6 +156,20 @@ def _is_sharded_repodata_enabled():
     return context.plugins.use_sharded_repodata is True  # type: ignore
 
 
+def _sharded_repodata_strategy():
+    """
+    Which algorithm should we use to collect sharded repodata?
+    """
+    strategy = context.plugins.sharded_repodata_strategy.lower()  # type: ignore
+    if strategy in ("dijkstra", "bfs", "pipelined"):
+        return strategy
+    log.warning(
+        "Unknown sharded_repodata_strategy '%s', falling back to 'bfs'.",
+        strategy,
+    )
+    return "bfs"
+
+
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
 
 
@@ -377,8 +391,12 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
+        algorithm = f"shortest_{_sharded_repodata_strategy()}"
+        print("Using", algorithm)
         channel_data = build_repodata_subset(
-            root_packages, urls_to_channel, algorithm="shortest_pipelined"
+            root_packages,
+            urls_to_channel,
+            algorithm=algorithm,
         )
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
