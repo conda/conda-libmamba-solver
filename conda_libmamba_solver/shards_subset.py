@@ -266,7 +266,7 @@ class RepodataSubset:
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
         cache = sharded[0].shards_cache if sharded else None
 
-        in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+        cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
         shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
         cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
 
@@ -274,7 +274,7 @@ class RepodataSubset:
         # handling.
         cache_thread = threading.Thread(
             target=cache_fetch_thread,
-            args=(in_queue, shard_out_queue, cache_miss_queue, cache),
+            args=(cache_in_queue, shard_out_queue, cache_miss_queue, cache),
             daemon=False,
         )
 
@@ -320,7 +320,7 @@ class RepodataSubset:
             if shard_out_batch:
                 shard_out_queue.put(shard_out_batch)
             if shard_in_batch:
-                in_queue.put(shard_in_batch)
+                cache_in_queue.put(shard_in_batch)
             pending.clear()
 
         enqueue_pending()  # initial batch
@@ -335,7 +335,6 @@ class RepodataSubset:
                 print(f"Pending {len(pending)}, Submitted {len(submitted)}")
                 if all([x in self.nodes for x in submitted]):
                     print("Done but submitted not empty")
-                    print("\n".join(str(x) for x in submitted))
                     running = False
                 timeouts += 1
                 # if timeouts > 10:
@@ -349,38 +348,51 @@ class RepodataSubset:
                 # add shard to appropriate ShardLike
                 submitted.remove(node_id)
                 processed.add(node_id)
-                shardlike = shardlikes_by_url[node_id.channel]
-                shardlike.visited[node_id.package] = shard
-                mentioned_packages = list(shard_mentioned_packages_2(shard))
 
-                for shardlike in self.shardlikes:
-                    for package in mentioned_packages:
-                        if package in shardlike:
-                            node_id = NodeId(package, shardlike.url, shardlike.shard_url(package))
-                            if node_id not in self.nodes:
-                                node = Node(
-                                    distance=0,
-                                    package=package,
-                                    channel=shardlike.url,
-                                    shard_url=shardlike.shard_url(package),
-                                )
-                                self.nodes[node_id] = node
-                                pending.add(node_id)
+                parent_node = self.nodes[node_id]
+                shardlike = shardlikes_by_url[node_id.channel]
+                if node_id.package not in shardlike.visited:
+                    shardlike.visited[node_id.package] = shard
+                else:
+                    pass  # e.g. monolithic repodata is already visited
+
+                self.neighbors_2(pending, parent_node, shard)
 
             enqueue_pending()
             if not submitted:
                 break
 
-        in_queue.put(None)
-
+        cache_in_queue.put(None)
         cache_thread.join()
         network_thread.join()
+
+    def neighbors_2(self, pending: set[NodeId], parent_node: Node, shard):
+        """Neighbors (in-memory data only) for shortest_pipelined()"""
+
+        mentioned_packages = list(shard_mentioned_packages_2(shard))
+        # Move this into function for scope clarity
+        for shardlike in self.shardlikes:
+            for package in mentioned_packages:
+                if package in shardlike:
+                    new_node_id = NodeId(package, shardlike.url, shardlike.shard_url(package))
+                    if new_node_id not in self.nodes:
+                        # not tracking parent nodes to track distance
+                        new_node = Node(
+                            distance=parent_node.distance + 1,
+                            package=new_node_id.package,
+                            channel=new_node_id.channel,
+                            shard_url=new_node_id.shard_url,
+                        )
+                        print(new_node.package, "d", new_node.distance)
+                        self.nodes[new_node_id] = new_node
+
+                        pending.add(new_node_id)
 
 
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[str],
-    algorithm: Literal["shortest_dijkstra", "shortest_bfs"] = "shortest_bfs",
+    algorithm: Literal["shortest_dijkstra", "shortest_bfs", "shortest_pipelined"] = "shortest_bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
@@ -438,34 +450,17 @@ def cache_fetch_thread(
     """
     cache = cache.copy()
 
-    # should we send None to out_queues when done? Or just return?
     for node_ids in combine_batches_until_none(in_queue):
-        if (
-            NodeId(
-                package="urllib3",
-                channel="https://conda.anaconda.org/conda-forge-sharded/noarch/repodata_shards.msgpack.zst",
-                shard_url="https://conda.anaconda.org/conda-forge-sharded/noarch/327b08b5834b3e06210a902498f80a85c9c3a02a9f44fade7b69e0f35b08c38d.msgpack.zst",
-            )
-            in node_ids
-        ):
-            print("urllib3 suspicious node")
-            print(len(set(node_ids)) == len(node_ids))
-        urls = [node_id.shard_url for node_id in node_ids]
-        if (
-            "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
-            in urls
-        ):
-            print("Fetch dbus from cache?")
         cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
-        url_to_nodeid = {node_id.shard_url: node_id for node_id in node_ids}
-        found = []
-        not_found = []
-        for url, shard in cached.items():
-            if shard:
-                found.append((url_to_nodeid[url], shard))
+        # should we add this into retrieve_multiple?
+        found: list[tuple[NodeId, ShardDict]] = []
+        not_found: list[NodeId] = []
+        for node_id in node_ids:
+            if shard := cached.get(node_id.shard_url):
+                found.append((node_id, shard))
             else:
-                not_found.append(url_to_nodeid[url])
+                not_found.append(node_id)
 
         # Might wake up the network thread by calling it first:
         if not_found:
@@ -506,14 +501,12 @@ def network_fetch_thread(
         for node_ids in combine_batches_until_none(in_queue):
             futures = []
             for node_id in node_ids:
-                if (
-                    node_id.shard_url
-                    == "https://conda.anaconda.org/conda-forge-sharded/osx-arm64/3302666cf70e89c4ad8b8deb80e1db74a64876ea2bb125e3f380cdef47f3728e.msgpack.zst"
-                    or node_id.package == "dbus"
-                ):
-                    print("Fetch dbus from network?", node_id)
                 # this worker should only recieve network node_id's:
-                session = shardlikes_by_url[node_id.channel].session
+                shardlike = shardlikes_by_url[node_id.channel]
+                if not isinstance(shardlike, Shards):
+                    log.warning("network_fetch_thread got non-network shardlike")
+                    continue
+                session = shardlike.session
                 url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
                 futures.append(executor.submit(fetch, session, url, node_id))
 
