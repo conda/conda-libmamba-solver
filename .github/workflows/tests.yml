@@ -127,15 +127,14 @@ jobs:
   # linux test suite
   linux:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Windows only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Pinned to commit: 1ca8113c5d5aecaff86c994ddfd367dff91f2400 (reusable-test-workflow branch)
+    # Pinned to commit: 43a5fa94decb3ff7606978d95dfa54c66c24cea2 (reusable-test-workflow branch) - includes enhanced Windows CONDA cleanup
     # TODO: Update to a specific tag when conda releases a versioned tag
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@1ca8113c5d5aecaff86c994ddfd367dff91f2400
+    # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@43a5fa94decb3ff7606978d95dfa54c66c24cea2
     strategy:
       fail-fast: false
       matrix:
@@ -191,10 +190,9 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Windows only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    # only run test suite if there are code changes
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -249,11 +247,8 @@ jobs:
   # linux-qemu test suite
   linux-qemu:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
-    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Run one single fast test per docker+qemu emulated linux platform to test that
     # test execution is possible there (container+tools+dependencies work). Can be
@@ -312,15 +307,14 @@ jobs:
   # macos test suite
   macos:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Windows only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Pinned to commit: 1ca8113c5d5aecaff86c994ddfd367dff91f2400 (reusable-test-workflow branch)
+    # Pinned to commit: 43a5fa94decb3ff7606978d95dfa54c66c24cea2 (reusable-test-workflow branch) - includes enhanced Windows CONDA cleanup
     # TODO: Update to a specific tag when conda releases a versioned tag
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@1ca8113c5d5aecaff86c994ddfd367dff91f2400
+    # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@43a5fa94decb3ff7606978d95dfa54c66c24cea2
     strategy:
       fail-fast: false
       matrix:
@@ -383,8 +377,7 @@ jobs:
   # aggregate and upload
   aggregate:
     # only aggregate test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Only depend on windows (other jobs disabled)
-    needs: [changes, windows]
+    needs: [changes, windows, linux, macos, linux-benchmarks]
     if: >-
       !cancelled()
       && needs.changes.outputs.code == 'true'
@@ -409,8 +402,7 @@ jobs:
 
   # required check
   analyze:
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Only depend on windows and aggregate (other jobs disabled)
-    needs: [windows, aggregate]
+    needs: [windows, linux, macos, linux-benchmarks, aggregate]
     if: '!cancelled()'
 
     runs-on: ubuntu-latest
