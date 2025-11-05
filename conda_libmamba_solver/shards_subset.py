@@ -502,6 +502,19 @@ def network_fetch_thread(
         url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
         return executor.submit(fetch, session, url, node_id)
 
+    def handle_result(future):
+        url, node_id, data = future.result()
+        log.debug("Fetch thread got %s (%s bytes)", url, len(data))
+        # Decompress and parse. If it decodes as
+        # msgpack.zst, insert into cache. Then put "known
+        # good" shard into out queue.
+        shard: ShardDict = msgpack.loads(
+            dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
+        )  # type: ignore[assign]
+        cache.insert(AnnotatedRawShard(url, node_id.package, data))
+        shard_out_queue.put([(node_id, shard)])
+
+    retired_futures = set()
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         new_futures = []
         for node_ids in combine_batches_until_none(in_queue):
@@ -512,18 +525,8 @@ def network_fetch_thread(
             new_futures = []
             for future in concurrent.futures.as_completed(futures):
                 try:
-                    url, node_id, data = future.result()
-                    log.debug("Fetch thread got %s (%s bytes)", url, len(data))
-
-                    # Decompress and parse. If it decodes as
-                    # msgpack.zst, insert into cache. Then put "known
-                    # good" shard into out queue.
-                    shard: ShardDict = msgpack.loads(
-                        dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
-                    )  # type: ignore[assign]
-                    # we don't track the unnecessary shard package name here:
-                    cache.insert(AnnotatedRawShard(url, node_id.package, data))
-                    shard_out_queue.put([(node_id, shard)])
+                    handle_result(future)
+                    retired_futures.add(future)
 
                     # Immediately enqueue more shards. It would also be
                     # appropriate to keep (number of threads) futures in-flight,
@@ -547,13 +550,14 @@ def network_fetch_thread(
                     # raises ZstdError for b"not zstd" test data e.g.
                     log.exception("Unhandled exception in network thread", exc_info=e)
 
-                # This will drain the http threadpool before loading another
-                # batch. Instead, we might want to get_nowait() and
-                # executor.submit() here after each future has been
-                # retired to make sure we always have
-                # _shards_connections() in flight. Or we could use
-                # future "on completion" callbacks instead of relying so
-                # much on as_completed().
+        # cleanup any remaining futures
+        for future in concurrent.futures.as_completed(new_futures):
+            try:
+                handle_result(future)
+            except requests.exceptions.RequestException as e:
+                log.error("Error fetching shard. %s", e)
+            except Exception as e:
+                log.exception("Unhandled exception in network thread", exc_info=e)
 
     shard_out_queue.put(None)
 
