@@ -105,7 +105,7 @@ jobs:
       shell: cmd /C call {0}
       checkout_conda: true
       checkout_conda_path: conda
-      checkout_conda_ref: ''  # TODO: Set to a tag like 'v24.1.0' to pin conda version
+      checkout_conda_ref: '25.9.1'  # Pin to stable conda version for reproducible builds
       checkout_other: true
       checkout_other_repo: conda/conda-libmamba-solver
       checkout_other_path: conda-libmamba-solver
@@ -169,7 +169,7 @@ jobs:
       shell: bash -el {0}
       checkout_conda: true
       checkout_conda_path: conda
-      checkout_conda_ref: ''  # TODO: Set to a tag like 'v24.1.0' to pin conda version
+      checkout_conda_ref: '25.9.1'  # Pin to stable conda version for reproducible builds
       checkout_other: true
       checkout_other_repo: conda/conda-libmamba-solver
       checkout_other_path: conda-libmamba-solver
@@ -351,7 +351,7 @@ jobs:
       shell: bash -el {0}
       checkout_conda: true
       checkout_conda_path: conda
-      checkout_conda_ref: ''  # TODO: Set to a tag like 'v24.1.0' to pin conda version
+      checkout_conda_ref: '25.9.1'  # Pin to stable conda version for reproducible builds
       checkout_other: true
       checkout_other_repo: conda/conda-libmamba-solver
       checkout_other_path: conda-libmamba-solver
