@@ -102,7 +102,7 @@ jobs:
     with:
       runs_on: windows-latest
       runner_os: Windows
-      shell: cmd /C call
+      shell: cmd /C call {0}
       checkout_conda: true
       checkout_conda_path: conda
       checkout_conda_ref: ''  # TODO: Set to a tag like 'v24.1.0' to pin conda version
