@@ -137,7 +137,7 @@ def test_traversal_algorithm_benchmarks(
             clean_cache(conda_cli)
 
         channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
-        channel_data = fetch_channels([channel.url()])
+        channel_data = fetch_channels([channel])
 
         assert len(channel_data) == 2
 
@@ -145,13 +145,13 @@ def test_traversal_algorithm_benchmarks(
 
         if cache_state == "lukewarm":
             # Collect pre-fetch packages
-            getattr(subset, algorithm)(scenario["prefetch_packages"])
+            getattr(subset, f"shortest_{algorithm}")(scenario["prefetch_packages"])
 
         return (subset,), {}
 
     def target(subset):
         with _timer(f"RepodataSubset.{algorithm}({scenario.get('name')})"):
-            getattr(subset, algorithm)(scenario["packages"])
+            getattr(subset, f"shortest_{algorithm}")(scenario["packages"])
 
     benchmark.pedantic(target, setup=setup, rounds=3)
 
