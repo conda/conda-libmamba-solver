@@ -496,19 +496,24 @@ def network_fetch_thread(
         data = response.content
         return (url, node_id, data)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
-        for node_ids in combine_batches_until_none(in_queue):
-            futures = []
-            for node_id in node_ids:
-                # this worker should only recieve network node_id's:
-                shardlike = shardlikes_by_url[node_id.channel]
-                if not isinstance(shardlike, Shards):
-                    log.warning("network_fetch_thread got non-network shardlike")
-                    continue
-                session = shardlike.session
-                url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
-                futures.append(executor.submit(fetch, session, url, node_id))
+    def submit(node_id):
+        # this worker should only recieve network node_id's:
+        shardlike = shardlikes_by_url[node_id.channel]
+        if not isinstance(shardlike, Shards):
+            log.warning("network_fetch_thread got non-network shardlike")
+            return
+        session = shardlike.session
+        url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
+        return executor.submit(fetch, session, url, node_id)
 
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        new_futures = []
+        for node_ids in combine_batches_until_none(in_queue):
+            for node_id in node_ids:
+                new_futures.append(submit(node_id))
+
+            futures = new_futures  # futures is copied into as_completed()
+            new_futures = []
             for future in concurrent.futures.as_completed(futures):
                 try:
                     url, node_id, data = future.result()
@@ -524,8 +529,24 @@ def network_fetch_thread(
                     cache.insert(AnnotatedRawShard(url, node_id.package, data))
                     shard_out_queue.put([(node_id, shard)])
 
+                    # Immediately enqueue more shards. It would also be
+                    # appropriate to keep (number of threads) futures in-flight,
+                    # instead of len(in_queue).
+                    with suppress(queue.Empty):
+                        extra_node_ids = in_queue.get_nowait()
+                        if extra_node_ids is None:
+                            in_queue.put(None)  # relay to top of loop
+                        else:
+                            for node_id in extra_node_ids:
+                                new_futures.append(submit(node_id))
+                                # new_futures should be missable when
+                                # combine_batches_until_none gets None? May need
+                                # to pump as_completed after exiting the
+                                # "process batches" loop.
+
                 except requests.exceptions.RequestException as e:
                     log.error("Error fetching shard. %s", e)
+
                 except Exception as e:
                     # raises ZstdError for b"not zstd" test data e.g.
                     log.exception("Unhandled exception in network thread", exc_info=e)
