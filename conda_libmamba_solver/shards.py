@@ -169,11 +169,6 @@ class ShardBase(abc.ABC):
     def fetch_shard(self, package: str) -> ShardDict:
         """
         Fetch an individual shard for the given package.
-
-        Default implementation calls fetch_shards() with a single package.
-        Subclasses may override for more efficient single-fetch operations.
-
-        Raise KeyError if package is not in the index.
         """
         ...
 
@@ -181,8 +176,6 @@ class ShardBase(abc.ABC):
     def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
         """
         Fetch multiple shards in one go.
-
-        Update self.visited with all not-None packages.
         """
         ...
 
@@ -337,7 +330,7 @@ class Shards(ShardBase):
 
         # https://github.com/conda/conda-index/pull/209 ensures that sharded
         # repodata will always include base_url, even if it is an empty string;
-        # this is also necessary for compatibility.
+        # rattler/pixi require these keys.
         self._base_url = shards_index["info"]["base_url"]
 
     @property

@@ -29,6 +29,7 @@ from tests.test_shards import (
 if TYPE_CHECKING:
     from conda_libmamba_solver.shards_typing import ShardDict
 
+
 TESTING_SCENARIOS = [
     {
         "name": "python",
