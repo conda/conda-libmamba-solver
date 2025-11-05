@@ -620,13 +620,15 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-def fetch_channels(channels) -> dict[str, ShardBase]:
+def fetch_channels(channels: Iterable[Channel]) -> dict[str, ShardBase]:
     """
     Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
 
     Attempt to fetch the sharded index first and then fall back to retrieving
     a traditional `repodata.json` file.
     """
+    # metaclass returns same channel, or casts to channel.
+    channels = [Channel(c) for c in channels]  # type: ignore
     channel_data: dict[str, ShardBase] = {}
 
     # share single disk cache for all Shards() instances
@@ -640,7 +642,7 @@ def fetch_channels(channels) -> dict[str, ShardBase]:
                 fetch_shards_index, SubdirData(Channel(channel_url)), cache
             ): channel_url
             for channel in channels
-            for channel_url in Channel(channel).urls(True, context.subdirs)
+            for channel_url in channel.urls(True, context.subdirs)
         }
         futures_non_sharded = {}
 

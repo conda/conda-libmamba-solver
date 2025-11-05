@@ -88,6 +88,8 @@ if TYPE_CHECKING:
     from queue import SimpleQueue as Queue
     from typing import Literal
 
+    from conda.models.channel import Channel
+
     from conda_libmamba_solver.shards_cache import ShardCache
     from conda_libmamba_solver.shards_typing import ShardDict
 
@@ -387,16 +389,16 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: Iterable[str],
+    channels: Iterable[Channel],
     algorithm: Literal["shortest_dijkstra", "shortest_bfs", "shortest_pipelined"] = "shortest_bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
 
     Params:
-        root_packages: iterable of root package names
-        channels: iterable of channel URLs
-        algorithm: one of "shortest", "shortest_bfs
+        root_packages: iterable of installed and requested package names
+        channels: iterable of Channel objects
+        algorithm: desired traversal algorithm
 
     TODO: Remove `algorithm` parameter once we've made a firm decision on which to use.
     """
