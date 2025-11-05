@@ -515,20 +515,13 @@ def network_fetch_thread(
         cache.insert(AnnotatedRawShard(url, node_id.package, data))
         shard_out_queue.put([(node_id, shard)])
 
-    retired_futures = set()
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+    def drain_futures(futures, last_batch=False):
         new_futures = []
-        for node_ids in combine_batches_until_none(in_queue):
-            for node_id in node_ids:
-                new_futures.append(submit(node_id))
+        for future in concurrent.futures.as_completed(futures):
+            try:
+                handle_result(future)
 
-            futures = new_futures  # futures is copied into as_completed()
-            new_futures = []
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    handle_result(future)
-                    retired_futures.add(future)
-
+                if not last_batch:
                     # Immediately enqueue more shards. It would also be
                     # appropriate to keep (number of threads) futures in-flight,
                     # instead of len(in_queue).
@@ -539,26 +532,23 @@ def network_fetch_thread(
                         else:
                             for node_id in extra_node_ids:
                                 new_futures.append(submit(node_id))
-                                # new_futures should be missable when
-                                # combine_batches_until_none gets None? May need
-                                # to pump as_completed after exiting the
-                                # "process batches" loop.
 
-                except requests.exceptions.RequestException as e:
-                    log.error("Error fetching shard. %s", e)
-
-                except Exception as e:
-                    # raises ZstdError for b"not zstd" test data e.g.
-                    log.exception("Unhandled exception in network thread", exc_info=e)
-
-        # cleanup any remaining futures
-        for future in concurrent.futures.as_completed(new_futures):
-            try:
-                handle_result(future)
             except requests.exceptions.RequestException as e:
                 log.error("Error fetching shard. %s", e)
             except Exception as e:
                 log.exception("Unhandled exception in network thread", exc_info=e)
+        return new_futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        new_futures = []
+        for node_ids in combine_batches_until_none(in_queue):
+            for node_id in node_ids:
+                new_futures.append(submit(node_id))
+
+            futures = new_futures  # futures is copied into as_completed()
+            new_futures = drain_futures(futures)
+
+        drain_futures(new_futures, last_batch=True)
 
     shard_out_queue.put(None)
 
