@@ -377,7 +377,9 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        channel_data = build_repodata_subset(
+            root_packages, urls_to_channel, algorithm="shortest_pipelined"
+        )
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
         return channel_repo_infos

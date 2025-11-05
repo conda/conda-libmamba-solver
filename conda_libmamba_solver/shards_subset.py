@@ -548,6 +548,7 @@ def network_fetch_thread(
             futures = new_futures  # futures is copied into as_completed()
             new_futures = drain_futures(futures)
 
+        # This "last chance" fetch can create new pending nodes. Examine end criteria.
         drain_futures(new_futures, last_batch=True)
 
     shard_out_queue.put(None)
