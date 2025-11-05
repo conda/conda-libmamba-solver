@@ -368,6 +368,23 @@ def test_shard_cache_multiple(
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
+def test_shard_cache_clear_remove(tmp_path):
+    """
+    Test clear, remove cache functions not otherwise used.
+    """
+    cache = shards_cache.ShardCache(tmp_path)
+
+    cache.insert(shards_cache.AnnotatedRawShard("https://bar", "bar", b"bar"))
+    assert len(list(cache.conn.execute("SELECT * FROM SHARDS"))) == 1
+
+    cache.clear_cache()
+    assert list(cache.conn.execute("SELECT * FROM SHARDS")) == []
+
+    assert (cache.base / shards_cache.SHARD_CACHE_NAME).exists()
+    cache.remove_cache()
+    assert not (cache.base / shards_cache.SHARD_CACHE_NAME).exists()
+
+
 def test_shardlike():
     """
     ShardLike class presents repodata.json as shards in a way that is suitable
