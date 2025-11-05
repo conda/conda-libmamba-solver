@@ -62,13 +62,16 @@ import threading
 from collections import deque
 from contextlib import suppress
 from dataclasses import dataclass
+from pathlib import Path
 from queue import SimpleQueue
 from typing import TYPE_CHECKING
 
+import conda.gateways.repodata
 import msgpack
 import requests.exceptions
 import zstandard
 
+from conda_libmamba_solver import shards_cache
 from conda_libmamba_solver.shards_cache import AnnotatedRawShard
 
 from .shards import (
@@ -264,9 +267,9 @@ class RepodataSubset:
         # these are in self.nodes but we still need the shards
         self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
-        # if sharded is empty, we could skip everything related to threads.
-        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        cache = sharded[0].shards_cache if sharded else None
+        # Ignore cache on shards object, use our own. Necessary if there are no
+        # sharded channels.
+        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
         cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
         shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
@@ -359,7 +362,7 @@ class RepodataSubset:
                 self.neighbors_2(pending, parent_node, shard)
 
             enqueue_pending()
-            if not submitted:
+            if not submitted and not pending:
                 break
 
         cache_in_queue.put(None)
