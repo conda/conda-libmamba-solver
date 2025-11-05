@@ -150,7 +150,7 @@ def test_traversal_algorithm_benchmarks(
         return (subset,), {}
 
     def target(subset):
-        with _timer(f"RepodataSubset.{algorithm}({scenario.get('name')})"):
+        with _timer(""):
             getattr(subset, f"shortest_{algorithm}")(scenario["packages"])
 
     benchmark.pedantic(target, setup=setup, rounds=3)
