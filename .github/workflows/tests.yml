@@ -74,10 +74,8 @@ jobs:
   # windows test suite
   windows:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Linux only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
     # Pinned to commit: 195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f (reusable-test-workflow branch) - includes CONDA_BUILD fix for Linux
@@ -193,10 +191,8 @@ jobs:
   # linux benchmarks
   linux-benchmarks:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Linux only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-latest
     defaults:
@@ -251,10 +247,8 @@ jobs:
   # linux-qemu test suite
   linux-qemu:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Linux only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Run one single fast test per docker+qemu emulated linux platform to test that
     # test execution is possible there (container+tools+dependencies work). Can be
@@ -313,10 +307,8 @@ jobs:
   # macos test suite
   macos:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Disabled - testing Linux only
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
     # Pinned to commit: 195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f (reusable-test-workflow branch) - includes CONDA_BUILD fix for Linux
@@ -385,8 +377,7 @@ jobs:
   # aggregate and upload
   aggregate:
     # only aggregate test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Only depend on linux (other jobs disabled)
-    needs: [changes, linux]
+    needs: [changes, windows, linux, macos, linux-benchmarks]
     if: >-
       !cancelled()
       && needs.changes.outputs.code == 'true'
@@ -411,8 +402,7 @@ jobs:
 
   # required check
   analyze:
-    # CONDA-LIBMAMBA-SOLVER CHANGE: Only depend on linux and aggregate (other jobs disabled)
-    needs: [linux, aggregate]
+    needs: [windows, linux, macos, linux-benchmarks, aggregate]
     if: '!cancelled()'
 
     runs-on: ubuntu-latest
