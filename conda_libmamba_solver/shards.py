@@ -73,11 +73,10 @@ def _shards_connections() -> int:
     # requests poolmanager size.
     session = CondaSession.__base__() if CondaSession.__base__ else CondaSession()
     adapter = session.get_adapter("https://")
-    if poolmanager := getattr(adapter, "poolmanager"):
-        try:
-            return int(poolmanager.connection_pool_kw["maxsize"])
-        except (KeyError, ValueError, AttributeError, TypeError):
-            pass
+    try:
+        return int(getattr(adapter, "_pool_connections"))
+    except (KeyError, ValueError, AttributeError, TypeError):
+        pass
     return SHARDS_CONNECTIONS_DEFAULT
 
 
