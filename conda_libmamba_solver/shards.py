@@ -97,6 +97,8 @@ def spec_to_package_name(spec: str) -> str:
     """
     Given a dependency spec, return the package name.
     """
+    # Note: hope for no MatchSpec-without-name in repodata, although it is
+    # possible in the MatchSpec grammar.
     parsed_spec = specs.MatchSpec.parse(spec)
     name = str(parsed_spec.name)
     return name
