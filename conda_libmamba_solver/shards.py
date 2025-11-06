@@ -91,7 +91,7 @@ def ensure_hex_hash(record: PackageRecordDict):
     return record
 
 
-def shard_mentioned_packages_2(shard: ShardDict) -> Iterable[str]:
+def shard_mentioned_packages(shard: ShardDict) -> Iterable[str]:
     """
     Return all dependency names mentioned in a shard, not including the shard's
     own package name.

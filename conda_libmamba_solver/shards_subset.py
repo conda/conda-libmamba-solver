@@ -65,7 +65,7 @@ from .shards import (
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
-    shard_mentioned_packages_2,
+    shard_mentioned_packages,
 )
 
 log = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ class RepodataSubset:
                 node.package
             )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
 
-            for package in shard_mentioned_packages_2(shard):
+            for package in shard_mentioned_packages(shard):
                 node_id = NodeId(package, shardlike.url)
 
                 if node_id not in self.nodes:
