@@ -19,10 +19,10 @@ from typing import TYPE_CHECKING, NamedTuple
 import conda.gateways.repodata
 import msgpack
 import pytest
+import requests.adapters
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import CondaSession
 from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
@@ -704,8 +704,8 @@ def test_shards_connections(monkeypatch):
     assert context.repodata_threads is None
     assert _shards_connections() == 10  # requests' default
 
-    poolmanager = CondaSession().get_adapter("https://").poolmanager  # type: ignore
-    monkeypatch.setattr(poolmanager, "connection_pool_kw", {"no_maxsize": 0})
+    # force fallback to default, as adapter._pool_connections will fail
+    monkeypatch.setattr(requests.sessions.Session, "get_adapter", lambda *args: None)
 
     monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
     assert _shards_connections() == 7
