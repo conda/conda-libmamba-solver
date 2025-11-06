@@ -37,7 +37,7 @@ from conda_libmamba_solver.shards import (
     _shards_connections,
     batch_retrieve_from_cache,
     fetch_shards_index,
-    shard_mentioned_packages_2,
+    shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import (
     Node,
@@ -251,7 +251,7 @@ def test_shards_base_url():
 
 
 def test_shard_mentioned_packages_2():
-    assert set(shard_mentioned_packages_2(FAKE_SHARD)) == set(
+    assert set(shard_mentioned_packages(FAKE_SHARD)) == set(
         (
             "bar",
             "baz",

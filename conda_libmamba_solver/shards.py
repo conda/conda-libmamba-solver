@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import abc
 import concurrent.futures
+import functools
 import json
 import logging
 from collections import defaultdict
@@ -91,7 +92,17 @@ def ensure_hex_hash(record: PackageRecordDict):
     return record
 
 
-def shard_mentioned_packages_2(shard: ShardDict) -> Iterable[str]:
+@functools.cache
+def spec_to_package_name(spec: str) -> str:
+    """
+    Given a dependency spec, return the package name.
+    """
+    parsed_spec = specs.MatchSpec.parse(spec)
+    name = str(parsed_spec.name)
+    return name
+
+
+def shard_mentioned_packages(shard: ShardDict) -> Iterable[str]:
     """
     Return all dependency names mentioned in a shard, not including the shard's
     own package name.
@@ -103,8 +114,7 @@ def shard_mentioned_packages_2(shard: ShardDict) -> Iterable[str]:
             if spec in unique_specs:
                 continue
             unique_specs.add(spec)
-            parsed_spec = specs.MatchSpec.parse(spec)
-            name = str(parsed_spec.name)
+            name = spec_to_package_name(spec)
             yield name  # not much improvement from only yielding unique names
 
 
