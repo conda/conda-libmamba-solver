@@ -196,7 +196,8 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     # installed, plus what we want to add (twine)
     root_packages = ROOT_PACKAGES[:]
 
-    channels = list(context.default_channels)
+    channels = []
+    # channels.extend(context.default_channels)
     channels.append(Channel("conda-forge-sharded"))
 
     with _timer("fetch_channels()"):
