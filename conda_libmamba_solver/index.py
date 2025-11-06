@@ -161,7 +161,7 @@ def _sharded_repodata_strategy():
     Which algorithm should we use to collect sharded repodata?
     """
     strategy = context.plugins.sharded_repodata_strategy.lower()  # type: ignore
-    if strategy in ("dijkstra", "bfs", "pipelined"):
+    if strategy in ("dijkstra", "bfs", "pipelined", "pipelined_2"):
         return strategy
     log.warning(
         "Unknown sharded_repodata_strategy '%s', falling back to 'bfs'.",

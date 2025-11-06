@@ -650,7 +650,7 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-def fetch_channels(channels: Iterable[Channel]) -> dict[str, ShardBase]:
+def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
     """
     Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
 

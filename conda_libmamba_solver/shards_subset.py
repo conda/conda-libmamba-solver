@@ -513,7 +513,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel | str],
-    algorithm: Literal["dijkstra", "bfs", "pipelined"] = "bfs",
+    algorithm: Literal["dijkstra", "bfs", "pipelined", "pipelined_2"] = "bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.

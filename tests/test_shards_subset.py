@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 import conda.gateways.repodata
 import pytest
 import pytest_codspeed
-from conda.base.context import context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
@@ -107,7 +106,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
-@pytest.mark.parametrize("algorithm", ("dijkstra", "bfs", "pipelined"))
+@pytest.mark.parametrize("algorithm", ("dijkstra", "bfs", "pipelined", "pipelined_2"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
@@ -175,6 +174,9 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
         "dijkstra": build_repodata_subset(scenario["packages"], [channel], algorithm="dijkstra"),
         "bfs": build_repodata_subset(scenario["packages"], [channel], algorithm="bfs"),
         "pipelined": build_repodata_subset(scenario["packages"], [channel], algorithm="pipelined"),
+        "pipelined_2": build_repodata_subset(
+            scenario["packages"], [channel], algorithm="pipelined_2"
+        ),
     }
 
     for subdir in repodata_algorithm_map["dijkstra"].keys():
