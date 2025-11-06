@@ -125,12 +125,12 @@ def test_traversal_algorithm_benchmarks(
 
         if cache_state == "lukewarm":
             # Collect pre-fetch packages
-            getattr(subset, algorithm)(scenario["prefetch_packages"])
+            getattr(subset, f"shortest_{algorithm}")(scenario["prefetch_packages"])
 
         return (subset,), {}
 
     def target(subset):
-        getattr(subset, algorithm)(scenario["packages"])
+        getattr(subset, f"shortest_{algorithm}")(scenario["packages"])
 
     benchmark.pedantic(target, setup=setup, rounds=3)
 
