@@ -3,9 +3,11 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import threading
 import urllib.parse
+from pathlib import Path
 from queue import SimpleQueue
 from typing import TYPE_CHECKING
 
+import conda.gateways.repodata
 import pytest
 import pytest_codspeed
 from conda.base.context import context
@@ -127,14 +129,16 @@ def test_traversal_algorithm_benchmarks(
     lukewarm:
         only some of the shards are in the SQLite cache database
     """
+    cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
     if cache_state == "warm":
-        # Clean cache just once for "warm"
-        clean_cache(conda_cli)
+        # Clean shards cache just once for "warm"; leave index cache intact.
+        cache.remove_cache()
 
     def setup():
         if cache_state != "warm":
-            # For "cold" and "lukewarm", we want to clean cache before each round of benchmarking
-            clean_cache(conda_cli)
+            # For "cold" and "lukewarm", we want to clean shards cache before
+            # each round of benchmarking
+            cache.remove_cache()
 
         channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
         channel_data = fetch_channels([channel])
