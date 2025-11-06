@@ -7,6 +7,10 @@ Sharded repodata subsets.
 Traverse dependencies of installed and to-be-installed packages to generate a
 useful subset for the solver.
 
+The algorithm developed here is a direct result of the following CEP:
+
+- https://conda.org/learn/ceps/cep-0016 (Sharded Repodata)
+
 In this algorithm we treat a package name as a node, and all its dependencies
 across all channels as edges. We then traverse all edges to discover all
 reachable package names. The solver should be able to find a solution with only
@@ -26,16 +30,33 @@ per-package shards, computing a subset of both. This is because it is possible
 for the monolithic repodata to mention packages that exist in the true sharded
 repodata but would not be found by only traversing the shards.
 
-After we have the subset we write it out as monolithic repodata files, where it
-can be used by a shards-unaware solver.
+## Example usage
+
+The following constructs several repodata (`noarch` and `linux-64`) from a single
+channel name and a list of root packages:
+
+```
+from conda.models.channel import Channel
+from conda_libmamba_solver.shards_subset import build_repodata_subset
+
+channel = Channel("conda-forge-sharded/linux-64")
+channel_data = build_repodata_subset(["python", "pandas"], [channel.url()])
+repodata = {}
+
+for url in channel_data:
+    repodata[url] = channel_data.build_repodata()
+
+# ... this is what's fed to the solver
+```
+
 """
 
 from __future__ import annotations
 
 import heapq
-import json
 import logging
 import sys
+from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -50,8 +71,11 @@ from .shards import (
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+    from typing import Literal
+
     from .shards import (
-        ShardLike,
+        ShardBase,
     )
 
 
@@ -65,9 +89,6 @@ class Node:
     def to_id(self) -> NodeId:
         return NodeId(self.package, self.channel)
 
-    def in_shard(self, shardlike: ShardLike) -> bool:
-        return self.channel == shardlike.url
-
 
 @dataclass(order=True, eq=True, frozen=True)
 class NodeId:
@@ -77,22 +98,35 @@ class NodeId:
     def __hash__(self):
         return hash((self.package, self.channel))
 
-    def in_shard(self, shardlike: ShardLike):
-        return self.channel == shardlike.url
+
+def _nodes_from_packages(
+    root_packages: list[str], shardlikes: Iterable[ShardBase]
+) -> Iterator[tuple[NodeId, Node]]:
+    """
+    Yield (NodeId, Node) for all root packages found in shardlikes.
+    """
+    for package in root_packages:
+        for shardlike in shardlikes:
+            if package in shardlike:
+                node = Node(0, package, shardlike.url)
+                node_id = node.to_id()
+                yield node_id, node
 
 
 @dataclass
 class RepodataSubset:
     nodes: dict[NodeId, Node]
-    shardlikes: list[ShardLike]
+    shardlikes: Iterable[ShardBase]
 
-    def __init__(self, shardlikes):
+    def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
         self.shardlikes = shardlikes
 
-    def neighbors(self, node: Node):
+    def neighbors(self, node: Node) -> Iterator[Node]:
         """
-        All neighbors for node.
+        Retrieve all unvisited neighbors of a node
+
+        Neighbors in the context are dependencies of a package
         """
         discovered = set()
 
@@ -101,7 +135,9 @@ class RepodataSubset:
                 continue
 
             # check that we don't fetch the same shard twice...
-            shard = shardlike.fetch_shard(node.package)
+            shard = shardlike.fetch_shard(
+                node.package
+            )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
 
             for package in shard_mentioned_packages_2(shard):
                 node_id = NodeId(package, shardlike.url)
@@ -112,7 +148,6 @@ class RepodataSubset:
 
                     if package not in discovered:
                         # now this is per package name, not per (name, channel) tuple
-                        log.debug("%s -> %s;", json.dumps(node.package), json.dumps(package))
                         discovered.add(package)
 
     def outgoing(self, node: Node):
@@ -127,22 +162,22 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
-    def shortest(self, start_packages):
+    def shortest_dijkstra(self, root_packages):
+        """
+        Fetch all root packages represented as `self.nodes`.
+
+        This method updates associated `self.shardlikes` to contain enough data
+        to build a repodata subset.
+        """
         # nodes.visited and nodes.distance should be reset before calling
 
-        def initial_nodes():
-            for package in start_packages:
-                for shardlike in self.shardlikes:
-                    if package in shardlike:
-                        node = Node(0, package, shardlike.url)
-                        node_id = node.to_id()
-                        yield (node_id, node)
+        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
-        self.nodes = dict(initial_nodes())
         unvisited = [(n.distance, n) for n in self.nodes.values()]
         sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        to_retrieve = set(self.nodes)
+        to_retrieve = set(self.nodes)  # XXX below, it expects set[str]
         retrieved: set[NodeId] = set()
+
         while unvisited:
             # parallel fetch all unvisited shards but don't mark as visited
             if to_retrieve:
@@ -161,18 +196,64 @@ class RepodataSubset:
                 continue
             node.visited = True
 
-            for next, cost in self.outgoing(node):
-                if not next.visited:
-                    next.distance = min(node.distance + cost, next.distance)
-                    to_retrieve.add(next.package)
-                    heapq.heappush(unvisited, (next.distance, next))
+            for next_node, cost in self.outgoing(node):
+                if not next_node.visited:
+                    next_node.distance = min(node.distance + cost, next_node.distance)
+                    to_retrieve.add(next_node.package)
+                    heapq.heappush(unvisited, (next_node.distance, next_node))
+
+    def shortest_bfs(self, root_packages):
+        """
+        Fetch all root packages represented as `self.nodes` using the "breadth-first search"
+        algorithm.
+
+        This method updates associated `self.shardlikes` to contain enough data
+        to build a repodata subset.
+        """
+        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
+
+        node_queue = deque(self.nodes.values())
+        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
+
+        while node_queue:
+            # Batch fetch all nodes at current level
+            to_retrieve = {node.package for node in node_queue if not node.visited}
+            if to_retrieve:
+                not_in_cache = batch_retrieve_from_cache(sharded, sorted(to_retrieve))
+                batch_retrieve_from_network(not_in_cache)
+
+            # Process one level
+            level_size = len(node_queue)
+            for _ in range(level_size):
+                node = node_queue.popleft()
+                if node.visited:
+                    continue
+                node.visited = True
+
+                for next_node, _ in self.outgoing(node):
+                    if not next_node.visited:
+                        node_queue.append(next_node)
 
 
-def build_repodata_subset(root_packages, channels):
+def build_repodata_subset(
+    root_packages: Iterable[str],
+    channels: Iterable[str],
+    algorithm: Literal["shortest_dijkstra", "shortest_bfs"] = "shortest_bfs",
+) -> dict[str, ShardBase]:
+    """
+    Retrieve all necessary information to build a repodata subset.
+
+    Params:
+        root_packages: iterable of root package names
+        channels: iterable of channel URLs
+        algorithm: one of "shortest", "shortest_bfs
+
+    TODO: Remove `algorithm` parameter once we've made a firm decision on which to use.
+    """
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
-    subset.shortest(root_packages)
-    log.debug("%d package names discovered", len(subset.nodes))
+    getattr(subset, algorithm)(root_packages)
+    log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
