@@ -358,7 +358,7 @@ class RepodataSubset:
                 else:
                     pass  # e.g. monolithic repodata is already visited
 
-                self.process_shard(pending, parent_node, shard)
+                self.visit_node(pending, parent_node, shard)
 
             enqueue_pending()
             if not submitted and not pending:
@@ -368,13 +368,109 @@ class RepodataSubset:
         cache_thread.join()
         network_thread.join()
 
-    def process_shard(self, pending: set[NodeId], parent_node: Node, shard):
-        """Find new nodes from shard and add to pending set."""
+    def shortest_pipelined_2(self, root_packages):
+        """
+        Build repodata subset using a main thread, a thread to fetch from
+        sqlite3 and another threadpool to fetch http.
+        """
 
-        mentioned_packages = list(shard_mentioned_packages(shard))
-        # Move this into function for scope clarity
-        for shardlike in self.shardlikes:
-            for package in mentioned_packages:
+        self.nodes = {}
+
+        # Ignore cache on shards object, use our own. Necessary if there are no
+        # sharded channels.
+        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
+
+        cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+        shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+        cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+
+        # this kind of thread can crash, and we don't hear back without our own
+        # handling.
+        cache_thread = threading.Thread(
+            target=cache_fetch_thread,
+            args=(cache_in_queue, shard_out_queue, cache_miss_queue, cache),
+            daemon=False,
+        )
+
+        # this kind of thread can crash, and we don't hear back without our own
+        # handling.
+        network_thread = threading.Thread(
+            target=network_fetch_thread,
+            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+            daemon=False,
+        )
+
+        # or after populating initial URLs queue
+        cache_thread.start()
+        network_thread.start()
+
+        shardlikes_by_url = {s.url: s for s in self.shardlikes}
+        pending: set[NodeId] = set()
+        in_flight: set[NodeId] = set()
+        timeouts = 0
+
+        # create start condition
+        parent_node = Node(0)
+        self.visit_node(pending, parent_node, root_packages)
+
+        def pump():
+            have, need = self.drain_pending(pending, shardlikes_by_url)
+            if need:
+                cache_in_queue.put(need)
+                in_flight.update(need)
+            if have:
+                shard_out_queue.put(have)
+                in_flight.difference_update(node_id for node_id, _ in have)
+            return len(have) + len(need)
+
+        running = True
+        while running:
+            pump()
+            try:
+                new_shards = shard_out_queue.get(timeout=1)
+            except queue.Empty:
+                pump_count = pump()
+                log.debug("Shard timeout %s, %d", timeouts, pump_count)
+                log.debug("pending: %s", sorted(node_id for node_id in pending))
+                log.debug("in_flight: %s", sorted(node_id for node_id in in_flight))
+                log.debug("nodes: %d", len(self.nodes))
+                if not pending and not in_flight:
+                    log.debug("All done?")
+                timeouts += 1
+                continue
+
+            if new_shards is None:
+                running = False
+                continue  # or break
+
+            for node_id, shard in new_shards:
+                in_flight.remove(node_id)
+
+                # add shard to appropriate ShardLike
+                parent_node = self.nodes[node_id]
+                shardlike = shardlikes_by_url[node_id.channel]
+                shardlike.visited[node_id.package] = (
+                    shard  # would rather use the visit_shard (add shard?) method.
+                )
+
+                self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
+
+            if not pending and not in_flight:
+                log.debug("Send None to cache_in_queue here?")
+                cache_in_queue.put(None)
+
+        cache_in_queue.put(None)
+        cache_thread.join()
+        network_thread.join()
+
+    def visit_node(
+        self, pending: set[NodeId], parent_node: Node, mentioned_packages: Iterable[str]
+    ):
+        """Broadcast mentioned packages across channels to pending."""
+        # NOTE we have visit for Nodes, and a separate visit for shardlike which
+        # includes packages in the output repodata.
+        for package in mentioned_packages:
+            for shardlike in self.shardlikes:
                 if package in shardlike:
                     new_node_id = NodeId(package, shardlike.url, shardlike.shard_url(package))
                     if new_node_id not in self.nodes:
@@ -385,8 +481,33 @@ class RepodataSubset:
                             shard_url=new_node_id.shard_url,
                         )
                         self.nodes[new_node_id] = new_node
-
                         pending.add(new_node_id)
+
+        parent_node.visited = True
+
+    def drain_pending(
+        self, pending: set[NodeId], shardlikes_by_url: dict[str, ShardBase]
+    ) -> tuple[list[tuple[NodeId, ShardDict]], list[NodeId]]:
+        """
+        Check pending for in-memory shards.
+        Clear pending.
+
+        Return a list of shards we have and shards we need to fetch.
+        """
+        shards_need = []
+        shards_have = []
+        for node_id in pending:
+            # we should already have these nodes.
+            shardlike = shardlikes_by_url[node_id.channel]
+            if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
+                shards_have.append((node_id, shardlike.visit_shard(node_id.package)))
+            else:
+                if self.nodes[node_id].visited:
+                    print("skip visited")
+                    continue
+                shards_need.append(node_id)
+        pending.clear()
+        return (shards_have, shards_need)
 
 
 def build_repodata_subset(

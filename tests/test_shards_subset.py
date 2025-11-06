@@ -205,7 +205,7 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
 
     with _timer("RepodataSubset.shortest_pipelined()"):
         subset = RepodataSubset((*channel_data.values(),))
-        subset.shortest_pipelined(root_packages)
+        subset.shortest_pipelined_2(root_packages)
         print(f"{len(subset.nodes)} (channel, package) nodes discovered")
 
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
