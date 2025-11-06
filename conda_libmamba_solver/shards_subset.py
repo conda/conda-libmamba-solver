@@ -74,6 +74,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from typing import Literal
 
+    from conda.models.channel import Channel
+
     from .shards import (
         ShardBase,
     )
