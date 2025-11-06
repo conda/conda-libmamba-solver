@@ -121,7 +121,7 @@ if TYPE_CHECKING:
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
-    from conda_libmamba_solver.shards_typing import ShardLike
+    from conda_libmamba_solver.shards import ShardBase
 
     from .shards_typing import PackageRecordDict
     from .state import SolverInputState
@@ -615,7 +615,7 @@ class LibMambaIndexHelper:
 
     @time_recorder(module_name=__name__)
     def _load_repo_info_from_repodata_dict(
-        self, repodata_subset: dict[str, ShardLike]
+        self, repodata_subset: dict[str, ShardBase]
     ) -> list[_ChannelRepoInfo]:
         """
         Load repository information from deserialized repodata.json-like
@@ -629,17 +629,16 @@ class LibMambaIndexHelper:
             # part of fetch:
             channel_object = Channel(channel_url)
             channel_id = self._channel_to_id(channel_object)
+            # must be appropriate for string concatenation:
             base_url = shardlike.base_url
 
-            # avoid calling urljoin many times
-            base_url_concat = base_url.rsplit("/", 1)[0]
             packages = []
             for package_group in ("packages", "packages.conda"):
                 for filename, record in repodata.get(package_group, {}).items():
                     package = _package_info_from_package_dict(
                         record,
                         filename,
-                        url=f"{base_url_concat}/{filename}",
+                        url=f"{base_url}{filename}",
                         channel_id=channel_id,
                     )
                     packages.append(package)
