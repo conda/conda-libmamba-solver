@@ -68,7 +68,9 @@ def _shards_connections() -> int:
     """
     if context.repodata_threads is not None:
         return context.repodata_threads
-    session = CondaSession()
+    # CondaSession() is expensive to create, we just want to find the default
+    # requests poolmanager size.
+    session = CondaSession.__base__() if CondaSession.__base__ else CondaSession()
     adapter = session.get_adapter("https://")
     if poolmanager := getattr(adapter, "poolmanager"):
         try:
