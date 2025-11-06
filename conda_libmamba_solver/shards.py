@@ -303,6 +303,10 @@ class Shards(ShardBase):
     Handle repodata_shards.msgpack.zst and individual per-package shards.
     """
 
+    # cache for shards_base_url()
+    _shards_base_url = ""
+    _shards_base_url_key = (None, None)
+
     def __init__(self, shards_index: ShardsIndexDict, url: str, cache: shards_cache.ShardCache):
         """
         Args:
@@ -347,8 +351,13 @@ class Shards(ShardBase):
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
         """
+        # could be simplified by restricting self.shards_index assignment
         shards_base_url_ = self.shards_index["info"].get("shards_base_url", "")
-        return _shards_base_url(self.url, shards_base_url_)
+        cache_key = (self.url, shards_base_url_)
+        if self._shards_base_url_key != cache_key:
+            self._shards_base_url_key = cache_key
+            self._shards_base_url = _shards_base_url(self.url, shards_base_url_)
+        return self._shards_base_url
 
     def shard_url(self, package: str) -> str:
         """
@@ -548,7 +557,7 @@ def fetch_shards_index(
             cache_state.etag = ""
             cache_state.mod = ""
         elif not repo_cache.stale():
-            # load from cache
+            # load from cache without network request
             shards_data = repo_cache.cache_path_shards.read_bytes()
 
         if shards_data is None:

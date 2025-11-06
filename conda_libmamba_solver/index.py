@@ -378,13 +378,15 @@ class LibMambaIndexHelper:
 
         # Prefer sharded repodata loading if it's enabled
         if self.in_state and _is_sharded_repodata_enabled():
+            # why do we need to encode URL's above instead of passing the
+            # Channel() objects that we already have?
             return self._load_channel_repo_info_shards(urls_to_channel)
 
         # Fallback to repodata.json loading
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
     def _load_channel_repo_info_shards(
-        self, urls_to_channel: dict[str, str]
+        self, urls_to_channel: dict[str, Channel]
     ) -> list[_ChannelRepoInfo]:
         """
         Load repository information from sharded repodata cache.

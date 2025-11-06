@@ -335,7 +335,6 @@ class RepodataSubset:
             try:
                 new_shards = shard_out_queue.get(timeout=1)
             except queue.Empty:
-                # print(f"Pending {len(pending)}, Submitted {len(submitted)}")
                 if all([x in self.nodes for x in submitted]):
                     # print("Done but submitted not empty")
                     running = False
@@ -359,7 +358,7 @@ class RepodataSubset:
                 else:
                     pass  # e.g. monolithic repodata is already visited
 
-                self.neighbors_2(pending, parent_node, shard)
+                self.process_shard(pending, parent_node, shard)
 
             enqueue_pending()
             if not submitted and not pending:
@@ -369,8 +368,8 @@ class RepodataSubset:
         cache_thread.join()
         network_thread.join()
 
-    def neighbors_2(self, pending: set[NodeId], parent_node: Node, shard):
-        """Neighbors (in-memory data only) for shortest_pipelined()"""
+    def process_shard(self, pending: set[NodeId], parent_node: Node, shard):
+        """Find new nodes from shard and add to pending set."""
 
         mentioned_packages = list(shard_mentioned_packages_2(shard))
         # Move this into function for scope clarity
@@ -392,7 +391,7 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: Iterable[Channel],
+    channels: Iterable[Channel | str],
     algorithm: Literal["dijkstra", "bfs", "pipelined"] = "bfs",
 ) -> dict[str, ShardBase]:
     """
