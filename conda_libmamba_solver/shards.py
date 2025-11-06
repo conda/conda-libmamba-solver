@@ -539,30 +539,37 @@ def fetch_shards_index(
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
     if cache_state.should_check_format("shards"):
+        # look for shards index
+        shards_data = None
+        shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
+
         if not repo_cache.cache_path_shards.exists():
             # avoid 304 not modified if we don't have the file
             cache_state.etag = ""
             cache_state.mod = ""
-        try:
-            # look for shards index
-            shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
-            found = repodata_shards(shards_index_url, repo_cache)
-            cache_state.set_has_format("shards", True)
-            # this will also set state["refresh_ns"] = time.time_ns(); we could
-            # call cache.refresh() if we got a 304 instead:
-            repo_cache.save(found)
+        elif not repo_cache.stale():
+            # load from cache
+            shards_data = repo_cache.cache_path_shards.read_bytes()
 
+        if shards_data is None:
+            try:
+                shards_data = repodata_shards(shards_index_url, repo_cache)
+                cache_state.set_has_format("shards", True)
+                # this will also set state["refresh_ns"] = time.time_ns(); we could
+                # call cache.refresh() if we got a 304 instead:
+                repo_cache.save(shards_data)
+            except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
+                # fetch repodata.json / repodata.json.zst instead
+                cache_state.set_has_format("shards", False)
+                repo_cache.refresh()
+
+        if shards_data:
             # basic parse (move into caller?)
             shards_index: ShardsIndexDict = msgpack.loads(
-                zstandard.decompress(found, max_output_size=ZSTD_MAX_SHARD_SIZE)
+                zstandard.decompress(shards_data, max_output_size=ZSTD_MAX_SHARD_SIZE)
             )  # type: ignore
             shards = Shards(shards_index, shards_index_url, cache)
             return shards
-
-        except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
-            # fetch repodata.json / repodata.json.zst instead
-            cache_state.set_has_format("shards", False)
-            repo_cache.refresh()
 
     return None
 
