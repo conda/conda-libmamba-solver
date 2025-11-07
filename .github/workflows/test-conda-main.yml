@@ -1,0 +1,84 @@
+name: Test Against Conda Main
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC (to catch regressions in conda main)
+    - cron: '0 2 * * *'
+  workflow_dispatch:  # Allow manual triggering
+
+jobs:
+  test-conda-main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout conda-libmamba-solver
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Use reusable test workflow from conda/conda repo
+        uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
+        with:
+          runs_on: ubuntu-latest
+          runner_os: Linux
+          shell: bash -el {0}
+          checkout_conda: true
+          checkout_conda_path: conda
+          checkout_conda_ref: ''  # Use conda main branch to catch regressions early
+          checkout_other: true
+          checkout_other_repo: conda/conda-libmamba-solver
+          checkout_other_path: conda-libmamba-solver
+          checkout_other_ref: ''  # Use current main branch
+          test_type: conda-libmamba-solver
+          test_group: 1
+          python_version: '3.12'
+          default_channel: defaults
+          conda_test_solvers: libmamba
+          pytest_reruns: '3'
+          pytest_cov_package: conda
+          pytest_additional_args: ''
+          requirements_other_dev: dev/requirements.txt
+          requirements_other_tests: tests/requirements.txt
+          test_results_base_path: conda
+        secrets:
+          CODECOV_TOKEN: ''
+
+      - name: Create Issue on Failure
+        if: failure()
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1
+        with:
+          script: |
+            const title = `[Cron] Tests failed against conda main branch`;
+            const body = `Tests failed when running against conda's main branch.
+
+            This is an automated check to catch regressions early. The failure may be due to:
+            - Changes in conda main that break compatibility
+            - New deprecation warnings that need to be addressed
+            - Temporary issues in conda main
+
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            **Date:** ${new Date().toISOString()}
+
+            Please investigate and either:
+            1. Fix compatibility issues if this is a real regression
+            2. Close this issue if it's a false positive or temporary issue
+            `;
+
+            // Check if an open issue with this title already exists
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: ['cron', 'conda-main-test']
+            });
+
+            const existingIssue = issues.find(issue => issue.title === title);
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['cron', 'conda-main-test', 'automated']
+              });
+            } else {
+              console.log('An open issue already exists for this failure');
+            }

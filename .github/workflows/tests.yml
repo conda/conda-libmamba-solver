@@ -77,7 +77,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
 
-    runs-on: windows-latest
+    # Use reusable test workflow from conda/conda repo
+    # Pinned to commit: 458c66187 (reusable-test-workflow branch) - includes test fix for conda-libmamba-solver plugin settings
+    # TODO: Update to a specific tag when conda releases a versioned tag
+    # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
     strategy:
       fail-fast: false
       matrix:
@@ -91,130 +95,35 @@ jobs:
             python-version: '3.10'
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
-    env:
-      ErrorActionPreference: Stop  # powershell exit immediately on error
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
-    steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-          path: conda-libmamba-solver
-      # /CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Hash + Timestamp
-        shell: bash  # use bash to run date command
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
-
-      - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
-        with:
-          # CONDA-LIBMAMBA-SOLVER CHANGE: add conda\
-          condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
-          run-post: false  # skip post cleanup
-
-      - name: Conda Install
-        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
-        run: >
-          conda install
-          --yes
-          --file tests\requirements.txt
-          --file tests\requirements-${{ runner.os }}.txt
-          --file tests\requirements-ci.txt
-          --file tests\requirements-s3.txt
-          --file tests\requirements-truststore.txt
-          --file ..\conda-libmamba-solver\dev\requirements.txt
-          ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ..\\conda-libmamba-solver\\tests\\requirements.txt' || '' }}
-          python=${{ matrix.python-version }}
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
-      #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Conda Info
-        run: python -m conda info --verbose
-
-      - name: Conda Config
-        run: conda config --show-sources
-
-      - name: Conda List
-        run: conda list --show-channel-urls
-
-      - name: Setup PowerShell
-        # for tests/shell, so only necessary for integration tests
-        if: matrix.test-type == 'integration'
-        run: |
-          Invoke-Expression "& { $(Invoke-RestMethod https://aka.ms/install-powershell.ps1) }"
-          "PWSHPATH=$env:LOCALAPPDATA\Microsoft\powershell" | Out-File -FilePath $env:GITHUB_ENV -Append
-
-      - name: PowerShell Info
-        # for tests/shell, so only necessary for integration tests
-        if: matrix.test-type == 'integration'
-        run: |
-          Get-Command -All powershell
-          Get-Command -All "$env:PWSHPATH\pwsh.exe"
-
-      - name: Run Upstream Tests
-        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
-        run: python -m pytest
-          --cov=conda
-          --durations-path=durations\${{ runner.os }}.json
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
-          -m "${{ env.PYTEST_MARKER }}"
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run conda-libmamba-solver Tests
-        working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        shell: bash -el {0}
-        run: |
-          python -m pip install -e ../conda/ --no-deps
-          python -m conda init --all
-          . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
-      #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Upload Coverage
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
-        with:
-          flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
-
-      - name: Upload Test Results
-        if: '!cancelled()'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: test-results-${{ env.HASH }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
-          path: |
-            conda\.coverage
-            conda\durations\${{ runner.os }}.json
-            conda\test-report.xml
-          retention-days: 1  # temporary, combined in aggregate below
+          - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
+            test-group: 3
+    with:
+      runs_on: windows-latest
+      runner_os: Windows
+      shell: cmd /C call {0}
+      checkout_conda: true
+      checkout_conda_path: conda
+      checkout_conda_ref: '25.9.1'  # Pin to stable conda version for reproducible builds
+      checkout_other: true
+      checkout_other_repo: conda/conda-libmamba-solver
+      checkout_other_path: conda-libmamba-solver
+      checkout_other_ref: ''  # Uses current branch/PR
+      test_type: ${{ matrix.test-type }}
+      test_group: ${{ matrix.test-group }}
+      python_version: ${{ matrix.python-version }}
+      default_channel: ${{ matrix.default-channel }}
+      conda_test_solvers: libmamba
+      pytest_reruns: '3'
+      pytest_cov_package: conda
+      pytest_additional_args: ''
+      requirements_os_specific: false
+      requirements_other_dev: dev/requirements.txt
+      requirements_other_tests: tests/requirements.txt
+      test_results_base_path: conda
+    secrets:
+      CODECOV_TOKEN: ''
 
   # linux test suite
   linux:
@@ -222,11 +131,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
 
-    runs-on: ${{ matrix.runs-on }}
-    defaults:
-      run:
-        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
-        shell: bash -el {0}  # bash exit immediately on error + login shell
+    # Use reusable test workflow from conda/conda repo
+    # Pinned to commit: 458c66187 (reusable-test-workflow branch) - includes test fix for conda-libmamba-solver plugin settings
+    # TODO: Update to a specific tag when conda releases a versioned tag
+    # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
     strategy:
       fail-fast: false
       matrix:
@@ -251,127 +160,39 @@ jobs:
             python-version: '3.11'
           - runs-on: ubuntu-24.04-arm
             python-version: '3.12'
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
-    env:
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
-
-    steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-          path: conda-libmamba-solver
-      # /CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Hash + Timestamp
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
-
-      - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
-        with:
-          # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
-          condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
-          run-post: false  # skip post cleanup
-
-      - name: Conda Install
-        working-directory: conda
-        run: >
-          conda install
-          --yes
-          --file tests/requirements.txt
-          --file tests/requirements-${{ runner.os }}.txt
-          --file tests/requirements-ci.txt
-          --file tests/requirements-s3.txt
-          --file tests/requirements-truststore.txt
-          --file ../conda-libmamba-solver/dev/requirements.txt
-          ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
-          python=${{ matrix.python-version }}
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
-
-      - name: Find fix .xonshrc
-        run: find . -name fix_xonshrc.py
-
-      - name: Fix .xonshrc
-        working-directory: conda-libmamba-solver
-        run: python ./dev/scripts/fix_xonshrc.py
-      #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Conda Info
-        run: python -m conda info --verbose
-
-      - name: Conda Config
-        run: conda config --show-sources
-
-      - name: Conda List
-        run: conda list --show-channel-urls
-
-      - name: Setup Shells
-        # for tests/shell, so only necessary for integration tests
-        if: matrix.test-type == 'integration'
-        run: sudo apt update && sudo apt install ash csh fish tcsh xonsh zsh
-
-      - name: Run Tests
-        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
-        run: python -m pytest
-          --cov=conda
-          --durations-path=durations/${{ runner.os }}.json
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
-          -m "${{ env.PYTEST_MARKER }}"
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run conda-libmamba-solver Tests
-        working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        run: |
-          python -m pip install -e ../conda/ --no-deps
-          python -m conda init --all
-          . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
-      #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Upload Coverage
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        if: false # CONDA-LIBMAMBA-SOLVER CHANGE
-        with:
-          flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
-
-      - name: Upload Test Results
-        if: '!cancelled()'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: test-results-${{ env.HASH }}
-          path: |
-            conda/.coverage
-            conda/durations/${{ runner.os }}.json
-            conda/test-report.xml
-          retention-days: 1  # temporary, combined in aggregate below
+          - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
+            test-group: 3
+    with:
+      runs_on: ${{ matrix.runs-on }}
+      runner_os: Linux
+      shell: bash -el {0}
+      checkout_conda: true
+      checkout_conda_path: conda
+      checkout_conda_ref: '25.9.1'  # Pin to stable conda version for reproducible builds
+      checkout_other: true
+      checkout_other_repo: conda/conda-libmamba-solver
+      checkout_other_path: conda-libmamba-solver
+      checkout_other_ref: ''  # Uses current branch/PR
+      test_type: ${{ matrix.test-type }}
+      test_group: ${{ matrix.test-group }}
+      python_version: ${{ matrix.python-version }}
+      default_channel: ${{ matrix.default-channel }}
+      conda_test_solvers: libmamba
+      pytest_reruns: '3'
+      pytest_cov_package: conda
+      pytest_additional_args: ''
+      requirements_os_specific: false
+      requirements_other_dev: dev/requirements.txt
+      requirements_other_tests: tests/requirements.txt
+      test_results_base_path: conda
+    secrets:
+      CODECOV_TOKEN: ''
 
   # linux benchmarks
   linux-benchmarks:
+    # only run test suite if there are code changes
     needs: changes
     if: needs.changes.outputs.code == 'true'
 
@@ -428,11 +249,8 @@ jobs:
   # linux-qemu test suite
   linux-qemu:
     # only run test suite if there are code changes
-    # CONDA-LIBMAMBA-SOLVER CHANGE
-    # needs: changes
-    if: false
-    # needs.changes.outputs.code == 'true'
-    #/ CONDA-LIBMAMBA-SOLVER CHANGE
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
 
     # Run one single fast test per docker+qemu emulated linux platform to test that
     # test execution is possible there (container+tools+dependencies work). Can be
@@ -455,6 +273,7 @@ jobs:
             platform: ppc64le
           - image: 'condaforge/miniforge3:latest'
             platform: s390x
+          - platform: s390x
 
     steps:
       - name: Checkout Source
@@ -475,18 +294,18 @@ jobs:
           bash -lc
           ". /opt/conda/etc/profile.d/conda.sh
           && set -x
-          && conda create
-            --name test
-            --yes
-            --file tests/requirements.txt
-            --file tests/requirements-${{ runner.os }}.txt
-            --file tests/requirements-ci.txt
-            python=${{ matrix.python-version }}
+          && REQ_ARGS='--file tests/requirements.txt'
+          && [ -f tests/requirements-${{ runner.os }}.txt ] && REQ_ARGS=\"\$REQ_ARGS --file tests/requirements-${{ runner.os }}.txt\" || true
+          && [ -f tests/requirements-ci.txt ] && REQ_ARGS=\"\$REQ_ARGS --file tests/requirements-ci.txt\" || true
+          && conda create --name test --yes \$REQ_ARGS python=${{ matrix.python-version }}
           && conda activate test
           && python -m conda info --verbose
           && conda config --show-sources
           && conda list --show-channel-urls
-          && python -m pytest tests/test_api.py::test_DepsModifier_contract"
+          && python -m pip install -e . --no-deps
+          && python -m conda init --all
+          && . \$CONDA_PREFIX/etc/profile.d/conda.sh
+          && python -m pytest tests/test_plugin.py::test_enabled_sharded_repodata -v"
 
   # macos test suite
   macos:
@@ -494,11 +313,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.code == 'true'
 
-    runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-15-intel') || 'macos-latest' }}
-    defaults:
-      run:
-        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
-        shell: bash -el {0}  # bash exit immediately on error + login shell
+    # Use reusable test workflow from conda/conda repo
+    # Pinned to commit: 458c66187 (reusable-test-workflow branch) - includes test fix for conda-libmamba-solver plugin settings
+    # TODO: Update to a specific tag when conda releases a versioned tag
+    # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
     strategy:
       fail-fast: false
       matrix:
@@ -506,7 +325,7 @@ jobs:
         arch: [osx-64, osx-arm64]
         python-version: ['3.10', '3.13']
         default-channel: [defaults, conda-forge]
-        test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
+        test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - arch: osx-64
@@ -521,138 +340,47 @@ jobs:
             default-channel: conda-forge
           - arch: osx-arm64
             test-type: unit
-          - arch: osx-arm64  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
+          - arch: osx-arm64
+            test-type: conda-libmamba-solver
           - test-type: unit
             test-group: 3
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
-          - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
-            test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
-    env:
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
-      PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
-
-    steps:
-      - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-          path: conda-libmamba-solver
-      # /CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Hash + Timestamp
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
-
-      - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
-
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@835234971496cad1653abb28a638a281cf32541f # v3.2.0
-        with:
-          # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
-          condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
-          run-post: false  # skip post cleanup
-          # conda not preinstalled in arm64 runners
-          miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
-          miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-64') && 'latest' || null }}
-          architecture: ${{ runner.arch }}
-
-      - name: Conda Install
-        working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
-        run: >
-          conda install
-          --yes
-          --file tests/requirements.txt
-          --file tests/requirements-ci.txt
-          --file tests/requirements-s3.txt
-          --file tests/requirements-truststore.txt
-          --file ../conda-libmamba-solver/dev/requirements.txt
-          ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
-          python=${{ matrix.python-version }}
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
-
-      - name: Find fix .xonshrc
-        run: find . -name fix_xonshrc.py
-
-      - name: Fix .xonshrc
-        working-directory: conda-libmamba-solver
-        run: python ./dev/scripts/fix_xonshrc.py
-      #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Conda Info
-        run: python -m conda info --verbose
-
-      - name: Conda Config
-        run: conda config --show-sources
-
-      - name: Conda List
-        run: conda list --show-channel-urls
-
-      - name: Setup Shells
-        # for tests/shell, so only necessary for integration tests
-        if: matrix.test-type == 'integration'
-        run: brew update && brew install fish xonsh
-
-      - name: Run Tests
-        working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-        if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
-        run: python -m pytest
-          --cov=conda
-          --durations-path=durations/${{ runner.os }}.json
-          --group=${{ matrix.test-group }}
-          --splits=${{ env.PYTEST_SPLITS }}
-          --reruns=${{ env.PYTEST_RERUN_FAILURES }}
-          -m "${{ env.PYTEST_MARKER }}"
-
-      # CONDA-LIBMAMBA-SOLVER CHANGE
-      - name: Run conda-libmamba-solver Tests
-        working-directory: conda-libmamba-solver
-        if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
-        run: |
-          python -m pip install -e ../conda/ --no-deps
-          python -m conda init --all
-          . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
-      #/ CONDA-LIBMAMBA-SOLVER CHANGE
-
-      - name: Upload Coverage
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
-        if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
-        with:
-          flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
-
-      - name: Upload Test Results
-        if: '!cancelled()'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: test-results-${{ env.HASH }}
-          # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
-          path: |
-            conda/.coverage
-            conda/durations/${{ runner.os }}.json
-            conda/test-report.xml
-          retention-days: 1  # temporary, combined in aggregate below
+          - test-type: conda-libmamba-solver
+            test-group: 2
+          - test-type: conda-libmamba-solver
+            test-group: 3
+    with:
+      runs_on: ${{ matrix.arch == 'osx-64' && 'macos-15-intel' || 'macos-latest' }}
+      runner_os: macOS
+      shell: bash -el {0}
+      checkout_conda: true
+      checkout_conda_path: conda
+      checkout_conda_ref: '25.9.1'  # Pin to stable conda version for reproducible builds
+      checkout_other: true
+      checkout_other_repo: conda/conda-libmamba-solver
+      checkout_other_path: conda-libmamba-solver
+      checkout_other_ref: ''  # Uses current branch/PR
+      test_type: ${{ matrix.test-type }}
+      test_group: ${{ matrix.test-group }}
+      python_version: ${{ matrix.python-version }}
+      default_channel: ${{ matrix.default-channel }}
+      conda_test_solvers: libmamba
+      pytest_reruns: '3'
+      pytest_cov_package: conda
+      pytest_additional_args: ''
+      requirements_os_specific: false
+      requirements_other_dev: dev/requirements.txt
+      requirements_other_tests: tests/requirements.txt
+      miniconda_version: ${{ matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64' && 'latest' || '' }}
+      miniforge_version: ${{ matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-64' && 'latest' || '' }}
+      architecture: ${{ matrix.arch == 'osx-64' && 'x86_64' || 'arm64' }}
+      test_results_base_path: conda
+    secrets:
+      CODECOV_TOKEN: ''
 
   # aggregate and upload
   aggregate:
     # only aggregate test suite if there are code changes
-    needs: [changes, windows, linux, linux-benchmarks, linux-qemu, macos]
+    needs: [changes, windows, linux, macos, linux-benchmarks]
     if: >-
       !cancelled()
       && needs.changes.outputs.code == 'true'
@@ -677,7 +405,7 @@ jobs:
 
   # required check
   analyze:
-    needs: [windows, linux, linux-qemu, linux-benchmarks, macos, aggregate]
+    needs: [windows, linux, macos, linux-benchmarks, aggregate]
     if: '!cancelled()'
 
     runs-on: ubuntu-latest
