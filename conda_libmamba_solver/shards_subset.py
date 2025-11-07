@@ -420,7 +420,6 @@ class RepodataSubset:
                 in_flight.update(need)
             if have:
                 shard_out_queue.put(have)
-                in_flight.difference_update(node_id for node_id, _ in have)
             return len(have) + len(need)
 
         running = True
@@ -431,8 +430,8 @@ class RepodataSubset:
             except queue.Empty:
                 pump_count = pump()
                 log.debug("Shard timeout %s, %d", timeouts, pump_count)
-                log.debug("pending: %s", sorted(node_id for node_id in pending))
-                log.debug("in_flight: %s", sorted(node_id for node_id in in_flight))
+                log.debug("pending: %s...", sorted(node_id for node_id in pending)[:10])
+                log.debug("in_flight: %s...", sorted(node_id for node_id in in_flight)[:10])
                 log.debug("nodes: %d", len(self.nodes))
                 if not pending and not in_flight:
                     log.debug("All done?")
@@ -440,7 +439,7 @@ class RepodataSubset:
                 continue
 
             if new_shards is None:
-                running = False
+                # running = False
                 continue  # or break
 
             for node_id, shard in new_shards:

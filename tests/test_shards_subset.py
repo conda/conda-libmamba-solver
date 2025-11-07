@@ -196,7 +196,7 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     Build repodata subset using a worker threads dependency traversal algorithm.
     """
     # installed, plus what we want to add (twine)
-    root_packages = ROOT_PACKAGES[:]
+    root_packages = ROOT_PACKAGES[:] + ["vaex"]
 
     channels = []
     # channels.extend(context.default_channels)
