@@ -441,7 +441,7 @@ class RepodataSubset:
                 continue
 
             if new_shards is None:
-                # running = False
+                running = False
                 continue  # or break
 
             for node_id, shard in new_shards:
@@ -647,7 +647,9 @@ def network_fetch_thread(
             try:
                 handle_result(future)
 
-                if not last_batch:
+                if (
+                    False and not last_batch
+                ):  # TODO this loses track of pending nodes, but something like it is important for performance.
                     # Immediately enqueue more shards. It would also be
                     # appropriate to keep (number of threads) futures in-flight,
                     # instead of len(in_queue).
@@ -675,7 +677,7 @@ def network_fetch_thread(
             new_futures = drain_futures(futures)
 
         # This "last chance" fetch can create new pending nodes. Examine end criteria.
-        drain_futures(new_futures, last_batch=True)
+        # drain_futures(new_futures, last_batch=True)
 
     shard_out_queue.put(None)
 
