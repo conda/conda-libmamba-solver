@@ -687,6 +687,8 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
                     )
                 ] = channel_url
 
+        # if all are None then don't do ShardLike...
+
         for future in concurrent.futures.as_completed(futures_non_sharded):
             channel_url = futures_non_sharded[future]
             repodata_json, _ = future.result()

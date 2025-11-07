@@ -147,4 +147,6 @@ class ShardCache:
         """
         Remove the sharded cache database.
         """
-        unlink_or_rename_to_trash(self.base / SHARD_CACHE_NAME)
+        # This function appears to support `Path()` except on Windows
+        # `os.rename(path, path + ".conda_trash")` fails:
+        unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))

@@ -355,8 +355,9 @@ class RepodataSubset:
         self, pending: set[NodeId], parent_node: Node, mentioned_packages: Iterable[str]
     ):
         """Broadcast mentioned packages across channels to pending."""
-        # NOTE we have visit for Nodes, and a separate visit for shardlike which
-        # includes packages in the output repodata.
+        # NOTE we have visit for Nodes which is used in the graph traversal
+        # algorithm, and a separate visit for ShardBase which means "include
+        # this package in the output repodata".
         for package in mentioned_packages:
             for shardlike in self.shardlikes:
                 if package in shardlike:
@@ -465,7 +466,7 @@ def exception_to_queue(func):
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     network_out_queue: Queue[list[NodeId] | None],
     cache: ShardCache,
 ):
@@ -473,7 +474,7 @@ def cache_fetch_thread(
     Fetch batches of shards from cache until in_queue sees None. Enqueue found
     shards to shard_out_queue, and not found shards to network_out_queue.
 
-    When we see None on in_queue, we send None to both out queues and exit.
+    When we see None on in_queue, send None to both out queues and exit.
     """
     cache = cache.copy()
 
@@ -502,8 +503,7 @@ def cache_fetch_thread(
 @exception_to_queue
 def network_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
-    # how to communicate errors?
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
     shardlikes: list[ShardBase],
 ):
@@ -512,6 +512,7 @@ def network_fetch_thread(
     While the in_queue has not received a sentinel None, empty everything from
     the queue. Fetch all of them over the network. Fetched shards go to
     shard_out_queue.
+    Unhandled exceptions also go to shard_out_queue, and exit this thread.
     """
     cache = cache.copy()
     dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
@@ -569,7 +570,7 @@ def network_fetch_thread(
             except requests.exceptions.RequestException as e:
                 log.error("Error fetching shard. %s", e)
             except Exception as e:
-                log.exception("Unhandled exception in network thread", exc_info=e)
+                log.exception("Unexpected error fetching shard", exc_info=e)
         return new_futures
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
