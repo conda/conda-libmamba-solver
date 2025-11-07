@@ -265,118 +265,6 @@ class RepodataSubset:
         sqlite3 and another threadpool to fetch http.
         """
 
-        # these are in self.nodes but we still need the shards
-        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
-
-        # Ignore cache on shards object, use our own. Necessary if there are no
-        # sharded channels.
-        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
-
-        cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
-        shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
-        cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
-
-        # this kind of thread can crash, and we don't hear back without our own
-        # handling.
-        cache_thread = threading.Thread(
-            target=cache_fetch_thread,
-            args=(cache_in_queue, shard_out_queue, cache_miss_queue, cache),
-            daemon=False,
-        )
-
-        # this kind of thread can crash, and we don't hear back without our own
-        # handling.
-        network_thread = threading.Thread(
-            target=network_fetch_thread,
-            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
-            daemon=False,
-        )
-
-        # or after populating initial URLs queue
-        cache_thread.start()
-        network_thread.start()
-
-        shardlikes_by_url = {s.url: s for s in self.shardlikes}
-        pending = set(self.nodes)  # to be sent to in_queue
-        submitted = set()  # sent to in_queue, not received from shard_out_queue
-        processed = set()  # received from shard_out_queue
-
-        def enqueue_pending():
-            log.debug(
-                "Enqueue %s pending %s",
-                len(pending),
-                sorted(node_id.package for node_id in pending),
-            )
-            shard_out_batch = []
-            shard_in_batch = []
-            # enqueue all pending nodes
-            for node_id in pending:
-                if node_id in submitted or node_id in processed:
-                    # skip already submitted or processed
-                    continue
-                # we could wind up sending duplicate node_id here?
-                shardlike = shardlikes_by_url[node_id.channel]
-                if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
-                    shard_out_batch.append((node_id, shardlike.visit_shard(node_id.package)))
-                else:
-                    shard_in_batch.append(node_id)
-                submitted.add(node_id)  # tracks everything not yet read from shard_out_batch
-            if shard_out_batch:
-                shard_out_queue.put(shard_out_batch)
-            if shard_in_batch:
-                cache_in_queue.put(shard_in_batch)
-            pending.clear()
-
-        enqueue_pending()  # initial batch
-
-        timeouts = 0
-
-        running = True
-        while running:
-            try:
-                new_shards = shard_out_queue.get(timeout=1)
-                if isinstance(new_shards, Exception):
-                    raise new_shards
-            except queue.Empty:
-                if all([x in self.nodes for x in submitted]):
-                    # print("Done but submitted not empty")
-                    running = False
-                timeouts += 1
-                # if timeouts > 10:
-                #    log.error("Timeout waiting for shard_out_queue")
-                #    raise TimeoutError("Timeout waiting for shard_out_queue")
-                continue
-            if new_shards is None:
-                running = False
-                new_shards = []
-            for node_id, shard in new_shards:
-                # add shard to appropriate ShardLike
-                submitted.remove(node_id)
-                processed.add(node_id)
-
-                parent_node = self.nodes[node_id]
-                shardlike = shardlikes_by_url[node_id.channel]
-                if node_id.package not in shardlike.visited:
-                    shardlike.visited[node_id.package] = shard
-                else:
-                    pass  # e.g. monolithic repodata is already visited
-
-                self.visit_node(pending, parent_node, shard)
-
-            enqueue_pending()
-            if not submitted and not pending:
-                break
-
-        cache_in_queue.put(None)
-        cache_thread.join()
-        network_thread.join()
-
-    def shortest_pipelined_2(self, root_packages):
-        """
-        Build repodata subset using a main thread, a thread to fetch from
-        sqlite3 and another threadpool to fetch http.
-        """
-
         self.nodes = {}
 
         # Ignore cache on shards object, use our own. Necessary if there are no
@@ -513,7 +401,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel | str],
-    algorithm: Literal["dijkstra", "bfs", "pipelined", "pipelined_2"] = "bfs",
+    algorithm: Literal["dijkstra", "bfs", "pipelined"] = "bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.

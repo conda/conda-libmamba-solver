@@ -106,7 +106,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
-@pytest.mark.parametrize("algorithm", ("dijkstra", "bfs", "pipelined", "pipelined_2"))
+@pytest.mark.parametrize("algorithm", ("dijkstra", "bfs", "pipelined"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
@@ -174,9 +174,6 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
         "dijkstra": build_repodata_subset(scenario["packages"], [channel], algorithm="dijkstra"),
         "bfs": build_repodata_subset(scenario["packages"], [channel], algorithm="bfs"),
         "pipelined": build_repodata_subset(scenario["packages"], [channel], algorithm="pipelined"),
-        "pipelined_2": build_repodata_subset(
-            scenario["packages"], [channel], algorithm="pipelined_2"
-        ),
     }
 
     for subdir in repodata_algorithm_map["dijkstra"].keys():
@@ -207,7 +204,7 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
 
     with _timer("RepodataSubset.shortest_pipelined()"):
         subset = RepodataSubset((*channel_data.values(),))
-        subset.shortest_pipelined_2(root_packages)
+        subset.shortest_pipelined(root_packages)
         print(f"{len(subset.nodes)} (channel, package) nodes discovered")
 
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
