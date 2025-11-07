@@ -88,7 +88,7 @@ from .shards import (
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable, Iterator, Sequence
     from queue import SimpleQueue as Queue
     from typing import Literal
 
@@ -100,6 +100,9 @@ if TYPE_CHECKING:
     from .shards import (
         ShardBase,
     )
+
+# Waiting for worker threads to shutdown cleanly, or raise error.
+THREAD_WAIT_TIMEOUT = 5  # seconds
 
 
 @dataclass(order=True)
@@ -272,17 +275,19 @@ class RepodataSubset:
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
         cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
-        shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+        shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]] | Exception] = SimpleQueue()
         cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
 
         cache_thread = threading.Thread(
             target=cache_fetch_thread,
             args=(cache_in_queue, shard_out_queue, cache_miss_queue, cache),
+            daemon=True,  # may have to set to False if we ever want to run in a subinterpreter
         )
 
         network_thread = threading.Thread(
             target=network_fetch_thread,
             args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+            daemon=True,
         )
 
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
@@ -312,6 +317,8 @@ class RepodataSubset:
                 pump()
                 try:
                     new_shards = shard_out_queue.get(timeout=1)
+                    if isinstance(new_shards, Exception):  # error propagated from worker thread
+                        raise new_shards
                 except queue.Empty:
                     pump_count = pump()
                     log.debug("Shard timeout %s, %d", timeouts, pump_count)
@@ -348,8 +355,9 @@ class RepodataSubset:
 
         finally:
             cache_in_queue.put(None)
-            cache_thread.join()
-            network_thread.join()
+            # These should finish almost immediately, but if not, raise an error:
+            cache_thread.join(THREAD_WAIT_TIMEOUT)
+            network_thread.join(THREAD_WAIT_TIMEOUT)
 
     def visit_node(
         self, pending: set[NodeId], parent_node: Node, mentioned_packages: Iterable[str]
@@ -466,8 +474,8 @@ def exception_to_queue(func):
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
-    network_out_queue: Queue[list[NodeId] | None],
+    shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception] | None],
+    network_out_queue: Queue[Sequence[NodeId] | None],
     cache: ShardCache,
 ):
     """
