@@ -54,6 +54,7 @@ for url in channel_data:
 from __future__ import annotations
 
 import concurrent.futures
+import functools
 import heapq
 import logging
 import queue
@@ -334,6 +335,8 @@ class RepodataSubset:
         while running:
             try:
                 new_shards = shard_out_queue.get(timeout=1)
+                if isinstance(new_shards, Exception):
+                    raise new_shards
             except queue.Empty:
                 if all([x in self.nodes for x in submitted]):
                     # print("Done but submitted not empty")
@@ -384,25 +387,15 @@ class RepodataSubset:
         shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
         cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
 
-        # this kind of thread can crash, and we don't hear back without our own
-        # handling.
         cache_thread = threading.Thread(
             target=cache_fetch_thread,
             args=(cache_in_queue, shard_out_queue, cache_miss_queue, cache),
-            daemon=False,
         )
 
-        # this kind of thread can crash, and we don't hear back without our own
-        # handling.
         network_thread = threading.Thread(
             target=network_fetch_thread,
             args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
-            daemon=False,
         )
-
-        # or after populating initial URLs queue
-        cache_thread.start()
-        network_thread.start()
 
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending: set[NodeId] = set()
@@ -416,54 +409,59 @@ class RepodataSubset:
         def pump():
             have, need = self.drain_pending(pending, shardlikes_by_url)
             if need:
-                cache_in_queue.put(need)
                 in_flight.update(need)
+                cache_in_queue.put(need)
             if have:
+                in_flight.update(node_id for node_id, _ in have)
                 shard_out_queue.put(have)
             return len(have) + len(need)
 
-        running = True
-        while running:
-            pump()
-            try:
-                new_shards = shard_out_queue.get(timeout=1)
-            except queue.Empty:
-                pump_count = pump()
-                log.debug("Shard timeout %s, %d", timeouts, pump_count)
-                log.debug("pending: %s...", sorted(node_id for node_id in pending)[:10])
-                log.debug("in_flight: %s...", sorted(node_id for node_id in in_flight)[:10])
-                log.debug("nodes: %d", len(self.nodes))
+        try:
+            cache_thread.start()
+            network_thread.start()
+            running = True
+            while running:
+                pump()
+                try:
+                    new_shards = shard_out_queue.get(timeout=1)
+                except queue.Empty:
+                    pump_count = pump()
+                    log.debug("Shard timeout %s, %d", timeouts, pump_count)
+                    log.debug("pending: %s...", sorted(node_id for node_id in pending)[:10])
+                    log.debug("in_flight: %s...", sorted(node_id for node_id in in_flight)[:10])
+                    log.debug("nodes: %d", len(self.nodes))
+                    if not pending and not in_flight:
+                        log.debug("All done?")
+                        break
+                    timeouts += 1
+                    if timeouts > 10:
+                        raise TimeoutError("Timeout waiting for shard_out_queue")
+                    continue
+
+                if new_shards is None:
+                    running = False
+                    continue  # or break
+
+                for node_id, shard in new_shards:
+                    in_flight.remove(node_id)
+
+                    # add shard to appropriate ShardLike
+                    parent_node = self.nodes[node_id]
+                    shardlike = shardlikes_by_url[node_id.channel]
+                    shardlike.visited[node_id.package] = (
+                        shard  # would rather use the visit_shard (add shard?) method.
+                    )
+
+                    self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
+
                 if not pending and not in_flight:
-                    log.debug("All done?")
-                    break
-                timeouts += 1
-                if timeouts > 10:
-                    raise TimeoutError("Timeout waiting for shard_out_queue")
-                continue
+                    log.debug("Send None to cache_in_queue here?")
+                    cache_in_queue.put(None)
 
-            if new_shards is None:
-                running = False
-                continue  # or break
-
-            for node_id, shard in new_shards:
-                in_flight.remove(node_id)
-
-                # add shard to appropriate ShardLike
-                parent_node = self.nodes[node_id]
-                shardlike = shardlikes_by_url[node_id.channel]
-                shardlike.visited[node_id.package] = (
-                    shard  # would rather use the visit_shard (add shard?) method.
-                )
-
-                self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
-
-            if not pending and not in_flight:
-                log.debug("Send None to cache_in_queue here?")
-                cache_in_queue.put(None)
-
-        cache_in_queue.put(None)
-        cache_thread.join()
-        network_thread.join()
+        finally:
+            cache_in_queue.put(None)
+            cache_thread.join()
+            network_thread.join()
 
     def visit_node(
         self, pending: set[NodeId], parent_node: Node, mentioned_packages: Iterable[str]
@@ -505,7 +503,7 @@ class RepodataSubset:
                 shards_have.append((node_id, shardlike.visit_shard(node_id.package)))
             else:
                 if self.nodes[node_id].visited:
-                    print("skip visited")
+                    print("skip visited")  # should not be reached
                     continue
                 shards_need.append(node_id)
         pending.clear()
@@ -560,6 +558,23 @@ def combine_batches_until_none(
         yield node_ids
 
 
+def exception_to_queue(func):
+    """
+    Decorator to send unhandled exceptions to the second argument out_queue.
+    """
+
+    @functools.wraps(func)
+    def wrapper(in_queue, out_queue, *args, **kwargs):
+        try:
+            return func(in_queue, out_queue, *args, **kwargs)
+        except Exception as e:
+            in_queue.put(None)  # signal termination
+            out_queue.put(e)
+
+    return wrapper
+
+
+@exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
@@ -596,6 +611,7 @@ def cache_fetch_thread(
     shard_out_queue.put(None)
 
 
+@exception_to_queue
 def network_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | None],
