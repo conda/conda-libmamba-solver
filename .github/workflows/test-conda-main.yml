@@ -60,7 +60,7 @@ jobs:
             1. Fix compatibility issues if this is a real regression
             2. Close this issue if it's a false positive or temporary issue
             `;
-            
+
             // Check if an open issue with this title already exists
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
@@ -68,9 +68,9 @@ jobs:
               state: 'open',
               labels: ['cron', 'conda-main-test']
             });
-            
+
             const existingIssue = issues.find(issue => issue.title === title);
-            
+
             if (!existingIssue) {
               await github.rest.issues.create({
                 owner: context.repo.owner,
@@ -82,4 +82,3 @@ jobs:
             } else {
               console.log('An open issue already exists for this failure');
             }
-
