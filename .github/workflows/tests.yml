@@ -118,6 +118,7 @@ jobs:
       pytest_reruns: '3'
       pytest_cov_package: conda
       pytest_additional_args: ''
+      requirements_os_specific: false
       requirements_other_dev: dev/requirements.txt
       requirements_other_tests: tests/requirements.txt
       test_results_base_path: conda
@@ -182,6 +183,7 @@ jobs:
       pytest_reruns: '3'
       pytest_cov_package: conda
       pytest_additional_args: ''
+      requirements_os_specific: false
       requirements_other_dev: dev/requirements.txt
       requirements_other_tests: tests/requirements.txt
       test_results_base_path: conda
@@ -299,7 +301,10 @@ jobs:
           && python -m conda info --verbose
           && conda config --show-sources
           && conda list --show-channel-urls
-          && python -m pytest tests/test_api.py::test_DepsModifier_contract"
+          && python -m pip install -e . --no-deps
+          && python -m conda init --all
+          && . \$CONDA_PREFIX/etc/profile.d/conda.sh
+          && python -m pytest tests/test_plugin.py::test_enabled_sharded_repodata -v"
 
   # macos test suite
   macos:
