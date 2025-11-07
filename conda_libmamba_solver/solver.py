@@ -1042,10 +1042,9 @@ class LibMambaSolver(Solver):
                                 current_conda_prefix_rec = PrefixRecord(**json.loads(f.read()))
                         elif package_name == "conda-self":
                             conda_self_installed = True
-                        else:
-                            if conda_self_installed and current_conda_prefix_rec is not None:
-                                # conda-self is installed and current conda has been found, no more information needed
-                                break
+                    if conda_self_installed and current_conda_prefix_rec is not None:
+                        # conda-self is installed and current conda has been found, no more information needed
+                        break
 
         if not current_conda_prefix_rec:
             # We are checking whether conda can be found in the environment conda is
