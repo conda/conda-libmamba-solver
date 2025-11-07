@@ -14,7 +14,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Use reusable test workflow from conda/conda repo
-        uses: conda/conda/.github/workflows/conda-test-suite.yml@195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f
+        uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
         with:
           runs_on: ubuntu-latest
           runner_os: Linux

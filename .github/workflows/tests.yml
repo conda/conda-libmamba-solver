@@ -78,10 +78,10 @@ jobs:
     if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Pinned to commit: 195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f (reusable-test-workflow branch) - includes CONDA_BUILD fix for Linux
+    # Pinned to commit: 458c66187 (reusable-test-workflow branch) - includes test fix for conda-libmamba-solver plugin settings
     # TODO: Update to a specific tag when conda releases a versioned tag
     # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
     strategy:
       fail-fast: false
       matrix:
@@ -132,10 +132,10 @@ jobs:
     if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Pinned to commit: 195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f (reusable-test-workflow branch) - includes CONDA_BUILD fix for Linux
+    # Pinned to commit: 458c66187 (reusable-test-workflow branch) - includes test fix for conda-libmamba-solver plugin settings
     # TODO: Update to a specific tag when conda releases a versioned tag
     # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
     strategy:
       fail-fast: false
       matrix:
@@ -314,10 +314,10 @@ jobs:
     if: needs.changes.outputs.code == 'true'
 
     # Use reusable test workflow from conda/conda repo
-    # Pinned to commit: 195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f (reusable-test-workflow branch) - includes CONDA_BUILD fix for Linux
+    # Pinned to commit: 458c66187 (reusable-test-workflow branch) - includes test fix for conda-libmamba-solver plugin settings
     # TODO: Update to a specific tag when conda releases a versioned tag
     # e.g., @v24.1.0 to pin to a specific conda version for reproducible tests
-    uses: conda/conda/.github/workflows/conda-test-suite.yml@195f731e1b9c1d44fb4bf7ad4d371cc9a1f4b13f
+    uses: conda/conda/.github/workflows/conda-test-suite.yml@458c66187
     strategy:
       fail-fast: false
       matrix:
