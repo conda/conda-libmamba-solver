@@ -273,6 +273,7 @@ jobs:
             platform: ppc64le
           - image: 'condaforge/miniforge3:latest'
             platform: s390x
+          - platform: s390x
 
     steps:
       - name: Checkout Source
