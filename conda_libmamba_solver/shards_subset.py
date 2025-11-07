@@ -436,6 +436,8 @@ class RepodataSubset:
                 if not pending and not in_flight:
                     log.debug("All done?")
                 timeouts += 1
+                if timeouts > 10:
+                    raise TimeoutError("Timeout waiting for shard_out_queue")
                 continue
 
             if new_shards is None:
