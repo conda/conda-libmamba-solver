@@ -393,7 +393,6 @@ class Shards(ShardBase):
         Return a shard that is already in memory and mark as visited.
         """
         shard = self.visited[package]
-        assert shard is not None
         return shard
 
     def fetch_shard(self, package: str) -> ShardDict:
