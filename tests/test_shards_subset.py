@@ -114,7 +114,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
-@pytest.mark.parametrize("algorithm", ("dijkstra", "bfs", "pipelined"))
+@pytest.mark.parametrize("algorithm", ("bfs", "pipelined", "httpx"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,

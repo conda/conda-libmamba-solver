@@ -262,12 +262,16 @@ class RepodataSubset:
                     if not next_node.visited:
                         node_queue.append(next_node)
 
-    def shortest_pipelined(self, root_packages):
+    def shortest_httpx(self, root_packages):
+        from .shards_subset_http2 import network_fetch_thread_httpx
+
+        return self.shortest_pipelined(root_packages, network_fetch_thread_httpx)
+
+    def shortest_pipelined(self, root_packages, network_worker=None):
         """
         Build repodata subset using a main thread, a thread to fetch from
         sqlite3 and another threadpool to fetch http.
         """
-        from .shards_subset_http2 import network_fetch_thread_httpx
 
         self.nodes = {}
 
@@ -285,8 +289,11 @@ class RepodataSubset:
             daemon=True,  # may have to set to False if we ever want to run in a subinterpreter
         )
 
+        if network_worker is None:
+            network_worker = network_fetch_thread
+
         network_thread = threading.Thread(
-            target=network_fetch_thread_httpx,
+            target=network_worker,
             args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
             daemon=True,
         )
