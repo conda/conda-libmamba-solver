@@ -74,6 +74,13 @@ TESTING_SCENARIOS = [
         "channel": "conda-forge-sharded",
         "platform": "linux-64",
     },
+    {
+        "name": "vaex",
+        "packages": ["vaex"],
+        "prefetch_packages": ["python", "numpy", "pandas"],
+        "channel": "conda-forge-sharded",
+        "platform": "linux-64",
+    },
 ]
 
 
@@ -112,8 +119,14 @@ def clean_cache(conda_cli: CondaCLIFixture):
     TESTING_SCENARIOS,
     ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
+@pytest.mark.parametrize("defaults", ["main", "no-main"])
 def test_traversal_algorithm_benchmarks(
-    conda_cli: CondaCLIFixture, benchmark, cache_state: str, algorithm: str, scenario: dict
+    conda_cli: CondaCLIFixture,
+    benchmark,
+    cache_state: str,
+    algorithm: str,
+    scenario: dict,
+    defaults: str,
 ):
     """
     Benchmark multiple traversal algorithms for retrieving repodata shards with
@@ -127,6 +140,9 @@ def test_traversal_algorithm_benchmarks(
 
     lukewarm:
         only some of the shards are in the SQLite cache database
+
+    defaults:
+        whether to include the "main" channel
     """
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
     if cache_state == "warm":
@@ -139,10 +155,12 @@ def test_traversal_algorithm_benchmarks(
             # each round of benchmarking
             cache.remove_cache()
 
-        channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
-        channel_data = fetch_channels([channel])
+        channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
+        if defaults:
+            channels.append(Channel("main"))
+        channel_data = fetch_channels(channels)
 
-        assert len(channel_data) == 2
+        assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
         subset = RepodataSubset((*channel_data.values(),))
 

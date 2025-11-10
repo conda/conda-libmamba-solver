@@ -509,7 +509,7 @@ def cache_fetch_thread(
 
 
 @exception_to_queue
-def network_fetch_thread(
+def network_fetch_thread_0(
     in_queue: Queue[list[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
@@ -560,21 +560,6 @@ def network_fetch_thread(
         for future in concurrent.futures.as_completed(futures):
             try:
                 handle_result(future)
-
-                if (
-                    False and not last_batch
-                ):  # TODO this loses track of pending nodes, but something like it is important for performance.
-                    # Immediately enqueue more shards. It would also be
-                    # appropriate to keep (number of threads) futures in-flight,
-                    # instead of len(in_queue).
-                    with suppress(queue.Empty):
-                        extra_node_ids = in_queue.get_nowait()
-                        if extra_node_ids is None:
-                            in_queue.put(None)  # relay to top of loop
-                        else:
-                            for node_id in extra_node_ids:
-                                new_futures.append(submit(node_id))
-
             except requests.exceptions.RequestException as e:
                 log.error("Error fetching shard. %s", e)
             except Exception as e:
@@ -590,8 +575,87 @@ def network_fetch_thread(
             futures = new_futures  # futures is copied into as_completed()
             new_futures = drain_futures(futures)
 
-        # This "last chance" fetch can create new pending nodes. Examine end criteria.
-        # drain_futures(new_futures, last_batch=True)
+    shard_out_queue.put(None)
+
+
+@exception_to_queue
+def network_fetch_thread(
+    in_queue: Queue[list[NodeId] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    cache: ShardCache,
+    shardlikes: list[ShardBase],
+):
+    """
+    in_queue contains urls to fetch over the network.
+    While the in_queue has not received a sentinel None, empty everything from
+    the queue. Fetch all of them over the network. Fetched shards go to
+    shard_out_queue.
+    Unhandled exceptions also go to shard_out_queue, and exit this thread.
+    """
+    cache = cache.copy()
+    dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
+    shardlikes_by_url = {s.url: s for s in shardlikes}
+
+    def fetch(s, url: str, node_id: NodeId):
+        response = s.get(url)
+        response.raise_for_status()
+        data = response.content
+        return (url, node_id, data)
+
+    def submit(node_id):
+        # this worker should only recieve network node_id's:
+        shardlike = shardlikes_by_url[node_id.channel]
+        if not isinstance(shardlike, Shards):
+            raise TypeError("network_fetch_thread got non-network shardlike")
+        session = shardlike.session
+        url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
+        return executor.submit(fetch, session, url, node_id)
+
+    def handle_result(future):
+        url, node_id, data = future.result()
+        log.debug("Fetch thread got %s (%s bytes)", url, len(data))
+        # Decompress and parse. If it decodes as
+        # msgpack.zst, insert into cache. Then put "known
+        # good" shard into out queue.
+        shard: ShardDict = msgpack.loads(
+            dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
+        )  # type: ignore[assign]
+        cache.insert(AnnotatedRawShard(url, node_id.package, data))
+        shard_out_queue.put([(node_id, shard)])
+
+    next_batch_iter = iter(combine_batches_until_none(in_queue))
+
+    # TODO limit number of submitted http requests to 10. wait() will iterate
+    # over waitables each time it's called, and, if there is an error, it is
+    # easier to "cancel" futures that have never been created.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections() + 1) as executor:
+        next_batch = executor.submit(next_batch_iter.__next__)
+        waitables: set[concurrent.futures.Future] = set((next_batch,))
+        while waitables:
+            done_notdone = concurrent.futures.wait(
+                waitables, return_when=concurrent.futures.FIRST_COMPLETED
+            )
+            for future in done_notdone.done:
+                if future is next_batch:
+                    waitables.remove(next_batch)
+                    try:
+                        node_ids = future.result()
+                        for node_id in node_ids:
+                            waitables.add(submit(node_id))
+                        next_batch = executor.submit(next_batch_iter.__next__)
+                        waitables.add(next_batch)
+                    except StopIteration:
+                        pass  # no more batches
+                else:
+                    try:
+                        waitables.remove(future)
+                        handle_result(future)
+                    except requests.exceptions.RequestException as e:
+                        log.error("Error fetching shard. %s", e)
+                    except Exception as e:
+                        log.exception("Unexpected error fetching shard", exc_info=e)
+
+            waitables.update(done_notdone.not_done)
 
     shard_out_queue.put(None)
 
