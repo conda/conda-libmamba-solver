@@ -267,6 +267,7 @@ class RepodataSubset:
         Build repodata subset using a main thread, a thread to fetch from
         sqlite3 and another threadpool to fetch http.
         """
+        from .shards_subset_http2 import network_fetch_thread_httpx
 
         self.nodes = {}
 
@@ -285,7 +286,7 @@ class RepodataSubset:
         )
 
         network_thread = threading.Thread(
-            target=network_fetch_thread,
+            target=network_fetch_thread_httpx,
             args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
             daemon=True,
         )
@@ -540,7 +541,7 @@ def network_fetch_thread_0(
             log.warning("network_fetch_thread got non-network shardlike")
             return
         session = shardlike.session
-        url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
+        url = shardlike.shard_url(node_id.package)
         return executor.submit(fetch, session, url, node_id)
 
     def handle_result(future):

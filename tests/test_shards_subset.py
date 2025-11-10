@@ -15,7 +15,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.testing.fixtures import CondaCLIFixture
 
-from conda_libmamba_solver import shards_cache, shards_subset
+from conda_libmamba_solver import shards_cache, shards_subset, shards_subset_http2
 from conda_libmamba_solver.shards import fetch_channels, fetch_shards_index
 from conda_libmamba_solver.shards_subset import (
     NodeId,
@@ -313,6 +313,47 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
             print(url, len(shard), "bytes")
 
     network_thread.join(5)
+
+
+def test_shards_network_thread_httpx(http_server_shards, shard_cache_with_data):
+    """
+    Test network retrieval thread, meant to be chained after the sqlite3 thread
+    by having network_in_queue = sqlite3 thread's network_out_queue.
+    """
+    cache, fake_shards = shard_cache_with_data
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+    found = fetch_shards_index(subdir_data)
+    assert found
+
+    network_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+    shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+
+    # this kind of thread can crash, and we don't hear back without our own
+    # handling.
+    network_thread = threading.Thread(
+        target=shards_subset_http2.network_fetch_thread_httpx,
+        args=(network_in_queue, shard_out_queue, cache, [found]),
+        daemon=False,
+    )
+
+    node_ids = [NodeId(package, found.url) for package in found.package_names]
+
+    # several batches, then None "finish thread" sentinel
+    network_in_queue.put([node_ids[0]])
+    network_in_queue.put(node_ids[1:])
+    network_in_queue.put(None)
+
+    network_thread.start()
+
+    while batch := shard_out_queue.get(timeout=1):
+        for url, shard in batch:
+            print(url, len(shard), "bytes")
+
+    network_thread.join(5)
+
+
+# endregion
 
 
 # endregion
