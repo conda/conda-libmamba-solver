@@ -157,3 +157,6 @@ rever/
 
 # setuptools_scm
 _version.py
+
+# codspeed
+.codspeed/
