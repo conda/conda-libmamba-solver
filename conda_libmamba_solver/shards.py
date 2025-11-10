@@ -22,7 +22,7 @@ import msgpack
 import zstandard
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import CondaSession, get_session
+from conda.gateways.connection.session import get_session
 from conda.gateways.repodata import (
     _add_http_value_to_dict,
     conda_http_errors,

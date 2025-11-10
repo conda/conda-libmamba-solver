@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, NamedTuple
 import conda.gateways.repodata
 import msgpack
 import pytest
-import requests.adapters
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
