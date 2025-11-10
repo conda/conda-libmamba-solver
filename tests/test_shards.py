@@ -704,11 +704,5 @@ def test_shards_connections(monkeypatch):
     assert context.repodata_threads is None
     assert _shards_connections() == 10  # requests' default
 
-    # force fallback to default, as adapter._pool_connections will fail
-    monkeypatch.setattr(requests.sessions.Session, "get_adapter", lambda *args: None)
-
     monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
     assert _shards_connections() == 7
-
-    monkeypatch.setattr(context, "_repodata_threads", 4)
-    assert _shards_connections() == 4

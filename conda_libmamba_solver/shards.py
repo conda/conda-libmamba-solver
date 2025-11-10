@@ -57,7 +57,7 @@ def _shards_connections() -> int:
     """
     If context.repodata_threads is not set, find the size of the connection pool
     in a typical https:// session. This should significantly reduce dropped
-    connections. This will usually be requests' default 10.
+    connections. We match requests' default 10.
 
     Is this shared between all sessions? Or do we get a different pool for a
     different get_session(url)?
@@ -68,14 +68,6 @@ def _shards_connections() -> int:
     """
     if context.repodata_threads is not None:
         return context.repodata_threads
-    # CondaSession() is expensive to create, we just want to find the default
-    # requests poolmanager size.
-    session = CondaSession.__base__() if CondaSession.__base__ else CondaSession()
-    adapter = session.get_adapter("https://")
-    try:
-        return int(getattr(adapter, "_pool_connections"))
-    except (KeyError, ValueError, AttributeError, TypeError):
-        pass
     return SHARDS_CONNECTIONS_DEFAULT
 
 
