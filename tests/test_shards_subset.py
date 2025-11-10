@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from conda_libmamba_solver.shards_typing import ShardDict
 
 
+# avoid underscores in names to parse them easily
 TESTING_SCENARIOS = [
     {
         "name": "python",
@@ -40,35 +41,35 @@ TESTING_SCENARIOS = [
         "platform": "linux-64",
     },
     {
-        "name": "data-science-basic",
+        "name": "data_science_basic",
         "packages": ["numpy", "pandas", "matplotlib"],
         "prefetch_packages": ["python"],
         "channel": "conda-forge-sharded",
         "platform": "linux-64",
     },
     {
-        "name": "data-science-ml",
+        "name": "data_science_ml",
         "packages": ["scikit-learn", "matplotlib"],
         "prefetch_packages": ["python", "numpy"],
         "channel": "conda-forge-sharded",
         "platform": "linux-64",
     },
     {
-        "name": "web-development",
+        "name": "web_development",
         "packages": ["django", "celery"],
         "prefetch_packages": ["python", "requests"],
         "channel": "conda-forge-sharded",
         "platform": "linux-64",
     },
     {
-        "name": "scientific-computing",
+        "name": "scientific_computing",
         "packages": ["scipy", "sympy", "pytorch"],
         "prefetch_packages": ["python", "numpy", "pandas"],
         "channel": "conda-forge-sharded",
         "platform": "linux-64",
     },
     {
-        "name": "devops-automation",
+        "name": "devops_automation",
         "packages": ["ansible", "pyyaml", "jinja2"],
         "prefetch_packages": ["python"],
         "channel": "conda-forge-sharded",
@@ -119,7 +120,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
     TESTING_SCENARIOS,
     ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
-@pytest.mark.parametrize("defaults", ["main", "no-main"])
+@pytest.mark.parametrize("defaults", ["main", "nomain"])
 def test_traversal_algorithm_benchmarks(
     conda_cli: CondaCLIFixture,
     benchmark,
@@ -156,7 +157,7 @@ def test_traversal_algorithm_benchmarks(
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
-        if defaults:
+        if defaults == "main":
             channels.append(Channel("main"))
         channel_data = fetch_channels(channels)
 
@@ -174,7 +175,7 @@ def test_traversal_algorithm_benchmarks(
         with _timer(""):
             getattr(subset, f"shortest_{algorithm}")(scenario["packages"])
 
-    benchmark.pedantic(target, setup=setup, rounds=3)
+    benchmark.pedantic(target, setup=setup, rounds=2)
 
 
 @pytest.mark.parametrize(
