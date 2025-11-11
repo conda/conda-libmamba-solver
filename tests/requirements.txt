@@ -6,3 +6,4 @@ conda-forge::pre-commit
 conda-forge::pytest-codspeed
 # needed for many conda tests
 flask
+httpx
