@@ -11,13 +11,10 @@ The algorithm developed here is a direct result of the following CEP:
 
 - https://conda.org/learn/ceps/cep-0016 (Sharded Repodata)
 
-In this algorithm we treat a package name as a node, and all its dependencies
-across all channels as edges. We then traverse all edges to discover all
-reachable package names. The solver should be able to find a solution with only
-this subset.
-
-We could treat a (name, channel) tuple as a node, but it's more to keep track
-of.
+In this algorithm we treat a (channel, package name) as a node, its dependencies
+as edges. We then traverse all edges to discover all reachable (channel, package
+name) tuples. The solver should be able to find a solution with only this
+subset.
 
 This subset is overgenerous since the user is unlikely to want to install very
 old packages and their dependencies. If this is too slow, we could deploy
@@ -30,24 +27,24 @@ per-package shards, computing a subset of both. This is because it is possible
 for the monolithic repodata to mention packages that exist in the true sharded
 repodata but would not be found by only traversing the shards.
 
+We treat all repodata as sharded, even if no actual sharded repodata has been
+found.
+
 ## Example usage
 
-The following constructs several repodata (`noarch` and `linux-64`) from a single
-channel name and a list of root packages:
+The following constructs several repodata (`noarch` and `linux-64`) from a
+single channel name and a list of root packages:
 
-```
-from conda.models.channel import Channel
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+``` from conda.models.channel import Channel from
+conda_libmamba_solver.shards_subset import build_repodata_subset
 
-channel = Channel("conda-forge-sharded/linux-64")
-channel_data = build_repodata_subset(["python", "pandas"], [channel.url()])
-repodata = {}
+channel = Channel("conda-forge-sharded/linux-64") channel_data =
+build_repodata_subset(["python", "pandas"], [channel.url()]) repodata = {}
 
 for url in channel_data:
     repodata[url] = channel_data.build_repodata()
 
-# ... this is what's fed to the solver
-```
+# ... this is what's fed to the solver ```
 
 """
 
@@ -65,7 +62,7 @@ from .shards import (
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
-    shard_mentioned_packages_2,
+    shard_mentioned_packages,
 )
 
 log = logging.getLogger(__name__)
@@ -73,6 +70,8 @@ log = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
     from typing import Literal
+
+    from conda.models.channel import Channel
 
     from .shards import (
         ShardBase,
@@ -139,7 +138,7 @@ class RepodataSubset:
                 node.package
             )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
 
-            for package in shard_mentioned_packages_2(shard):
+            for package in shard_mentioned_packages(shard):
                 node_id = NodeId(package, shardlike.url)
 
                 if node_id not in self.nodes:
@@ -237,8 +236,8 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: Iterable[str],
-    algorithm: Literal["shortest_dijkstra", "shortest_bfs"] = "shortest_bfs",
+    channels: Iterable[Channel],
+    algorithm: Literal["dijkstra", "bfs"] = "bfs",
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
@@ -253,7 +252,7 @@ def build_repodata_subset(
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
-    getattr(subset, algorithm)(root_packages)
+    getattr(subset, f"shortest_{algorithm}")(root_packages)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
