@@ -11,13 +11,10 @@ The algorithm developed here is a direct result of the following CEP:
 
 - https://conda.org/learn/ceps/cep-0016 (Sharded Repodata)
 
-In this algorithm we treat a package name as a node, and all its dependencies
-across all channels as edges. We then traverse all edges to discover all
-reachable package names. The solver should be able to find a solution with only
-this subset.
-
-We could treat a (name, channel) tuple as a node, but it's more to keep track
-of.
+In this algorithm we treat a (channel, package name) as a node, its dependencies
+as edges. We then traverse all edges to discover all reachable (channel, package
+name) tuples. The solver should be able to find a solution with only this
+subset.
 
 This subset is overgenerous since the user is unlikely to want to install very
 old packages and their dependencies. If this is too slow, we could deploy
@@ -30,24 +27,24 @@ per-package shards, computing a subset of both. This is because it is possible
 for the monolithic repodata to mention packages that exist in the true sharded
 repodata but would not be found by only traversing the shards.
 
+We treat all repodata as sharded, even if no actual sharded repodata has been
+found.
+
 ## Example usage
 
-The following constructs several repodata (`noarch` and `linux-64`) from a single
-channel name and a list of root packages:
+The following constructs several repodata (`noarch` and `linux-64`) from a
+single channel name and a list of root packages:
 
-```
-from conda.models.channel import Channel
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+``` from conda.models.channel import Channel from
+conda_libmamba_solver.shards_subset import build_repodata_subset
 
-channel = Channel("conda-forge-sharded/linux-64")
-channel_data = build_repodata_subset(["python", "pandas"], [channel.url()])
-repodata = {}
+channel = Channel("conda-forge-sharded/linux-64") channel_data =
+build_repodata_subset(["python", "pandas"], [channel.url()]) repodata = {}
 
 for url in channel_data:
     repodata[url] = channel_data.build_repodata()
 
-# ... this is what's fed to the solver
-```
+# ... this is what's fed to the solver ```
 
 """
 
@@ -419,7 +416,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel | str],
-    algorithm: Literal["dijkstra", "bfs", "pipelined", "httpx"] = RepodataSubset.DEFAULT_STRATEGY,
+    algorithm: Literal["dijkstra", "bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
