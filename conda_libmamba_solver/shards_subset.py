@@ -143,12 +143,21 @@ def _nodes_from_packages(
 
 @dataclass
 class RepodataSubset:
+    DEFAULT_STRATEGY = "bfs"
+
     nodes: dict[NodeId, Node]
     shardlikes: Iterable[ShardBase]
 
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
         self.shardlikes = shardlikes
+
+    @classmethod
+    def has_strategy(cls, strategy: str) -> bool:
+        """
+        Return True if this class provides the named reachability strategy.
+        """
+        return hasattr(cls, f"shortest_{strategy}")
 
     def neighbors(self, node: Node) -> Iterator[Node]:
         """
@@ -410,7 +419,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel | str],
-    algorithm: Literal["dijkstra", "bfs", "pipelined"] = "bfs",
+    algorithm: Literal["dijkstra", "bfs", "pipelined", "httpx"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
