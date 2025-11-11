@@ -1,4 +1,5 @@
-# Copyright (C) 2012 Anaconda, Inc
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 """
 Local test server based on http.server
@@ -33,9 +34,7 @@ def run_test_server(directory: str) -> http.server.ThreadingHTTPServer:
             self.RequestHandlerClass(request, client_address, self, directory=directory)
 
     def start_server(queue):
-        with DualStackServer(
-            ("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler
-        ) as httpd:
+        with DualStackServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as httpd:
             host, port = httpd.socket.getsockname()[:2]
             queue.put(httpd)
             url_host = f"[{host}]" if ":" in host else host
