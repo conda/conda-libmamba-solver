@@ -43,10 +43,11 @@ from conda_libmamba_solver.shards_subset import (
     build_repodata_subset,
     fetch_channels,
 )
-from tests.channel_testing.helpers import _dummy_http_server
+from tests import http_test_server
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    import http.server
+    from collections.abc import Iterable, Iterator
 
     from conda_libmamba_solver.shards_typing import ShardDict, ShardsIndexDict
 
@@ -125,8 +126,8 @@ FAKE_SHARD: ShardDict = {
 }
 
 
-@pytest.fixture
-def http_server_shards(xprocess, tmp_path_factory):
+@pytest.fixture(scope="session")
+def http_server_shards(xprocess, tmp_path_factory) -> Iterable[http.server.ThreadingHTTPServer]:
     """
     A shard repository with a difference.
     """
@@ -162,9 +163,17 @@ def http_server_shards(xprocess, tmp_path_factory):
     (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
         zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
     )
-    yield from _dummy_http_server(
-        xprocess, name="http_server_auth_none", port=0, auth="none", path=shards_repository
-    )
+
+    http = http_test_server.run_test_server(str(shards_repository))
+
+    host, port = http.socket.getsockname()[:2]
+    url_host = f"[{host}]" if ":" in host else host
+    url = f"http://{url_host}:{port}/"
+
+    yield url
+    # shutdown is checked at a polling interval, or the daemon thread will shut
+    # down when the test suite exits.
+    http.shutdown()
 
 
 def test_fetch_shards_error(http_server_shards):

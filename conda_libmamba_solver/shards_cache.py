@@ -149,4 +149,5 @@ class ShardCache:
         """
         # This function appears to support `Path()` except on Windows
         # `os.rename(path, path + ".conda_trash")` fails:
+        self.conn.close()
         unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
