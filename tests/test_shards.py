@@ -125,6 +125,30 @@ FAKE_SHARD: ShardDict = {
     },
 }
 
+# This package depends on the
+FAKE_SHARD_2: ShardDict = {
+    "packages": {
+        "bar": {
+            "name": "bar",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["foo"],
+        }
+    },
+    "packages.conda": {
+        "bar": {
+            "name": "bar",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["foo"],
+            "constrains": ["splat<3"],
+            "sha256": hashlib.sha256().digest(),
+        }
+    },
+}
+
 
 @pytest.fixture(scope="session")
 def http_server_shards(xprocess, tmp_path_factory) -> Iterable[http.server.ThreadingHTTPServer]:
@@ -138,6 +162,10 @@ def http_server_shards(xprocess, tmp_path_factory) -> Iterable[http.server.Threa
     foo_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
     foo_shard_digest = hashlib.sha256(foo_shard).digest()
     (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
+
+    bar_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
+    bar_shard_digest = hashlib.sha256(bar_shard).digest()
+    (noarch / f"{bar_shard_digest.hex()}.msgpack.zst").write_bytes(bar_shard)
 
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
@@ -153,6 +181,7 @@ def http_server_shards(xprocess, tmp_path_factory) -> Iterable[http.server.Threa
         "version": 1,
         "shards": {
             "foo": foo_shard_digest,
+            "bar": bar_shard_digest,
             "wrong_package_name": foo_shard_digest,
             "fake_package": b"",
             "malformed": hashlib.sha256(bad_schema).digest(),

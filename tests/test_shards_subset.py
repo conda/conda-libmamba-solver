@@ -4,8 +4,9 @@
 import concurrent.futures
 import threading
 import urllib.parse
+from contextlib import suppress
 from pathlib import Path
-from queue import SimpleQueue
+from queue import Empty, SimpleQueue
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -26,6 +27,8 @@ from conda_libmamba_solver.shards_subset import (
     build_repodata_subset,
 )
 from tests.test_shards import (
+    FAKE_SHARD,
+    FAKE_SHARD_2,
     ROOT_PACKAGES,
     _timer,
 )
@@ -304,16 +307,23 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
 
     node_ids = [NodeId(package, found.url) for package in found.package_names]
 
-    # several batches, then None "finish thread" sentinel
-    network_in_queue.put([node_ids[0]])
-    network_in_queue.put(node_ids[1:])
+    # Only fetch "foo" and "bar" because these are valid shards
+    for node_id in node_ids:
+        if node_id.package in ("foo", "bar"):
+            network_in_queue.put([node_id])
+
+    # Terminate with sentinel
     network_in_queue.put(None)
 
     network_thread.start()
 
-    while batch := shard_out_queue.get(timeout=1):
-        for url, shard in batch:
-            print(url, len(shard), "bytes")
+    with suppress(Empty):
+        while batch := shard_out_queue.get(timeout=1):
+            for url, shard in batch:
+                assert isinstance(shard, dict)
+
+                # Make sure this is either one of the two packages from above ("foo" or "bar")
+                assert set(shard.get("packages", {}).keys()).intersection(("foo", "bar"))
 
     network_thread.join(5)
 
@@ -324,7 +334,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
 def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, mocker, tmp_path):
     """
-    Test that errors during shard fetching are properly propagated.
+    Ensure errors encountered during shard fetching are properly propagated.
 
     This test uses http_server_shards to fetch the initial shards index,
     then mocks the actual shard fetching to simulate network errors.
@@ -374,7 +384,7 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
 def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, tmp_path, mocker):
     """
-    Test that packages that cannot be found result in empty repodata.
+    Ensure packages that cannot be found result in empty repodata.
 
     This test uses http_server_shards to fetch the initial shards index,
     and then tests the code to make sure an empty repodata is produced at the end.
@@ -391,3 +401,21 @@ def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, 
 
     for shardlike in channel_data.values():
         assert not shardlike.build_repodata().get("packages")
+
+
+@pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
+def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocker, tmp_path):
+    """
+    Ensure we can fetch and build a valid repodata subset from our mock local server.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+    expected_repodata = {**FAKE_SHARD["packages"], **FAKE_SHARD_2["packages"]}
+
+    # Override cache dir location for tests; ensures it's empty
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+
+    for shardlike in channel_data.values():
+        assert shardlike.build_repodata().get("packages") == expected_repodata
