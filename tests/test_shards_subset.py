@@ -418,4 +418,7 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
     channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
 
     for shardlike in channel_data.values():
+        # expanded in fetch_channels() "channel.urls(True, context.subdirs)"
+        if "/noarch/" not in shardlike.url:
+            continue
         assert shardlike.build_repodata().get("packages") == expected_repodata
