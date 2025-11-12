@@ -66,7 +66,6 @@ from typing import TYPE_CHECKING
 
 import conda.gateways.repodata
 import msgpack
-import requests.exceptions
 import zstandard
 
 from conda_libmamba_solver import shards_cache
@@ -332,7 +331,7 @@ class RepodataSubset:
                     log.debug("in_flight: %s...", sorted(node_id for node_id in in_flight)[:10])
                     log.debug("nodes: %d", len(self.nodes))
                     if not pending and not in_flight:
-                        log.debug("All done?")
+                        log.debug("All shards have finished processing ")
                         break
                     timeouts += 1
                     if timeouts > 10:
@@ -406,11 +405,11 @@ class RepodataSubset:
                 shards_have.append((node_id, shardlike.visit_shard(node_id.package)))
             else:
                 if self.nodes[node_id].visited:
-                    print("skip visited")  # should not be reached
+                    log.debug("Skip visited, should not be reached")
                     continue
                 shards_need.append(node_id)
         pending.clear()
-        return (shards_have, shards_need)
+        return shards_have, shards_need
 
 
 def build_repodata_subset(
@@ -515,76 +514,6 @@ def cache_fetch_thread(
 
 
 @exception_to_queue
-def network_fetch_thread_0(
-    in_queue: Queue[list[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
-    cache: ShardCache,
-    shardlikes: list[ShardBase],
-):
-    """
-    in_queue contains urls to fetch over the network.
-    While the in_queue has not received a sentinel None, empty everything from
-    the queue. Fetch all of them over the network. Fetched shards go to
-    shard_out_queue.
-    Unhandled exceptions also go to shard_out_queue, and exit this thread.
-    """
-    cache = cache.copy()
-    dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
-
-    shardlikes_by_url = {s.url: s for s in shardlikes}
-
-    def fetch(s, url: str, node_id: NodeId):
-        response = s.get(url)
-        response.raise_for_status()
-        data = response.content
-        return (url, node_id, data)
-
-    def submit(node_id):
-        # this worker should only recieve network node_id's:
-        shardlike = shardlikes_by_url[node_id.channel]
-        if not isinstance(shardlike, Shards):
-            log.warning("network_fetch_thread got non-network shardlike")
-            return
-        session = shardlike.session
-        url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
-        return executor.submit(fetch, session, url, node_id)
-
-    def handle_result(future):
-        url, node_id, data = future.result()
-        log.debug("Fetch thread got %s (%s bytes)", url, len(data))
-        # Decompress and parse. If it decodes as
-        # msgpack.zst, insert into cache. Then put "known
-        # good" shard into out queue.
-        shard: ShardDict = msgpack.loads(
-            dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
-        )  # type: ignore[assign]
-        cache.insert(AnnotatedRawShard(url, node_id.package, data))
-        shard_out_queue.put([(node_id, shard)])
-
-    def drain_futures(futures, last_batch=False):
-        new_futures = []
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                handle_result(future)
-            except requests.exceptions.RequestException as e:
-                log.error("Error fetching shard. %s", e)
-            except Exception as e:
-                log.exception("Unexpected error fetching shard", exc_info=e)
-        return new_futures
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
-        new_futures = []
-        for node_ids in combine_batches_until_none(in_queue):
-            for node_id in node_ids:
-                new_futures.append(submit(node_id))
-
-            futures = new_futures  # futures is copied into as_completed()
-            new_futures = drain_futures(futures)
-
-    shard_out_queue.put(None)
-
-
-@exception_to_queue
 def network_fetch_thread(
     in_queue: Queue[list[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
@@ -606,7 +535,7 @@ def network_fetch_thread(
         response = s.get(url)
         response.raise_for_status()
         data = response.content
-        return (url, node_id, data)
+        return url, node_id, data
 
     def submit(node_id):
         # this worker should only recieve network node_id's:
@@ -653,17 +582,10 @@ def network_fetch_thread(
                     except StopIteration:
                         pass  # no more batches
                 else:
-                    try:
-                        waitables.remove(future)
-                        handle_result(future)
-                    except requests.exceptions.RequestException as e:
-                        log.error("Error fetching shard. %s", e)
-                    except Exception as e:
-                        log.exception("Unexpected error fetching shard", exc_info=e)
+                    waitables.remove(future)
+                    handle_result(future)
 
             waitables.update(done_notdone.not_done)
-
-    shard_out_queue.put(None)
 
 
 # endregion

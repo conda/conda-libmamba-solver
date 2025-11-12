@@ -4,5 +4,6 @@ conda-index
 conda-lock
 conda-forge::pre-commit
 conda-forge::pytest-codspeed
+conda-forge::pytest-mock
 # needed for many conda tests
 flask

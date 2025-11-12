@@ -1,11 +1,13 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+import concurrent.futures
 import threading
 import urllib.parse
 from pathlib import Path
 from queue import SimpleQueue
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import conda.gateways.repodata
 import pytest
@@ -14,6 +16,7 @@ from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.testing.fixtures import CondaCLIFixture
+from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
 from conda_libmamba_solver.shards import fetch_channels, fetch_shards_index
@@ -316,3 +319,75 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
 
 
 # endregion
+
+
+@pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
+def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, mocker, tmp_path):
+    """
+    Test that errors during shard fetching are properly propagated.
+
+    This test uses http_server_shards to fetch the initial shards index,
+    then mocks the actual shard fetching to simulate network errors.
+    """
+
+    # Use http_server_shards to set up the initial channel with shards index
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    # Override cache dir location for tests; ensures it's empty
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    # Mock batch_retrieve_from_network to raise an error for bfs algorithm
+    if algorithm == "bfs":
+        with patch(
+            "conda_libmamba_solver.shards_subset.batch_retrieve_from_network"
+        ) as mock_batch:
+            # Simulate a network error when fetching shards
+            mock_batch.side_effect = HTTPError("Simulated network error")
+
+            with pytest.raises(HTTPError, match="Simulated network error"):
+                build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+
+    # For pipelined algorithm, mock the session.get to raise an error
+    elif algorithm == "pipelined":
+        # Patch at the module level before threads start
+        original_executor = concurrent.futures.ThreadPoolExecutor
+
+        def mock_executor(*args, **kwargs):
+            executor = original_executor(*args, **kwargs)
+            original_submit = executor.submit
+
+            def mock_submit(fn, *fn_args, **fn_kwargs):
+                if fn.__name__ == "fetch":
+                    raise HTTPError("Simulated network error during pipelined fetch")
+                return original_submit(fn, *fn_args, **fn_kwargs)
+
+            executor.submit = mock_submit
+            return executor
+
+        with patch("concurrent.futures.ThreadPoolExecutor", mock_executor):
+            # The pipelined algorithm should propagate this error
+            with pytest.raises(HTTPError, match="Simulated network error during pipelined fetch"):
+                build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+
+
+@pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
+def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, tmp_path, mocker):
+    """
+    Test that packages that cannot be found result in empty repodata.
+
+    This test uses http_server_shards to fetch the initial shards index,
+    and then tests the code to make sure an empty repodata is produced at the end.
+    """
+
+    # Use http_server_shards to set up the initial channel with shards index
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["404-package-not-found"]
+
+    # Override cache dir location for tests; ensures it's empty
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+
+    for shardlike in channel_data.values():
+        assert not shardlike.build_repodata().get("packages")
