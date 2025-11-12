@@ -636,7 +636,7 @@ def test_shards_indexhelper(prepare_shards_test):
 
     class fake_in_state:
         installed = {name: object() for name in ROOT_PACKAGES}
-        requested = ("vaex",)
+        requested = ("python",)
 
     # Would eagerly download repodata.json.zst for all channels
     helper = LibMambaIndexHelper(
