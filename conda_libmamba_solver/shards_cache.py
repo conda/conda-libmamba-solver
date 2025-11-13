@@ -61,7 +61,7 @@ class ShardCache:
     Handle caching for individual shards (not the index of shards).
     """
 
-    def __init__(self, base: Path):
+    def __init__(self, base: Path, create=True):
         """
         base: directory and filename prefix for cache.
         """
@@ -72,11 +72,17 @@ class ShardCache:
         """
         Copy cache with new connection. Useful for threads.
         """
-        return ShardCache(self.base)
+        return ShardCache(self.base, create=False)
 
-    def connect(self):
+    def connect(self, create=True):
+        """
+        Args:
+            create: if True, create table if not exists.
+        """
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
+        if not create:
+            return
         # this schema will also get confused if we merge packages into a single
         # shard, but the package name should be advisory.
         self.conn.execute(
