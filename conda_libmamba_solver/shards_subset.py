@@ -512,6 +512,13 @@ def cache_fetch_thread(
     shards to shard_out_queue, and not found shards to network_out_queue.
 
     When we see None on in_queue, send None to both out queues and exit.
+
+    Args:
+        in_queue: NodeId (URLs) to fetch.
+        shard_out_queue: fetched shards sent to queue.
+        network_out_queue: cache misses forwarded to queue. Same queue is
+            network_fetch_thread's in_queue.
+        cache: used to retrieve shards.
     """
     cache = cache.copy()
 
@@ -545,11 +552,16 @@ def network_fetch_thread(
     shardlikes: list[ShardBase],
 ):
     """
-    in_queue contains urls to fetch over the network.
-    While the in_queue has not received a sentinel None, empty everything from
-    the queue. Fetch all of them over the network. Fetched shards go to
-    shard_out_queue.
+    Fetch shards from the network that are received on in_queue, until we see
+    None.
+
     Unhandled exceptions also go to shard_out_queue, and exit this thread.
+
+    Args:
+        in_queue: NodeId (URLs) to fetch.
+        shard_out_queue: fetched shards sent to queue.
+        cache: once shards are decoded they are stored in cache.
+        shardlikes: list of (network-only) shard index objects.
     """
     cache = cache.copy()
     dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
