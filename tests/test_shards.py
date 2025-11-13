@@ -374,6 +374,9 @@ def test_shard_cache_multiple(
     """
     cache, fake_shards = shard_cache_with_data
 
+    none_retrieved = cache.retrieve_multiple([])  # coverage
+    assert none_retrieved == {}
+
     start_multiple = time.monotonic_ns()
     retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
     end_multiple = time.monotonic_ns()
