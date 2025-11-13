@@ -86,8 +86,9 @@ markers = [
 
 [tool.ruff]
 exclude = ["conda_libmamba_solver/mamba_utils.py", "tests/data/"]
-target-version = "py310"
 line-length = 99
+show-fixes = true
+target-version = "py310"
 
 [tool.ruff.lint]
 # E, W = pycodestyle errors and warnings
