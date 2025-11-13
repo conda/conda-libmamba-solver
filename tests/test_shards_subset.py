@@ -699,3 +699,12 @@ def test_shutdown_with_pending_work(http_server_shards, mocker, tmp_path):
 
     # Verify shutdown was initiated (None was sent to queues)
     assert len(shutdown_events) > 0, "Shutdown was never initiated"
+
+
+def test_repodata_subset_misc():
+    """
+    Test utility functions on RepodataSubset.
+    """
+    assert tuple(
+        RepodataSubset.has_strategy(strategy) for strategy in ("bfs", "pipelined", "squirrel")
+    ) == (True, True, False)

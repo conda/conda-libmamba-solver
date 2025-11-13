@@ -258,8 +258,8 @@ class RepodataSubset:
             level_size = len(node_queue)
             for _ in range(level_size):
                 node = node_queue.popleft()
-                if node.visited:
-                    continue
+                if node.visited:  # pragma: no cover
+                    continue  # we should never add visited nodes to node_queue
                 node.visited = True
 
                 for next_node, _ in self.outgoing(node):
@@ -419,7 +419,7 @@ class RepodataSubset:
             if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
                 shards_have.append((node_id, shardlike.visit_shard(node_id.package)))
             else:
-                if self.nodes[node_id].visited:
+                if self.nodes[node_id].visited:  # pragma: no cover
                     log.debug("Skip visited, should not be reached")
                     continue
                 shards_need.append(node_id)
