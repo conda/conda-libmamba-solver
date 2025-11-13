@@ -46,7 +46,6 @@ from conda_libmamba_solver.shards_subset import (
 from tests import http_test_server
 
 if TYPE_CHECKING:
-    import http.server
     from collections.abc import Iterable, Iterator
 
     from conda_libmamba_solver.shards_typing import ShardDict, ShardsIndexDict
@@ -151,7 +150,7 @@ FAKE_SHARD_2: ShardDict = {
 
 
 @pytest.fixture(scope="session")
-def http_server_shards(xprocess, tmp_path_factory) -> Iterable[http.server.ThreadingHTTPServer]:
+def http_server_shards(xprocess, tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
@@ -520,6 +519,21 @@ def test_shard_hash_as_array():
     assert shard_url == shard_url_2
 
 
+def test_shard_coverage():
+    """
+    Call Shards() methods that are not otherwise called.
+    """
+    shard = shards.Shards({"info": {"base_url": ""}}, "url", None)  # type: ignore
+    with pytest.raises(KeyError):
+        # The visit_shard() method is used for ShardLike (from monolithic
+        # repodata) and makes a package part of the generated repodata. For
+        # Shards() (from sharded repodata), we assign directly to visited and
+        # don't wind up calling visit_shard().
+        shard.visit_shard("package")
+    shard.visited["package"] = {}  # type: ignore[assign]
+    assert shard.visit_shard("package") == {}
+
+
 def test_ensure_hex_hash_in_record():
     """
     Test that ensure_hex_hash_in_record() converts bytes to hex strings.
@@ -764,3 +778,6 @@ def test_shards_connections(monkeypatch):
 
     monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
     assert _shards_connections() == 7
+
+    monkeypatch.setattr(context, "_repodata_threads", 4)
+    assert _shards_connections() == 4

@@ -625,9 +625,6 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
     Given a list of (Shards, package name, shard URL) tuples, group by Shards and call fetch_shards
     with a list of all URLs for that Shard.
     """
-    if not wanted:
-        return
-
     shard_packages: dict[Shards, list[str]] = defaultdict(list)
     for shard, package, _ in wanted:
         shard_packages[shard].append(package)
