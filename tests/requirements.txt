@@ -3,7 +3,7 @@ conda-forge::pytest-xprocess
 conda-index
 conda-lock
 conda-forge::pre-commit
-conda-forge::pytest-codspeed
+conda-forge::pytest-codspeed >=4
 conda-forge::pytest-mock
 # needed for many conda tests
 flask
