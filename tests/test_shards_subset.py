@@ -282,7 +282,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     assert found
 
     invalid_shardlike = ShardLike(
-        {},
+        {},  # type: ignore
         url="file:///non-network/shard/url",
     )
 
@@ -497,6 +497,30 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
             if "/noarch/" in shardlike.url and shardlike.build_repodata().get("packages"):
                 found_packages = True
         assert found_packages
+
+
+def test_pipelined_timeout(http_server_shards, monkeypatch):
+    """
+    Test that pipelined times out if a URL is never fetched.
+    """
+
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    shardlikes = fetch_channels([channel])
+
+    # a slow and ineffective get()
+    monkeypatch.setattr(
+        "conda.gateways.connection.session.CondaSession.get",
+        lambda *args, **kwargs: time.sleep(3),
+    )
+
+    # faster failure
+    monkeypatch.setattr("conda_libmamba_solver.shards_subset.REACHABLE_PIPELINED_MAX_TIMEOUTS", 1)
+    monkeypatch.setattr("conda_libmamba_solver.shards_subset.THREAD_WAIT_TIMEOUT", 0)
+
+    subset = RepodataSubset(shardlikes.values())
+    subset.reachable_pipelined(root_packages)
 
 
 def test_combine_batches_blocking_scenario():

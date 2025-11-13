@@ -98,6 +98,7 @@ if TYPE_CHECKING:
 
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
+REACHABLE_PIPELINED_MAX_TIMEOUTS = 10  # number of times we can timeout waiting for shards
 
 
 @dataclass(order=True)
@@ -139,12 +140,12 @@ def _nodes_from_packages(
 @dataclass
 class RepodataSubset:
     nodes: dict[NodeId, Node]
-    shardlikes: Iterable[ShardBase]
+    shardlikes: Sequence[ShardBase]
     DEFAULT_STRATEGY = "pipelined"
 
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
-        self.shardlikes = shardlikes
+        self.shardlikes = list(shardlikes)
 
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
@@ -301,7 +302,7 @@ class RepodataSubset:
                         log.debug("All shards have finished processing")
                         break
                     timeouts += 1
-                    if timeouts > 10:
+                    if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
                         raise TimeoutError(
                             f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
                             f"pending={len(pending)}, in_flight={len(in_flight)}, "
