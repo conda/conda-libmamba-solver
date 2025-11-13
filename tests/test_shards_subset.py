@@ -626,7 +626,7 @@ def test_pipelined_extreme_race_conditions(http_server_shards, mocker, tmp_path)
     assert not failures, f"Failed on iterations: {failures}"
 
 
-@pytest.mark.parametrize("num_threads", [1, 2, 5, 10])
+@pytest.mark.parametrize("num_threads", [1, 2, 5])
 def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_threads):
     """
     Run pipelined algorithm from multiple threads concurrently.

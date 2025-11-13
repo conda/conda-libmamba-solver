@@ -10,13 +10,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import reset_context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
-from conda_libmamba_solver.index import LibMambaIndexHelper
+from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.state import SolverInputState
 
 if TYPE_CHECKING:
@@ -122,35 +122,35 @@ def test_reload_channels(tmp_path: Path):
 
 
 @pytest.mark.parametrize(
-    "load_type,load_channel", [("shard", "conda-forge-sharded"), ("repodata", "conda-forge")]
+    "load_type,requested",
+    [
+        ("shard", ("python",)),
+        ("shard", ("django", "celery")),
+        ("shard", ("vaex",)),
+        ("repodata", ("vaex",)),
+    ],
+    ids=["shard-small", "shard-medium", "shard-large", "noshard"],
 )
 def test_load_channel_repo_info(
     load_type: str,
-    load_channel: str,
+    requested: tuple[str, ...],
     tmp_path: Path,
     conda_cli: CondaCLIFixture,
     monkeypatch: pytest.MonkeyPatch,
     benchmark: BenchmarkFixture,
 ):
     """
-    Benchmark both loading methods and ensure they return the same data.
+    Benchmark shards/not-shards under different dependency tree sizes.
 
     TODO: This test should eventually switch to just using conda-forge when that channel
           supports shards and not the `conda-forge-sharded` channel.
     """
-    conda_cli("create", "--yes", "--prefix", str(tmp_path / "env"))
-    _, stderr, _ = conda_cli("clean", "--all", "--yes")
+    load_channel = "conda-forge-sharded"
 
-    # Windows CI runners cannot reliably remove this file, so we don't care about
-    # this assertion on that platform
-    if not on_win:
-        assert not stderr
+    monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
+    assert _is_sharded_repodata_enabled() == (load_type == "shard")
 
-    if load_type == "shard":
-        monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
-        reset_context()
-
-    in_state = SolverInputState(str(tmp_path / "env"), requested=("python",))
+    in_state = SolverInputState(str(tmp_path / "env"), requested=requested)
 
     def index():
         return LibMambaIndexHelper(
