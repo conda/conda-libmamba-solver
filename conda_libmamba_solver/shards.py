@@ -158,17 +158,23 @@ class ShardBase(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def shard_in_memory(self, package: str) -> bool:
+    def shard_loaded(self, package: str) -> bool:
         """
         Return True if the given package's shard is in memory.
         """
         ...
 
-    def visit_shard(self, package: str) -> ShardDict:
+    def visit_package(self, package: str) -> ShardDict:
         """
-        Return a shard that is already in memory and mark as visited.
+        Return a shard that is already loaded in memory and mark as visited.
         """
         ...
+
+    def visit_shard(self, package: str, shard: ShardDict):
+        """
+        Store new shard data in the visited dict.
+        """
+        self.visited[package] = shard
 
     @abc.abstractmethod
     def fetch_shard(self, package: str) -> ShardDict:
@@ -258,13 +264,13 @@ class ShardLike(ShardBase):
         self.shards[package]
         return f"{self.url}#{package}"
 
-    def shard_in_memory(self, package: str) -> bool:
+    def shard_loaded(self, package: str) -> bool:
         """
         Return True if the given package's shard is in memory.
         """
         return package in self.shards
 
-    def visit_shard(self, package: str) -> ShardDict:
+    def visit_package(self, package: str) -> ShardDict:
         """
         Return a shard that is already in memory and mark as visited.
         """
@@ -374,13 +380,13 @@ class Shards(ShardBase):
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return f"{self.shards_base_url}{shard_name}"
 
-    def shard_in_memory(self, package: str) -> bool:
+    def shard_loaded(self, package: str) -> bool:
         """
         Return True if the given package's shard is in memory.
         """
         return package in self.visited
 
-    def visit_shard(self, package: str) -> ShardDict:
+    def visit_package(self, package: str) -> ShardDict:
         """
         Return a shard that is already in memory and mark as visited.
         """
@@ -615,7 +621,7 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
     # add fetched Shard objects to Shards objects visited dict
     for shard, package, shard_url in wanted:
         if from_cache_shard := from_cache.get(shard_url):
-            shard.visited[package] = from_cache_shard
+            shard.visit_shard(package, from_cache_shard)
 
     return wanted
 

@@ -529,9 +529,9 @@ def test_shard_coverage():
         # repodata) and makes a package part of the generated repodata. For
         # Shards() (from sharded repodata), we assign directly to visited and
         # don't wind up calling visit_shard().
-        shard.visit_shard("package")
+        shard.visit_package("package")
     shard.visited["package"] = {}  # type: ignore[assign]
-    assert shard.visit_shard("package") == {}
+    assert shard.visit_package("package") == {}
 
 
 def test_ensure_hex_hash_in_record():

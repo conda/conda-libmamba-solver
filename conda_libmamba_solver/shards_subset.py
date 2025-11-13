@@ -321,9 +321,7 @@ class RepodataSubset:
                     # add shard to appropriate ShardLike
                     parent_node = self.nodes[node_id]
                     shardlike = shardlikes_by_url[node_id.channel]
-                    shardlike.visited[node_id.package] = (
-                        shard  # would rather use the visit_shard (add shard?) method.
-                    )
+                    shardlike.visit_shard(node_id.package, shard)
 
                     self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
 
@@ -375,8 +373,8 @@ class RepodataSubset:
         for node_id in pending:
             # we should already have these nodes.
             shardlike = shardlikes_by_url[node_id.channel]
-            if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
-                shards_have.append((node_id, shardlike.visit_shard(node_id.package)))
+            if shardlike.shard_loaded(node_id.package):  # for monolithic repodata
+                shards_have.append((node_id, shardlike.visit_package(node_id.package)))
             else:
                 if self.nodes[node_id].visited:  # pragma: no cover
                     log.debug("Skip visited, should not be reached")
