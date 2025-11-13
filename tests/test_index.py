@@ -128,8 +128,9 @@ def test_reload_channels(tmp_path: Path):
         ("shard", ("django", "celery")),
         ("shard", ("vaex",)),
         ("repodata", ("vaex",)),
+        ("main", ()),
     ],
-    ids=["shard-small", "shard-medium", "shard-large", "noshard"],
+    ids=["shard-small", "shard-medium", "shard-large", "noshard", "main"],
 )
 def test_load_channel_repo_info(
     load_type: str,
@@ -145,7 +146,7 @@ def test_load_channel_repo_info(
     TODO: This test should eventually switch to just using conda-forge when that channel
           supports shards and not the `conda-forge-sharded` channel.
     """
-    load_channel = "conda-forge-sharded"
+    load_channel = "defaults" if load_type == "main" else "conda-forge-sharded"
 
     monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
     assert _is_sharded_repodata_enabled() == (load_type == "shard")
@@ -154,8 +155,12 @@ def test_load_channel_repo_info(
 
     def index():
         return LibMambaIndexHelper(
+            # this is expanded to noarch, linux-64 for shards.
             channels=[Channel(f"{load_channel}/linux-64")],
-            subdirs=("linux-64",),
+            subdirs=(
+                "noarch",
+                "linux-64",
+            ),
             installed_records=(),  # do not load installed
             pkgs_dirs=(),  # do not load local cache as a channel
             in_state=in_state,
