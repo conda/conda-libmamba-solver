@@ -50,7 +50,6 @@ for url in channel_data:
 
 from __future__ import annotations
 
-import concurrent.futures
 import functools
 import heapq
 import logging
@@ -58,11 +57,12 @@ import queue
 import sys
 import threading
 from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import SimpleQueue
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import conda.gateways.repodata
 import msgpack
@@ -451,10 +451,12 @@ def build_repodata_subset(
 
 # region workers
 
+T = TypeVar("T")
+
 
 def combine_batches_until_none(
-    in_queue: Queue[list[NodeId] | None],
-) -> Iterator[list[NodeId]]:
+    in_queue: Queue[Sequence[T] | None],
+) -> Iterator[Sequence[T]]:
     """
     Combine lists from in_queue until we see None. Yield combined lists.
     """
@@ -469,7 +471,7 @@ def combine_batches_until_none(
             # If we timeout, continue waiting - producer might still send data
             continue
 
-        node_ids = batch[:]
+        node_ids = list(batch)
         with suppress(queue.Empty):
             while True:  # loop exits with break or queue.Empty exception
                 batch = in_queue.get_nowait()
@@ -500,7 +502,7 @@ def exception_to_queue(func):
 
 @exception_to_queue
 def cache_fetch_thread(
-    in_queue: Queue[list[NodeId] | None],
+    in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception] | None],
     network_out_queue: Queue[Sequence[NodeId] | None],
     cache: ShardCache,
@@ -537,7 +539,7 @@ def cache_fetch_thread(
 
 @exception_to_queue
 def network_fetch_thread(
-    in_queue: Queue[list[NodeId] | None],
+    in_queue: Queue[Sequence[NodeId | Future] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
     shardlikes: list[ShardBase],
@@ -559,7 +561,7 @@ def network_fetch_thread(
         data = response.content
         return url, node_id, data
 
-    def submit(node_id):
+    def submit(node_id: NodeId):
         # this worker should only receive network node_id's:
         shardlike = shardlikes_by_url[node_id.channel]
         if not isinstance(shardlike, Shards):
@@ -568,7 +570,7 @@ def network_fetch_thread(
         url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
         return executor.submit(fetch, session, url, node_id)
 
-    def handle_result(future):
+    def handle_result(future: Future):
         url, node_id, data = future.result()
         log.debug("Fetch thread got %s (%s bytes)", url, len(data))
         # Decompress and parse. If it decodes as
@@ -577,36 +579,23 @@ def network_fetch_thread(
         shard: ShardDict = msgpack.loads(
             dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
         )  # type: ignore[assign]
+        # We could send this back into the cache thread instead to
+        # serialize access to sqlite3 if lock contention becomes an issue.
         cache.insert(AnnotatedRawShard(url, node_id.package, data))
         shard_out_queue.put([(node_id, shard)])
 
-    next_batch_iter = iter(combine_batches_until_none(in_queue))
+    def result_to_in_queue(future: Future):
+        # Simplify waiting below by putting responses back into in_queue
+        in_queue.put([future])
 
-    # TODO limit number of submitted http requests to 10. wait() will iterate
-    # over waitables each time it's called, and, if there is an error, it is
-    # easier to "cancel" futures that have never been created.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
-        next_batch = executor.submit(next_batch_iter.__next__)
-        waitables: set[concurrent.futures.Future] = set((next_batch,))
-        while waitables:
-            done_notdone = concurrent.futures.wait(
-                waitables, return_when=concurrent.futures.FIRST_COMPLETED
-            )
-            for future in done_notdone.done:
-                if future is next_batch:
-                    waitables.remove(next_batch)
-                    try:
-                        node_ids = future.result()
-                        for node_id in node_ids:
-                            waitables.add(submit(node_id))
-                        next_batch = executor.submit(next_batch_iter.__next__)
-                        waitables.add(next_batch)
-                    except StopIteration:
-                        pass  # no more batches
+    with ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        for node_ids_and_results in combine_batches_until_none(in_queue):
+            for node_id_or_result in node_ids_and_results:
+                if isinstance(node_id_or_result, Future):
+                    handle_result(node_id_or_result)
                 else:
-                    waitables.remove(future)
-                    handle_result(future)
-            # not_done futures are already in waitables, no need to update
+                    future = submit(node_id_or_result)
+                    future.add_done_callback(result_to_in_queue)
 
 
 # endregion
