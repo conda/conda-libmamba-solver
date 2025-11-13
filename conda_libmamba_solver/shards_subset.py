@@ -560,7 +560,9 @@ def network_fetch_thread(
         shard_out_queue.put([(node_id, shard)])
 
     def result_to_in_queue(future: Future):
-        # Simplify waiting below by putting responses back into in_queue
+        # Simplify waiting by putting responses back into in_queue. This
+        # function is called in the ThreadPoolExecutor's thread, but we want to
+        # serialize result processing in the network_fetch_thread.
         in_queue.put([future])
 
     with ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
