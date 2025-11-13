@@ -61,7 +61,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import SimpleQueue
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
 import conda.gateways.repodata
 import msgpack
@@ -85,7 +85,7 @@ log = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Sequence
     from queue import SimpleQueue as Queue
-    from typing import Literal
+    from typing import Literal, TypeVar
 
     from conda.models.channel import Channel
 
@@ -296,11 +296,7 @@ class RepodataSubset:
                     log.debug("nodes: %d", len(self.nodes))
                     log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
                     log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
-                    # SimpleQueue doesn't have qsize(), but we can try
-                    try:
-                        log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-                    except AttributeError:
-                        pass  # SimpleQueue doesn't support qsize()
+                    log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
                     if not pending and not in_flight:
                         log.debug("All shards have finished processing")
                         break
