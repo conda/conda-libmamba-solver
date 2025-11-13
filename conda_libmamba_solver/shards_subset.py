@@ -413,12 +413,13 @@ def build_repodata_subset(
 
 # region workers
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    _T = TypeVar("_T")
 
 
 def combine_batches_until_none(
-    in_queue: Queue[Sequence[T] | None],
-) -> Iterator[Sequence[T]]:
+    in_queue: Queue[Sequence[_T] | None],
+) -> Iterator[Sequence[_T]]:
     """
     Combine lists from in_queue until we see None. Yield combined lists.
     """
