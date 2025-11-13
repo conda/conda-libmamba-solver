@@ -348,7 +348,7 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
     # For pipelined algorithm, mock the session.get to raise an error
     elif algorithm == "pipelined":
         # Patch at the module level before threads start
-        original_executor = concurrent.futures.ThreadPoolExecutor
+        original_executor = shards_subset.ThreadPoolExecutor
 
         def mock_executor(*args, **kwargs):
             executor = original_executor(*args, **kwargs)
@@ -362,7 +362,7 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
             executor.submit = mock_submit
             return executor
 
-        with patch("concurrent.futures.ThreadPoolExecutor", mock_executor):
+        with patch("conda_libmamba_solver.shards_subset.ThreadPoolExecutor", mock_executor):
             # The pipelined algorithm should propagate this error
             with pytest.raises(HTTPError, match="Simulated network error during pipelined fetch"):
                 build_repodata_subset(root_packages, [channel], algorithm=algorithm)
