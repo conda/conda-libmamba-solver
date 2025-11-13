@@ -1,6 +1,8 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import concurrent.futures
 import random
 import threading
@@ -18,7 +20,6 @@ import pytest_codspeed
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
-from conda.testing.fixtures import CondaCLIFixture
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
@@ -38,6 +39,9 @@ from tests.test_shards import (
 )
 
 if TYPE_CHECKING:
+    from conda.testing.fixtures import CondaCLIFixture
+    from pytest_benchmark.plugin import BenchmarkFixture
+
     from conda_libmamba_solver.shards_typing import ShardDict
 
 
@@ -124,8 +128,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
     ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
 def test_traversal_algorithm_benchmarks(
-    conda_cli: CondaCLIFixture,
-    benchmark,
+    benchmark: BenchmarkFixture,
     cache_state: str,
     algorithm: str,
     scenario: dict,

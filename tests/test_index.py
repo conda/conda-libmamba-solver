@@ -1,11 +1,13 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import json
-import os
 import shutil
 import time
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 from conda.base.context import reset_context
@@ -13,10 +15,16 @@ from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
-from conda.testing.fixtures import CondaCLIFixture
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 from conda_libmamba_solver.state import SolverInputState
+
+if TYPE_CHECKING:
+    import os
+
+    from conda.testing.fixtures import CondaCLIFixture
+    from pytest_benchmark.plugin import BenchmarkFixture
+
 
 initialize_logging()
 DATA = Path(__file__).parent / "data"
@@ -122,7 +130,7 @@ def test_load_channel_repo_info(
     tmp_path: Path,
     conda_cli: CondaCLIFixture,
     monkeypatch: pytest.MonkeyPatch,
-    benchmark,
+    benchmark: BenchmarkFixture,
 ):
     """
     Benchmark both loading methods and ensure they return the same data.

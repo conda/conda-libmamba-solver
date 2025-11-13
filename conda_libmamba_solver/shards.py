@@ -545,10 +545,11 @@ def fetch_shards_index(
     # If we fall back to monolithic repodata.json, the standard fetch code will
     # load the state again in text mode.
     try:
-        # by using read_bytes, a possible UnicodeDecodeError should be converted
-        # to a JSONDecodeError. But a valid json that is not a dict will fail on
-        # .update().
-        repo_cache.state.update(json.loads(repo_cache.cache_path_state.read_bytes()))
+        with repo_cache.lock("r+") as state_file:
+            # cannot use pathlib.read_text / write_text on any locked file, as
+            # it will release the lock early
+            state = json.loads(state_file.read())
+            repo_cache.state.update(state)
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
