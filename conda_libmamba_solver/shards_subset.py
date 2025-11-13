@@ -568,6 +568,9 @@ def network_fetch_thread(
                 else:
                     future = submit(node_id_or_result)
                     future.add_done_callback(result_to_in_queue)
+        # TODO call executor.shutdown(cancel_futures=True) on error or otherwise
+        # prevent new HTTP requests from being started e.g. "skip" flag in
+        # fetch() function. Also possible to shutdown(wait=False).
 
 
 # endregion
