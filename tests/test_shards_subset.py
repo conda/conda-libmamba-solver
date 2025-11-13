@@ -165,7 +165,7 @@ def test_traversal_algorithm_benchmarks(
 
     def target(subset):
         with _timer(""):
-            getattr(subset, f"shortest_{algorithm}")(scenario["packages"])
+            getattr(subset, f"reachable_{algorithm}")(scenario["packages"])
 
     warmup_rounds = 1 if cache_state == "warm" else 0
 
@@ -214,9 +214,9 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     with _timer("fetch_channels()"):
         channel_data = fetch_channels(channels)
 
-    with _timer("RepodataSubset.shortest_pipelined()"):
+    with _timer("RepodataSubset.reachable_pipelined()"):
         subset = RepodataSubset((*channel_data.values(),))
-        subset.shortest_pipelined(root_packages)
+        subset.reachable_pipelined(root_packages)
         print(f"{len(subset.nodes)} (channel, package) nodes discovered")
 
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))

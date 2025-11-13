@@ -51,7 +51,6 @@ for url in channel_data:
 from __future__ import annotations
 
 import functools
-import heapq
 import logging
 import queue
 import sys
@@ -150,9 +149,9 @@ class RepodataSubset:
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
         """
-        Return True if this class provides the named reachability strategy.
+        Return True if this class provides the named shard traversal strategy.
         """
-        return hasattr(cls, f"shortest_{strategy}")
+        return hasattr(cls, f"reachable_{strategy}")
 
     def neighbors(self, node: Node) -> Iterator[Node]:
         """
@@ -194,13 +193,13 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
-    def shortest_bfs(self, root_packages):
+    def reachable_bfs(self, root_packages):
         """
-        Fetch all root packages represented as `self.nodes` using the "breadth-first search"
-        algorithm.
+        Fetch all packages reachable from `root_packages`' by following
+        dependencies using the "breadth-first search" algorithm.
 
-        This method updates associated `self.shardlikes` to contain enough data
-        to build a repodata subset.
+        Update associated `self.shardlikes` to contain enough data to build a
+        repodata subset.
         """
         self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
@@ -226,10 +225,13 @@ class RepodataSubset:
                     if not next_node.visited:
                         node_queue.append(next_node)
 
-    def shortest_pipelined(self, root_packages):
+    def reachable_pipelined(self, root_packages):
         """
-        Build repodata subset using a main thread, a thread to fetch from
-        sqlite3 and another threadpool to fetch http.
+        Fetch all packages reachable from `root_packages`' by following
+        dependencies.
+
+        Build repodata subset using concurrent threads to follow dependencies,
+        fetch from cache, and fetch from network.
         """
 
         self.nodes = {}
@@ -403,7 +405,7 @@ def build_repodata_subset(
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
-    getattr(subset, f"shortest_{algorithm}")(root_packages)
+    getattr(subset, f"reachable_{algorithm}")(root_packages)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
