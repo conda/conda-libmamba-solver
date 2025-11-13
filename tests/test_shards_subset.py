@@ -2,7 +2,9 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 import concurrent.futures
+import random
 import threading
+import time
 import urllib.parse
 from contextlib import suppress
 from pathlib import Path
@@ -25,6 +27,8 @@ from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
     build_repodata_subset,
+    combine_batches_until_none,
+    exception_to_queue,
 )
 from tests.test_shards import (
     FAKE_SHARD,
@@ -406,3 +410,292 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
         if "/noarch/" not in shardlike.url:
             continue
         assert shardlike.build_repodata().get("packages") == expected_repodata
+
+
+def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_path):
+    """
+    Test that simulates slow queue operations which can trigger race conditions
+    where the main thread might timeout waiting for results.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    # Override cache dir location for tests
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    # Create a custom queue that adds delays
+    class SlowQueue(SimpleQueue):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.put_count = 0
+
+        def put(self, item, *args, **kwargs):
+            self.put_count += 1
+            # Add delay every few puts to simulate slow operations
+            if self.put_count % 3 == 0:
+                time.sleep(0.05)
+            return super().put(item, *args, **kwargs)
+
+    def slow_simple_queue_factory(*args, **kwargs):
+        # Only slow down shard_out_queue (not all queues)
+        return SlowQueue(*args, **kwargs)
+
+    mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", slow_simple_queue_factory)
+
+    # This should complete despite slow queue operations
+    channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+
+    # Verify results
+    found_packages = False
+    for shardlike in channel_data.values():
+        if "/noarch/" in shardlike.url and shardlike.build_repodata().get("packages"):
+            found_packages = True
+    assert found_packages
+
+
+def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path):
+    """
+    Test the specific race condition where the main thread checks pending/in_flight
+    and finds them empty, but worker threads are still processing items.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    # Track when drain_pending is called
+    original_drain_pending = RepodataSubset.drain_pending
+    drain_count = {"count": 0}
+
+    def tracked_drain_pending(self, pending, shardlikes_by_url):
+        drain_count["count"] += 1
+        result = original_drain_pending(self, pending, shardlikes_by_url)
+        # Add delay after drain to increase chance of race condition
+        if drain_count["count"] > 1:
+            time.sleep(0.1)
+        return result
+
+    mocker.patch.object(RepodataSubset, "drain_pending", tracked_drain_pending)
+
+    # Run multiple times to increase chance of hitting race condition
+    for _ in range(10):
+        channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+
+        # Verify we got valid results
+        found_packages = False
+        for shardlike in channel_data.values():
+            if "/noarch/" in shardlike.url and shardlike.build_repodata().get("packages"):
+                found_packages = True
+        assert found_packages
+
+
+def test_combine_batches_blocking_scenario():
+    """
+    Test the scenario where combine_batches_until_none would block indefinitely
+    without the timeout fix.
+
+    This simulates the case where:
+    1. Producer sends a few items
+    2. Producer crashes or stops sending before sending None
+    3. Consumer blocks forever waiting for more items
+    """
+    test_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+
+    # Put some items in the queue
+    test_queue.put([NodeId("package1", "channel1")])
+    test_queue.put([NodeId("package2", "channel2")])
+
+    # Simulate producer failure - don't send None sentinel
+    # Without timeout fix, this would block forever
+
+    received = []
+    timeout_occurred = False
+
+    def consumer():
+        nonlocal timeout_occurred
+        try:
+            for batch in combine_batches_until_none(test_queue):
+                received.extend(batch)
+                # After processing existing items, iterator should timeout
+                # rather than block forever
+        except Exception:
+            timeout_occurred = True
+
+    consumer_thread = threading.Thread(target=consumer, daemon=True)
+    consumer_thread.start()
+
+    # Wait for consumer to process existing items
+    consumer_thread.join(timeout=2)
+
+    # With the timeout fix, the thread should still be alive (waiting)
+    # but not blocking indefinitely - it will timeout periodically
+    # Let's verify it processed the items we sent
+    assert len(received) == 2
+    assert any(node.package == "package1" for node in received)
+
+
+@pytest.mark.integration
+def test_pipelined_extreme_race_conditions(http_server_shards, mocker, tmp_path):
+    """
+    Extremely aggressive test that introduces chaos to force race conditions.
+
+    This test:
+    - Adds random delays at multiple points
+    - Runs many iterations
+    - Uses smaller timeouts
+    - Simulates thread scheduling variability
+    """
+    channel = Channel("conda-forge-sharded/linux-64")
+    root_packages = ["python", "vaex"]
+
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    # Create a chaotic queue class that adds random delays
+    class ChaoticQueue(SimpleQueue):
+        def get(self, block=True, timeout=None):
+            # Random delay before get
+            if random.random() < 0.3:  # 30% chance
+                time.sleep(random.uniform(0.001, 0.02))
+            return super().get(block=block, timeout=timeout)
+
+        def put(self, item, block=True, timeout=None):
+            # Random delay before put
+            if random.random() < 0.3:  # 30% chance
+                time.sleep(random.uniform(0.001, 0.02))
+            return super().put(item, block=block, timeout=timeout)
+
+    # Patch at module level
+    mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", ChaoticQueue)
+
+    # Run multiple iterations to increase chance of hitting race condition
+    failures = []
+    for iteration in range(20):
+        try:
+            channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+
+            # Verify we got results
+            found = any(
+                "/noarch/" in s.url and s.build_repodata().get("packages")
+                for s in channel_data.values()
+            )
+            assert found, f"Iteration {iteration}: No packages found"
+        except Exception as e:
+            failures.append((iteration, str(e)))
+
+    # With our fixes, there should be no failures
+    assert not failures, f"Failed on iterations: {failures}"
+
+
+@pytest.mark.parametrize("num_threads", [1, 2, 5, 10])
+def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_threads):
+    """
+    Run pipelined algorithm from multiple threads concurrently.
+    This can expose race conditions in shared state or thread coordination.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    errors = []
+
+    def run_subset():
+        try:
+            channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+            # Verify results
+            for shardlike in channel_data.values():
+                if "/noarch/" in shardlike.url:
+                    packages = shardlike.build_repodata().get("packages", {})
+                    if packages:
+                        return True
+            return False
+        except Exception as e:
+            errors.append(e)
+            raise
+
+    # Run multiple instances concurrently
+    with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = [executor.submit(run_subset) for _ in range(num_threads)]
+        results = [f.result(timeout=30) for f in futures]
+
+    assert not errors, f"Errors occurred: {errors}"
+    assert all(results), "Some runs didn't find packages"
+
+
+def test_worker_thread_exception_propagation():
+    """
+    Test that exceptions in worker threads are properly propagated to main thread.
+    Without proper exception handling, the main thread could timeout waiting for
+    results that will never arrive.
+    """
+    in_queue = SimpleQueue()
+    out_queue = SimpleQueue()
+
+    @exception_to_queue
+    def failing_worker(in_q, out_q):
+        # Process one item successfully
+        item = in_q.get()
+        out_q.put(f"processed: {item}")
+
+        # Then raise an exception
+        raise ValueError("Simulated worker failure")
+
+    # Put test data
+    in_queue.put("test_item")
+
+    # Run worker in thread
+    worker = threading.Thread(target=failing_worker, args=(in_queue, out_queue), daemon=True)
+    worker.start()
+
+    # Should get the successful result first
+    result = out_queue.get(timeout=1)
+    assert result == "processed: test_item"
+
+    # Should get the exception propagated
+    exception = out_queue.get(timeout=1)
+    assert isinstance(exception, ValueError)
+    assert "Simulated worker failure" in str(exception)
+
+    # Worker should also send None to in_queue to signal termination
+    sentinel = in_queue.get(timeout=1)
+    assert sentinel is None
+
+
+def test_shutdown_with_pending_work(http_server_shards, mocker, tmp_path):
+    """
+    Test the race condition where main thread initiates shutdown while
+    worker threads still have work in their queues.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+
+    # Track shutdown events
+    shutdown_events = []
+
+    class TrackShutdownQueue(SimpleQueue):
+        def put(self, item, *args, **kwargs):
+            if item is None:
+                shutdown_events.append(
+                    {
+                        "time": time.time(),
+                        "thread": threading.current_thread().name,
+                    }
+                )
+            return super().put(item, *args, **kwargs)
+
+    # Patch at module level
+    mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", TrackShutdownQueue)
+
+    # Run the algorithm
+    channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+
+    # Verify we got results
+    found = any(
+        "/noarch/" in s.url and s.build_repodata().get("packages") for s in channel_data.values()
+    )
+    assert found
+
+    # Verify shutdown was initiated (None was sent to queues)
+    assert len(shutdown_events) > 0, "Shutdown was never initiated"

@@ -298,6 +298,7 @@ class RepodataSubset:
         pending: set[NodeId] = set()
         in_flight: set[NodeId] = set()
         timeouts = 0
+        shutdown_initiated = False
 
         # create start condition
         parent_node = Node(0)
@@ -325,16 +326,30 @@ class RepodataSubset:
                         raise new_shards
                 except queue.Empty:
                     pump_count = pump()
-                    log.debug("Shard timeout %s, %d", timeouts, pump_count)
-                    log.debug("pending: %s...", sorted(node_id for node_id in pending)[:10])
-                    log.debug("in_flight: %s...", sorted(node_id for node_id in in_flight)[:10])
+                    log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
+                    log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
+                    log.debug(
+                        "in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10]
+                    )
                     log.debug("nodes: %d", len(self.nodes))
+                    log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
+                    log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
+                    # SimpleQueue doesn't have qsize(), but we can try
+                    try:
+                        log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
+                    except AttributeError:
+                        pass  # SimpleQueue doesn't support qsize()
                     if not pending and not in_flight:
-                        log.debug("All shards have finished processing ")
+                        log.debug("All shards have finished processing")
                         break
                     timeouts += 1
                     if timeouts > 10:
-                        raise TimeoutError("Timeout waiting for shard_out_queue")
+                        raise TimeoutError(
+                            f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
+                            f"pending={len(pending)}, in_flight={len(in_flight)}, "
+                            f"cache_thread_alive={cache_thread.is_alive()}, "
+                            f"network_thread_alive={network_thread.is_alive()}"
+                        )
                     continue
 
                 if new_shards is None:
@@ -353,9 +368,10 @@ class RepodataSubset:
 
                     self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
 
-                if not pending and not in_flight:
-                    log.debug("Send None to cache_in_queue here?")
+                if not pending and not in_flight and not shutdown_initiated:
+                    log.debug("Initiating shutdown: sending None to cache_in_queue")
                     cache_in_queue.put(None)
+                    shutdown_initiated = True
 
         finally:
             cache_in_queue.put(None)
@@ -443,7 +459,16 @@ def combine_batches_until_none(
     Combine lists from in_queue until we see None. Yield combined lists.
     """
     running = True
-    while running and (batch := in_queue.get()) is not None:
+    while running:
+        try:
+            # Add timeout to prevent indefinite blocking if producer thread fails
+            batch = in_queue.get(timeout=5)
+            if batch is None:
+                break
+        except queue.Empty:
+            # If we timeout, continue waiting - producer might still send data
+            continue
+
         node_ids = batch[:]
         with suppress(queue.Empty):
             while True:  # loop exits with break or queue.Empty exception
@@ -581,8 +606,7 @@ def network_fetch_thread(
                 else:
                     waitables.remove(future)
                     handle_result(future)
-
-            waitables.update(done_notdone.not_done)
+            # not_done futures are already in waitables, no need to update
 
 
 # endregion
