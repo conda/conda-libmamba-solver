@@ -39,6 +39,8 @@ from tests.test_shards import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from conda.testing.fixtures import CondaCLIFixture
     from pytest_benchmark.plugin import BenchmarkFixture
 
@@ -537,7 +539,7 @@ def test_combine_batches_blocking_scenario():
     2. Producer crashes or stops sending before sending None
     3. Consumer blocks forever waiting for more items
     """
-    test_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+    test_queue: SimpleQueue[Sequence[NodeId] | None] = SimpleQueue()
 
     # Put some items in the queue
     test_queue.put([NodeId("package1", "channel1")])
