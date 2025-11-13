@@ -520,7 +520,8 @@ def test_pipelined_timeout(http_server_shards, monkeypatch):
     monkeypatch.setattr("conda_libmamba_solver.shards_subset.THREAD_WAIT_TIMEOUT", 0)
 
     subset = RepodataSubset(shardlikes.values())
-    subset.reachable_pipelined(root_packages)
+    with pytest.raises(TimeoutError, match="shard_out_queue"):
+        subset.reachable_pipelined(root_packages)
 
 
 def test_combine_batches_blocking_scenario():
