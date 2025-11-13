@@ -184,12 +184,11 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
     channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
 
     repodata_algorithm_map = {
-        "dijkstra": build_repodata_subset(scenario["packages"], [channel], algorithm="dijkstra"),
         "bfs": build_repodata_subset(scenario["packages"], [channel], algorithm="bfs"),
         "pipelined": build_repodata_subset(scenario["packages"], [channel], algorithm="pipelined"),
     }
 
-    for subdir in repodata_algorithm_map["dijkstra"].keys():
+    for subdir in repodata_algorithm_map["bfs"].keys():
         repodatas = []
 
         for algorithm, repodata_subset in repodata_algorithm_map.items():

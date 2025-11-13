@@ -141,7 +141,7 @@ def _nodes_from_packages(
 class RepodataSubset:
     nodes: dict[NodeId, Node]
     shardlikes: Iterable[ShardBase]
-    DEFAULT_STRATEGY: str = "pipelined"
+    DEFAULT_STRATEGY = "pipelined"
 
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
@@ -193,46 +193,6 @@ class RepodataSubset:
         # be sharded.
         for n in self.neighbors(node):
             yield n, 1
-
-    def shortest_dijkstra(self, root_packages):
-        """
-        Fetch all root packages represented as `self.nodes`.
-
-        This method updates associated `self.shardlikes` to contain enough data
-        to build a repodata subset.
-        """
-        # nodes.visited and nodes.distance should be reset before calling
-
-        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
-
-        unvisited = [(n.distance, n) for n in self.nodes.values()]
-        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        to_retrieve = set(self.nodes)  # XXX below, it expects set[str]
-        retrieved: set[NodeId] = set()
-
-        while unvisited:
-            # parallel fetch all unvisited shards but don't mark as visited
-            if to_retrieve:
-                # can we get stuck looking for unavailable packages repeatedly?
-                not_in_cache = batch_retrieve_from_cache(sharded, sorted(to_retrieve))
-                batch_retrieve_from_network(not_in_cache)
-            retrieved.update(to_retrieve)  # not necessary
-            to_retrieve.clear()
-
-            original_priority, node = heapq.heappop(unvisited)
-            if (
-                original_priority != node.distance
-            ):  # pragma: no cover; didn't match what's in the heap
-                continue
-            if node.visited:  # pragma: no cover
-                continue
-            node.visited = True
-
-            for next_node, cost in self.outgoing(node):
-                if not next_node.visited:
-                    next_node.distance = min(node.distance + cost, next_node.distance)
-                    to_retrieve.add(next_node.package)
-                    heapq.heappush(unvisited, (next_node.distance, next_node))
 
     def shortest_bfs(self, root_packages):
         """
@@ -430,7 +390,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel | str],
-    algorithm: Literal["dijkstra", "bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
+    algorithm: Literal["bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.

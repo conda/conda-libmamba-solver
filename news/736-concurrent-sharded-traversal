@@ -2,7 +2,7 @@
 
 * Add `pipelined` sharded repodata traversal algorithm with separate cache and network threads. (#736)
 * Add `sharded_repodata_strategy` (`CONDA_PLUGINS_SHARDED_REPODATA_STRATEGY`) to
-  choose between `dijkstra`, `bfs`, `pipelined` traversal algorithms.
+  choose between `bfs`, `pipelined` traversal algorithms.
 
 ### Bug fixes
 
