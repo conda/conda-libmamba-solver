@@ -139,10 +139,9 @@ def _nodes_from_packages(
 
 @dataclass
 class RepodataSubset:
-    DEFAULT_STRATEGY = "bfs"
-
     nodes: dict[NodeId, Node]
     shardlikes: Iterable[ShardBase]
+    DEFAULT_STRATEGY: str = "pipelined"
 
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
@@ -424,8 +423,6 @@ def build_repodata_subset(
         root_packages: iterable of installed and requested package names
         channels: iterable of Channel objects
         algorithm: desired traversal algorithm
-
-    TODO: Remove `algorithm` parameter once we've made a firm decision on which to use.
     """
     channel_data = fetch_channels(channels)
 
@@ -538,7 +535,7 @@ def network_fetch_thread(
         return url, node_id, data
 
     def submit(node_id):
-        # this worker should only recieve network node_id's:
+        # this worker should only receive network node_id's:
         shardlike = shardlikes_by_url[node_id.channel]
         if not isinstance(shardlike, Shards):
             raise TypeError("network_fetch_thread got non-network shardlike")
@@ -563,7 +560,7 @@ def network_fetch_thread(
     # TODO limit number of submitted http requests to 10. wait() will iterate
     # over waitables each time it's called, and, if there is an error, it is
     # easier to "cancel" futures that have never been created.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections() + 1) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         next_batch = executor.submit(next_batch_iter.__next__)
         waitables: set[concurrent.futures.Future] = set((next_batch,))
         while waitables:

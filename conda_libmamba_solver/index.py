@@ -108,7 +108,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import RepodataSubset, build_repodata_subset
+from conda_libmamba_solver.shards_subset import build_repodata_subset
 
 from .mamba_utils import logger_callback
 
@@ -154,21 +154,6 @@ def _is_sharded_repodata_enabled():
     Flag to see whether we should check for sharded repodata.
     """
     return context.plugins.use_sharded_repodata is True  # type: ignore
-
-
-def _sharded_repodata_strategy():
-    """
-    Which algorithm should we use to collect sharded repodata?
-    """
-    strategy = context.plugins.sharded_repodata_strategy.lower()  # type: ignore
-    if RepodataSubset.has_strategy(strategy):
-        return strategy
-    log.warning(
-        "Unknown sharded_repodata_strategy '%s', falling back to '%s'.",
-        strategy,
-        RepodataSubset.DEFAULT_STRATEGY,
-    )
-    return RepodataSubset.DEFAULT_STRATEGY
 
 
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
@@ -379,8 +364,7 @@ class LibMambaIndexHelper:
 
         # Prefer sharded repodata loading if it's enabled
         if self.in_state and _is_sharded_repodata_enabled():
-            # why do we need to encode URL's above instead of passing the
-            # Channel() objects that we already have?
+            # TODO: It may be better to directly pass channel objects without URL encoding
             return self._load_channel_repo_info_shards(urls_to_channel)
 
         # Fallback to repodata.json loading
@@ -394,12 +378,7 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        algorithm = _sharded_repodata_strategy()
-        channel_data = build_repodata_subset(
-            root_packages,
-            urls_to_channel,
-            algorithm=algorithm,
-        )
+        channel_data = build_repodata_subset(root_packages, urls_to_channel)
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
         return channel_repo_infos

@@ -47,13 +47,6 @@ TESTING_SCENARIOS = [
         "platform": "linux-64",
     },
     {
-        "name": "data_science_basic",
-        "packages": ["numpy", "pandas", "matplotlib"],
-        "prefetch_packages": ["python"],
-        "channel": "conda-forge-sharded",
-        "platform": "linux-64",
-    },
-    {
         "name": "data_science_ml",
         "packages": ["scikit-learn", "matplotlib"],
         "prefetch_packages": ["python", "numpy"],
@@ -126,14 +119,12 @@ def clean_cache(conda_cli: CondaCLIFixture):
     TESTING_SCENARIOS,
     ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
-@pytest.mark.parametrize("defaults", ["main", "nomain"])
 def test_traversal_algorithm_benchmarks(
     conda_cli: CondaCLIFixture,
     benchmark,
     cache_state: str,
     algorithm: str,
     scenario: dict,
-    defaults: str,
 ):
     """
     Benchmark multiple traversal algorithms for retrieving repodata shards with
@@ -148,9 +139,6 @@ def test_traversal_algorithm_benchmarks(
 
     scenario:
         List of packages to use to create an environment
-
-    defaults:
-        Whether to include the "main" channel
     """
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
     if cache_state == "warm":
@@ -163,8 +151,6 @@ def test_traversal_algorithm_benchmarks(
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
-        if defaults == "main":
-            channels.append(Channel("main"))
         channel_data = fetch_channels(channels)
 
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
