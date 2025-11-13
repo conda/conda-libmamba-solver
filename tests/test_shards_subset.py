@@ -22,7 +22,7 @@ from conda.testing.fixtures import CondaCLIFixture
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
-from conda_libmamba_solver.shards import fetch_channels, fetch_shards_index
+from conda_libmamba_solver.shards import ShardLike, fetch_channels, fetch_shards_index
 from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
@@ -281,6 +281,11 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     found = fetch_shards_index(subdir_data)
     assert found
 
+    invalid_shardlike = ShardLike(
+        {},
+        url="file:///non-network/shard/url",
+    )
+
     network_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
     shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
 
@@ -288,7 +293,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     # handling.
     network_thread = threading.Thread(
         target=shards_subset.network_fetch_thread,
-        args=(network_in_queue, shard_out_queue, cache, [found]),
+        args=(network_in_queue, shard_out_queue, cache, [found, invalid_shardlike]),
         daemon=False,
     )
 
@@ -299,9 +304,6 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
         if node_id.package in ("foo", "bar"):
             network_in_queue.put([node_id])
 
-    # Terminate with sentinel
-    network_in_queue.put(None)
-
     network_thread.start()
 
     with suppress(Empty):
@@ -311,6 +313,15 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
 
                 # Make sure this is either one of the two packages from above ("foo" or "bar")
                 assert set(shard.get("packages", {}).keys()).intersection(("foo", "bar"))
+
+    # Worker produces TypeError if non-network NodeId is sent and one of the
+    # shardlikes has its url. (If no shardlike has NodeId's url, it produces
+    # KeyError).
+    network_in_queue.put([NodeId("nope", invalid_shardlike.url)])
+    assert isinstance(shard_out_queue.get(timeout=1), TypeError)
+
+    # Terminate with sentinel
+    network_in_queue.put(None)
 
     network_thread.join(5)
 
