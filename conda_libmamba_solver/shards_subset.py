@@ -139,8 +139,6 @@ def _nodes_from_packages(
 
 @dataclass
 class RepodataSubset:
-    DEFAULT_STRATEGY = "bfs"
-
     nodes: dict[NodeId, Node]
     shardlikes: Sequence[ShardBase]
     DEFAULT_STRATEGY = "pipelined"

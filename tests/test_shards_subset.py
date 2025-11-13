@@ -367,9 +367,6 @@ def test_shards_network_thread_httpx(http_server_shards, shard_cache_with_data):
 # endregion
 
 
-# endregion
-
-
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
 def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, mocker, tmp_path):
     """
