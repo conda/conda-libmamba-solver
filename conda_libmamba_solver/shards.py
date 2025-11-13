@@ -23,7 +23,7 @@ import msgpack
 import zstandard
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
-from conda.gateways.connection.session import CondaSession, get_session
+from conda.gateways.connection.session import get_session
 from conda.gateways.repodata import (
     _add_http_value_to_dict,
     conda_http_errors,
@@ -58,7 +58,7 @@ def _shards_connections() -> int:
     """
     If context.repodata_threads is not set, find the size of the connection pool
     in a typical https:// session. This should significantly reduce dropped
-    connections. This will usually be requests' default 10.
+    connections. We match requests' default 10.
 
     Is this shared between all sessions? Or do we get a different pool for a
     different get_session(url)?
@@ -69,14 +69,6 @@ def _shards_connections() -> int:
     """
     if context.repodata_threads is not None:
         return context.repodata_threads
-    # CondaSession() is expensive to create, we just want to find the default
-    # requests poolmanager size.
-    session = CondaSession.__base__() if CondaSession.__base__ else CondaSession()
-    adapter = session.get_adapter("https://")
-    try:
-        return int(getattr(adapter, "_pool_connections"))
-    except (KeyError, ValueError, AttributeError, TypeError):
-        pass
     return SHARDS_CONNECTIONS_DEFAULT
 
 
@@ -166,17 +158,23 @@ class ShardBase(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def shard_in_memory(self, package: str) -> bool:
+    def shard_loaded(self, package: str) -> bool:
         """
         Return True if the given package's shard is in memory.
         """
         ...
 
-    def visit_shard(self, package: str) -> ShardDict:
+    def visit_package(self, package: str) -> ShardDict:
         """
-        Return a shard that is already in memory and mark as visited.
+        Return a shard that is already loaded in memory and mark as visited.
         """
         ...
+
+    def visit_shard(self, package: str, shard: ShardDict):
+        """
+        Store new shard data in the visited dict.
+        """
+        self.visited[package] = shard
 
     @abc.abstractmethod
     def fetch_shard(self, package: str) -> ShardDict:
@@ -266,13 +264,13 @@ class ShardLike(ShardBase):
         self.shards[package]
         return f"{self.url}#{package}"
 
-    def shard_in_memory(self, package: str) -> bool:
+    def shard_loaded(self, package: str) -> bool:
         """
         Return True if the given package's shard is in memory.
         """
         return package in self.shards
 
-    def visit_shard(self, package: str) -> ShardDict:
+    def visit_package(self, package: str) -> ShardDict:
         """
         Return a shard that is already in memory and mark as visited.
         """
@@ -382,13 +380,13 @@ class Shards(ShardBase):
         # "Individual shards are stored under the URL <shards_base_url><sha256>.msgpack.zst"
         return f"{self.shards_base_url}{shard_name}"
 
-    def shard_in_memory(self, package: str) -> bool:
+    def shard_loaded(self, package: str) -> bool:
         """
         Return True if the given package's shard is in memory.
         """
         return package in self.visited
 
-    def visit_shard(self, package: str) -> ShardDict:
+    def visit_package(self, package: str) -> ShardDict:
         """
         Return a shard that is already in memory and mark as visited.
         """
@@ -623,7 +621,7 @@ def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
     # add fetched Shard objects to Shards objects visited dict
     for shard, package, shard_url in wanted:
         if from_cache_shard := from_cache.get(shard_url):
-            shard.visited[package] = from_cache_shard
+            shard.visit_shard(package, from_cache_shard)
 
     return wanted
 
@@ -633,9 +631,6 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
     Given a list of (Shards, package name, shard URL) tuples, group by Shards and call fetch_shards
     with a list of all URLs for that Shard.
     """
-    if not wanted:
-        return
-
     shard_packages: dict[Shards, list[str]] = defaultdict(list)
     for shard, package, _ in wanted:
         shard_packages[shard].append(package)

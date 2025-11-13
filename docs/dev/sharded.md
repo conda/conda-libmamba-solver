@@ -33,6 +33,35 @@ fetch those packages quickly enough, from cache or from the network, we will
 save RAM, disk space, bandwidth and time compared to parsing every package on
 the channel every time.
 
+### Threading and concurrency
+
+In order to achieve concurrency, our sharded repodata implementation uses
+the Python [threading module](https://docs.python.org/3/library/threading.html).
+We have two separate thread workers for fetching cache and network data. These
+threads communicate to each other via the following queues:
+
+- **cache_in_queue** every requested shard goes here first where the cache
+  worker sees if we have a valid cache record.
+- **cache_miss_queue** for every shard not in cache, we send it this queue where
+  the network worker thread downloads it.
+- **shard_out_queue** once a shard has been fetched from either the cache or
+  network worker threads, it is placed here so we can gather all needed
+  shards at the end to build our repodata subset.
+
+:::{mermaid}
+
+    sequenceDiagram
+        loop
+            Main ->> Main: "Fetch" in-memory shard
+            Main ->> Cache: Fetch shard
+            Cache ->> Network: Cache miss
+            Cache ->> Main: Cache hit
+            Network ->> Main: Network result
+            Main ->> Main: Find new (channel, package) from shard data
+        end
+
+:::
+
 ## Source code
 
 The shard handling code is split into `shards.py`, `shards_cache.py`,

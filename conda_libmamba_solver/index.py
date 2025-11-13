@@ -379,8 +379,7 @@ class LibMambaIndexHelper:
 
         # Prefer sharded repodata loading if it's enabled
         if self.in_state and _is_sharded_repodata_enabled():
-            # why do we need to encode URL's above instead of passing the
-            # Channel() objects that we already have?
+            # TODO: It may be better to directly pass channel objects without URL encoding
             return self._load_channel_repo_info_shards(urls_to_channel)
 
         # Fallback to repodata.json loading
@@ -394,12 +393,7 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        algorithm = _sharded_repodata_strategy()
-        channel_data = build_repodata_subset(
-            root_packages,
-            urls_to_channel,
-            algorithm=algorithm,
-        )
+        channel_data = build_repodata_subset(root_packages, urls_to_channel)
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
         return channel_repo_infos

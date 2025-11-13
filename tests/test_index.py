@@ -125,7 +125,7 @@ def test_load_channel_repo_info(
     benchmark,
 ):
     """
-    Profile both loading methods and ensure they return the same data.
+    Benchmark both loading methods and ensure they return the same data.
 
     TODO: This test should eventually switch to just using conda-forge when that channel
           supports shards and not the `conda-forge-sharded` channel.
@@ -144,7 +144,6 @@ def test_load_channel_repo_info(
 
     in_state = SolverInputState(str(tmp_path / "env"), requested=("python",))
 
-    @benchmark
     def index():
         return LibMambaIndexHelper(
             channels=[Channel(f"{load_channel}/linux-64")],
@@ -154,4 +153,6 @@ def test_load_channel_repo_info(
             in_state=in_state,
         )
 
-    assert len(index.repos) > 0
+    index_helper = benchmark.pedantic(index, rounds=1)
+
+    assert len(index_helper.repos) > 0

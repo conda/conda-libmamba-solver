@@ -11,13 +11,10 @@ The algorithm developed here is a direct result of the following CEP:
 
 - https://conda.org/learn/ceps/cep-0016 (Sharded Repodata)
 
-In this algorithm we treat a package name as a node, and all its dependencies
-across all channels as edges. We then traverse all edges to discover all
-reachable package names. The solver should be able to find a solution with only
-this subset.
-
-We could treat a (name, channel) tuple as a node, but it's more to keep track
-of.
+In this algorithm we treat a (channel, package name) as a node, its dependencies
+as edges. We then traverse all edges to discover all reachable (channel, package
+name) tuples. The solver should be able to find a solution with only this
+subset.
 
 This subset is overgenerous since the user is unlikely to want to install very
 old packages and their dependencies. If this is too slow, we could deploy
@@ -30,37 +27,36 @@ per-package shards, computing a subset of both. This is because it is possible
 for the monolithic repodata to mention packages that exist in the true sharded
 repodata but would not be found by only traversing the shards.
 
+We treat all repodata as sharded, even if no actual sharded repodata has been
+found.
+
 ## Example usage
 
-The following constructs several repodata (`noarch` and `linux-64`) from a single
-channel name and a list of root packages:
+The following constructs several repodata (`noarch` and `linux-64`) from a
+single channel name and a list of root packages:
 
-```
-from conda.models.channel import Channel
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+``` from conda.models.channel import Channel from
+conda_libmamba_solver.shards_subset import build_repodata_subset
 
-channel = Channel("conda-forge-sharded/linux-64")
-channel_data = build_repodata_subset(["python", "pandas"], [channel.url()])
-repodata = {}
+channel = Channel("conda-forge-sharded/linux-64") channel_data =
+build_repodata_subset(["python", "pandas"], [channel.url()]) repodata = {}
 
 for url in channel_data:
     repodata[url] = channel_data.build_repodata()
 
-# ... this is what's fed to the solver
-```
+# ... this is what's fed to the solver ```
 
 """
 
 from __future__ import annotations
 
-import concurrent.futures
 import functools
-import heapq
 import logging
 import queue
 import sys
 import threading
 from collections import deque
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,7 +65,6 @@ from typing import TYPE_CHECKING
 
 import conda.gateways.repodata
 import msgpack
-import requests.exceptions
 import zstandard
 
 from conda_libmamba_solver import shards_cache
@@ -90,7 +85,7 @@ log = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Sequence
     from queue import SimpleQueue as Queue
-    from typing import Literal
+    from typing import Literal, TypeVar
 
     from conda.models.channel import Channel
 
@@ -103,6 +98,7 @@ if TYPE_CHECKING:
 
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
+REACHABLE_PIPELINED_MAX_TIMEOUTS = 10  # number of times we can timeout waiting for shards
 
 
 @dataclass(order=True)
@@ -146,18 +142,19 @@ class RepodataSubset:
     DEFAULT_STRATEGY = "bfs"
 
     nodes: dict[NodeId, Node]
-    shardlikes: Iterable[ShardBase]
+    shardlikes: Sequence[ShardBase]
+    DEFAULT_STRATEGY = "pipelined"
 
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
-        self.shardlikes = shardlikes
+        self.shardlikes = list(shardlikes)
 
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
         """
-        Return True if this class provides the named reachability strategy.
+        Return True if this class provides the named shard traversal strategy.
         """
-        return hasattr(cls, f"shortest_{strategy}")
+        return hasattr(cls, f"reachable_{strategy}")
 
     def neighbors(self, node: Node) -> Iterator[Node]:
         """
@@ -199,53 +196,13 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
-    def shortest_dijkstra(self, root_packages):
+    def reachable_bfs(self, root_packages):
         """
-        Fetch all root packages represented as `self.nodes`.
+        Fetch all packages reachable from `root_packages`' by following
+        dependencies using the "breadth-first search" algorithm.
 
-        This method updates associated `self.shardlikes` to contain enough data
-        to build a repodata subset.
-        """
-        # nodes.visited and nodes.distance should be reset before calling
-
-        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
-
-        unvisited = [(n.distance, n) for n in self.nodes.values()]
-        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-        to_retrieve = set(self.nodes)  # XXX below, it expects set[str]
-        retrieved: set[NodeId] = set()
-
-        while unvisited:
-            # parallel fetch all unvisited shards but don't mark as visited
-            if to_retrieve:
-                # can we get stuck looking for unavailable packages repeatedly?
-                not_in_cache = batch_retrieve_from_cache(sharded, sorted(to_retrieve))
-                batch_retrieve_from_network(not_in_cache)
-            retrieved.update(to_retrieve)  # not necessary
-            to_retrieve.clear()
-
-            original_priority, node = heapq.heappop(unvisited)
-            if (
-                original_priority != node.distance
-            ):  # pragma: no cover; didn't match what's in the heap
-                continue
-            if node.visited:  # pragma: no cover
-                continue
-            node.visited = True
-
-            for next_node, cost in self.outgoing(node):
-                if not next_node.visited:
-                    next_node.distance = min(node.distance + cost, next_node.distance)
-                    to_retrieve.add(next_node.package)
-                    heapq.heappush(unvisited, (next_node.distance, next_node))
-
-    def shortest_bfs(self, root_packages):
-        """
-        Fetch all root packages represented as `self.nodes` using the "breadth-first search"
-        algorithm.
-
-        This method updates associated `self.shardlikes` to contain enough data
-        to build a repodata subset.
+        Update associated `self.shardlikes` to contain enough data to build a
+        repodata subset.
         """
         self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
@@ -263,23 +220,26 @@ class RepodataSubset:
             level_size = len(node_queue)
             for _ in range(level_size):
                 node = node_queue.popleft()
-                if node.visited:
-                    continue
+                if node.visited:  # pragma: no cover
+                    continue  # we should never add visited nodes to node_queue
                 node.visited = True
 
                 for next_node, _ in self.outgoing(node):
                     if not next_node.visited:
                         node_queue.append(next_node)
 
-    def shortest_httpx(self, root_packages):
+    def reachable_httpx(self, root_packages):
         from .shards_subset_http2 import network_fetch_thread_httpx
 
-        return self.shortest_pipelined(root_packages, network_fetch_thread_httpx)
+        return self.reachable_pipelined(root_packages, network_fetch_thread_httpx)
 
-    def shortest_pipelined(self, root_packages, network_worker=None):
+    def reachable_pipelined(self, root_packages, network_worker=None):
         """
-        Build repodata subset using a main thread, a thread to fetch from
-        sqlite3 and another threadpool to fetch http.
+        Fetch all packages reachable from `root_packages`' by following
+        dependencies.
+
+        Build repodata subset using concurrent threads to follow dependencies,
+        fetch from cache, and fetch from network.
         """
 
         self.nodes = {}
@@ -311,6 +271,7 @@ class RepodataSubset:
         pending: set[NodeId] = set()
         in_flight: set[NodeId] = set()
         timeouts = 0
+        shutdown_initiated = False
 
         # create start condition
         parent_node = Node(0)
@@ -338,16 +299,26 @@ class RepodataSubset:
                         raise new_shards
                 except queue.Empty:
                     pump_count = pump()
-                    log.debug("Shard timeout %s, %d", timeouts, pump_count)
-                    log.debug("pending: %s...", sorted(node_id for node_id in pending)[:10])
-                    log.debug("in_flight: %s...", sorted(node_id for node_id in in_flight)[:10])
+                    log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
+                    log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
+                    log.debug(
+                        "in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10]
+                    )
                     log.debug("nodes: %d", len(self.nodes))
+                    log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
+                    log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
+                    log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
                     if not pending and not in_flight:
-                        log.debug("All done?")
+                        log.debug("All shards have finished processing")
                         break
                     timeouts += 1
-                    if timeouts > 10:
-                        raise TimeoutError("Timeout waiting for shard_out_queue")
+                    if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+                        raise TimeoutError(
+                            f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
+                            f"pending={len(pending)}, in_flight={len(in_flight)}, "
+                            f"cache_thread_alive={cache_thread.is_alive()}, "
+                            f"network_thread_alive={network_thread.is_alive()}"
+                        )
                     continue
 
                 if new_shards is None:
@@ -360,15 +331,14 @@ class RepodataSubset:
                     # add shard to appropriate ShardLike
                     parent_node = self.nodes[node_id]
                     shardlike = shardlikes_by_url[node_id.channel]
-                    shardlike.visited[node_id.package] = (
-                        shard  # would rather use the visit_shard (add shard?) method.
-                    )
+                    shardlike.visit_shard(node_id.package, shard)
 
                     self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
 
-                if not pending and not in_flight:
-                    log.debug("Send None to cache_in_queue here?")
+                if not pending and not in_flight and not shutdown_initiated:
+                    log.debug("Initiating shutdown: sending None to cache_in_queue")
                     cache_in_queue.put(None)
+                    shutdown_initiated = True
 
         finally:
             cache_in_queue.put(None)
@@ -413,21 +383,21 @@ class RepodataSubset:
         for node_id in pending:
             # we should already have these nodes.
             shardlike = shardlikes_by_url[node_id.channel]
-            if shardlike.shard_in_memory(node_id.package):  # for monolithic repodata
-                shards_have.append((node_id, shardlike.visit_shard(node_id.package)))
+            if shardlike.shard_loaded(node_id.package):  # for monolithic repodata
+                shards_have.append((node_id, shardlike.visit_package(node_id.package)))
             else:
-                if self.nodes[node_id].visited:
-                    print("skip visited")  # should not be reached
+                if self.nodes[node_id].visited:  # pragma: no cover
+                    log.debug("Skip visited, should not be reached")
                     continue
                 shards_need.append(node_id)
         pending.clear()
-        return (shards_have, shards_need)
+        return shards_have, shards_need
 
 
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: Iterable[Channel | str],
-    algorithm: Literal["dijkstra", "bfs", "pipelined", "httpx"] = RepodataSubset.DEFAULT_STRATEGY,
+    algorithm: Literal["bfs", "pipelined", "httpx"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
@@ -436,13 +406,11 @@ def build_repodata_subset(
         root_packages: iterable of installed and requested package names
         channels: iterable of Channel objects
         algorithm: desired traversal algorithm
-
-    TODO: Remove `algorithm` parameter once we've made a firm decision on which to use.
     """
     channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
-    getattr(subset, f"shortest_{algorithm}")(root_packages)
+    getattr(subset, f"reachable_{algorithm}")(root_packages)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
@@ -450,16 +418,28 @@ def build_repodata_subset(
 
 # region workers
 
+if TYPE_CHECKING:
+    _T = TypeVar("_T")
+
 
 def combine_batches_until_none(
-    in_queue: Queue[list[NodeId] | None],
-) -> Iterator[list[NodeId]]:
+    in_queue: Queue[Sequence[_T] | None],
+) -> Iterator[Sequence[_T]]:
     """
     Combine lists from in_queue until we see None. Yield combined lists.
     """
     running = True
-    while running and (batch := in_queue.get()) is not None:
-        node_ids = batch[:]
+    while running:
+        try:
+            # Add timeout to prevent indefinite blocking if producer thread fails
+            batch = in_queue.get(timeout=5)
+            if batch is None:
+                break
+        except queue.Empty:
+            # If we timeout, continue waiting - producer might still send data
+            continue
+
+        node_ids = list(batch)
         with suppress(queue.Empty):
             while True:  # loop exits with break or queue.Empty exception
                 batch = in_queue.get_nowait()
@@ -490,7 +470,7 @@ def exception_to_queue(func):
 
 @exception_to_queue
 def cache_fetch_thread(
-    in_queue: Queue[list[NodeId] | None],
+    in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception] | None],
     network_out_queue: Queue[Sequence[NodeId] | None],
     cache: ShardCache,
@@ -500,6 +480,13 @@ def cache_fetch_thread(
     shards to shard_out_queue, and not found shards to network_out_queue.
 
     When we see None on in_queue, send None to both out queues and exit.
+
+    Args:
+        in_queue: NodeId (URLs) to fetch.
+        shard_out_queue: fetched shards sent to queue.
+        network_out_queue: cache misses forwarded to queue. Same queue is
+            network_fetch_thread's in_queue.
+        cache: used to retrieve shards.
     """
     cache = cache.copy()
 
@@ -526,88 +513,23 @@ def cache_fetch_thread(
 
 
 @exception_to_queue
-def network_fetch_thread_0(
-    in_queue: Queue[list[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
-    cache: ShardCache,
-    shardlikes: list[ShardBase],
-):
-    """
-    in_queue contains urls to fetch over the network.
-    While the in_queue has not received a sentinel None, empty everything from
-    the queue. Fetch all of them over the network. Fetched shards go to
-    shard_out_queue.
-    Unhandled exceptions also go to shard_out_queue, and exit this thread.
-    """
-    cache = cache.copy()
-    dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
-
-    shardlikes_by_url = {s.url: s for s in shardlikes}
-
-    def fetch(s, url: str, node_id: NodeId):
-        response = s.get(url)
-        response.raise_for_status()
-        data = response.content
-        return (url, node_id, data)
-
-    def submit(node_id):
-        # this worker should only recieve network node_id's:
-        shardlike = shardlikes_by_url[node_id.channel]
-        if not isinstance(shardlike, Shards):
-            log.warning("network_fetch_thread got non-network shardlike")
-            return
-        session = shardlike.session
-        url = shardlike.shard_url(node_id.package)
-        return executor.submit(fetch, session, url, node_id)
-
-    def handle_result(future):
-        url, node_id, data = future.result()
-        log.debug("Fetch thread got %s (%s bytes)", url, len(data))
-        # Decompress and parse. If it decodes as
-        # msgpack.zst, insert into cache. Then put "known
-        # good" shard into out queue.
-        shard: ShardDict = msgpack.loads(
-            dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
-        )  # type: ignore[assign]
-        cache.insert(AnnotatedRawShard(url, node_id.package, data))
-        shard_out_queue.put([(node_id, shard)])
-
-    def drain_futures(futures, last_batch=False):
-        new_futures = []
-        for future in concurrent.futures.as_completed(futures):
-            try:
-                handle_result(future)
-            except requests.exceptions.RequestException as e:
-                log.error("Error fetching shard. %s", e)
-            except Exception as e:
-                log.exception("Unexpected error fetching shard", exc_info=e)
-        return new_futures
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
-        new_futures = []
-        for node_ids in combine_batches_until_none(in_queue):
-            for node_id in node_ids:
-                new_futures.append(submit(node_id))
-
-            futures = new_futures  # futures is copied into as_completed()
-            new_futures = drain_futures(futures)
-
-    shard_out_queue.put(None)
-
-
-@exception_to_queue
 def network_fetch_thread(
-    in_queue: Queue[list[NodeId] | None],
+    in_queue: Queue[Sequence[NodeId | Future] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
     shardlikes: list[ShardBase],
 ):
     """
-    in_queue contains urls to fetch over the network.
-    While the in_queue has not received a sentinel None, empty everything from
-    the queue. Fetch all of them over the network. Fetched shards go to
-    shard_out_queue.
+    Fetch shards from the network that are received on in_queue, until we see
+    None.
+
     Unhandled exceptions also go to shard_out_queue, and exit this thread.
+
+    Args:
+        in_queue: NodeId (URLs) to fetch.
+        shard_out_queue: fetched shards sent to queue.
+        cache: once shards are decoded they are stored in cache.
+        shardlikes: list of (network-only) shard index objects.
     """
     cache = cache.copy()
     dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
@@ -617,10 +539,10 @@ def network_fetch_thread(
         response = s.get(url)
         response.raise_for_status()
         data = response.content
-        return (url, node_id, data)
+        return url, node_id, data
 
-    def submit(node_id):
-        # this worker should only recieve network node_id's:
+    def submit(node_id: NodeId):
+        # this worker should only receive network node_id's:
         shardlike = shardlikes_by_url[node_id.channel]
         if not isinstance(shardlike, Shards):
             raise TypeError("network_fetch_thread got non-network shardlike")
@@ -628,7 +550,7 @@ def network_fetch_thread(
         url = shardlikes_by_url[node_id.channel].shard_url(node_id.package)
         return executor.submit(fetch, session, url, node_id)
 
-    def handle_result(future):
+    def handle_result(future: Future):
         url, node_id, data = future.result()
         log.debug("Fetch thread got %s (%s bytes)", url, len(data))
         # Decompress and parse. If it decodes as
@@ -637,44 +559,25 @@ def network_fetch_thread(
         shard: ShardDict = msgpack.loads(
             dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
         )  # type: ignore[assign]
+        # We could send this back into the cache thread instead to
+        # serialize access to sqlite3 if lock contention becomes an issue.
         cache.insert(AnnotatedRawShard(url, node_id.package, data))
         shard_out_queue.put([(node_id, shard)])
 
-    next_batch_iter = iter(combine_batches_until_none(in_queue))
+    def result_to_in_queue(future: Future):
+        # Simplify waiting by putting responses back into in_queue. This
+        # function is called in the ThreadPoolExecutor's thread, but we want to
+        # serialize result processing in the network_fetch_thread.
+        in_queue.put([future])
 
-    # TODO limit number of submitted http requests to 10. wait() will iterate
-    # over waitables each time it's called, and, if there is an error, it is
-    # easier to "cancel" futures that have never been created.
-    with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections() + 1) as executor:
-        next_batch = executor.submit(next_batch_iter.__next__)
-        waitables: set[concurrent.futures.Future] = set((next_batch,))
-        while waitables:
-            done_notdone = concurrent.futures.wait(
-                waitables, return_when=concurrent.futures.FIRST_COMPLETED
-            )
-            for future in done_notdone.done:
-                if future is next_batch:
-                    waitables.remove(next_batch)
-                    try:
-                        node_ids = future.result()
-                        for node_id in node_ids:
-                            waitables.add(submit(node_id))
-                        next_batch = executor.submit(next_batch_iter.__next__)
-                        waitables.add(next_batch)
-                    except StopIteration:
-                        pass  # no more batches
+    with ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+        for node_ids_and_results in combine_batches_until_none(in_queue):
+            for node_id_or_result in node_ids_and_results:
+                if isinstance(node_id_or_result, Future):
+                    handle_result(node_id_or_result)
                 else:
-                    try:
-                        waitables.remove(future)
-                        handle_result(future)
-                    except requests.exceptions.RequestException as e:
-                        log.error("Error fetching shard. %s", e)
-                    except Exception as e:
-                        log.exception("Unexpected error fetching shard", exc_info=e)
-
-            waitables.update(done_notdone.not_done)
-
-    shard_out_queue.put(None)
+                    future = submit(node_id_or_result)
+                    future.add_done_callback(result_to_in_queue)
 
 
 # endregion

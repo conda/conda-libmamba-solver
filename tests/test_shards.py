@@ -19,7 +19,6 @@ from typing import TYPE_CHECKING, NamedTuple
 import conda.gateways.repodata
 import msgpack
 import pytest
-import requests.adapters
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
@@ -44,10 +43,10 @@ from conda_libmamba_solver.shards_subset import (
     build_repodata_subset,
     fetch_channels,
 )
-from tests.channel_testing.helpers import _dummy_http_server
+from tests import http_test_server
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 
     from conda_libmamba_solver.shards_typing import ShardDict, ShardsIndexDict
 
@@ -125,9 +124,33 @@ FAKE_SHARD: ShardDict = {
     },
 }
 
+# This package depends on the
+FAKE_SHARD_2: ShardDict = {
+    "packages": {
+        "bar": {
+            "name": "bar",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["foo"],
+        }
+    },
+    "packages.conda": {
+        "bar": {
+            "name": "bar",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["foo"],
+            "constrains": ["splat<3"],
+            "sha256": hashlib.sha256().digest(),
+        }
+    },
+}
 
-@pytest.fixture
-def http_server_shards(xprocess, tmp_path_factory):
+
+@pytest.fixture(scope="session")
+def http_server_shards(xprocess, tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
@@ -138,6 +161,10 @@ def http_server_shards(xprocess, tmp_path_factory):
     foo_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
     foo_shard_digest = hashlib.sha256(foo_shard).digest()
     (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
+
+    bar_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
+    bar_shard_digest = hashlib.sha256(bar_shard).digest()
+    (noarch / f"{bar_shard_digest.hex()}.msgpack.zst").write_bytes(bar_shard)
 
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
@@ -153,6 +180,7 @@ def http_server_shards(xprocess, tmp_path_factory):
         "version": 1,
         "shards": {
             "foo": foo_shard_digest,
+            "bar": bar_shard_digest,
             "wrong_package_name": foo_shard_digest,
             "fake_package": b"",
             "malformed": hashlib.sha256(bad_schema).digest(),
@@ -163,9 +191,17 @@ def http_server_shards(xprocess, tmp_path_factory):
     (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
         zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
     )
-    yield from _dummy_http_server(
-        xprocess, name="http_server_auth_none", port=0, auth="none", path=shards_repository
-    )
+
+    http = http_test_server.run_test_server(str(shards_repository))
+
+    host, port = http.socket.getsockname()[:2]
+    url_host = f"[{host}]" if ":" in host else host
+    url = f"http://{url_host}:{port}/"
+
+    yield url
+    # shutdown is checked at a polling interval, or the daemon thread will shut
+    # down when the test suite exits.
+    http.shutdown()
 
 
 def test_fetch_shards_error(http_server_shards):
@@ -337,6 +373,9 @@ def test_shard_cache_multiple(
     """
     cache, fake_shards = shard_cache_with_data
 
+    none_retrieved = cache.retrieve_multiple([])  # coverage
+    assert none_retrieved == {}
+
     start_multiple = time.monotonic_ns()
     retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
     end_multiple = time.monotonic_ns()
@@ -480,6 +519,21 @@ def test_shard_hash_as_array():
     assert shard_url == shard_url_2
 
 
+def test_shard_coverage():
+    """
+    Call Shards() methods that are not otherwise called.
+    """
+    shard = shards.Shards({"info": {"base_url": ""}}, "url", None)  # type: ignore
+    with pytest.raises(KeyError):
+        # The visit_shard() method is used for ShardLike (from monolithic
+        # repodata) and makes a package part of the generated repodata. For
+        # Shards() (from sharded repodata), we assign directly to visited and
+        # don't wind up calling visit_shard().
+        shard.visit_package("package")
+    shard.visited["package"] = {}  # type: ignore[assign]
+    assert shard.visit_package("package") == {}
+
+
 def test_ensure_hex_hash_in_record():
     """
     Test that ensure_hex_hash_in_record() converts bytes to hex strings.
@@ -599,7 +653,7 @@ def test_shards_indexhelper(prepare_shards_test):
 
     class fake_in_state:
         installed = {name: object() for name in ROOT_PACKAGES}
-        requested = ("vaex",)
+        requested = ("python",)
 
     # Would eagerly download repodata.json.zst for all channels
     helper = LibMambaIndexHelper(
@@ -721,9 +775,6 @@ def test_shards_connections(monkeypatch):
     """
     assert context.repodata_threads is None
     assert _shards_connections() == 10  # requests' default
-
-    # force fallback to default, as adapter._pool_connections will fail
-    monkeypatch.setattr(requests.sessions.Session, "get_adapter", lambda *args: None)
 
     monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
     assert _shards_connections() == 7

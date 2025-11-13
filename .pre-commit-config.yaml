@@ -32,10 +32,10 @@ repos:
       - id: blacken-docs
         additional_dependencies: [black]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.3
+    rev: v0.14.4
     hooks:
       # lint & attempt to correct failures (e.g. pyupgrade)
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       # compatible replacement for black
       - id: ruff-format
@@ -50,14 +50,6 @@ repos:
       - id: bandit
         args: [--exit-zero]
         exclude: ^(tests/)
-  - repo: local
-    hooks:
-      - id: git-diff
-        name: git diff
-        entry: git diff --exit-code
-        language: system
-        pass_filenames: false
-        always_run: true
   - repo: https://github.com/Lucas-C/pre-commit-hooks
     rev: v1.5.5
     hooks:
