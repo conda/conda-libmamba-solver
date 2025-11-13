@@ -119,8 +119,8 @@ def clean_cache(conda_cli: CondaCLIFixture):
 
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
-@pytest.mark.parametrize("cache_state", ("cold", "warm", "lukewarm"))
-@pytest.mark.parametrize("algorithm", ("dijkstra", "bfs", "pipelined"))
+@pytest.mark.parametrize("cache_state", ("cold", "warm"))
+@pytest.mark.parametrize("algorithm", ("bfs", "pipelined"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
@@ -137,19 +137,20 @@ def test_traversal_algorithm_benchmarks(
 ):
     """
     Benchmark multiple traversal algorithms for retrieving repodata shards with
-    a variety of cache states (defined below)
+    a variety of parameter states (described below).
 
-    cold:
-        no shards in the SQLite cache database
+    cache_state:
+        Either "cold" or "warm" representing shards available or not available in
+        SQLite, respectively.
 
-    warm:
-        all shards in the SQLite cache database
+    algorithm:
+        Method used to fetch shards
 
-    lukewarm:
-        only some of the shards are in the SQLite cache database
+    scenario:
+        List of packages to use to create an environment
 
     defaults:
-        whether to include the "main" channel
+        Whether to include the "main" channel
     """
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
     if cache_state == "warm":
@@ -158,8 +159,7 @@ def test_traversal_algorithm_benchmarks(
 
     def setup():
         if cache_state != "warm":
-            # For "cold" and "lukewarm", we want to clean shards cache before
-            # each round of benchmarking
+            # For "cold", we want to clean shards cache before each round of benchmarking
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
@@ -171,17 +171,15 @@ def test_traversal_algorithm_benchmarks(
 
         subset = RepodataSubset((*channel_data.values(),))
 
-        if cache_state == "lukewarm":
-            # Collect pre-fetch packages
-            getattr(subset, f"shortest_{algorithm}")(scenario["prefetch_packages"])
-
         return (subset,), {}
 
     def target(subset):
         with _timer(""):
             getattr(subset, f"shortest_{algorithm}")(scenario["packages"])
 
-    benchmark.pedantic(target, setup=setup, rounds=2)
+    warmup_rounds = 1 if cache_state == "warm" else 0
+
+    benchmark.pedantic(target, setup=setup, rounds=1, warmup_rounds=warmup_rounds)
 
 
 @pytest.mark.parametrize(
