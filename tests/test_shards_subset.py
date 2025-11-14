@@ -814,7 +814,7 @@ class NetworkSimulator:
     ):
         self.connections = connections
         self.bandwidth_mbps = bandwidth_mbps
-        self.latency_ns = latency_ms * 1_000_000
+        self.latency_ms = latency_ms
         self.initial_delay_bytes = initial_delay_bytes
         self.bytes_transferred = 0
 
@@ -830,8 +830,9 @@ class NetworkSimulator:
         return (
             f"NetworkSimulator(connections={self.connections}, "
             f"bandwidth_mbps={self.bandwidth_mbps}, "
-            f"latency_ms={self.latency_ns / 1_000_000}, "
-            f"initial_delay_bytes={self.initial_delay_bytes})"
+            f"latency_ms={self.latency_ms}, "
+            f"initial_delay_bytes={self.initial_delay_bytes}), "
+            f"cache={self.cache.base}"
         )
 
     def transfer_time(self, byte_count: int):
@@ -859,17 +860,29 @@ class NetworkSimulator:
         connection_pool = asyncio.Semaphore(self.connections)
         bandwidth_pool = asyncio.Semaphore(1)
 
+        latency_error = 0.0
+
         async def latency_task(item: ShardFetchResult):
+            nonlocal latency_error
             async with connection_pool:
                 # print("Get", Channel(item.node_id.channel), item.node_id.package)
-                await asyncio.sleep(self.latency_ns / 1_000_000_000)
+                latency_start = time.monotonic()
+                await asyncio.sleep(self.latency_ms / 1000.0)
+                latency_end = time.monotonic()
+                latency_error += (self.latency_ms / 1000.0) - (latency_end - latency_start)
                 asyncio.create_task(bandwidth_task(item))
 
+        transfer_error = 0.0
+
         async def bandwidth_task(item: ShardFetchResult):
+            nonlocal transfer_error
             async with bandwidth_pool:
                 # one task at a time waits proportional to size / bandwidth
                 transfer_time = self.transfer_time(item.size)
+                transfer_start = time.monotonic()
                 await asyncio.sleep(transfer_time)
+                transfer_end = time.monotonic()
+                transfer_error += transfer_time - (transfer_end - transfer_start)
                 self.bytes_transferred += item.size
                 self.out_queue.put([(item.node_id, item.shard)])
 
@@ -908,6 +921,8 @@ class NetworkSimulator:
 
         print("Processing nodes")
         await process_nodes()
+        print(f"Bandwidth error {transfer_error:0.3f}")
+        print(f"Latency error {latency_error:0.3f}")
 
     def index_transfer_delay(self):
         """
@@ -943,8 +958,8 @@ def repodata_index_transfer_size():
 
 # Different latency/bandwidth scenarios, loosely based on Firefox debug console.
 NETWORK_SCENARIOS = {
-    "3G": {"bandwidth_mbps": 4, "latency_ms": 100},  # want a high latency
-    "5G": {"bandwidth_mbps": 30, "latency_ms": 30},  # medium
+    "4MBPS": {"bandwidth_mbps": 4, "latency_ms": 100},  # want a high latency
+    "30MBPS": {"bandwidth_mbps": 30, "latency_ms": 30},  # medium
     "HALFGIG": {
         "bandwidth_mbps": 500,
         "latency_ms": 20,
@@ -961,13 +976,8 @@ def test_repodata_subset_network_simulator(
     benchmark, repodata_index_transfer_size, scenario_name, connections, packages
 ):
     """
-    Test RepodataSubset.reachable_pipelined with a simulated network.
-
-    This underestimates the time taken to download shards, possibly due to
-    compounded async.sleep() error. We could measure the actual start and end
-    time and then sleep more or less the next time based on the error(); or, we
-    could increment a counter with the correct latency and bandwidth delays
-    instead of sleeping in real time.
+    Test RepodataSubset.reachable_pipelined with a simulated network. Real-world
+    results may vary.
     """
 
     # May remove debugging "is thread alive" from pipelined_main_thread later.
@@ -1005,7 +1015,7 @@ def test_repodata_subset_network_simulator(
         monolithic_transfer = simulator.transfer_time(
             repodata_index_transfer_size["repodata.json.zst"]
         )
-        with _timer(f"Non-shards download {monolithic_transfer:.2f}s vs simulated traversal"):
+        with _timer(f"Non-shards transfer {monolithic_transfer:.2f}s vs simulated traversal"):
             simulator.index_transfer_delay()
             for value in channel_data.values():
                 value.reset()  # avoid already-loaded shortcut
@@ -1013,13 +1023,13 @@ def test_repodata_subset_network_simulator(
             subset.pipelined_main_thread(
                 packages, simulator.in_queue, simulator.out_queue, FakeThread(), FakeThread()
             )
-            print(f"{len(subset.nodes)} nodes found.")
-            shards_mib = (
-                simulator.bytes_transferred + repodata_index_transfer_size["repodata.json.zst"]
-            ) / (2**20)
+            shards_mib = (simulator.bytes_transferred) / (2**20)
+            shards_index_mib = +repodata_index_transfer_size["repodata_shards.msgpack.zst"] / (
+                2**20
+            )
             repodata_mib = repodata_index_transfer_size["repodata.json.zst"] / (2**20)
             print(
-                f"Shards {shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB for {packages}"
+                f"Shards {shards_index_mib:0.2f}MiB+{shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB for {packages}, {len(subset.nodes)} nodes"
             )
 
     # Missing here is the "load into LibMambaIndexHelper" step. When bandwidth
