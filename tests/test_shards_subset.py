@@ -802,6 +802,9 @@ class NetworkSimulator:
     """
     Simulate a network with configurable parallelism and bandwidth, for
     RepodataSubset.reachable_pipelined.
+
+    Not sure this does a great job of simulating http/1 vs. http/2 "10 versus
+    much more than 10 simultaneous requests".
     """
 
     def __init__(
@@ -870,7 +873,7 @@ class NetworkSimulator:
                 await asyncio.sleep(self.latency_ms / 1000.0)
                 latency_end = time.monotonic()
                 latency_error += (self.latency_ms / 1000.0) - (latency_end - latency_start)
-                asyncio.create_task(bandwidth_task(item))
+            asyncio.create_task(bandwidth_task(item))
 
         transfer_error = 0.0
 
@@ -891,6 +894,7 @@ class NetworkSimulator:
             wrap_nodes = 0
             async for node_ids in get_work():
                 # latency needs to be added after we go into the request queue. ignore the sqlite3 latency.
+                # we could afford to cache these in RAM.
                 cached = cache.retrieve_multiple_size([node_id.shard_url for node_id in node_ids])
                 found: list[tuple[NodeId, tuple[ShardDict, int]]] = []
                 not_found: list[NodeId] = []
@@ -1012,6 +1016,7 @@ def test_repodata_subset_network_simulator(
     @benchmark
     def simulate():
         simulator = build_simulator()
+        print(simulator)
         monolithic_transfer = simulator.transfer_time(
             repodata_index_transfer_size["repodata.json.zst"]
         )
