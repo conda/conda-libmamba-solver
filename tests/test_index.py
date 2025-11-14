@@ -132,7 +132,7 @@ def test_reload_channels(tmp_path: Path):
     ],
     ids=["shard-small", "shard-medium", "shard-large", "noshard", "main"],
 )
-def test_load_channel_repo_info(
+def test_load_channel_repo_info_shards(
     load_type: str,
     requested: tuple[str, ...],
     tmp_path: Path,
