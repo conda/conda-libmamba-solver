@@ -14,7 +14,6 @@ from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, SimpleQueue
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import conda.gateways.repodata
@@ -42,7 +41,7 @@ from tests.test_shards import (
     _timer,
 )
 
-if TYPE_CHECKING:
+if typing.TYPE_CHECKING:
     from collections.abc import Sequence
 
     from conda.testing.fixtures import CondaCLIFixture
@@ -817,6 +816,7 @@ class NetworkSimulator:
         self.bandwidth_mbps = bandwidth_mbps
         self.latency_ns = latency_ms * 1_000_000
         self.initial_delay_bytes = initial_delay_bytes
+        self.bytes_transferred = 0
 
         self.in_queue: SimpleQueue[Sequence[NodeId] | None] = SimpleQueue()
         self.async_queue = asyncio.Queue()
@@ -870,16 +870,22 @@ class NetworkSimulator:
                 # one task at a time waits proportional to size / bandwidth
                 transfer_time = self.transfer_time(item.size)
                 await asyncio.sleep(transfer_time)
-                # print("Got", Channel(item.node_id.channel), item.node_id.package)
+                self.bytes_transferred += item.size
                 self.out_queue.put([(item.node_id, item.shard)])
 
         async def process_nodes():
+            total_nodes = 0
+            wrap_nodes = 0
             async for node_ids in get_work():
                 # latency needs to be added after we go into the request queue. ignore the sqlite3 latency.
                 cached = cache.retrieve_multiple_size([node_id.shard_url for node_id in node_ids])
                 found: list[tuple[NodeId, tuple[ShardDict, int]]] = []
                 not_found: list[NodeId] = []
-                print("Batch size", len(node_ids))
+                wrap_nodes += len(node_ids)
+                total_nodes += len(node_ids)
+                if wrap_nodes > 100:
+                    print(f"Simulated {total_nodes} nodes")
+                    wrap_nodes %= 100
                 for node_id in node_ids:
                     if shard_info := cached.get(node_id.shard_url):
                         found.append((node_id, shard_info))
@@ -915,6 +921,7 @@ class NetworkSimulator:
 
     def run(self):
         asyncio.run(self.delay_shards())
+        print("NetworkSimulator end")
 
 
 @pytest.fixture(scope="session")
@@ -934,7 +941,25 @@ def repodata_index_transfer_size():
     return result
 
 
-def test_repodata_subset_network_simulator(repodata_index_transfer_size):
+# Different latency/bandwidth scenarios, loosely based on Firefox debug console.
+NETWORK_SCENARIOS = {
+    "3G": {"bandwidth_mbps": 4, "latency_ms": 100},  # want a high latency
+    "5G": {"bandwidth_mbps": 30, "latency_ms": 30},  # medium
+    "HALFGIG": {
+        "bandwidth_mbps": 500,
+        "latency_ms": 20,
+    },  # and low (ping time to cloudflare) option
+}
+
+
+@pytest.mark.parametrize("scenario_name", NETWORK_SCENARIOS.keys())
+@pytest.mark.parametrize("connections", [10, 20, 100])
+@pytest.mark.parametrize(
+    "packages", [["python", "celery"], ["numpy", "pandas", "scipy"]], ids=["web", "sci"]
+)
+def test_repodata_subset_network_simulator(
+    benchmark, repodata_index_transfer_size, scenario_name, connections, packages
+):
     """
     Test RepodataSubset.reachable_pipelined with a simulated network.
     """
@@ -950,27 +975,44 @@ def test_repodata_subset_network_simulator(repodata_index_transfer_size):
     # Set up test channel and root packages
     channel = Channel("conda-forge-sharded/linux-64")
     channel_data = fetch_channels([channel])
-    root_packages = ["python", "vaex"]
 
     # populate cache
-    build_repodata_subset(root_packages, [channel], algorithm="httpx")
+    build_repodata_subset(packages, [channel], algorithm="httpx")
 
-    # set up network simulator
-    simulator = NetworkSimulator(
-        connections=10,
-        bandwidth_mbps=10.0,
-        latency_ms=100,
-        cache=list(channel_data.values())[0].shards_cache,  # type: ignore[arg-type]
-        initial_delay_bytes=repodata_index_transfer_size["repodata_shards.msgpack.zst"],
-    )
+    def build_simulator():
+        # set up network simulator
+        simulator = NetworkSimulator(
+            connections=connections,
+            cache=list(channel_data.values())[0].shards_cache,  # type: ignore[arg-type]
+            initial_delay_bytes=repodata_index_transfer_size["repodata_shards.msgpack.zst"],
+            **NETWORK_SCENARIOS[scenario_name],
+        )
 
-    simulator_thread = threading.Thread(target=simulator.run)
-    simulator_thread.start()
+        simulator_thread = threading.Thread(target=simulator.run)
+        simulator_thread.start()
 
-    print()
-    print(simulator)
-    simulator.index_transfer_delay()
-    subset = RepodataSubset(channel_data.values())
-    subset.pipelined_main_thread(
-        root_packages, simulator.in_queue, simulator.out_queue, FakeThread(), FakeThread()
-    )
+        return simulator
+
+    @benchmark
+    def simulate():
+        simulator = build_simulator()
+        monolithic_transfer = simulator.transfer_time(
+            repodata_index_transfer_size["repodata.json.zst"]
+        )
+        with _timer(f"Non-shards download {monolithic_transfer:.2f}s vs simulated traversal"):
+            simulator.index_transfer_delay()
+            for value in channel_data.values():
+                value.reset()  # avoid already-loaded shortcut
+            subset = RepodataSubset(channel_data.values())
+            subset.pipelined_main_thread(
+                packages, simulator.in_queue, simulator.out_queue, FakeThread(), FakeThread()
+            )
+            print(f"{len(subset.nodes)} nodes found.")
+            shards_mib = (
+                simulator.bytes_transferred + repodata_index_transfer_size["repodata.json.zst"]
+            ) / (2**20)
+            repodata_mib = repodata_index_transfer_size["repodata.json.zst"] / (2**20)
+            print(f"Shards {shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB")
+
+    # Missing here is the "load into LibMambaIndexHelper" step. When bandwidth
+    # is high the time spent parsing repodata vs shards can dominate.
