@@ -61,16 +61,28 @@ class ShardCache:
     Handle caching for individual shards (not the index of shards).
     """
 
-    def __init__(self, base: Path):
+    def __init__(self, base: Path, create=True):
         """
         base: directory and filename prefix for cache.
         """
         self.base = base
         self.connect()
 
-    def connect(self):
+    def copy(self):
+        """
+        Copy cache with new connection. Useful for threads.
+        """
+        return ShardCache(self.base, create=False)
+
+    def connect(self, create=True):
+        """
+        Args:
+            create: if True, create table if not exists.
+        """
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
+        if not create:
+            return
         # this schema will also get confused if we merge packages into a single
         # shard, but the package name should be advisory.
         self.conn.execute(
@@ -141,4 +153,7 @@ class ShardCache:
         """
         Remove the sharded cache database.
         """
-        unlink_or_rename_to_trash(self.base / SHARD_CACHE_NAME)
+        # This function appears to support `Path()` except on Windows
+        # `os.rename(path, path + ".conda_trash")` fails:
+        self.conn.close()
+        unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
