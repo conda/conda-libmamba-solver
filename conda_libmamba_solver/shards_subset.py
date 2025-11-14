@@ -286,6 +286,10 @@ class RepodataSubset:
         self.visit_node(pending, parent_node, root_packages)
 
         def pump():
+            """
+            Find shards we already have and those we need. Submit those need to
+            cache_in_queue, those we have to shard_out_queue.
+            """
             have, need = self.drain_pending(pending, shardlikes_by_url)
             if need:
                 in_flight.update(need)
@@ -300,6 +304,9 @@ class RepodataSubset:
             pump()
             try:
                 new_shards = shard_out_queue.get(timeout=1)
+                if new_shards is None:
+                    running = False
+                    continue  # or break
                 if isinstance(new_shards, Exception):  # error propagated from worker thread
                     raise new_shards
             except queue.Empty:
@@ -322,11 +329,7 @@ class RepodataSubset:
                         f"cache_thread_alive={cache_thread.is_alive()}, "
                         f"network_thread_alive={network_thread.is_alive()}"
                     )
-                continue
-
-            if new_shards is None:
-                running = False
-                continue  # or break
+                continue  # immediately calls pump() at top of loop
 
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
