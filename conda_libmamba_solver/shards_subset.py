@@ -258,7 +258,7 @@ class RepodataSubset:
         try:
             cache_thread.start()
             network_thread.start()
-            self._reachable_pipelined_main_thread(
+            self.pipelined_main_thread(
                 root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
             )
         finally:
@@ -267,7 +267,7 @@ class RepodataSubset:
             cache_thread.join(THREAD_WAIT_TIMEOUT)
             network_thread.join(THREAD_WAIT_TIMEOUT)
 
-    def _reachable_pipelined_main_thread(
+    def pipelined_main_thread(
         self, root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
     ):
         """
