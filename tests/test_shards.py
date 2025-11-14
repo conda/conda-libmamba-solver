@@ -26,7 +26,6 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
-    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
@@ -640,32 +639,6 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     )
 
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
-
-
-def test_shards_indexhelper(prepare_shards_test):
-    """
-    Load LibMambaIndexHelper with parameters that will enable sharded repodata.
-
-    This will include a build_repodata_subset() call redundant with
-    test_build_repodata_subset().
-    """
-    channels = [Channel("conda-forge-sharded")]
-
-    class fake_in_state:
-        installed = {name: object() for name in ROOT_PACKAGES}
-        requested = ("python",)
-
-    # Would eagerly download repodata.json.zst for all channels
-    helper = LibMambaIndexHelper(
-        channels,
-        (),  # subdirs
-        "repodata.json",
-        (),
-        (),  # pkgs_dirs to load packages locally when offline
-        in_state=fake_in_state,  # type: ignore
-    )
-
-    print(helper.repos)
 
 
 def test_batch_retrieve_from_cache(prepare_shards_test: None):

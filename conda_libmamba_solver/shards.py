@@ -545,10 +545,11 @@ def fetch_shards_index(
     # If we fall back to monolithic repodata.json, the standard fetch code will
     # load the state again in text mode.
     try:
-        # by using read_bytes, a possible UnicodeDecodeError should be converted
-        # to a JSONDecodeError. But a valid json that is not a dict will fail on
-        # .update().
-        repo_cache.state.update(json.loads(repo_cache.cache_path_state.read_bytes()))
+        with repo_cache.lock("r+") as state_file:
+            # cannot use pathlib.read_text / write_text on any locked file, as
+            # it will release the lock early
+            state = json.loads(state_file.read())
+            repo_cache.state.update(state)
     except (FileNotFoundError, json.JSONDecodeError):
         pass
 
@@ -652,6 +653,19 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
     """
     # metaclass returns same channel, or casts to channel.
     channels = [Channel(c) for c in channels]  # type: ignore
+
+    # Eliminate duplicates for example if this class is called with
+    # channels=[Channel(f"{load_channel}/linux-64")],
+    # subdirs=(
+    #     "noarch",
+    #     "linux-64",
+    # ),
+    url_to_channel = dict(
+        (channel_url, Channel(channel_url))
+        for channel in channels
+        for channel_url in channel.urls(True, context.subdirs)
+    )
+
     channel_data: dict[str, ShardBase] = {}
 
     # share single disk cache for all Shards() instances
@@ -661,11 +675,8 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         futures = {
-            executor.submit(
-                fetch_shards_index, SubdirData(Channel(channel_url)), cache
-            ): channel_url
-            for channel in channels
-            for channel_url in channel.urls(True, context.subdirs)
+            executor.submit(fetch_shards_index, SubdirData(channel), cache): channel_url
+            for (channel_url, channel) in url_to_channel.items()
         }
         futures_non_sharded = {}
 

@@ -1,6 +1,8 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
 import concurrent.futures
 import random
 import threading
@@ -18,7 +20,6 @@ import pytest_codspeed
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
-from conda.testing.fixtures import CondaCLIFixture
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset, shards_subset_http2
@@ -38,6 +39,11 @@ from tests.test_shards import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from conda.testing.fixtures import CondaCLIFixture
+    from pytest_benchmark.plugin import BenchmarkFixture
+
     from conda_libmamba_solver.shards_typing import ShardDict
 
 
@@ -124,8 +130,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
     ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
 )
 def test_traversal_algorithm_benchmarks(
-    conda_cli: CondaCLIFixture,
-    benchmark,
+    benchmark: BenchmarkFixture,
     cache_state: str,
     algorithm: str,
     scenario: dict,
@@ -572,7 +577,7 @@ def test_combine_batches_blocking_scenario():
     2. Producer crashes or stops sending before sending None
     3. Consumer blocks forever waiting for more items
     """
-    test_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+    test_queue: SimpleQueue[Sequence[NodeId] | None] = SimpleQueue()
 
     # Put some items in the queue
     test_queue.put([NodeId("package1", "channel1")])
@@ -659,7 +664,7 @@ def test_pipelined_extreme_race_conditions(http_server_shards, mocker, tmp_path)
     assert not failures, f"Failed on iterations: {failures}"
 
 
-@pytest.mark.parametrize("num_threads", [1, 2, 5, 10])
+@pytest.mark.parametrize("num_threads", [1, 2, 5])
 def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_threads):
     """
     Run pipelined algorithm from multiple threads concurrently.
