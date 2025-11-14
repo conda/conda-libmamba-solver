@@ -108,7 +108,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+from conda_libmamba_solver.shards_subset import RepodataSubset, build_repodata_subset
 
 from .mamba_utils import logger_callback
 
@@ -154,6 +154,21 @@ def _is_sharded_repodata_enabled():
     Flag to see whether we should check for sharded repodata.
     """
     return context.plugins.use_sharded_repodata is True  # type: ignore
+
+
+def _sharded_repodata_strategy():
+    """
+    Which algorithm should we use to collect sharded repodata?
+    """
+    strategy = context.plugins.sharded_repodata_strategy.lower()  # type: ignore
+    if RepodataSubset.has_strategy(strategy):
+        return strategy
+    log.warning(
+        "Unknown sharded_repodata_strategy '%s', falling back to '%s'.",
+        strategy,
+        RepodataSubset.DEFAULT_STRATEGY,
+    )
+    return RepodataSubset.DEFAULT_STRATEGY
 
 
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")

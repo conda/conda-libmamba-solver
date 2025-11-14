@@ -3,12 +3,15 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import asyncio
 import concurrent.futures
 import random
 import threading
 import time
+import typing
 import urllib.parse
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, SimpleQueue
 from typing import TYPE_CHECKING
@@ -17,12 +20,13 @@ from unittest.mock import patch
 import conda.gateways.repodata
 import pytest
 import pytest_codspeed
+import requests
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
-from conda_libmamba_solver import shards_cache, shards_subset
+from conda_libmamba_solver import shards_cache, shards_subset, shards_subset_http2
 from conda_libmamba_solver.shards import ShardLike, fetch_channels, fetch_shards_index
 from conda_libmamba_solver.shards_subset import (
     NodeId,
@@ -123,7 +127,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm"))
-@pytest.mark.parametrize("algorithm", ("bfs", "pipelined"))
+@pytest.mark.parametrize("algorithm", ("bfs", "pipelined", "httpx"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
@@ -327,6 +331,44 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
 
     # Terminate with sentinel
     network_in_queue.put(None)
+
+    network_thread.join(5)
+
+
+def test_shards_network_thread_httpx(http_server_shards, shard_cache_with_data):
+    """
+    Test network retrieval thread, meant to be chained after the sqlite3 thread
+    by having network_in_queue = sqlite3 thread's network_out_queue.
+    """
+    cache, fake_shards = shard_cache_with_data
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+    found = fetch_shards_index(subdir_data)
+    assert found
+
+    network_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+    shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+
+    # this kind of thread can crash, and we don't hear back without our own
+    # handling.
+    network_thread = threading.Thread(
+        target=shards_subset_http2.network_fetch_thread_httpx,
+        args=(network_in_queue, shard_out_queue, cache, [found]),
+        daemon=False,
+    )
+
+    node_ids = [NodeId(package, found.url) for package in found.package_names]
+
+    # several batches, then None "finish thread" sentinel
+    network_in_queue.put([node_ids[0]])
+    network_in_queue.put(node_ids[1:])
+    network_in_queue.put(None)
+
+    network_thread.start()
+
+    while batch := shard_out_queue.get(timeout=1):
+        for url, shard in batch:
+            print(url, len(shard), "bytes")
 
     network_thread.join(5)
 
@@ -748,3 +790,187 @@ def test_repodata_subset_misc():
     assert tuple(
         RepodataSubset.has_strategy(strategy) for strategy in ("bfs", "pipelined", "squirrel")
     ) == (True, True, False)
+
+
+@dataclass
+class ShardFetchResult:
+    node_id: NodeId
+    shard: ShardDict
+    size: int
+
+
+class NetworkSimulator:
+    """
+    Simulate a network with configurable parallelism and bandwidth, for
+    RepodataSubset.reachable_pipelined.
+    """
+
+    def __init__(
+        self,
+        connections: int,
+        bandwidth_mbps: float,
+        latency_ms: int,
+        cache: shards_cache.ShardCache,
+        initial_delay_bytes=0,  # wait for this many bytes before processing nodes
+    ):
+        self.connections = connections
+        self.bandwidth_mbps = bandwidth_mbps
+        self.latency_ns = latency_ms * 1_000_000
+        self.initial_delay_bytes = initial_delay_bytes
+
+        self.in_queue: SimpleQueue[Sequence[NodeId] | None] = SimpleQueue()
+        self.async_queue = asyncio.Queue()
+        self.out_queue: SimpleQueue[list[tuple[NodeId, ShardDict] | Exception] | None] = (
+            SimpleQueue()
+        )
+
+        self.cache = cache
+
+    def __str__(self):
+        return (
+            f"NetworkSimulator(connections={self.connections}, "
+            f"bandwidth_mbps={self.bandwidth_mbps}, "
+            f"latency_ms={self.latency_ns / 1_000_000}, "
+            f"initial_delay_bytes={self.initial_delay_bytes})"
+        )
+
+    def transfer_time(self, byte_count: int):
+        """
+        Time to transfer byte_count bytes at configured bandwidth.
+        """
+        return (byte_count * 8) / (self.bandwidth_mbps * 1_000_000)
+
+    async def delay_shards(self):
+        """
+        Delay shards based on connections, bandwidth, and latency.
+        """
+        cache = self.cache.copy()
+
+        async def get_work() -> typing.AsyncGenerator[Sequence[NodeId], None]:
+            with concurrent.futures.ThreadPoolExecutor() as thread_pool:
+                while True:
+                    batch = await asyncio.get_running_loop().run_in_executor(
+                        thread_pool, self.in_queue.get
+                    )
+                    if batch is None:
+                        break
+                    yield batch
+
+        connection_pool = asyncio.Semaphore(self.connections)
+        bandwidth_pool = asyncio.Semaphore(1)
+
+        async def latency_task(item: ShardFetchResult):
+            async with connection_pool:
+                # print("Get", Channel(item.node_id.channel), item.node_id.package)
+                await asyncio.sleep(self.latency_ns / 1_000_000_000)
+                asyncio.create_task(bandwidth_task(item))
+
+        async def bandwidth_task(item: ShardFetchResult):
+            async with bandwidth_pool:
+                # one task at a time waits proportional to size / bandwidth
+                transfer_time = self.transfer_time(item.size)
+                await asyncio.sleep(transfer_time)
+                # print("Got", Channel(item.node_id.channel), item.node_id.package)
+                self.out_queue.put([(item.node_id, item.shard)])
+
+        async def process_nodes():
+            async for node_ids in get_work():
+                # latency needs to be added after we go into the request queue. ignore the sqlite3 latency.
+                cached = cache.retrieve_multiple_size([node_id.shard_url for node_id in node_ids])
+                found: list[tuple[NodeId, tuple[ShardDict, int]]] = []
+                not_found: list[NodeId] = []
+                print("Batch size", len(node_ids))
+                for node_id in node_ids:
+                    if shard_info := cached.get(node_id.shard_url):
+                        found.append((node_id, shard_info))
+                    else:
+                        not_found.append(node_id)
+                        print(f"Simulator wants full cache, but missing {node_id.shard_url}")
+                        self.out_queue.put(None)
+                        return
+
+                for node_id, (shard, size) in found:
+                    asyncio.create_task(
+                        latency_task(
+                            ShardFetchResult(
+                                node_id=node_id,
+                                shard=shard,
+                                size=size,
+                            )
+                        )
+                    )
+
+        print("Processing nodes")
+        await process_nodes()
+
+    def index_transfer_delay(self):
+        """
+        Call before RepodataSubset.build_repodata_subset to simulate initial index transfer delay.
+        """
+        index_transfer = self.transfer_time(self.initial_delay_bytes)
+        print(
+            f"Wait to transfer repodata_shards.msgpack.zst ({self.initial_delay_bytes} bytes, {index_transfer:.2f} s)"
+        )
+        time.sleep(index_transfer)
+
+    def run(self):
+        asyncio.run(self.delay_shards())
+
+
+@pytest.fixture(scope="session")
+def repodata_index_transfer_size():
+    """
+    Determine the transfer size of the shards index for use in network simulator.
+    """
+    channel = Channel("conda-forge-sharded/linux-64")
+    urls = channel.urls()
+    result = {}
+    session = requests.Session()
+    for filename in "repodata_shards.msgpack.zst", "repodata.json.zst":
+        total_size = 0
+        for url in urls:
+            total_size += int(session.head(f"{url}/{filename}").headers.get("Content-Length", 0))
+        result[filename] = total_size
+    return result
+
+
+def test_repodata_subset_network_simulator(repodata_index_transfer_size):
+    """
+    Test RepodataSubset.reachable_pipelined with a simulated network.
+    """
+
+    # May remove debugging "is thread alive" from pipelined_main_thread later.
+    class FakeThread:
+        def is_alive(self):
+            return True
+
+        def join(self, timeout=None):
+            pass
+
+    # Set up test channel and root packages
+    channel = Channel("conda-forge-sharded/linux-64")
+    channel_data = fetch_channels([channel])
+    root_packages = ["python", "vaex"]
+
+    # populate cache
+    build_repodata_subset(root_packages, [channel], algorithm="httpx")
+
+    # set up network simulator
+    simulator = NetworkSimulator(
+        connections=10,
+        bandwidth_mbps=10.0,
+        latency_ms=100,
+        cache=list(channel_data.values())[0].shards_cache,  # type: ignore[arg-type]
+        initial_delay_bytes=repodata_index_transfer_size["repodata_shards.msgpack.zst"],
+    )
+
+    simulator_thread = threading.Thread(target=simulator.run)
+    simulator_thread.start()
+
+    print()
+    print(simulator)
+    simulator.index_transfer_delay()
+    subset = RepodataSubset(channel_data.values())
+    subset.pipelined_main_thread(
+        root_packages, simulator.in_queue, simulator.out_queue, FakeThread(), FakeThread()
+    )
