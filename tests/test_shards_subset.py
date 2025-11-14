@@ -810,12 +810,12 @@ class NetworkSimulator:
         bandwidth_mbps: float,
         latency_ms: int,
         cache: shards_cache.ShardCache,
-        initial_delay_bytes=0,  # wait for this many bytes before processing nodes
+        index_delay_bytes=0,  # wait for this many bytes before processing nodes
     ):
         self.connections = connections
         self.bandwidth_mbps = bandwidth_mbps
         self.latency_ms = latency_ms
-        self.initial_delay_bytes = initial_delay_bytes
+        self.index_delay_bytes = index_delay_bytes
         self.bytes_transferred = 0
 
         self.in_queue: SimpleQueue[Sequence[NodeId] | None] = SimpleQueue()
@@ -831,7 +831,7 @@ class NetworkSimulator:
             f"NetworkSimulator(connections={self.connections}, "
             f"bandwidth_mbps={self.bandwidth_mbps}, "
             f"latency_ms={self.latency_ms}, "
-            f"initial_delay_bytes={self.initial_delay_bytes}), "
+            f"index_delay_bytes={self.index_delay_bytes}), "
             f"cache={self.cache.base}"
         )
 
@@ -928,9 +928,9 @@ class NetworkSimulator:
         """
         Call before RepodataSubset.build_repodata_subset to simulate initial index transfer delay.
         """
-        index_transfer = self.transfer_time(self.initial_delay_bytes)
+        index_transfer = self.transfer_time(self.index_delay_bytes)
         print(
-            f"Wait to transfer repodata_shards.msgpack.zst ({self.initial_delay_bytes} bytes, {index_transfer:.2f} s)"
+            f"Wait to transfer repodata_shards.msgpack.zst ({self.index_delay_bytes} bytes, {index_transfer:.2f} s)"
         )
         time.sleep(index_transfer)
 
@@ -1000,7 +1000,7 @@ def test_repodata_subset_network_simulator(
         simulator = NetworkSimulator(
             connections=connections,
             cache=list(channel_data.values())[0].shards_cache,  # type: ignore[arg-type]
-            initial_delay_bytes=repodata_index_transfer_size["repodata_shards.msgpack.zst"],
+            index_delay_bytes=repodata_index_transfer_size["repodata_shards.msgpack.zst"],
             **NETWORK_SCENARIOS[scenario_name],
         )
 
