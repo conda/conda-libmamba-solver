@@ -81,6 +81,7 @@ async def _network_fetch_loop_httpx(
             task.add_done_callback(handle_result)
             tasks.add(task)
 
+        # this loop is unnecessary as handle_result sends results to shard_out_queue
         for task in asyncio.as_completed(tasks):
             try:
                 result = await task
