@@ -962,6 +962,12 @@ def test_repodata_subset_network_simulator(
 ):
     """
     Test RepodataSubset.reachable_pipelined with a simulated network.
+
+    This underestimates the time taken to download shards, possibly due to
+    compounded async.sleep() error. We could measure the actual start and end
+    time and then sleep more or less the next time based on the error(); or, we
+    could increment a counter with the correct latency and bandwidth delays
+    instead of sleeping in real time.
     """
 
     # May remove debugging "is thread alive" from pipelined_main_thread later.
@@ -1012,7 +1018,9 @@ def test_repodata_subset_network_simulator(
                 simulator.bytes_transferred + repodata_index_transfer_size["repodata.json.zst"]
             ) / (2**20)
             repodata_mib = repodata_index_transfer_size["repodata.json.zst"] / (2**20)
-            print(f"Shards {shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB")
+            print(
+                f"Shards {shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB for {packages}"
+            )
 
     # Missing here is the "load into LibMambaIndexHelper" step. When bandwidth
     # is high the time spent parsing repodata vs shards can dominate.
