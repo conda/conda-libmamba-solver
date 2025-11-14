@@ -970,7 +970,7 @@ NETWORK_SCENARIOS = {
 @pytest.mark.parametrize("scenario_name", NETWORK_SCENARIOS.keys())
 @pytest.mark.parametrize("connections", [10, 20, 100])
 @pytest.mark.parametrize(
-    "packages", [["python", "celery"], ["numpy", "pandas", "scipy"]], ids=["web", "sci"]
+    "packages", [["python"], ["django", "celery"], ["vaex"]], ids=["python", "django", "vaex"]
 )
 def test_repodata_subset_network_simulator(
     benchmark, repodata_index_transfer_size, scenario_name, connections, packages
