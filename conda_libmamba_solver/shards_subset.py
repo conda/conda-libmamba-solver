@@ -235,8 +235,6 @@ class RepodataSubset:
         fetch from cache, and fetch from network.
         """
 
-        self.nodes = {}
-
         # Ignore cache on shards object, use our own. Necessary if there are no
         # sharded channels.
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
@@ -257,17 +255,41 @@ class RepodataSubset:
             daemon=True,
         )
 
+        try:
+            cache_thread.start()
+            network_thread.start()
+            self.pipelined_main_thread(
+                root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
+            )
+        finally:
+            cache_in_queue.put(None)
+            # These should finish almost immediately, but if not, raise an error:
+            cache_thread.join(THREAD_WAIT_TIMEOUT)
+            network_thread.join(THREAD_WAIT_TIMEOUT)
+
+    def pipelined_main_thread(
+        self, root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
+    ):
+        """
+        Run reachibility algorithm given queues to submit and receive shards.
+        """
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending: set[NodeId] = set()
         in_flight: set[NodeId] = set()
         timeouts = 0
         shutdown_initiated = False
 
+        self.nodes = {}
+
         # create start condition
         parent_node = Node(0)
         self.visit_node(pending, parent_node, root_packages)
 
         def pump():
+            """
+            Find shards we already have and those we need. Submit those need to
+            cache_in_queue, those we have to shard_out_queue.
+            """
             have, need = self.drain_pending(pending, shardlikes_by_url)
             if need:
                 in_flight.update(need)
@@ -277,64 +299,52 @@ class RepodataSubset:
                 shard_out_queue.put(have)
             return len(have) + len(need)
 
-        try:
-            cache_thread.start()
-            network_thread.start()
-            running = True
-            while running:
-                pump()
-                try:
-                    new_shards = shard_out_queue.get(timeout=1)
-                    if isinstance(new_shards, Exception):  # error propagated from worker thread
-                        raise new_shards
-                except queue.Empty:
-                    pump_count = pump()
-                    log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
-                    log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
-                    log.debug(
-                        "in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10]
-                    )
-                    log.debug("nodes: %d", len(self.nodes))
-                    log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
-                    log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
-                    log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-                    if not pending and not in_flight:
-                        log.debug("All shards have finished processing")
-                        break
-                    timeouts += 1
-                    if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
-                        raise TimeoutError(
-                            f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
-                            f"pending={len(pending)}, in_flight={len(in_flight)}, "
-                            f"cache_thread_alive={cache_thread.is_alive()}, "
-                            f"network_thread_alive={network_thread.is_alive()}"
-                        )
-                    continue
-
+        running = True
+        while running:
+            pump()
+            try:
+                new_shards = shard_out_queue.get(timeout=1)
                 if new_shards is None:
                     running = False
                     continue  # or break
+                if isinstance(new_shards, Exception):  # error propagated from worker thread
+                    raise new_shards
+            except queue.Empty:
+                pump_count = pump()
+                log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
+                log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
+                log.debug("in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10])
+                log.debug("nodes: %d", len(self.nodes))
+                log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
+                log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
+                log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
+                if not pending and not in_flight:
+                    log.debug("All shards have finished processing")
+                    break
+                timeouts += 1
+                if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+                    raise TimeoutError(
+                        f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
+                        f"pending={len(pending)}, in_flight={len(in_flight)}, "
+                        f"cache_thread_alive={cache_thread.is_alive()}, "
+                        f"network_thread_alive={network_thread.is_alive()}"
+                    )
+                continue  # immediately calls pump() at top of loop
 
-                for node_id, shard in new_shards:
-                    in_flight.remove(node_id)
+            for node_id, shard in new_shards:
+                in_flight.remove(node_id)
 
-                    # add shard to appropriate ShardLike
-                    parent_node = self.nodes[node_id]
-                    shardlike = shardlikes_by_url[node_id.channel]
-                    shardlike.visit_shard(node_id.package, shard)
+                # add shard to appropriate ShardLike
+                parent_node = self.nodes[node_id]
+                shardlike = shardlikes_by_url[node_id.channel]
+                shardlike.visit_shard(node_id.package, shard)
 
-                    self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
+                self.visit_node(pending, parent_node, shard_mentioned_packages(shard))
 
-                if not pending and not in_flight and not shutdown_initiated:
-                    log.debug("Initiating shutdown: sending None to cache_in_queue")
-                    cache_in_queue.put(None)
-                    shutdown_initiated = True
-
-        finally:
-            cache_in_queue.put(None)
-            # These should finish almost immediately, but if not, raise an error:
-            cache_thread.join(THREAD_WAIT_TIMEOUT)
-            network_thread.join(THREAD_WAIT_TIMEOUT)
+            if not pending and not in_flight and not shutdown_initiated:
+                log.debug("Initiating shutdown: sending None to cache_in_queue")
+                cache_in_queue.put(None)
+                shutdown_initiated = True
 
     def visit_node(
         self, pending: set[NodeId], parent_node: Node, mentioned_packages: Iterable[str]
