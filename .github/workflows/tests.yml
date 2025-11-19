@@ -37,6 +37,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
+  CONDA_REF: main # possible to set a tag or version for more stable tests
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -106,6 +107,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          ref: ${{ env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -266,6 +268,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          ref: ${{ env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -540,6 +543,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          ref: ${{ env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
