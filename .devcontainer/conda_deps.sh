@@ -10,6 +10,11 @@
 
 set -euo pipefail
 
+HERE=$(dirname $0)
+BASE_CONDA=${BASE_CONDA:-/opt/conda}
+SRC_CONDA=${SRC_CONDA:-/workspaces/conda}
+SRC_CONDA_LIBMAMBA_SOLVER=${SRC_CONDA_LIBMAMBA_SOLVER:-/workspaces/conda-libmamba-solver}
+
 if [ ! -f "$SRC_CONDA/pyproject.toml" ]; then
     echo "https://github.com/conda/conda not found! Please clone or mount to $SRC_CONDA"
     exit 1
