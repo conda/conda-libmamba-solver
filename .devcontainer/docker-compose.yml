@@ -4,9 +4,9 @@ services:
       context: .
       dockerfile: ./network-simulator/Dockerfile
     volumes:
-      - ../../conda:/workspace/conda:cached
-      - ../../mamba:/workspace/mamba:cached
-      - ../../conda-libmamba-solver:/workspace/conda-libmamba-solver
+      - ../../conda:/workspaces/conda:cached
+      - ../../mamba:/workspaces/mamba:cached
+      - ../:/workspaces/conda-libmamba-solver
     cap_add:
       - NET_ADMIN
 
