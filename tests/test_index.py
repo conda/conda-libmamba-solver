@@ -136,7 +136,6 @@ def test_load_channel_repo_info_shards(
     load_type: str,
     requested: tuple[str, ...],
     tmp_path: Path,
-    conda_cli: CondaCLIFixture,
     monkeypatch: pytest.MonkeyPatch,
     benchmark: BenchmarkFixture,
 ):
@@ -165,7 +164,10 @@ def test_load_channel_repo_info_shards(
             pkgs_dirs=(),  # do not load local cache as a channel
             in_state=in_state,
         )
+        pass
 
+    # this fails for some reason if run twice
+    # cuda finder function crashes when run twice, sys.exit() called?
     index_helper = benchmark.pedantic(index, rounds=1)
 
     assert len(index_helper.repos) > 0

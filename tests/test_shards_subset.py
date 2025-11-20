@@ -277,7 +277,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     Test network retrieval thread, meant to be chained after the sqlite3 thread
     by having network_in_queue = sqlite3 thread's network_out_queue.
     """
-    cache, fake_shards = shard_cache_with_data
+    cache, _ = shard_cache_with_data
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
     found = fetch_shards_index(subdir_data)
@@ -883,13 +883,20 @@ class NetworkSimulator:
                 self.bytes_transferred += item.size
                 self.out_queue.put([(item.node_id, item.shard)])
 
+        sqlite_time = 0.0
+
         async def process_nodes():
+            nonlocal sqlite_time
             total_nodes = 0
             wrap_nodes = 0
             async for node_ids in get_work():
                 # latency needs to be added after we go into the request queue. ignore the sqlite3 latency.
                 # we could afford to cache these in RAM.
+                sqlite_start = time.monotonic()
                 cached = cache.retrieve_multiple_size([node_id.shard_url for node_id in node_ids])
+                sqlite_end = time.monotonic()
+                sqlite_time += sqlite_end - sqlite_start
+
                 found: list[tuple[NodeId, tuple[ShardDict, int]]] = []
                 not_found: list[NodeId] = []
                 wrap_nodes += len(node_ids)
@@ -921,6 +928,7 @@ class NetworkSimulator:
         await process_nodes()
         print(f"Bandwidth error {transfer_error:0.3f}")
         print(f"Latency error {latency_error:0.3f}")
+        print(f"SQLite took {sqlite_time:0.3f}")
 
     def index_transfer_delay(self):
         """
@@ -966,7 +974,7 @@ NETWORK_SCENARIOS = {
 
 
 @pytest.mark.parametrize("scenario_name", NETWORK_SCENARIOS.keys())
-@pytest.mark.parametrize("connections", [10, 20, 100])
+@pytest.mark.parametrize("connections", [5, 20, 80])
 @pytest.mark.parametrize(
     "packages", [["python"], ["django", "celery"], ["vaex"]], ids=["python", "django", "vaex"]
 )
