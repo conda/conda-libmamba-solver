@@ -965,6 +965,7 @@ def repodata_index_transfer_size():
 # Different latency/bandwidth scenarios, loosely based on Firefox debug console.
 NETWORK_SCENARIOS = {
     "4MBPS": {"bandwidth_mbps": 4, "latency_ms": 100},  # want a high latency
+    "11MBPS": {"bandwidth_mbps": 11, "latency_ms": 100},  # want a high latency
     "30MBPS": {"bandwidth_mbps": 30, "latency_ms": 30},  # medium
     "HALFGIG": {
         "bandwidth_mbps": 500,
