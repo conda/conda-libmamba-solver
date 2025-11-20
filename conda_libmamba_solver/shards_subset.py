@@ -226,7 +226,12 @@ class RepodataSubset:
                     if not next_node.visited:
                         node_queue.append(next_node)
 
-    def reachable_pipelined(self, root_packages):
+    def reachable_httpx(self, root_packages):
+        from .shards_subset_http2 import network_fetch_thread_httpx
+
+        return self.reachable_pipelined(root_packages, network_fetch_thread_httpx)
+
+    def reachable_pipelined(self, root_packages, network_worker=None):
         """
         Fetch all packages reachable from `root_packages`' by following
         dependencies.
@@ -249,8 +254,11 @@ class RepodataSubset:
             daemon=True,  # may have to set to False if we ever want to run in a subinterpreter
         )
 
+        if network_worker is None:
+            network_worker = network_fetch_thread
+
         network_thread = threading.Thread(
-            target=network_fetch_thread,
+            target=network_worker,
             args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
             daemon=True,
         )
@@ -397,7 +405,7 @@ class RepodataSubset:
 def build_repodata_subset(
     root_packages: Iterable[str],
     channels: dict[str, Channel],
-    algorithm: Literal["bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
+    algorithm: Literal["bfs", "pipelined", "httpx"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
     Retrieve all necessary information to build a repodata subset.
