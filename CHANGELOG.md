@@ -17,14 +17,14 @@ Remember to update the hyperlinks at the bottom.
 
 ### Enhancements
 
-* Add experimental support [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata. It can be enabled with `conda config --set plugins.use_sharded_repodata true` or `CONDA_PLUGINS_USE_SHARDED_REPODATA=1`. (#684, #695, #696, #715 via #722, #730, #748, #736, #756, #762)
-  * When sharded repodata is enabled, the solver will check every channel for an index,
+* Add experimental support for [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata. Enable it with `conda config --set plugins.use_sharded_repodata true` or `CONDA_PLUGINS_USE_SHARDED_REPODATA=1`. (#684, #695, #696, #715 via #722, #730, #748, #736, #756, #762)
+  * When sharded repodata is enabled, the solver checks every channel for an index,
   `repodata_shards.msgpack.zst`, and re-checks every 7 days if not found. It builds a subset of
   repodata by recursively traversing the dependencies of all installed and requested packages,
   using shards to fetch only the package metadata that could possibly be part of the solution from
   each channel. This smaller amount of package metadata is sent to the solver. Sharded repodata can
   save a significant amount of bandwidth and memory when installing packages.
-  * Shards are cached in a sqlite database in `${CONDA_PREFIX}/pkgs/cache/repodata_shards.db`.
+  * Cache shards in a sqlite database in `${CONDA_PREFIX}/pkgs/cache/repodata_shards.db`.
   * This implementation does not use shards for `conda search` or other repodata uses that do not
   include a solve.
 * Add support for [CEP 17](https://conda.org/learn/ceps/cep-0017/) `python_site_packages_path`. (#560 via #628)
@@ -47,7 +47,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### Docs
 
-* Updated documentation to reflect that the cudatoolkit/cpuonly issue has been resolved for the libmamba solver. (#131)
+* Update documentation to reflect that the cudatoolkit/cpuonly issue has been resolved for the libmamba solver. (#131)
 
 ### Other
 
