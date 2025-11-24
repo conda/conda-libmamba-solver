@@ -402,7 +402,9 @@ class LibMambaIndexHelper:
         self, root_packages: tuple[str, ...], urls_to_channel: dict[str, Channel]
     ) -> dict[str, ShardBase]:
         # split into a separate method for tests
-        return build_repodata_subset(root_packages, urls_to_channel)
+        return build_repodata_subset(
+            root_packages, urls_to_channel, algorithm=_sharded_repodata_strategy()
+        )
 
     def _load_channel_repo_info_json(
         self, urls_to_channel: dict[str, Channel], try_solv: bool
