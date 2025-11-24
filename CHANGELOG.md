@@ -17,45 +17,29 @@ Remember to update the hyperlinks at the bottom.
 
 ### Enhancements
 
-* Add support for CEP 17 `python_site_packages_path`. (#560 via #628)
-* Support sharded repodata [CEP 16](https://conda.org/learn/ceps/cep-0016) when
-  enabled by a flag or environment variable. When sharded repodata is enabled,
-  the solver will check every channel for an index,
-  "repodata_shards.msgpack.zst", and re-checks every 7 days if not found. It
-  builds a subset of repodata by recursively traversing the dependencies of all
-  installed and requested packages, using shards to fetch only the package
-  metadata that could possibly be part of the solution from each channel. This
-  smaller amount of package metadata is sent to the solver. Sharded repodata can
+* Add experimental support [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata. It can be enabled with `conda config --set plugins.use_sharded_repodata true` or `CONDA_PLUGINS_USE_SHARDED_REPODATA=1`. (#684, #695, #696, #715 via #722, #730, #748, #736, #756, #762)
+  * When sharded repodata is enabled, the solver will check every channel for an index,
+  `repodata_shards.msgpack.zst`, and re-checks every 7 days if not found. It builds a subset of
+  repodata by recursively traversing the dependencies of all installed and requested packages,
+  using shards to fetch only the package metadata that could possibly be part of the solution from
+  each channel. This smaller amount of package metadata is sent to the solver. Sharded repodata can
   save a significant amount of bandwidth and memory when installing packages.
-  (#684)
-* Shards are cached in a sqlite database in
-  $(CONDA_PREFIX)/pkgs/cache/repodata_shards.db
-* This implementation does not use shards for "conda search" or other repodata
-  uses that do not include a solve.
-* Add sqlite3-based sharded repodata cache. (#695)
-* Add models for sharded repodata; detect sharded repodata on server. (#696)
-* Add a new setting to control sharded repodata fetching (#715 via #722)
-* Improve shard traversal by (channel, package) instead of (package). (#730)
-* Add `pipelined` sharded repodata traversal algorithm with separate cache and network threads. (#736)
-* Add `sharded_repodata_strategy` (`CONDA_PLUGINS_SHARDED_REPODATA_STRATEGY`) to
-  choose between `bfs`, `pipelined` traversal algorithms.
+  * Shards are cached in a sqlite database in `${CONDA_PREFIX}/pkgs/cache/repodata_shards.db`.
+  * This implementation does not use shards for `conda search` or other repodata uses that do not
+  include a solve.
+* Add support for CEP 17 `python_site_packages_path`. (#560 via #628)
 * Add new messaging for when `conda` is outdated and environment is frozen (https://conda.org/learn/ceps/cep-0022/). (#753 via #766)
 * Add check for `conda-self` with frozen environment marker. (#753 via #766)
 * Add a codspeed benchmarking GitHub action and a few benchmarks (#754 via #755)
-* Add a different, more performant traversal algorithm (#762)
 
 ### Bug fixes
 
-* constrain the torchvision version in `test_pytorch_gpu`. (#659 via #661)
+* Constrain the torchvision version in `test_pytorch_gpu`. (#659 via #661)
 * Correctly record channel platform in conda-meta record files. (#662 via #663)
 * Import `CondaSolver` from its canonical location in `conda.plugins.types`. (#691)
 * The `cpuonly` mutex now correctly prevents CUDA packages from being installed, matching classic solver behavior. (#131 via #741)
-* Support sharded repodata with hash as `list(bytes)` as created by some
-  versions of rattler-index (#748)
 * Don't swallow last URL component when `base_url`, `shards_base_url` do not end
-  in / (#748)
-* Support zstd-compressed shards without size header by setting maximum output
-  size. (#748)
+  in /. (#748)
 
 ### Deprecations
 
@@ -72,6 +56,16 @@ Remember to update the hyperlinks at the bottom.
 * Add Python 3.13 to the CI matrix. (#747)
 * Test osx-64 with `conda-forge`, and osx-arm64 with `defaults`, since Anaconda does not build osx-64 dependencies anymore. (#729, #747)
 
+## Contributors
+
+* @agriyakhetarpal made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/741
+* @dholth
+* @jaimergp
+* @jezdez
+* @jjhelmus
+* @kenodegard
+* @stacynoland made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/766
+* @travishathaway
 
 
 
