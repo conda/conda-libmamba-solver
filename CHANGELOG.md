@@ -17,7 +17,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### ✨ Special Announcement ✨
 
-This release includes preliminary support for fetching [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata, a substantially more efficient way of distributing the necessary metadata to install packages in your environments. 
+This release includes preliminary support for fetching [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata, a substantially more efficient way of distributing the necessary metadata to install packages in your environments.
 
 You can try it by:
 
