@@ -19,6 +19,7 @@ from conda.models.channel import Channel
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.shards_subset import build_repodata_subset
 from conda_libmamba_solver.state import SolverInputState
+from tests.test_shards import _timer
 
 if TYPE_CHECKING:
     import os
@@ -185,8 +186,16 @@ def test_load_channel_repo_info_shards(
         ("shard", ("vaex",)),
         ("repodata", ("vaex",)),
         ("main", ()),
+        ("shard-unavailable", ("vaex",)),
     ],
-    ids=["shard-small", "shard-medium", "shard-large", "noshard", "main"],
+    ids=[
+        "shard-small",
+        "shard-medium",
+        "shard-large",
+        "noshard",
+        "main",
+        "shard-unavailable",
+    ],
 )
 def test_load_channel_repo_info_shards_parse_only(
     load_type: str,
@@ -203,11 +212,17 @@ def test_load_channel_repo_info_shards_parse_only(
     TODO: This test should eventually switch to just using conda-forge when that channel
           supports shards and not the `conda-forge-sharded` channel.
     """
-    # defaults is more than one channel but I don't think it is too significant for the test.
-    load_channel = "main" if load_type == "main" else "conda-forge-sharded"
+    # defaults is more than one channel but I don't think that matters here.
+    load_channel = {"main": "main", "shard-unavailable": "conda-forge"}.get(
+        load_type, "conda-forge-sharded"
+    )
 
-    monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
-    assert _is_sharded_repodata_enabled() == (load_type == "shard")
+    monkeypatch.setattr(
+        context.plugins,
+        "use_sharded_repodata",
+        load_type in ("shard", "shard-unavailable"),
+    )
+    assert _is_sharded_repodata_enabled() == (load_type in ("shard", "shard-unavailable"))
 
     in_state = SolverInputState(str(tmp_path / "env"), requested=requested)
 
@@ -218,10 +233,10 @@ def test_load_channel_repo_info_shards_parse_only(
 
     repodata_jsons = {}
     channel_data = {}
-    root_packages_ = ()
-    if load_type == "shard":  # shards
-        root_packages_ = (*in_state.installed.keys(), *in_state.requested)
-        channel_data = build_repodata_subset(root_packages_, urls_to_channel_)
+    root_packages_ = (*in_state.installed.keys(), *in_state.requested)
+    if load_type in ("shard", "shard-unavailable"):  # shards
+        with _timer("subset monolithic repodata.json"):
+            channel_data = build_repodata_subset(root_packages_, urls_to_channel_)
 
     else:  # no shards
         # this is an inefficient way to fetch repodata.json in the format

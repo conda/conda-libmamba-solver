@@ -785,6 +785,11 @@ def test_repodata_subset_misc():
     ) == (True, True, False)
 
 
+# endregion
+
+# region simulator
+
+
 @dataclass
 class ShardFetchResult:
     node_id: NodeId
@@ -965,8 +970,8 @@ def repodata_index_transfer_size():
 # Different latency/bandwidth scenarios, loosely based on Firefox debug console.
 NETWORK_SCENARIOS = {
     "4MBPS": {"bandwidth_mbps": 4, "latency_ms": 100},  # want a high latency
-    "11MBPS": {"bandwidth_mbps": 11, "latency_ms": 100},  # want a high latency
-    "30MBPS": {"bandwidth_mbps": 30, "latency_ms": 30},  # medium
+    "10MBPS": {"bandwidth_mbps": 10, "latency_ms": 100},  # want a high latency
+    # "30MBPS": {"bandwidth_mbps": 30, "latency_ms": 30},  # medium
     "HALFGIG": {
         "bandwidth_mbps": 500,
         "latency_ms": 20,
@@ -1037,7 +1042,7 @@ def test_repodata_subset_network_simulator(
             )
             repodata_mib = repodata_index_transfer_size["repodata.json.zst"] / (2**20)
             print(
-                f"Shards {shards_index_mib:0.2f}MiB+{shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB for {packages}, {len(subset.nodes)} nodes"
+                f"Shards index {shards_index_mib:0.2f}MiB+shards {shards_mib:0.2f}MiB vs repodata.json.zst {repodata_mib:0.2f}MiB for {packages}, {len(subset.nodes)} nodes"
             )
 
     # Missing here is the "load into LibMambaIndexHelper" step. When bandwidth
