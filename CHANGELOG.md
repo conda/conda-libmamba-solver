@@ -27,9 +27,8 @@ Remember to update the hyperlinks at the bottom.
   * Shards are cached in a sqlite database in `${CONDA_PREFIX}/pkgs/cache/repodata_shards.db`.
   * This implementation does not use shards for `conda search` or other repodata uses that do not
   include a solve.
-* Add support for CEP 17 `python_site_packages_path`. (#560 via #628)
-* Add new messaging for when `conda` is outdated and environment is frozen (https://conda.org/learn/ceps/cep-0022/). (#753 via #766)
-* Add check for `conda-self` with frozen environment marker. (#753 via #766)
+* Add support for [CEP 17](https://conda.org/learn/ceps/cep-0017/) `python_site_packages_path`. (#560 via #628)
+* Add new messaging for when `conda` is outdated, environment is [frozen](https://conda.org/learn/ceps/cep-0022/), and `conda-self` is installed. (#753 via #766)
 * Add a codspeed benchmarking GitHub action and a few benchmarks (#754 via #755)
 
 ### Bug fixes
