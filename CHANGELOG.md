@@ -15,6 +15,17 @@ Remember to update the hyperlinks at the bottom.
 
 ## 25.11.0 (2025-11-24)
 
+### ✨ Special Announcement ✨
+
+This release includes preliminary support for fetching [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata, a substantially more efficient way of distributing the necessary metadata to install packages in your environments. 
+
+You can try it by:
+
+- Enabling it in your settings with `conda config --set plugins.use_sharded_repodata true`
+- Setting this environment variable: `CONDA_PLUGINS_USE_SHARDED_REPODATA=1`
+
+Note that sharded repodata requires that the target channels expose the necessary metadata too, so it will only work with CEP-16-ready deployments. `conda-libmamba-solver` will fallback to traditional (monolithic) repodata if not available, so you can mix sharded and non-sharded channels without problems.
+
 ### Enhancements
 
 * Add experimental support for [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata. Enable it with `conda config --set plugins.use_sharded_repodata true` or `CONDA_PLUGINS_USE_SHARDED_REPODATA=1`. (#684, #695, #696, #715 via #722, #730, #748, #736, #756, #762)
@@ -23,13 +34,13 @@ Remember to update the hyperlinks at the bottom.
   repodata by recursively traversing the dependencies of all installed and requested packages,
   using shards to fetch only the package metadata that could possibly be part of the solution from
   each channel. This smaller amount of package metadata is sent to the solver. Sharded repodata can
-  save a significant amount of bandwidth and memory when installing packages.
+  save a significant amount of bandwith, memory, and parse time when installing packages.
   * Cache shards in a sqlite database in `${CONDA_PREFIX}/pkgs/cache/repodata_shards.db`.
   * This implementation does not use shards for `conda search` or other repodata uses that do not
   include a solve.
 * Add support for [CEP 17](https://conda.org/learn/ceps/cep-0017/) `python_site_packages_path`. (#560 via #628)
 * Add new messaging for when `conda` is outdated, environment is [frozen](https://conda.org/learn/ceps/cep-0022/), and `conda-self` is installed. (#753 via #766)
-* Add a codspeed benchmarking GitHub action and a few benchmarks (#754 via #755)
+* Add a codspeed benchmarking GitHub action and a few benchmarks. (#754 via #755)
 
 ### Bug fixes
 
@@ -46,6 +57,7 @@ Remember to update the hyperlinks at the bottom.
 ### Docs
 
 * Update documentation to reflect that the cudatoolkit/cpuonly issue has been resolved for the libmamba solver. (#131)
+* Document the [sharded repodata implementation](https://conda.github.io/conda-libmamba-solver/dev/sharded/). (#756, #745)
 
 ### Other
 
