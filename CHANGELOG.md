@@ -37,8 +37,6 @@ Remember to update the hyperlinks at the bottom.
 * Correctly record channel platform in conda-meta record files. (#662 via #663)
 * Import `CondaSolver` from its canonical location in `conda.plugins.types`. (#691)
 * The `cpuonly` mutex now correctly prevents CUDA packages from being installed, matching classic solver behavior. (#131 via #741)
-* Don't swallow last URL component when `base_url`, `shards_base_url` do not end
-  in /. (#748)
 
 ### Deprecations
 
