@@ -1,6 +1,7 @@
 All of the people who have made at least one contribution to conda-libmamba-solver.
 Authors are sorted alphabetically.
 
+* Agriya Khetarpal
 * Albert DeFusco
 * Christopher Ostrouchov
 * Daniel Holth
@@ -13,6 +14,7 @@ Authors are sorted alphabetically.
 * Kevin Markham
 * Klaus Zimmermann
 * Matthew R. Becker
+* Stacy Noland
 * Thomas Lam
 * Travis Hathaway
 * conda-bot
