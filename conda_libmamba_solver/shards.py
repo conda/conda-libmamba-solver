@@ -662,7 +662,7 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
     # ),
     url_to_channel = dict(
         (channel_url, Channel(channel_url))
-        for channel in channels
+        for channel in channelsaoeu
         for channel_url in channel.urls(True, context.subdirs)
     )
 
@@ -672,6 +672,8 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
     # The parallel version may reorder channels, does this matter?
+
+    non_sharded_channels = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         futures = {
@@ -686,13 +688,22 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
             if found:
                 channel_data[channel_url] = found
             else:
+                non_sharded_channels.append(Channel(channel_url))
+
+        # if all are None then don't do ShardLike... will get here very quickly once "there are no shards" is cached.
+        if not channel_data:
+            return None # caller should interpret this as falling back to the older code path
+
+        # On the other hand, shard traversal saves libmamba parse time even if there are no real shards;
+        # fallback to the old code seems to be a conservative move more than a performance one.
+        
+        # Latency penalty launching these requests here instead of when we non_sharded_channels.append()
+        for channel in non_sharded_channels:
                 futures_non_sharded[
                     executor.submit(
-                        SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed
+                        SubdirData(channel).repo_fetch.fetch_latest_parsed
                     )
                 ] = channel_url
-
-        # if all are None then don't do ShardLike...
 
         for future in concurrent.futures.as_completed(futures_non_sharded):
             channel_url = futures_non_sharded[future]
