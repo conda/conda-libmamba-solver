@@ -662,7 +662,7 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
     # ),
     url_to_channel = dict(
         (channel_url, Channel(channel_url))
-        for channel in channelsaoeu
+        for channel in channels
         for channel_url in channel.urls(True, context.subdirs)
     )
 
