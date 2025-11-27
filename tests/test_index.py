@@ -169,3 +169,43 @@ def test_load_channel_repo_info_shards(
     index_helper = benchmark.pedantic(index, rounds=1)
 
     assert len(index_helper.repos) > 0
+
+
+def test_load_mix_shard_and_no_shard_channels(
+    http_server_auth_none,
+    http_server_shards,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """
+    Ensure that shard and non-sharded channels work together.
+
+    The http_server_auth_none fixture serves the non-sharded mamba_repo channel,
+    which contains "not-sharded-package" with a dependency on "foo".
+    The http_server_shards fixture serves a sharded channel that provides "foo".
+    This test verifies that the solver can resolve dependencies across both types of channels.
+    """
+    # Enable sharded repodata
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    reset_context()
+    assert _is_sharded_repodata_enabled()
+
+    # Request not-sharded-package which depends on foo (from sharded channel)
+    requested = ("not-sharded-package",)
+    in_state = SolverInputState(str(Path(tmp_path) / "env"), requested=requested)
+    index = LibMambaIndexHelper(
+        channels=[
+            Channel(f"{http_server_auth_none}/noarch"),  # non-sharded channel
+            Channel(f"{http_server_shards}/noarch"),  # sharded channel
+        ],
+        subdirs=("noarch",),
+        installed_records=(),  # do not load installed
+        pkgs_dirs=(),  # do not load local cache as a channel
+        in_state=in_state,
+    )
+
+    # Verify that packages from both channels are loaded
+    assert index.n_packages() > 0
+
+    # Make sure the transitive dependency can be found
+    assert index.search("foo")

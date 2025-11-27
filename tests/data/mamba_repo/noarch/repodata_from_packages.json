@@ -3,10 +3,29 @@
     "subdir": "noarch"
   },
   "packages": {
+    "not-sharded-package-0.1-0.tar.bz2": {
+      "build": "0",
+      "build_number": 0,
+      "depends": [
+        "foo"
+      ],
+      "license": "BSD",
+      "license_family": "BSD",
+      "md5": "90f57bf8a88ed472b814e52fbdcb2202",
+      "name": "not-sharded-package",
+      "noarch": "generic",
+      "sha256": "c94eb387ac773b317fc22c9f7cb1ca9542dc5ad35ecb5fd9a0375e8113ab6ab2",
+      "size": 417,
+      "subdir": "noarch",
+      "timestamp": 1732737000000,
+      "version": "0.1"
+    },
     "test-package-0.1-0.tar.bz2": {
       "build": "0",
       "build_number": 0,
-      "depends": [],
+      "depends": [
+        "foo"
+      ],
       "license": "BSD",
       "license_family": "BSD",
       "md5": "2a8595f37faa2950e1b433acbe91d481",

@@ -53,6 +53,9 @@ ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data 
 # or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
 # decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
 
+# Shards index filename
+SHARDS_INDEX_FILENAME = "repodata_shards.msgpack.zst"
+
 
 def _shards_connections() -> int:
     """
@@ -480,7 +483,7 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
         headers["If-None-Match"] = str(etag)
     if last_modified:
         headers["If-Modified-Since"] = str(last_modified)
-    filename = "repodata_shards.msgpack.zst"
+    filename = SHARDS_INDEX_FILENAME
 
     with conda_http_errors(url, filename):
         timeout = (
@@ -561,7 +564,7 @@ def fetch_shards_index(
     if cache_state.should_check_format("shards"):
         # look for shards index
         shards_data = None
-        shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
+        shards_index_url = f"{sd.url_w_subdir}/{SHARDS_INDEX_FILENAME}"
 
         if not repo_cache.cache_path_shards.exists():
             # avoid 304 not modified if we don't have the file
