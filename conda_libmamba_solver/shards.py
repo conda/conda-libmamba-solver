@@ -483,9 +483,8 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
         headers["If-None-Match"] = str(etag)
     if last_modified:
         headers["If-Modified-Since"] = str(last_modified)
-    filename = SHARDS_INDEX_FILENAME
 
-    with conda_http_errors(url, filename):
+    with conda_http_errors(url, SHARDS_INDEX_FILENAME):
         timeout = (
             context.remote_connect_timeout_secs,
             context.remote_read_timeout_secs,

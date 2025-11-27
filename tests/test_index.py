@@ -195,8 +195,8 @@ def test_load_mix_shard_and_no_shard_channels(
     in_state = SolverInputState(str(Path(tmp_path) / "env"), requested=requested)
     index = LibMambaIndexHelper(
         channels=[
-            Channel(f"{http_server_auth_none}/noarch"),  # non-sharded channel
-            Channel(f"{http_server_shards}/noarch"),  # sharded channel
+            Channel(http_server_auth_none),  # non-sharded channel
+            Channel(http_server_shards),  # sharded channel
         ],
         subdirs=("noarch",),
         installed_records=(),  # do not load installed

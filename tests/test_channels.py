@@ -23,12 +23,6 @@ from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
-from .channel_testing.helpers import (
-    http_server_auth_basic,  # noqa: F401
-    http_server_auth_basic_email,  # noqa: F401
-    http_server_auth_none,  # noqa: F401
-    http_server_auth_token,  # noqa: F401
-)
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
