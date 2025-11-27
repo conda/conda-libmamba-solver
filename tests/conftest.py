@@ -10,6 +10,15 @@ pytest_plugins = (
 
 # Allow fixtures from test_shards to be available globally, specifically in
 # test_shards_subset:
+# Register channel_testing fixtures for use across all tests:
+from .channel_testing.helpers import (  # noqa: F401
+    http_server_auth_basic,
+    http_server_auth_basic_email,
+    http_server_auth_none,
+    http_server_auth_none_debug_packages,
+    http_server_auth_none_debug_repodata,
+    http_server_auth_token,
+)
 from .test_shards import (  # noqa: F401
     http_server_shards,
     prepare_shards_test,

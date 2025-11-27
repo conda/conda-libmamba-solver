@@ -73,8 +73,10 @@ and `libmamba.Repo` objects.
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import os
+import urllib.parse
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -87,6 +89,7 @@ from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
+from conda.gateways.connection.session import get_session
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -107,7 +110,9 @@ from libmambapy.specs import (
     NoArchType,
     PackageInfo,
 )
+from requests.exceptions import HTTPError
 
+from conda_libmamba_solver.shards import SHARDS_INDEX_FILENAME
 from conda_libmamba_solver.shards_subset import build_repodata_subset
 
 from .mamba_utils import logger_callback
@@ -213,6 +218,34 @@ def _package_info_from_package_dict(
         ),  # XXX packages may have either seconds or milliseconds timestamps, see convert-if-out-of-range code in conda
         **extra,
     )
+
+
+def _supports_shards(urls_to_channel: dict[str, Channel]) -> list[bool]:
+    """
+    Check if sharded repodata is enabled by sending a HEAD request.
+
+    To do this, the presence of the "repodata_shards.msgpack.zst" file" is checked
+    """
+
+    def check(url_inner: str) -> bool:
+        session = get_session(url_inner)
+        url_inner = url_inner if url_inner.endswith("/") else f"{url_inner}/"
+        sharded_url = urllib.parse.urljoin(url_inner, SHARDS_INDEX_FILENAME)
+        resp = session.head(sharded_url)
+
+        try:
+            resp.raise_for_status()
+        except HTTPError as e:
+            log.debug(f"Shards not supported for {url_inner}; reason: {e}")
+            return False
+
+        return True
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=context.repodata_threads) as executor:
+        futures = {executor.submit(check, channel_url) for channel_url in urls_to_channel.keys()}
+        supported = [future.result() for future in concurrent.futures.as_completed(futures)]
+
+    return supported
 
 
 class LibMambaIndexHelper:
@@ -364,8 +397,8 @@ class LibMambaIndexHelper:
 
         # Prefer sharded repodata loading if it's enabled
         if self.in_state and _is_sharded_repodata_enabled():
-            # TODO: It may be better to directly pass channel objects without URL encoding
-            return self._load_channel_repo_info_shards(urls_to_channel)
+            if any(_supports_shards(urls_to_channel)):
+                return self._load_channel_repo_info_shards(urls_to_channel)
 
         # Fallback to repodata.json loading
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
