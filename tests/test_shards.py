@@ -13,13 +13,12 @@ import logging
 import time
 import urllib.parse
 from contextlib import contextmanager
-from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
+import conda.gateways.repodata
 import msgpack
 import pytest
-import requests.exceptions
 import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
@@ -27,25 +26,27 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
-    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
+    _shards_connections,
     batch_retrieve_from_cache,
     fetch_shards_index,
-    shard_mentioned_packages_2,
+    shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import (
     Node,
     build_repodata_subset,
     fetch_channels,
 )
-from tests.channel_testing.helpers import _dummy_http_server
+from tests import http_test_server
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
+
     from conda_libmamba_solver.shards_typing import ShardDict, ShardsIndexDict
 
 HERE = Path(__file__).parent
@@ -122,9 +123,33 @@ FAKE_SHARD: ShardDict = {
     },
 }
 
+# This package depends on the
+FAKE_SHARD_2: ShardDict = {
+    "packages": {
+        "bar": {
+            "name": "bar",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["foo"],
+        }
+    },
+    "packages.conda": {
+        "bar": {
+            "name": "bar",
+            "version": "1",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["foo"],
+            "constrains": ["splat<3"],
+            "sha256": hashlib.sha256().digest(),
+        }
+    },
+}
 
-@pytest.fixture
-def http_server_shards(xprocess, tmp_path_factory):
+
+@pytest.fixture(scope="session")
+def http_server_shards(xprocess, tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
@@ -136,35 +161,46 @@ def http_server_shards(xprocess, tmp_path_factory):
     foo_shard_digest = hashlib.sha256(foo_shard).digest()
     (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
 
+    bar_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
+    bar_shard_digest = hashlib.sha256(bar_shard).digest()
+    (noarch / f"{bar_shard_digest.hex()}.msgpack.zst").write_bytes(bar_shard)
+
     malformed = {"follows_schema": False}
     bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
-    # XXX not-zstandard; not msgpack
     malformed_digest = hashlib.sha256(bad_schema).digest()
 
     (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
     not_zstd = b"not zstd"
-    (noarch / f"{sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
+    (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
     not_msgpack = zstandard.compress(b"not msgpack")
-    (noarch / f"{sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
+    (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
     fake_shards: ShardsIndexDict = {
         "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
-        "repodata_version": 1,
+        "version": 1,
         "shards": {
             "foo": foo_shard_digest,
+            "bar": bar_shard_digest,
             "wrong_package_name": foo_shard_digest,
             "fake_package": b"",
             "malformed": hashlib.sha256(bad_schema).digest(),
             "not_zstd": hashlib.sha256(not_zstd).digest(),
             "not_msgpack": hashlib.sha256(not_msgpack).digest(),
         },
-        "removed": [],
     }
     (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
         zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
     )
-    yield from _dummy_http_server(
-        xprocess, name="http_server_auth_none", port=0, auth="none", path=shards_repository
-    )
+
+    http = http_test_server.run_test_server(str(shards_repository))
+
+    host, port = http.socket.getsockname()[:2]
+    url_host = f"[{host}]" if ":" in host else host
+    url = f"http://{url_host}:{port}/"
+
+    yield url
+    # shutdown is checked at a polling interval, or the daemon thread will shut
+    # down when the test suite exits.
+    http.shutdown()
 
 
 def test_fetch_shards_error(http_server_shards):
@@ -189,8 +225,7 @@ def test_fetch_shards_error(http_server_shards):
     assert shard_a is not shard_c
     assert shard_a == shard_c
 
-    with pytest.raises(requests.exceptions.HTTPError):
-        # XXX this is currently trying to decompress the server's 404 response, which should be a `requests.Response.raise_for_status()`
+    with pytest.raises(conda.gateways.repodata.RepodataIsEmpty):
         found.fetch_shard("fake_package")
 
     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
@@ -206,8 +241,52 @@ def test_fetch_shards_error(http_server_shards):
         found.fetch_shard("not_msgpack")
 
 
+def test_shards_base_url():
+    shards = Shards(
+        {
+            "info": {
+                "subdir": "noarch",
+                "base_url": "",
+                "shards_base_url": "https://shards.example.com/channel-name",
+            },
+            "version": 1,
+            "shards": {"fake_package": b""},
+        },
+        "https://conda.anaconda.org/channel-name/noarch/",
+        None,  # type: ignore
+    )
+
+    assert (
+        shards.shard_url("fake_package") == "https://shards.example.com/channel-name/.msgpack.zst"
+    )
+
+    shards.shards_index["info"]["shards_base_url"] = ""
+
+    assert (
+        shards.shard_url("fake_package")
+        == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
+    )
+
+    # no-trailing-/ example from prefix.dev metadata
+    shards.url = "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst"
+    shards.shards_index["info"]["base_url"] = "https://prefix.dev/conda-forge/osx-arm64"
+    # shards_base_url should be suitable for string concatenation
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/"
+    assert (
+        shards.shard_url("fake_package") == "https://prefix.dev/conda-forge/osx-arm64/.msgpack.zst"
+    )
+
+    # relative shards_base_url
+    shards.shards_index["info"]["shards_base_url"] = "./shards/"
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/shards/"
+
+    # relative shards_base_url, with parent directory (not likely in the wild)
+    shards.shards_index["info"]["shards_base_url"] = "../shards"
+    assert shards.shards_base_url == "https://prefix.dev/conda-forge/shards/"
+
+
 def test_shard_mentioned_packages_2():
-    assert set(shard_mentioned_packages_2(FAKE_SHARD)) == set(
+    assert set(shard_mentioned_packages(FAKE_SHARD)) == set(
         (
             "bar",
             "baz",
@@ -257,12 +336,16 @@ def test_shard_cache(tmp_path: Path):
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
-def test_shard_cache_multiple(tmp_path: Path):
-    """
-    Test that retrieve_multiple() is equivalent to several retrieve() calls.
-    """
-    NUM_FAKE_SHARDS = 64
+NUM_FAKE_SHARDS = 64
 
+
+@pytest.fixture
+def shard_cache_with_data(
+    tmp_path: Path,
+) -> tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]]:
+    """
+    ShardCache with some data already inserted.
+    """
     cache = shards_cache.ShardCache(tmp_path)
     fake_shards = []
 
@@ -276,6 +359,21 @@ def test_shard_cache_multiple(tmp_path: Path):
         )
         cache.insert(annotated_shard)
         fake_shards.append(annotated_shard)
+
+    return cache, fake_shards
+
+
+def test_shard_cache_multiple(
+    tmp_path: Path,
+    shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
+):
+    """
+    Test that retrieve_multiple() is equivalent to several retrieve() calls.
+    """
+    cache, fake_shards = shard_cache_with_data
+
+    none_retrieved = cache.retrieve_multiple([])  # coverage
+    assert none_retrieved == {}
 
     start_multiple = time.monotonic_ns()
     retrieved = cache.retrieve_multiple([shard.url for shard in fake_shards])
@@ -308,30 +406,21 @@ def test_shard_cache_multiple(tmp_path: Path):
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
 
-def test_shard_cache_2():
+def test_shard_cache_clear_remove(tmp_path):
     """
-    Check that existing shards cache has been populated with matching shards,
-    package names.
+    Test clear, remove cache functions not otherwise used.
     """
-    subdir_data = SubdirData(Channel("main/noarch"))
-    # accepts directory that cache goes into, not database filename
-    cache = shards_cache.ShardCache(Path(subdir_data.cache_path_base).parent)
-    extant = {}
-    for row in cache.conn.execute("SELECT url, package, shard, timestamp FROM shards"):
-        extant[row["url"]] = shards_cache.AnnotatedRawShard(
-            url=row["url"], package=row["package"], compressed_shard=row["shard"]
-        )
+    cache = shards_cache.ShardCache(tmp_path)
 
-    # check that url's are in the url field, and package names are in the package name field
-    for url in extant:
-        if shard := cache.retrieve(url):
-            assert "://" in extant[url].url
-            assert "://" not in extant[url].package
-            for group in ("packages", "packages.conda"):
-                assert all(
-                    extant[url].package in (package["name"], "wrong_package_name")
-                    for package in shard[group].values()
-                ), f"Bad package name {extant[url].package}"
+    cache.insert(shards_cache.AnnotatedRawShard("https://bar", "bar", b"bar"))
+    assert len(list(cache.conn.execute("SELECT * FROM SHARDS"))) == 1
+
+    cache.clear_cache()
+    assert list(cache.conn.execute("SELECT * FROM SHARDS")) == []
+
+    assert (cache.base / shards_cache.SHARD_CACHE_NAME).exists()
+    cache.remove_cache()
+    assert not (cache.base / shards_cache.SHARD_CACHE_NAME).exists()
 
 
 def test_shardlike():
@@ -392,12 +481,81 @@ def test_shardlike_repr():
             "packages": {},
             "packages.conda": {},
             "info": {"base_url": "", "shards_base_url": "", "subdir": "noarch"},
+            "repodata_version": 1,
         },
         "https://conda.anaconda.org/",
     )
     cls, url, *_ = repr(shardlike).split()
     assert "ShardLike" in cls
     assert shardlike.url == url
+
+
+def test_shard_hash_as_array():
+    """
+    Test that shard hashes can be bytes or list[int], for rattler compatibility.
+    """
+    name = "package"
+    fake_shard: ShardsIndexDict = {
+        "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
+        "repodata_version": 1,
+        "shards": {
+            name: list(hashlib.sha256().digest()),  # type: ignore
+        },
+    }
+
+    fake_shard_2 = fake_shard.copy()
+    fake_shard_2["shards"] = fake_shard["shards"].copy()
+    fake_shard_2["shards"][name] = hashlib.sha256().digest()
+
+    assert isinstance(fake_shard["shards"][name], list)
+    assert isinstance(fake_shard_2["shards"][name], bytes)
+
+    index = Shards(fake_shard, "", None)  # type: ignore
+    index_2 = Shards(fake_shard_2, "", None)  # type: ignore
+
+    shard_url = index.shard_url(name)
+    shard_url_2 = index_2.shard_url(name)
+    assert shard_url == shard_url_2
+
+
+def test_shard_coverage():
+    """
+    Call Shards() methods that are not otherwise called.
+    """
+    shard = shards.Shards({"info": {"base_url": ""}}, "url", None)  # type: ignore
+    with pytest.raises(KeyError):
+        # The visit_shard() method is used for ShardLike (from monolithic
+        # repodata) and makes a package part of the generated repodata. For
+        # Shards() (from sharded repodata), we assign directly to visited and
+        # don't wind up calling visit_shard().
+        shard.visit_package("package")
+    shard.visited["package"] = {}  # type: ignore[assign]
+    assert shard.visit_package("package") == {}
+
+
+def test_ensure_hex_hash_in_record():
+    """
+    Test that ensure_hex_hash_in_record() converts bytes to hex strings.
+    """
+    name = "package"
+    sha256_hash = hashlib.sha256()
+    md5_hash = hashlib.md5()
+    for sha, md5 in [
+        (sha256_hash.digest(), md5_hash.digest()),
+        (list(sha256_hash.digest()), list(md5_hash.digest())),
+        (sha256_hash.hexdigest(), md5_hash.hexdigest()),
+    ]:
+        record = {
+            "name": name,
+            "sha256": sha,
+            "md5": md5,
+        }
+
+        updated = shards.ensure_hex_hash(record)  # type: ignore
+        assert isinstance(updated["sha256"], str)  # type: ignore
+        assert updated["sha256"] == sha256_hash.hexdigest()  # type: ignore
+        assert isinstance(updated["md5"], str)  # type: ignore
+        assert updated["md5"] == md5_hash.hexdigest()  # type: ignore
 
 
 ROOT_PACKAGES = [
@@ -466,6 +624,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 
     assert len(package_info), "no packages in subset"
 
+    print(f"{len(package_info)} packages in subset")
+
     with _timer("write_repodata_subset()"):
         repodata_size = repodata_subset_size(channel_data)
     print(f"Repodata subset would be {repodata_size} bytes as json")
@@ -479,32 +639,6 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     )
 
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
-
-
-def test_shards_indexhelper(prepare_shards_test):
-    """
-    Load LibMambaIndexHelper with parameters that will enable sharded repodata.
-
-    This will include a build_repodata_subset() call redundant with
-    test_build_repodata_subset().
-    """
-    channels = [Channel("conda-forge-sharded")]
-
-    class fake_in_state:
-        installed = {name: object() for name in ROOT_PACKAGES}
-        requested = ("vaex",)
-
-    # Would eagerly download repodata.json.zst for all channels
-    helper = LibMambaIndexHelper(
-        channels,
-        (),  # subdirs
-        "repodata.json",
-        (),
-        (),  # pkgs_dirs to load packages locally when offline
-        in_state=fake_in_state,  # type: ignore
-    )
-
-    print(helper.repos)
 
 
 def test_batch_retrieve_from_cache(prepare_shards_test: None):
@@ -549,3 +683,74 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     assert remaining == []
 
     # XXX don't call everything Shard/Shards
+
+
+class MockCache(NamedTuple):
+    """
+    Contain all the elements needed to be returned by the `mock_cache` fixture
+    """
+
+    num_shards: int
+    shards: list[shards_cache.AnnotatedRawShard]
+    cache: shards_cache.ShardCache
+
+
+@pytest.fixture()
+def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
+    """
+    Set up a mock shard cache that will be used by multiple benchmark tests.
+    """
+    cache = shards_cache.ShardCache(tmp_path)
+
+    NUM_FAKE_SHARDS = 64
+    fake_shards = []
+
+    compressor = zstandard.ZstdCompressor(level=1)
+    for i in range(NUM_FAKE_SHARDS):
+        fake_shard = {f"foo{i}": "bar"}
+        annotated_shard = shards_cache.AnnotatedRawShard(
+            f"https://foo{i}",
+            f"foo{i}",
+            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
+        )
+        cache.insert(annotated_shard)
+        fake_shards.append(annotated_shard)
+
+    yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
+
+    cache.clear_cache()
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize("retrieval_type", ["retrieve_multiple", "retrieve_single"])
+def test_shard_cache_multiple_profile(retrieval_type, mock_cache: MockCache):
+    """
+    Measure the difference between `shards_cache.retrieve_multiple` and `shards_cache.retrieve`.
+
+    `shards_cache.retrieve_multiple should be faster than `shards_cache.retrieve`.
+    """
+    if retrieval_type == "retrieve_multiple":
+        retrieved = mock_cache.cache.retrieve_multiple([shard.url for shard in mock_cache.shards])
+        assert len(retrieved) == mock_cache.num_shards
+
+    elif retrieval_type == "retrieve_single":
+        retrieved = {}
+        for i, url in enumerate([shard.url for shard in mock_cache.shards]):
+            single = mock_cache.cache.retrieve(url)
+            retrieved[url] = single
+
+        assert len(retrieved) == mock_cache.num_shards
+
+
+def test_shards_connections(monkeypatch):
+    """
+    Test _shards_connections() and execute all its code.
+    """
+    assert context.repodata_threads is None
+    assert _shards_connections() == 10  # requests' default
+
+    monkeypatch.setattr(shards, "SHARDS_CONNECTIONS_DEFAULT", 7)
+    assert _shards_connections() == 7
+
+    monkeypatch.setattr(context, "_repodata_threads", 4)
+    assert _shards_connections() == 4

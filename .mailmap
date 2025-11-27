@@ -9,6 +9,7 @@
 # This file is up-to-date if the command git log --format="%aN <%aE>" | sort -u
 # gives no duplicates.
 
+Agriya Khetarpal <74401230+agriyakhetarpal@users.noreply.github.com>
 Albert DeFusco <albert.defusco+gh@me.com>
 Christopher Ostrouchov <chris.ostrouchov@gmail.com>
 Daniel Holth <dholth@anaconda.com>
@@ -21,6 +22,7 @@ Ken Odegard <kodegard@anaconda.com>
 Kevin Markham <justmarkham@users.noreply.github.com>
 Klaus Zimmermann <klaus.zimmermann@quansight.com>
 Matthew R. Becker <beckermr@users.noreply.github.com>
+Stacy Noland <46572585+stacynoland@users.noreply.github.com>
 Thomas Lam <79589038+tl-hbk@users.noreply.github.com>
 Travis Hathaway <travis.j.hathaway@gmail.com>
 conda-bot <18747875+conda-bot@users.noreply.github.com> Conda Bot <18747875+conda-bot@users.noreply.github.com>

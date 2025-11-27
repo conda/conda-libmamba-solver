@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 
 import msgpack
 import zstandard
+from conda.gateways.disk.delete import unlink_or_rename_to_trash
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 SHARD_CACHE_NAME = "repodata_shards.db"
+ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
 
 
 @dataclass
@@ -59,16 +61,28 @@ class ShardCache:
     Handle caching for individual shards (not the index of shards).
     """
 
-    def __init__(self, base: Path):
+    def __init__(self, base: Path, create=True):
         """
         base: directory and filename prefix for cache.
         """
         self.base = base
         self.connect()
 
-    def connect(self):
+    def copy(self):
+        """
+        Copy cache with new connection. Useful for threads.
+        """
+        return ShardCache(self.base, create=False)
+
+    def connect(self, create=True):
+        """
+        Args:
+            create: if True, create table if not exists.
+        """
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
+        if not create:
+            return
         # this schema will also get confused if we merge packages into a single
         # shard, but the package name should be advisory.
         self.conn.execute(
@@ -95,7 +109,13 @@ class ShardCache:
     def retrieve(self, url) -> ShardDict | None:
         with self.conn as c:
             row = c.execute("SELECT shard FROM shards WHERE url = ?", (url,)).fetchone()
-            return msgpack.loads(zstandard.decompress(row["shard"])) if row else None  # type: ignore
+            return (
+                msgpack.loads(
+                    zstandard.decompress(row["shard"], max_output_size=ZSTD_MAX_SHARD_SIZE)
+                )
+                if row
+                else None
+            )  # type: ignore
 
     def retrieve_multiple(self, urls: list[str]) -> dict[str, ShardDict | None]:
         """
@@ -113,7 +133,27 @@ class ShardCache:
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
         with self.conn as c:
             result: dict[str, ShardDict | None] = {
-                row["url"]: msgpack.loads(dctx.decompress(row["shard"])) if row else None
+                row["url"]: msgpack.loads(
+                    dctx.decompress(row["shard"], max_output_size=ZSTD_MAX_SHARD_SIZE)
+                )
+                if row
+                else None
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result
+
+    def clear_cache(self):
+        """
+        Truncate the database by removing all rows from tables
+        """
+        with self.conn as c:
+            c.execute("DELETE FROM shards")
+
+    def remove_cache(self):
+        """
+        Remove the sharded cache database.
+        """
+        # This function appears to support `Path()` except on Windows
+        # `os.rename(path, path + ".conda_trash")` fails:
+        self.conn.close()
+        unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))

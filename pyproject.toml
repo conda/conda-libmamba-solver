@@ -14,14 +14,14 @@ classifiers = [
   "License :: OSI Approved :: BSD License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy"
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
   "conda >=25.9",
   # "libmambapy >=2",
@@ -45,7 +45,7 @@ source = "vcs"
 
 [tool.black]
 line-length = 99
-target-version = ['py38', 'py39', 'py310', 'py311', 'py312']
+target-version = ['py310', 'py311', 'py312', 'py313']
 exclude = '''
 (
       ^/conda_libmamba_solver/_libmamba\.py
@@ -86,8 +86,9 @@ markers = [
 
 [tool.ruff]
 exclude = ["conda_libmamba_solver/mamba_utils.py", "tests/data/"]
-target-version = "py39"
 line-length = 99
+show-fixes = true
+target-version = "py310"
 
 [tool.ruff.lint]
 # E, W = pycodestyle errors and warnings
@@ -122,7 +123,8 @@ flake8-type-checking = {exempt-modules = [], strict = true}
 # strict = ["**/"]
 
 [tool.coverage.report]
-exclude_lines = [
+exclude_also = [
   "pragma: no cover",
   "if TYPE_CHECKING:",
+  "\\.\\.\\.",
 ]

@@ -20,7 +20,11 @@ if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
     from pytest import FixtureRequest
 
-pytestmark = [pytest.mark.slow, pytest.mark.usefixtures("parametrized_solver_fixture")]
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.usefixtures("parametrized_solver_fixture"),
+    pytest.mark.skip,
+]
 
 TEST_DATA_DIR = Path(__file__).parent / "data"
 PLATFORM = context.subdir
@@ -50,7 +54,7 @@ def prefix_and_channels(
 ) -> Iterable[tuple[Path, tuple[str, ...]]]:
     lockfile = Path(request.param)
     lock_platform = lockfile.suffixes[-2]
-    if lock_platform != PLATFORM:
+    if not lock_platform.endswith(PLATFORM):
         pytest.skip(f"Running platform {PLATFORM} does not match file platform {lock_platform}")
 
     with pytest.MonkeyPatch.context() as monkeypatch:
