@@ -98,8 +98,6 @@ class ShardCache:
             package: package name
             raw_shard: msgpack.zst compressed shard data
         """
-        # decompress and return shard for convenience, also to validate? unless
-        # caller would rather retrieve the shard from another thread.
         with self.conn as c:
             c.execute(
                 "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
@@ -117,11 +115,21 @@ class ShardCache:
                 else None
             )  # type: ignore
 
-    def retrieve_multiple(self, urls: list[str]) -> dict[str, ShardDict | None]:
+    def retrieve_multiple(self, urls: list[str]) -> dict[str, ShardDict]:
         """
         Query database for cached shard urls.
 
-        Return a dict of urls in cache mapping to the Shard or None if not present.
+        Return a dict of urls in cache mapping to the Shard. If not in cache,
+        that url will not appear in the result.
+        """
+        return {k: v[0] for k, v in self.retrieve_multiple_size(urls).items()}
+
+    def retrieve_multiple_size(self, urls: list[str]) -> dict[str, tuple[ShardDict, int]]:
+        """
+        Query database for cached shard urls; include compressed size.
+
+        Return a dict of urls in cache mapping to the Shard, omit URLs that are
+        not found.
         """
         if not urls:
             return {}  # this optimization does not save a noticeable amount of time.
@@ -132,12 +140,13 @@ class ShardCache:
 
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
         with self.conn as c:
-            result: dict[str, ShardDict | None] = {
-                row["url"]: msgpack.loads(
-                    dctx.decompress(row["shard"], max_output_size=ZSTD_MAX_SHARD_SIZE)
+            result: dict[str, tuple[ShardDict, int]] = {
+                row["url"]: (
+                    msgpack.loads(
+                        dctx.decompress(row["shard"], max_output_size=ZSTD_MAX_SHARD_SIZE)
+                    ),
+                    len(row["shard"]),
                 )
-                if row
-                else None
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result
