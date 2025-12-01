@@ -74,11 +74,12 @@ and `libmamba.Repo` objects.
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import logging
 import os
 import urllib.parse
 from dataclasses import dataclass
-from functools import partial
+from functools import partial, wraps
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -220,6 +221,37 @@ def _package_info_from_package_dict(
     )
 
 
+def _check_state(func):
+    """
+    Check the state file (*.info.json) to see if shard support is available for the channel.
+
+    This is meant to be used as a decorator to wrap `_support_shards` to fetch the information
+    it needs from cache before submitting a network request.
+    """
+
+    @wraps(func)
+    def wrapper(urls_to_channel: dict[str, Channel]) -> bool:
+        supported = []
+        channels_to_check = {}
+
+        for url, channel in urls_to_channel.items():
+            subdir = SubdirData(channel)
+            try:
+                with subdir.repo_cache.cache_path_state.open("r") as fh:
+                    state = json.load(fh)
+                    is_supported = state.get("has_shards", {}).get("value", False)
+                    supported.append(is_supported)
+
+            except (OSError, json.JSONDecodeError, AttributeError) as exc:
+                log.debug(f"Unable to read state file for {channel}; reason: {exc}")
+                channels_to_check[url] = channel
+
+        return supported + func(channels_to_check)
+
+    return wrapper
+
+
+@_check_state
 def _supports_shards(urls_to_channel: dict[str, Channel]) -> list[bool]:
     """
     Check if sharded repodata is enabled by sending a HEAD request.

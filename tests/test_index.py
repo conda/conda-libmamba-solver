@@ -13,10 +13,15 @@ import pytest
 from conda.base.context import context, reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
+from conda.exceptions import DryRunExit
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
-from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
+import conda_libmamba_solver.index as index_module
+from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
+    _is_sharded_repodata_enabled,
+)
 from conda_libmamba_solver.state import SolverInputState
 
 if TYPE_CHECKING:
@@ -209,3 +214,134 @@ def test_load_mix_shard_and_no_shard_channels(
 
     # Make sure the transitive dependency can be found
     assert index.search("foo")
+
+
+def test_supports_shards_cold_cache(
+    conda_cli, http_server_auth_none, http_server_shards, monkeypatch, mocker
+):
+    """
+    Ensure cache checking operates as expected in a cold cache scenario.
+
+    This is when the state file (*.info.json) is not present
+    """
+    # Enable sharded repodata
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    reset_context()
+    assert _is_sharded_repodata_enabled()
+
+    out, err, rc = conda_cli("clean", "--all", "--yes")
+    assert rc == 0
+
+    # Create a transparent spy around _supports_shards
+    spy = mocker.spy(index_module, "get_session")
+    non_sharded_channel_url = f"{http_server_auth_none}/noarch"
+    sharded_channel_url = f"{http_server_shards}/noarch"
+
+    urls_to_channels = {
+        non_sharded_channel_url: Channel(non_sharded_channel_url),
+        sharded_channel_url: Channel(sharded_channel_url),
+    }
+
+    is_supported = index_module._supports_shards(urls_to_channels)
+
+    assert len(is_supported) == 2
+    assert False in is_supported
+    assert True in is_supported
+
+    # This means we made two network requests
+    assert mocker.call(non_sharded_channel_url) in spy.call_args_list
+    assert mocker.call(sharded_channel_url) in spy.call_args_list
+
+
+def test_supports_shards_warm_cache(
+    conda_cli, http_server_auth_none, http_server_shards, monkeypatch, mocker
+):
+    """
+    Ensure cache checking operates as expected in a warm cache scenario.
+
+    This is when the state file (*.info.json) is already present
+    """
+    # Enable sharded repodata
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    reset_context()
+    assert _is_sharded_repodata_enabled()
+
+    out, err, rc = conda_cli("clean", "--all", "--yes")
+    assert rc == 0
+
+    with pytest.raises(DryRunExit):
+        out, err, rc = conda_cli(
+            "create",
+            "--name",
+            "dry_run_test",
+            "--dry-run",
+            "--override-channels",
+            "--channel",
+            http_server_auth_none,
+            "--channel",
+            http_server_shards,
+            "test-package",
+        )
+
+    # Create a transparent spy around _supports_shards
+    spy = mocker.spy(index_module, "get_session")
+    non_sharded_channel_url = f"{http_server_auth_none}/noarch"
+    sharded_channel_url = f"{http_server_shards}/noarch"
+
+    urls_to_channels = {
+        non_sharded_channel_url: Channel(non_sharded_channel_url),
+        sharded_channel_url: Channel(sharded_channel_url),
+    }
+
+    is_supported = index_module._supports_shards(urls_to_channels)
+
+    assert is_supported == [False, True]
+
+    # This means we didn't make any network requests
+    assert spy.call_args_list == []
+
+
+def test_supports_shards_partial_cache(
+    conda_cli, http_server_auth_none, http_server_shards, monkeypatch, mocker
+):
+    """
+    Ensure cache checking operates as expected in a warm cache scenario.
+
+    This is when the state file (*.info.json) is already present
+    """
+    # Enable sharded repodata
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    reset_context()
+    assert _is_sharded_repodata_enabled()
+
+    out, err, rc = conda_cli("clean", "--all", "--yes")
+    assert rc == 0
+
+    with pytest.raises(DryRunExit):
+        out, err, rc = conda_cli(
+            "create",
+            "--name",
+            "dry_run_test",
+            "--dry-run",
+            "--override-channels",
+            "--channel",
+            http_server_auth_none,
+            "test-package",
+        )
+
+    # Create a transparent spy around _supports_shards
+    spy = mocker.spy(index_module, "get_session")
+    non_sharded_channel_url = f"{http_server_auth_none}/noarch"
+    sharded_channel_url = f"{http_server_shards}/noarch"
+
+    urls_to_channels = {
+        non_sharded_channel_url: Channel(non_sharded_channel_url),
+        sharded_channel_url: Channel(sharded_channel_url),
+    }
+
+    is_supported = index_module._supports_shards(urls_to_channels)
+
+    assert is_supported == [False, True]
+
+    # We only loaded a single channel, so we should have made a single network request
+    assert mocker.call(sharded_channel_url) in spy.call_args_list
