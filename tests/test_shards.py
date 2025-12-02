@@ -754,3 +754,27 @@ def test_shards_connections(monkeypatch):
 
     monkeypatch.setattr(context, "_repodata_threads", 4)
     assert _shards_connections() == 4
+
+
+def test_remove_legacy_packages():
+    simple = {
+        "packages": {"a.tar.bz2": {}, "b.tar.bz2": {}},
+        "packages.conda": {
+            "a.conda": {},
+        },
+    }
+    trimmed = shards.remove_legacy_packages(simple)
+    assert trimmed["packages"] == {"b.tar.bz2": {}}
+
+    for channel in "conda-forge/linux-64", "https://repo.anaconda.com/pkgs/main/linux-64":
+        # Channel("main/linux-64") has zero "packages.conda"??
+        repodata, _ = SubdirData(Channel(channel)).repo_fetch.fetch_latest_parsed()
+        print(
+            f"Original {channel} has {len(repodata['packages'])} .tar.bz2 packages and {len(repodata['packages.conda'])} .conda packages"
+        )
+
+        repodata_no_legacy_packages = shards.remove_legacy_packages(repodata)
+
+        print(
+            f"Trimmed {channel} has {len(repodata_no_legacy_packages['packages'])} .tar.bz2 packages and {len(repodata['packages.conda'])} .conda packages"
+        )
