@@ -587,4 +587,30 @@ def network_fetch_thread(
         # fetch() function. Also possible to shutdown(wait=False).
 
 
+@exception_to_queue
+def offline_nofetch_thread(
+    in_queue: Queue[Sequence[NodeId | Future] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    cache: ShardCache,
+    shardlikes: list[ShardBase],
+):
+    """
+    For offline mode, where network requests are not allowed.
+    Pretend that every network request is an empty shard.
+    Don't save those to the cache.
+    
+    Depending on how many shards are in sqlite3 and which packages were requested, the user may or may not get enough repodata for a solution.
+
+    Args:
+        in_queue: NodeId (URLs) to fetch.
+        shard_out_queue: fetched shards sent to queue.
+        cache: once shards are decoded they are stored in cache.
+        shardlikes: list of (network-only) shard index objects.
+    """
+
+    for node_ids in combine_batches_until_none(in_queue):
+        for node_id in node_ids:
+            shard_out_queue.put([(node_id, {"packages":{}, "packages.conda":{})])
+
+
 # endregion
