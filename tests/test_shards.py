@@ -35,6 +35,7 @@ from conda_libmamba_solver.shards import (
     _shards_connections,
     batch_retrieve_from_cache,
     fetch_shards_index,
+    repodata_shards,
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import (
@@ -754,3 +755,69 @@ def test_shards_connections(monkeypatch):
 
     monkeypatch.setattr(context, "_repodata_threads", 4)
     assert _shards_connections() == 4
+
+
+def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
+    """
+    Test that expired cached shards are used when offline mode is enabled.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+
+    # Populate cache
+    found = fetch_shards_index(subdir_data)
+    assert found is not None
+
+    repo_cache = subdir_data.repo_fetch.repo_cache
+    assert repo_cache.cache_path_shards.exists()
+
+    # Make cache stale by setting refresh_ns to 1 day ago
+    cache_state = repo_cache.state
+    cache_state["refresh_ns"] = time.time_ns() - (24 * 60 * 60 * 1_000_000_000)
+
+    # Persist stale timestamp
+    with repo_cache.lock("r+") as state_file:
+        state_file.seek(0)
+        state_file.truncate()
+        # Convert RepodataState to dict for JSON serialization
+        state_dict = dict(cache_state)
+        json.dump(state_dict, state_file)
+
+    assert repo_cache.stale()
+
+    # Enable offline mode and fetch
+    monkeypatch.setattr(context, "offline", True)
+    reset_context()
+    caplog.clear()
+
+    found_offline = fetch_shards_index(subdir_data)
+    assert found_offline is not None
+
+    # Verify warning about expired cache
+    warning_messages = [record.message for record in caplog.records if record.levelname == "WARNING"]
+    assert any("expired" in msg.lower() and "offline" in msg.lower() for msg in warning_messages)
+
+
+def test_offline_mode_no_cache(http_server_shards, monkeypatch):
+    """
+    Test that offline mode falls back gracefully when no cache exists.
+
+    When offline and no cache exists, the system should fall back to non-sharded repodata
+    rather than failing.
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+
+    # Remove cache if it exists
+    repo_cache = subdir_data.repo_fetch.repo_cache
+    if repo_cache.cache_path_shards.exists():
+        repo_cache.cache_path_shards.unlink()
+
+    # Enable offline mode
+    monkeypatch.setattr(context, "offline", True)
+    reset_context()
+
+    # Try to fetch shards index in offline mode without cache
+    # Should return None (fallback to non-sharded repodata)
+    found = fetch_shards_index(subdir_data)
+    assert found is None
