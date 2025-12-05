@@ -469,7 +469,33 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
     Update cache state.
 
     Return shards data, either newly fetched or from cache.
+
+    In offline mode, returns cached data even if expired. If no cache exists
+    in offline mode, raises RepodataIsEmpty to signal unavailability.
     """
+    # In offline mode, return cached data if available, even if expired
+    if context.offline:
+        if cache.cache_path_shards.exists():
+            # Check if cache is stale to provide appropriate warning message
+            is_stale = cache.stale()
+            if is_stale:
+                log.warning(
+                    "Using expired cached repodata_shards for %s (offline mode). "
+                    "Data may be stale.",
+                    url,
+                )
+            else:
+                log.debug(
+                    "Using cached repodata_shards for %s (offline mode).", url
+                )
+            return cache.cache_path_shards.read_bytes()
+        else:
+            # In offline mode with no cache, signal that shards are not available.
+            # The caller (fetch_shards_index) catches RepodataIsEmpty and falls back to non-sharded repodata.
+            raise conda.gateways.repodata.RepodataIsEmpty(
+                url, status_code=404, response=None
+            )
+
     session = get_session(url)
 
     state = cache.state
@@ -571,6 +597,7 @@ def fetch_shards_index(
             # load from cache without network request
             shards_data = repo_cache.cache_path_shards.read_bytes()
 
+        # If we don't have shards_data yet, try fetching (repodata_shards handles offline mode)
         if shards_data is None:
             try:
                 shards_data = repodata_shards(shards_index_url, repo_cache)
