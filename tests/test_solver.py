@@ -700,7 +700,7 @@ def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
 def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1" if shards else "0")
     reset_context()
-    with tmp_env("python=3.14=*_cp314t") as prefix:
+    with tmp_env("python=3.14=*_cp314t", "--override-channels", "-c", "conda-forge") as prefix:
         python = PrefixData(prefix).get("python")
         tf = python.track_features
         assert tf == ("py_freethreading",)
