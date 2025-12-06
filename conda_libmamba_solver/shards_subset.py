@@ -271,7 +271,7 @@ class RepodataSubset:
         self, root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
     ):
         """
-        Run reachibility algorithm given queues to submit and receive shards.
+        Run reachability algorithm given queues to submit and receive shards.
         """
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending: set[NodeId] = set()
