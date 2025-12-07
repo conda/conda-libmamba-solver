@@ -702,5 +702,11 @@ def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
     reset_context()
     with tmp_env("python=3.14=*_cp314t", "--override-channels", "-c", "conda-forge") as prefix:
         python = PrefixData(prefix).get("python")
+        print(
+            json.dumps(
+                {k: v for k, v in python.dump().items() if k not in ("files", "paths_data")},
+                indent=2,
+            )
+        )
         tf = python.track_features
         assert tf == ("py_freethreading",)
