@@ -66,6 +66,7 @@ from typing import TYPE_CHECKING
 import conda.gateways.repodata
 import msgpack
 import zstandard
+from conda.base.context import context
 
 from conda_libmamba_solver import shards_cache
 from conda_libmamba_solver.shards_cache import AnnotatedRawShard
@@ -259,11 +260,20 @@ class RepodataSubset:
             daemon=True,  # may have to set to False if we ever want to run in a subinterpreter
         )
 
-        network_thread = threading.Thread(
-            target=network_fetch_thread,
-            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
-            daemon=True,
-        )
+        # In offline mode, use offline_nofetch_thread to return empty shards
+        # instead of attempting network requests
+        if context.offline:
+            network_thread = threading.Thread(
+                target=offline_nofetch_thread,
+                args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+                daemon=True,
+            )
+        else:
+            network_thread = threading.Thread(
+                target=network_fetch_thread,
+                args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+                daemon=True,
+            )
 
         try:
             cache_thread.start()
