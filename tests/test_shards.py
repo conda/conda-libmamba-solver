@@ -35,11 +35,11 @@ from conda_libmamba_solver.shards import (
     _shards_connections,
     batch_retrieve_from_cache,
     fetch_shards_index,
-    repodata_shards,
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import (
     Node,
+    RepodataSubset,
     build_repodata_subset,
     fetch_channels,
 )
@@ -768,6 +768,8 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     found = fetch_shards_index(subdir_data)
     assert found is not None
 
+    # TODO make sure there is something in the sqlite3 cache to find with reachable(...)
+
     repo_cache = subdir_data.repo_fetch.repo_cache
     assert repo_cache.cache_path_shards.exists()
 
@@ -793,8 +795,17 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     found_offline = fetch_shards_index(subdir_data)
     assert found_offline is not None
 
+    subset = RepodataSubset([found_offline])
+    subset.reachable_pipelined(
+        ("python",)
+    )  # need to have some shards in the cache and verify that the available ones are loaded
+    repodata = found_offline.build_repodata()
+    assert len(repodata["packages"]) + len(repodata["packages.conda"]) > 0, "no package records"
+
     # Verify warning about expired cache
-    warning_messages = [record.message for record in caplog.records if record.levelname == "WARNING"]
+    warning_messages = [
+        record.message for record in caplog.records if record.levelname == "WARNING"
+    ]
     assert any("expired" in msg.lower() and "offline" in msg.lower() for msg in warning_messages)
 
 

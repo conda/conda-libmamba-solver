@@ -194,6 +194,16 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
+    def reachable(self, root_packages, *, strategy=DEFAULT_STRATEGY) -> None:
+        """
+        Run named reachability strategy or the default.
+
+        Update `self.shardlikes` with reachable package records. Later,
+        [shardlike.build_repodata() for shardlike in shardlikes] can be used to
+        generate repodata.json-format subsets of each channel.
+        """
+        return getattr(self, f"reachable_{strategy}")(root_packages)
+
     def reachable_bfs(self, root_packages):
         """
         Fetch all packages reachable from `root_packages`' by following
@@ -414,7 +424,7 @@ def build_repodata_subset(
     channel_data = fetch_channels(channels_)
 
     subset = RepodataSubset((*channel_data.values(),))
-    getattr(subset, f"reachable_{algorithm}")(root_packages)
+    subset.reachable(root_packages)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data

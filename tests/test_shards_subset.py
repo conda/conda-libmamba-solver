@@ -168,9 +168,9 @@ def test_traversal_algorithm_benchmarks(
 
         return (subset,), {}
 
-    def target(subset):
+    def target(subset: RepodataSubset):
         with _timer(""):
-            getattr(subset, f"reachable_{algorithm}")(scenario["packages"])
+            subset.reachable(scenario["packages"])
 
     warmup_rounds = 1 if cache_state == "warm" else 0
 
