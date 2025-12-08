@@ -476,18 +476,6 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
     # In offline mode, return cached data if available, even if expired
     if context.offline:
         if cache.cache_path_shards.exists():
-            # Check if cache is stale to provide appropriate warning message
-            is_stale = cache.stale()
-            if is_stale:
-                log.warning(
-                    "Using expired cached repodata_shards for %s (offline mode). "
-                    "Data may be stale.",
-                    url,
-                )
-            else:
-                log.debug(
-                    "Using cached repodata_shards for %s (offline mode).", url
-                )
             return cache.cache_path_shards.read_bytes()
         else:
             # In offline mode with no cache, signal that shards are not available.
