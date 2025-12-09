@@ -101,6 +101,13 @@ def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     assert _is_sharded_repodata_enabled()
 
 
+# 'foo' and 'bar' have circular dependencies on each other; dependencies on
+# missing shards (which are not an error during traversal; the solver may or may
+# not complain if ran); and 'constrains' to exercise other parts of the code.
+
+# TODO may need to give these unique prefixes, version numbers ending in
+# '.tar.bz2', '.conda' to avoid confusing tar-vs-conda code. May need to create
+# a few more packages giving a richer dependency graph.
 FAKE_SHARD: ShardDict = {
     "packages": {
         "foo": {
@@ -124,7 +131,6 @@ FAKE_SHARD: ShardDict = {
     },
 }
 
-# This package depends on the
 FAKE_SHARD_2: ShardDict = {
     "packages": {
         "bar": {

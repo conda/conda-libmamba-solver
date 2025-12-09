@@ -246,6 +246,22 @@ class RepodataSubset:
         fetch from cache, and fetch from network.
         """
 
+        # In offline mode shards are retrieved from the cache database as usual,
+        # but cache misses are forwarded to offline_nofetch_thread returning
+        # empty shards.
+        if context.offline:
+            network_worker = offline_nofetch_thread
+        else:
+            network_worker = network_fetch_thread
+
+        return self._reachable_pipelined(root_packages, network_worker=network_worker)
+
+    def _reachable_pipelined(self, root_packages, network_worker=None):
+        """
+        Set up queues and threads for shard traversal with a configurable
+        network_worker. Called by reachable_pipelined()
+        """
+
         # Ignore cache on shards object, use our own. Necessary if there are no
         # sharded channels.
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
@@ -260,25 +276,16 @@ class RepodataSubset:
             daemon=True,  # may have to set to False if we ever want to run in a subinterpreter
         )
 
-        # In offline mode, use offline_nofetch_thread to return empty shards
-        # instead of attempting network requests
-        if context.offline:
-            network_thread = threading.Thread(
-                target=offline_nofetch_thread,
-                args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
-                daemon=True,
-            )
-        else:
-            network_thread = threading.Thread(
-                target=network_fetch_thread,
-                args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
-                daemon=True,
-            )
+        network_thread = threading.Thread(
+            target=network_worker,
+            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+            daemon=True,
+        )
 
         try:
             cache_thread.start()
             network_thread.start()
-            self.pipelined_main_thread(
+            self._pipelined_traversal(
                 root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
             )
         finally:
@@ -287,11 +294,11 @@ class RepodataSubset:
             cache_thread.join(THREAD_WAIT_TIMEOUT)
             network_thread.join(THREAD_WAIT_TIMEOUT)
 
-    def pipelined_main_thread(
+    def _pipelined_traversal(
         self, root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
     ):
         """
-        Run reachibility algorithm given queues to submit and receive shards.
+        Run reachability algorithm given queues to submit and receive shards.
         """
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending: set[NodeId] = set()
