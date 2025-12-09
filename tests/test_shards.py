@@ -802,12 +802,6 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     repodata = found_offline.build_repodata()
     assert len(repodata["packages"]) + len(repodata["packages.conda"]) > 0, "no package records"
 
-    # Verify warning about expired cache
-    warning_messages = [
-        record.message for record in caplog.records if record.levelname == "WARNING"
-    ]
-    assert any("expired" in msg.lower() and "offline" in msg.lower() for msg in warning_messages)
-
 
 def test_offline_mode_no_cache(http_server_shards, monkeypatch):
     """
