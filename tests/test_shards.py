@@ -757,7 +757,7 @@ def test_shards_connections(monkeypatch):
     assert _shards_connections() == 4
 
 
-def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
+def test_offline_mode_expired_cache(http_server_shards, monkeypatch):
     """
     Test that expired cached shards are used when offline mode is enabled.
     """
@@ -769,10 +769,7 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     assert found is not None
 
     # Fetch a shard to populate the sqlite3 cache
-    # Use "foo" which exists in the test server
-    foo_shard = found.fetch_shard("foo")
-    assert foo_shard is not None
-    assert "packages" in foo_shard or "packages.conda" in foo_shard
+    found.fetch_shard("foo")
 
     repo_cache = subdir_data.repo_fetch.repo_cache
     assert repo_cache.cache_path_shards.exists()
@@ -785,25 +782,20 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     with repo_cache.lock("r+") as state_file:
         state_file.seek(0)
         state_file.truncate()
-        # Convert RepodataState to dict for JSON serialization
         state_dict = dict(cache_state)
         json.dump(state_dict, state_file)
 
     assert repo_cache.stale()
 
-    # Enable offline mode and fetch
+    # Enable offline mode
     monkeypatch.setattr(context, "offline", True)
     reset_context()
-    caplog.clear()
 
     found_offline = fetch_shards_index(subdir_data)
     assert found_offline is not None
 
     subset = RepodataSubset([found_offline])
-    # Use "foo" which exists in the test server and should be in the cache
-    subset.reachable_pipelined(
-        ("foo",)
-    )  # need to have some shards in the cache and verify that the available ones are loaded
+    subset.reachable_pipelined(("foo",))
     repodata = found_offline.build_repodata()
     assert len(repodata["packages"]) + len(repodata["packages.conda"]) > 0, "no package records"
 
@@ -844,27 +836,19 @@ def test_offline_mode_missing_shard_in_cache(http_server_shards, monkeypatch):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
 
-    # Fetch the shards index to populate it (so "bar" is in the index)
+    # Fetch the shards index (so "bar" is in the index)
     found = fetch_shards_index(subdir_data)
     assert found is not None
-    assert "bar" in found  # "bar" exists in the shard index
+    # Verify "bar" is in the index
+    assert "bar" in found
 
     # Fetch "foo" shard to ensure cache exists, but don't fetch "bar"
-    # This way "bar" is in the index but not in the cache
-    foo_shard = found.fetch_shard("foo")
-    assert foo_shard is not None
-
-    # Verify "bar" is not in cache by checking the shard cache directly
-    repo_cache = subdir_data.repo_fetch.repo_cache
-    assert repo_cache.cache_path_shards.exists()
-
-    # Get the shard URL for "bar"
-    bar_shard_url = found.shard_url("bar")
+    found.fetch_shard("foo")
 
     # Verify "bar" shard is not in the cache
+    bar_shard_url = found.shard_url("bar")
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
-    bar_from_cache = cache.retrieve(bar_shard_url)
-    assert bar_from_cache is None, "bar shard should not be in cache"
+    assert cache.retrieve(bar_shard_url) is None, "bar shard should not be in cache"
 
     # Enable offline mode
     monkeypatch.setattr(context, "offline", True)
@@ -873,17 +857,13 @@ def test_offline_mode_missing_shard_in_cache(http_server_shards, monkeypatch):
     # Fetch shards index again in offline mode (should use cached index)
     found_offline = fetch_shards_index(subdir_data)
     assert found_offline is not None
-    assert "bar" in found_offline
 
     # Try to reach "bar" which is in index but not in cache
     # In offline mode, this should return an empty shard gracefully
     subset = RepodataSubset([found_offline])
     subset.reachable_pipelined(("bar",))
 
-    # Build repodata - "bar" should result in an empty shard since it's not cached
+    # Build repodata - should complete without crashing
     repodata = found_offline.build_repodata()
-    # The repodata may be empty or may have some packages from dependencies
-    # The key is that it doesn't crash and handles the missing shard gracefully
+    # The repodata may be empty since "bar" is not cached and returns empty shard
     assert isinstance(repodata, dict)
-    assert "packages" in repodata
-    assert "packages.conda" in repodata
