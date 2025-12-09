@@ -84,7 +84,7 @@ from .shards import (
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
     from queue import SimpleQueue as Queue
     from typing import Literal, TypeVar
 
@@ -249,14 +249,26 @@ class RepodataSubset:
         # In offline mode shards are retrieved from the cache database as usual,
         # but cache misses are forwarded to offline_nofetch_thread returning
         # empty shards.
-        if context.offline:
+        if context.offline or True:
             network_worker = offline_nofetch_thread
         else:
             network_worker = network_fetch_thread
 
         return self._reachable_pipelined(root_packages, network_worker=network_worker)
 
-    def _reachable_pipelined(self, root_packages, network_worker=None):
+    def _reachable_pipelined(
+        self,
+        root_packages,
+        network_worker: Callable[
+            [
+                Queue[Sequence[NodeId] | None],
+                Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+                ShardCache,
+                Sequence[ShardBase],
+            ],
+            None,
+        ],
+    ):
         """
         Set up queues and threads for shard traversal with a configurable
         network_worker. Called by reachable_pipelined()
@@ -295,7 +307,12 @@ class RepodataSubset:
             network_thread.join(THREAD_WAIT_TIMEOUT)
 
     def _pipelined_traversal(
-        self, root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
+        self,
+        root_packages,
+        cache_in_queue: Queue[list[NodeId] | None],
+        shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | Exception],
+        cache_thread: threading.Thread,
+        network_thread: threading.Thread,
     ):
         """
         Run reachability algorithm given queues to submit and receive shards.
@@ -548,7 +565,7 @@ def network_fetch_thread(
     in_queue: Queue[Sequence[NodeId | Future] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
-    shardlikes: list[ShardBase],
+    shardlikes: Sequence[ShardBase],
 ):
     """
     Fetch shards from the network that are received on in_queue, until we see
@@ -619,7 +636,7 @@ def offline_nofetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
-    shardlikes: list[ShardBase],
+    shardlikes: Sequence[ShardBase],
 ):
     """
     For offline mode, where network requests are not allowed.
