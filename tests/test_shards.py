@@ -768,7 +768,11 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     found = fetch_shards_index(subdir_data)
     assert found is not None
 
-    # TODO make sure there is something in the sqlite3 cache to find with reachable(...)
+    # Fetch a shard to populate the sqlite3 cache
+    # Use "foo" which exists in the test server
+    foo_shard = found.fetch_shard("foo")
+    assert foo_shard is not None
+    assert "packages" in foo_shard or "packages.conda" in foo_shard
 
     repo_cache = subdir_data.repo_fetch.repo_cache
     assert repo_cache.cache_path_shards.exists()
@@ -796,8 +800,9 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, caplog):
     assert found_offline is not None
 
     subset = RepodataSubset([found_offline])
+    # Use "foo" which exists in the test server and should be in the cache
     subset.reachable_pipelined(
-        ("python",)
+        ("foo",)
     )  # need to have some shards in the cache and verify that the available ones are loaded
     repodata = found_offline.build_repodata()
     assert len(repodata["packages"]) + len(repodata["packages.conda"]) > 0, "no package records"
