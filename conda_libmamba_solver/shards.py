@@ -480,9 +480,7 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
         else:
             # In offline mode with no cache, signal that shards are not available.
             # The caller (fetch_shards_index) catches RepodataIsEmpty and falls back to non-sharded repodata.
-            raise conda.gateways.repodata.RepodataIsEmpty(
-                url, status_code=404, response=None
-            )
+            raise conda.gateways.repodata.RepodataIsEmpty(url, status_code=404, response=None)
 
     session = get_session(url)
 
