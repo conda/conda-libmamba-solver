@@ -77,6 +77,7 @@ from .shards import (
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
+    remove_legacy_packages,
     shard_mentioned_packages,
 )
 
@@ -334,6 +335,10 @@ class RepodataSubset:
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
+                # TODO only call remove_legacy_packages if the ".conda" format
+                # is enabled / conda is not in ".tar.bz2 only" mode.
+                shard = remove_legacy_packages(shard)
+
                 # add shard to appropriate ShardLike
                 parent_node = self.nodes[node_id]
                 shardlike = shardlikes_by_url[node_id.channel]
@@ -343,7 +348,7 @@ class RepodataSubset:
 
             if not pending and not in_flight and not shutdown_initiated:
                 log.debug("Initiating shutdown: sending None to cache_in_queue")
-                cache_in_queue.put(None)
+                cache_in_queue.put(None)  # XXX caller also sends None
                 shutdown_initiated = True
 
     def visit_node(
