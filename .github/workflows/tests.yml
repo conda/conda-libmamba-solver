@@ -148,7 +148,8 @@ jobs:
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
-        run: conda remove --yes -n base anaconda-auth
+        run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
@@ -163,7 +164,7 @@ jobs:
 
       - name: Conda List Extra
         run: |
-          conda envs list
+          conda env list
           conda list -n base
           conda list --show-channel-urls
 
@@ -312,7 +313,7 @@ jobs:
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
-        run: conda remove --yes -n base anaconda-auth
+        run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
@@ -334,7 +335,7 @@ jobs:
 
       - name: Conda List Extra
         run: |
-          conda envs list
+          conda env list
           conda list -n base
           conda list --show-channel-urls
 
@@ -596,7 +597,7 @@ jobs:
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
-        run: conda remove --yes -n base anaconda-auth
+        run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
