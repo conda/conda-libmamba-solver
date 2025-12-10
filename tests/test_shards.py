@@ -163,7 +163,7 @@ FAKE_SHARD_2 = _shard_for_name(FAKE_REPODATA, "bar")
 
 
 @pytest.fixture(scope="session")
-def http_server_shards(xprocess, tmp_path_factory) -> Iterable[str]:
+def http_server_shards(tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
