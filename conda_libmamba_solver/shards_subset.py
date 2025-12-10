@@ -440,7 +440,7 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: dict[str, Channel],
+    channels: dict[str, Channel] | list[Channel],
     algorithm: Literal["bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
@@ -448,7 +448,7 @@ def build_repodata_subset(
 
     Params:
         root_packages: iterable of installed and requested package names
-        channels: iterable of Channel objects
+        channels: Channel objects; dict form preferred.
         algorithm: desired traversal algorithm
     """
     if isinstance(channels, dict):  # True when called by LibMambaIndexHelper

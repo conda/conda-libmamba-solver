@@ -151,6 +151,22 @@ FAKE_REPODATA = {
 }
 
 
+def _ensure_hex_hash(repodata: dict):
+    """
+    Convert every hash in a repodata to hex. Copy repodata.
+    """
+    new_repodata = {**repodata}
+    for group in ("packages", "packages.conda"):
+        for name, record in repodata[group].items():
+            record = {**record}
+            new_repodata[group][name] = record
+            for hash_type in "sha256", "md5":
+                if hash_value := record.get(hash_type):
+                    if not isinstance(hash_value, str):
+                        record[hash_type] = bytes(hash_value).hex()
+    return new_repodata
+
+
 def _shard_for_name(repodata, name):
     return {
         group: {k: v for (k, v) in repodata[group].items() if v["name"] == name}
@@ -311,7 +327,7 @@ def test_shard_mentioned_packages_2():
     )
 
     # check that the bytes hash was converted to hex
-    assert FAKE_SHARD["packages.conda"]["foo"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
+    assert FAKE_SHARD["packages.conda"]["foo.conda"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
 
 
 def test_fetch_shards_channels(prepare_shards_test: None):
@@ -813,20 +829,23 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch):
     assert len(repodata["packages"]) + len(repodata["packages.conda"]) > 0, "no package records"
 
 
-def test_offline_mode_no_cache(http_server_shards, monkeypatch):
+def test_offline_mode_no_cache(http_server_shards, monkeypatch, tmp_path):
     """
     Test that offline mode falls back gracefully when no cache exists.
 
     When offline and no cache exists, the system should fall back to non-sharded repodata
     rather than failing.
     """
+    # Guarantee empty cache as to not interfere with other tests.
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
 
     # Remove cache if it exists
     repo_cache = subdir_data.repo_fetch.repo_cache
-    if repo_cache.cache_path_shards.exists():
-        repo_cache.cache_path_shards.unlink()
+    assert not repo_cache.cache_path_shards.exists()
 
     # Enable offline mode
     monkeypatch.setattr(context, "offline", True)
@@ -838,7 +857,7 @@ def test_offline_mode_no_cache(http_server_shards, monkeypatch):
     assert found is None
 
 
-def test_offline_mode_missing_shard_in_cache(http_server_shards, monkeypatch):
+def test_offline_mode_missing_shard_in_cache(http_server_shards, tmp_path, monkeypatch):
     """
     Test that offline mode handles missing shards gracefully when the package
     exists in the shard index but the shard is not cached.
@@ -846,6 +865,11 @@ def test_offline_mode_missing_shard_in_cache(http_server_shards, monkeypatch):
     When offline and a package is in the shard index but not in cache,
     offline_nofetch_thread should return an empty shard rather than failing.
     """
+    # Guarantee empty cache; the other 'test_offline...' test can cause 'assert
+    # found is not None' to fail.
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
 
