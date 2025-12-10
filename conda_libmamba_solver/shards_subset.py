@@ -249,7 +249,7 @@ class RepodataSubset:
         # In offline mode shards are retrieved from the cache database as usual,
         # but cache misses are forwarded to offline_nofetch_thread returning
         # empty shards.
-        if context.offline or True:
+        if context.offline:
             network_worker = offline_nofetch_thread
         else:
             network_worker = network_fetch_thread
@@ -458,7 +458,7 @@ def build_repodata_subset(
     channel_data = fetch_channels(channels_)
 
     subset = RepodataSubset((*channel_data.values(),))
-    subset.reachable(root_packages)
+    subset.reachable(root_packages, strategy=algorithm)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
@@ -562,7 +562,7 @@ def cache_fetch_thread(
 
 @exception_to_queue
 def network_fetch_thread(
-    in_queue: Queue[Sequence[NodeId | Future] | None],
+    in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
     shardlikes: Sequence[ShardBase],
@@ -616,7 +616,10 @@ def network_fetch_thread(
         # Simplify waiting by putting responses back into in_queue. This
         # function is called in the ThreadPoolExecutor's thread, but we want to
         # serialize result processing in the network_fetch_thread.
-        in_queue.put([future])
+
+        # Not in our signature; the caller doesn't need to know we are putting
+        # Future in here as well.
+        in_queue.put([future])  # type: ignore
 
     with ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         for node_ids_and_results in combine_batches_until_none(in_queue):
@@ -626,6 +629,7 @@ def network_fetch_thread(
                 else:
                     future = submit(node_id_or_result)
                     future.add_done_callback(result_to_in_queue)
+
         # TODO call executor.shutdown(cancel_futures=True) on error or otherwise
         # prevent new HTTP requests from being started e.g. "skip" flag in
         # fetch() function. Also possible to shutdown(wait=False).

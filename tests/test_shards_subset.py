@@ -32,8 +32,7 @@ from conda_libmamba_solver.shards_subset import (
     exception_to_queue,
 )
 from tests.test_shards import (
-    FAKE_SHARD,
-    FAKE_SHARD_2,
+    FAKE_REPODATA,
     ROOT_PACKAGES,
     _timer,
 )
@@ -413,18 +412,22 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
     """
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
-    expected_repodata = {**FAKE_SHARD["packages"], **FAKE_SHARD_2["packages"]}
+    expected_repodata = FAKE_REPODATA
 
     # Override cache dir location for tests; ensures it's empty
     mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
 
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+    channel_data = build_repodata_subset(
+        root_packages, {channel.url() or "": channel}, algorithm=algorithm
+    )
 
     for shardlike in channel_data.values():
         # expanded in fetch_channels() "channel.urls(True, context.subdirs)"
         if "/noarch/" not in shardlike.url:
             continue
-        assert shardlike.build_repodata().get("packages") == expected_repodata
+        actual_repodata = shardlike.build_repodata()
+
+        assert actual_repodata == expected_repodata, (actual_repodata, expected_repodata)
 
 
 def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_path):
