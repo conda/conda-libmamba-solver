@@ -55,7 +55,6 @@ import logging
 import queue
 import sys
 import threading
-from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
@@ -74,8 +73,6 @@ from .shards import (
     ZSTD_MAX_SHARD_SIZE,
     Shards,
     _shards_connections,
-    batch_retrieve_from_cache,
-    batch_retrieve_from_network,
     fetch_channels,
     shard_mentioned_packages,
 )
@@ -123,20 +120,6 @@ class NodeId:
         return hash((self.package, self.channel, self.shard_url))
 
 
-def _nodes_from_packages(
-    root_packages: list[str], shardlikes: Iterable[ShardBase]
-) -> Iterator[tuple[NodeId, Node]]:
-    """
-    Yield (NodeId, Node) for all root packages found in shardlikes.
-    """
-    for package in root_packages:
-        for shardlike in shardlikes:
-            if package in shardlike:
-                node = Node(0, package, shardlike.url, shard_url=shardlike.shard_url(package))
-                node_id = node.to_id()
-                yield node_id, node
-
-
 @dataclass
 class RepodataSubset:
     nodes: dict[NodeId, Node]
@@ -153,78 +136,6 @@ class RepodataSubset:
         Return True if this class provides the named shard traversal strategy.
         """
         return hasattr(cls, f"reachable_{strategy}")
-
-    def neighbors(self, node: Node) -> Iterator[Node]:
-        """
-        Retrieve all unvisited neighbors of a node
-
-        Neighbors in the context are dependencies of a package
-        """
-        discovered = set()
-
-        for shardlike in self.shardlikes:
-            if node.package not in shardlike:
-                continue
-
-            # check that we don't fetch the same shard twice...
-            shard = shardlike.fetch_shard(
-                node.package
-            )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
-
-            for package in shard_mentioned_packages(shard):
-                node_id = NodeId(package, shardlike.url)
-
-                if node_id not in self.nodes:
-                    self.nodes[node_id] = Node(node.distance + 1, package, shardlike.url)
-                    yield self.nodes[node_id]
-
-                    if package not in discovered:
-                        # now this is per package name, not per (name, channel) tuple
-                        discovered.add(package)
-
-    def outgoing(self, node: Node):
-        """
-        All nodes that can be reached by this node, plus cost.
-        """
-        # If we set a greater cost for sharded repodata than the repodata that
-        # is already in memory and tracked nodes as (channel, package) tuples,
-        # we might be able to find more shards-to-fetch-in-parallel more
-        # quickly. On the other hand our goal is that the big channels will all
-        # be sharded.
-        for n in self.neighbors(node):
-            yield n, 1
-
-    def reachable_bfs(self, root_packages):
-        """
-        Fetch all packages reachable from `root_packages`' by following
-        dependencies using the "breadth-first search" algorithm.
-
-        Update associated `self.shardlikes` to contain enough data to build a
-        repodata subset.
-        """
-        self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
-
-        node_queue = deque(self.nodes.values())
-        sharded = [s for s in self.shardlikes if isinstance(s, Shards)]
-
-        while node_queue:
-            # Batch fetch all nodes at current level
-            to_retrieve = {node.package for node in node_queue if not node.visited}
-            if to_retrieve:
-                not_in_cache = batch_retrieve_from_cache(sharded, sorted(to_retrieve))
-                batch_retrieve_from_network(not_in_cache)
-
-            # Process one level
-            level_size = len(node_queue)
-            for _ in range(level_size):
-                node = node_queue.popleft()
-                if node.visited:  # pragma: no cover
-                    continue  # we should never add visited nodes to node_queue
-                node.visited = True
-
-                for next_node, _ in self.outgoing(node):
-                    if not next_node.visited:
-                        node_queue.append(next_node)
 
     def reachable_pipelined(self, root_packages):
         """

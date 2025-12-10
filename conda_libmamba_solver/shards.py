@@ -176,20 +176,6 @@ class ShardBase(abc.ABC):
         """
         self.visited[package] = shard
 
-    @abc.abstractmethod
-    def fetch_shard(self, package: str) -> ShardDict:
-        """
-        Fetch an individual shard for the given package.
-        """
-        ...
-
-    @abc.abstractmethod
-    def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
-        """
-        Fetch multiple shards in one go.
-        """
-        ...
-
     def build_repodata(self) -> RepodataDict:
         """
         Return monolithic repodata including all visited shards.
@@ -393,74 +379,6 @@ class Shards(ShardBase):
         shard = self.visited[package]
         return shard
 
-    def fetch_shard(self, package: str) -> ShardDict:
-        """
-        Fetch an individual shard for the given package.
-
-        Default implementation calls fetch_shards() with a single package.
-        Subclasses may override for more efficient single-fetch operations.
-
-        Raise KeyError if package is not in the index.
-        """
-        return self.fetch_shards([package])[package]
-
-    def fetch_shards(self, packages: Iterable[str]) -> dict[str, ShardDict]:
-        """
-        Return mapping of *package names* to Shard for given packages.
-
-        If a shard is already in self.visited, it is not fetched again.
-        """
-        results = {}
-
-        def fetch(s, url, package_to_fetch):
-            response = s.get(url)
-            response.raise_for_status()
-            data = response.content
-
-            return shards_cache.AnnotatedRawShard(
-                url=url, package=package_to_fetch, compressed_shard=data
-            )
-
-        packages = sorted(list(packages))
-        urls_packages = {}  # package shards to fetch
-        for package in packages:
-            if package in self.visited:
-                results[package] = self.visited[package]
-            else:
-                urls_packages[self.shard_url(package)] = package
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
-            futures = {
-                executor.submit(fetch, self.session, url, package): (url, package)
-                for url, package in urls_packages.items()
-                if package not in results
-            }
-            for future in concurrent.futures.as_completed(futures):
-                log.debug(". %s", futures[future])
-                url, package = futures[future]
-                self._process_fetch_result(future, url, package, results)
-
-        self.visited.update(results)
-
-        return results
-
-    def _process_fetch_result(self, future, url, package, results):
-        """
-        Process a single fetched shard.
-        """
-        with conda_http_errors(url, package):
-            fetch_result = future.result()
-
-        # Decompress and save record
-        results[fetch_result.package] = msgpack.loads(
-            zstandard.decompress(
-                fetch_result.compressed_shard, max_output_size=ZSTD_MAX_SHARD_SIZE
-            )
-        )
-
-        # Cache fetched shard
-        self.shards_cache.insert(fetch_result)
-
 
 def repodata_shards(url, cache: RepodataCache) -> bytes:
     """
@@ -592,56 +510,6 @@ def fetch_shards_index(
             return shards
 
     return None
-
-
-def batch_retrieve_from_cache(sharded: list[Shards], packages: list[str]):
-    """
-    Given a list of Shards objects and a list of package names, fetch all URLs
-    from a shared local cache, and update Shards with those per-package shards.
-    Return the remaining URLs that must be fetched from the network.
-    """
-    sharded = [shardlike for shardlike in sharded if isinstance(shardlike, Shards)]
-
-    wanted = []
-    # XXX update batch_retrieve_from_cache to work with (Shards, package name)
-    # tuples instead of broadcasting across shards itself.
-    for shard in sharded:
-        for package_name in packages:
-            if package_name in shard:  # and not package_name in shard.visited
-                wanted.append((shard, package_name, shard.shard_url(package_name)))
-
-    log.debug("%d shards to fetch", len(wanted))
-
-    if not sharded:
-        log.debug("No sharded channels found.")
-        return wanted
-
-    shared_shard_cache = sharded[0].shards_cache
-    from_cache = shared_shard_cache.retrieve_multiple([shard_url for *_, shard_url in wanted])
-
-    # add fetched Shard objects to Shards objects visited dict
-    for shard, package, shard_url in wanted:
-        if from_cache_shard := from_cache.get(shard_url):
-            shard.visit_shard(package, from_cache_shard)
-
-    return wanted
-
-
-def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
-    """
-    Given a list of (Shards, package name, shard URL) tuples, group by Shards and call fetch_shards
-    with a list of all URLs for that Shard.
-    """
-    shard_packages: dict[Shards, list[str]] = defaultdict(list)
-    for shard, package, _ in wanted:
-        shard_packages[shard].append(package)
-
-    # XXX it might be better to pull networking and Session() out of Shards(),
-    # so that we can e.g. use the same session for a Channel(); typically a
-    # noarch+arch pair of subdirs.
-    # Could we share a ThreadPoolExecutor and see better session utilization?
-    for shard, packages in shard_packages.items():
-        shard.fetch_shards(packages)
 
 
 def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:

@@ -33,8 +33,6 @@ from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
     _shards_connections,
-    batch_retrieve_from_cache,
-    fetch_shards_index,
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import (
@@ -203,42 +201,42 @@ def http_server_shards(xprocess, tmp_path_factory) -> Iterable[str]:
     http.shutdown()
 
 
-def test_fetch_shards_error(http_server_shards):
-    channel = Channel.from_url(f"{http_server_shards}/noarch")
-    subdir_data = SubdirData(channel)
-    found = fetch_shards_index(subdir_data)
-    assert found
+# def test_fetch_shards_error(http_server_shards):
+#     channel = Channel.from_url(f"{http_server_shards}/noarch")
+#     subdir_data = SubdirData(channel)
+#     found = fetch_shards_index(subdir_data)
+#     assert found
 
-    not_found = fetch_shards_index(SubdirData(Channel.from_url(f"{http_server_shards}/linux-64")))
-    assert not not_found
+#     not_found = fetch_shards_index(SubdirData(Channel.from_url(f"{http_server_shards}/linux-64")))
+#     assert not not_found
 
-    # cover "unexpected package name in shard" branch
-    found.visited.clear()
-    assert "packages" in found.fetch_shard("wrong_package_name")
+#     # cover "unexpected package name in shard" branch
+#     found.visited.clear()
+#     assert "packages" in found.fetch_shard("wrong_package_name")
 
-    # one non-error shard
-    shard_a = found.fetch_shard("foo")
-    shard_b = found.fetch_shard("foo")
-    assert shard_a is shard_b
-    found.visited.clear()  # force sqlite3 cache usage
-    shard_c = found.fetch_shard("foo")
-    assert shard_a is not shard_c
-    assert shard_a == shard_c
+#     # one non-error shard
+#     shard_a = found.fetch_shard("foo")
+#     shard_b = found.fetch_shard("foo")
+#     assert shard_a is shard_b
+#     found.visited.clear()  # force sqlite3 cache usage
+#     shard_c = found.fetch_shard("foo")
+#     assert shard_a is not shard_c
+#     assert shard_a == shard_c
 
-    with pytest.raises(conda.gateways.repodata.RepodataIsEmpty):
-        found.fetch_shard("fake_package")
+#     with pytest.raises(conda.gateways.repodata.RepodataIsEmpty):
+#         found.fetch_shard("fake_package")
 
-    # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
-    malo = found.fetch_shard("malformed")
-    assert malo == {"follows_schema": False}  # XXX should we return None or raise
+#     # currently logs KeyError: 'packages', doesn't cache, returns decoded msgpack
+#     malo = found.fetch_shard("malformed")
+#     assert malo == {"follows_schema": False}  # XXX should we return None or raise
 
-    with pytest.raises(zstandard.ZstdError):
-        found.fetch_shard("not_zstd")
+#     with pytest.raises(zstandard.ZstdError):
+#         found.fetch_shard("not_zstd")
 
-    # unclear if all possible "bad msgpack" errors inherit from a common class
-    # besides ValueError
-    with pytest.raises(ValueError):
-        found.fetch_shard("not_msgpack")
+#     # unclear if all possible "bad msgpack" errors inherit from a common class
+#     # besides ValueError
+#     with pytest.raises(ValueError):
+#         found.fetch_shard("not_msgpack")
 
 
 def test_shards_base_url():
@@ -639,50 +637,6 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     )
 
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
-
-
-def test_batch_retrieve_from_cache(prepare_shards_test: None):
-    """
-    Test single database query to fetch cached shard URLs in a batch.
-    """
-    channels = [*context.default_channels, Channel("conda-forge-sharded")]
-    roots = [
-        Node(distance=0, package="ca-certificates", visited=False),
-        Node(distance=0, package="icu", visited=False),
-        Node(distance=0, package="expat", visited=False),
-        Node(distance=0, package="libexpat", visited=False),
-        Node(distance=0, package="libffi", visited=False),
-        Node(distance=0, package="libmpdec", visited=False),
-        Node(distance=0, package="libzlib", visited=False),
-        Node(distance=0, package="openssl", visited=False),
-        Node(distance=0, package="python", visited=False),
-        Node(distance=0, package="readline", visited=False),
-        Node(distance=0, package="liblzma", visited=False),
-        Node(distance=0, package="xz", visited=False),
-        Node(distance=0, package="libsqlite", visited=False),
-        Node(distance=0, package="tk", visited=False),
-        Node(distance=0, package="ncurses", visited=False),
-        Node(distance=0, package="zlib", visited=False),
-        Node(distance=0, package="pip", visited=False),
-        Node(distance=0, package="twine", visited=False),
-        Node(distance=0, package="python_abi", visited=False),
-        Node(distance=0, package="tzdata", visited=False),
-    ]
-
-    with _timer("repodata.json/shards index fetch"):
-        channel_data = fetch_channels(channels)
-
-    with _timer("Shard fetch"):
-        sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]
-        assert sharded, "No sharded repodata found"
-        remaining = batch_retrieve_from_cache(sharded, [node.package for node in roots])
-        print(f"{len(remaining)} shards to fetch from network")
-
-    # execute "no sharded channels" branch
-    remaining = batch_retrieve_from_cache([], ["python"])
-    assert remaining == []
-
-    # XXX don't call everything Shard/Shards
 
 
 class MockCache(NamedTuple):
