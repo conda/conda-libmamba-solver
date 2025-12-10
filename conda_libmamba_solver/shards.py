@@ -113,35 +113,23 @@ def shard_mentioned_packages(shard: ShardDict) -> Iterable[str]:
 
 def remove_legacy_packages(repodata: RepodataDict):
     """
-    Return a copy of repodata without .tar.bz2 packages if there is a conda
-    package with the same stem (filename without suffix). This function always
-    removes .tar.bz2 packages without checking context.use_only_tar_bz2.
-
-    Should work with either a shard or a full repodata dict.
-
-    See also SubdirData._process_repodata(), which also implements "add pip as
-    Python dependency" and broadcasts metadata across records; we do some of
-    that in index._package_info_from_package_dict().
-
-    Return a shallow copy of repodata without .tar.bz2 packages having a .conda
-    counterpart.
+    Given repodata, remove any .tar.bz2 packages that have a .conda counterpart.
+    Return a shallow copy of repodata.
     """
     _tar_bz2 = ".tar.bz2"
+    _conda = ".conda"
     _len_tar_bz2 = len(_tar_bz2)
 
     legacy_packages = repodata.get("packages", {})
     conda_packages = repodata.get("packages.conda", {})
 
-    legacy_packages = repodata.get("packages", {})
-    conda_packages = repodata.get("packages.conda", {})
-
-    use_these_legacy_keys = set(legacy_packages.keys()) - {
-        k[:-6] + _tar_bz2 for k in conda_packages.keys()
-    }
-
     return {
         **repodata,
-        "packages": {k: v for k, v in legacy_packages.items() if k in use_these_legacy_keys},
+        "packages": {
+            k: v
+            for k, v in legacy_packages.items()
+            if f"{k[:-_len_tar_bz2]}{_conda}" not in conda_packages
+        },
     }
 
 
