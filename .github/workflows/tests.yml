@@ -158,8 +158,11 @@ jobs:
       - name: Conda Config
         run: conda config --show-sources
 
-      - name: Conda List
-        run: conda list --show-channel-urls
+      - name: Conda List Extra
+        run: |
+          conda envs list
+          conda list -n base
+          conda list --show-channel-urls
 
       - name: Setup PowerShell
         # for tests/shell, so only necessary for integration tests
@@ -323,8 +326,11 @@ jobs:
       - name: Conda Config
         run: conda config --show-sources
 
-      - name: Conda List
-        run: conda list --show-channel-urls
+      - name: Conda List Extra
+        run: |
+          conda envs list
+          conda list -n base
+          conda list --show-channel-urls
 
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
