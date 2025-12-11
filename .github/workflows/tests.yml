@@ -34,7 +34,7 @@ env:
   CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
   PYTEST_RERUN_FAILURES: 3
   # upstream conda tests that we want to skip
-  PYTEST_ADDOPTS: "-k (not test_get_index_lazy and not test_strict_resolve_get_reduced_index)"
+  PYTEST_ADDOPTS: "-k \"not test_get_index_lazy and not test_strict_resolve_get_reduced_index\""
   # See https://github.com/conda/conda/pull/13694
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
