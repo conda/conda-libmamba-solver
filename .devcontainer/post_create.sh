@@ -21,7 +21,6 @@ if which apt-get > /dev/null; then
     DEBIAN_FRONTEND=noninteractive xargs -a "$HERE/apt-deps.txt" apt-get install -y
 fi
 
-# this would make sense in a separate docker layer:
 
 if [ ! -f "$SRC_CONDA/pyproject.toml" ]; then
     echo "https://github.com/conda/conda not found! Please clone or mount to $SRC_CONDA"
