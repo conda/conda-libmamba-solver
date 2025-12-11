@@ -33,6 +33,8 @@ env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
   CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
   PYTEST_RERUN_FAILURES: 3
+  # upstream conda tests that we want to skip
+  PYTEST_ADDOPTS: "-k (not test_get_index_lazy and not test_strict_resolve_get_reduced_index)"
   # See https://github.com/conda/conda/pull/13694
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
@@ -97,7 +99,7 @@ jobs:
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration and not test_get_index_lazy' }}
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -262,7 +264,7 @@ jobs:
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration and not test_get_index_lazy' }}
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
 
     steps:
@@ -541,7 +543,7 @@ jobs:
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration and not test_get_index_lazy' }}
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
 
     steps:
