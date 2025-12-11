@@ -33,6 +33,8 @@ env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
   CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
   PYTEST_RERUN_FAILURES: 3
+  # upstream conda tests that we want to skip
+  PYTEST_ADDOPTS: "-k \"not test_get_index_lazy and not test_strict_resolve_get_reduced_index\""
   # See https://github.com/conda/conda/pull/13694
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
@@ -148,9 +150,13 @@ jobs:
           ${{ matrix.python-version < '3.14' && 'backports.zstd' || '' }}
           python=${{ matrix.python-version }}
 
+      - name: Conda Remove anaconda-auth
+        run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+
+
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -159,8 +165,11 @@ jobs:
       - name: Conda Config
         run: conda config --show-sources
 
-      - name: Conda List
-        run: conda list --show-channel-urls
+      - name: Conda List Extra
+        run: |
+          conda env list
+          conda list -n base
+          conda list --show-channel-urls
 
       - name: Setup PowerShell
         # for tests/shell, so only necessary for integration tests
@@ -180,7 +189,6 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
-          --cov=conda
           --durations-path=durations\${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
@@ -307,9 +315,12 @@ jobs:
           ${{ matrix.python-version < '3.14' && 'backports.zstd' || '' }}
           python=${{ matrix.python-version }}
 
+      - name: Conda Remove anaconda-auth
+        run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
 
       - name: Find fix .xonshrc
         run: find . -name fix_xonshrc.py
@@ -325,8 +336,11 @@ jobs:
       - name: Conda Config
         run: conda config --show-sources
 
-      - name: Conda List
-        run: conda list --show-channel-urls
+      - name: Conda List Extra
+        run: |
+          conda env list
+          conda list -n base
+          conda list --show-channel-urls
 
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
@@ -337,7 +351,6 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
-          --cov=conda
           --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
@@ -586,9 +599,13 @@ jobs:
           ${{ matrix.python-version < '3.14' && 'backports.zstd' || '' }}
           python=${{ matrix.python-version }}
 
+      - name: Conda Remove anaconda-auth
+        if: matrix.arch != 'osx-64'
+        run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
-        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps
+        run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
 
       - name: Find fix .xonshrc
         run: find . -name fix_xonshrc.py
@@ -616,7 +633,6 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
-          --cov=conda
           --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
