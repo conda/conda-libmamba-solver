@@ -203,6 +203,12 @@ class ShardBase(abc.ABC):
                 repodata[package_group].update(shard[package_group])
         return repodata
 
+    def reset(self):
+        """
+        Clear visited shards.
+        """
+        self.visited.clear()
+
 
 class ShardLike(ShardBase):
     """
