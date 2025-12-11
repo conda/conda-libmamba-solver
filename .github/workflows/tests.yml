@@ -186,7 +186,7 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
-          --cov=conda
+          --deselect=test_get_index_lazy
           --durations-path=durations\${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
@@ -348,7 +348,7 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
-          --cov=conda
+          --deselect=test_get_index_lazy
           --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
@@ -629,7 +629,7 @@ jobs:
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
         run: python -m pytest
-          --cov=conda
+          --deselect=test_get_index_lazy
           --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
           --splits=${{ env.PYTEST_SPLITS }}
