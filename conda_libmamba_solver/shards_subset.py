@@ -148,6 +148,7 @@ class RepodataSubset:
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
         self.shardlikes = list(shardlikes)
+        self._use_only_tar_bz2 = context.use_only_tar_bz2
 
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
@@ -379,9 +380,10 @@ class RepodataSubset:
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
-                # TODO only call remove_legacy_packages if the ".conda" format
-                # is enabled / conda is not in ".tar.bz2 only" mode.
-                shard = remove_legacy_packages(shard)
+                if self._use_only_tar_bz2:
+                    # remove_legacy_packages if the ".conda" format is enabled /
+                    # conda is not in ".tar.bz2 only" mode.
+                    shard = remove_legacy_packages(shard)
 
                 # add shard to appropriate ShardLike
                 parent_node = self.nodes[node_id]
