@@ -14,8 +14,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import msgpack
-import zstandard
 from conda.gateways.disk.delete import unlink_or_rename_to_trash
+
+from .zstd import ZstdDecompressor, decompress
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -25,7 +26,6 @@ if TYPE_CHECKING:
 log = logging.getLogger(__name__)
 
 SHARD_CACHE_NAME = "repodata_shards.db"
-ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compresed data has no size header
 
 
 @dataclass
@@ -109,13 +109,7 @@ class ShardCache:
     def retrieve(self, url) -> ShardDict | None:
         with self.conn as c:
             row = c.execute("SELECT shard FROM shards WHERE url = ?", (url,)).fetchone()
-            return (
-                msgpack.loads(
-                    zstandard.decompress(row["shard"], max_output_size=ZSTD_MAX_SHARD_SIZE)
-                )
-                if row
-                else None
-            )  # type: ignore
+            return msgpack.loads(decompress(row["shard"])) if row else None  # type: ignore
 
     def retrieve_multiple(self, urls: list[str]) -> dict[str, ShardDict | None]:
         """
@@ -128,16 +122,13 @@ class ShardCache:
 
         # In one test reusing the context saves difference between .006s and .01s
         # We could make this a threadlocal.
-        dctx = zstandard.ZstdDecompressor()
+        dctx = ZstdDecompressor()
 
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
         with self.conn as c:
             result: dict[str, ShardDict | None] = {
-                row["url"]: msgpack.loads(
-                    dctx.decompress(row["shard"], max_output_size=ZSTD_MAX_SHARD_SIZE)
-                )
-                if row
-                else None
+                # note compression.zstd.decompress does not require or provide max_output_size
+                row["url"]: msgpack.loads(dctx.decompress(row["shard"])) if row else None
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result
