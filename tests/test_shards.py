@@ -786,10 +786,14 @@ def test_shards_connections(monkeypatch):
     assert _shards_connections() == 4
 
 
-def test_offline_mode_expired_cache(http_server_shards, monkeypatch):
+def test_offline_mode_expired_cache(http_server_shards, monkeypatch, tmp_path):
     """
     Test that expired cached shards are used when offline mode is enabled.
     """
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
 
