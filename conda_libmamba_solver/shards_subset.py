@@ -66,6 +66,7 @@ from typing import TYPE_CHECKING
 import conda.gateways.repodata
 import msgpack
 import zstandard
+from conda.base.context import context
 
 from conda_libmamba_solver import shards_cache
 from conda_libmamba_solver.shards_cache import AnnotatedRawShard
@@ -84,7 +85,7 @@ from .shards import (
 log = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
     from queue import SimpleQueue as Queue
     from typing import Literal, TypeVar
 
@@ -195,6 +196,16 @@ class RepodataSubset:
         for n in self.neighbors(node):
             yield n, 1
 
+    def reachable(self, root_packages, *, strategy=DEFAULT_STRATEGY) -> None:
+        """
+        Run named reachability strategy or the default.
+
+        Update `self.shardlikes` with reachable package records. Later,
+        [shardlike.build_repodata() for shardlike in shardlikes] can be used to
+        generate repodata.json-format subsets of each channel.
+        """
+        return getattr(self, f"reachable_{strategy}")(root_packages)
+
     def reachable_bfs(self, root_packages):
         """
         Fetch all packages reachable from `root_packages`' by following
@@ -236,6 +247,34 @@ class RepodataSubset:
         fetch from cache, and fetch from network.
         """
 
+        # In offline mode shards are retrieved from the cache database as usual,
+        # but cache misses are forwarded to offline_nofetch_thread returning
+        # empty shards.
+        if context.offline:
+            network_worker = offline_nofetch_thread
+        else:
+            network_worker = network_fetch_thread
+
+        return self._reachable_pipelined(root_packages, network_worker=network_worker)
+
+    def _reachable_pipelined(
+        self,
+        root_packages,
+        network_worker: Callable[
+            [
+                Queue[Sequence[NodeId] | None],
+                Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+                ShardCache,
+                Sequence[ShardBase],
+            ],
+            None,
+        ],
+    ):
+        """
+        Set up queues and threads for shard traversal with a configurable
+        network_worker. Called by reachable_pipelined()
+        """
+
         # Ignore cache on shards object, use our own. Necessary if there are no
         # sharded channels.
         cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
@@ -251,7 +290,7 @@ class RepodataSubset:
         )
 
         network_thread = threading.Thread(
-            target=network_fetch_thread,
+            target=network_worker,
             args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
             daemon=True,
         )
@@ -259,7 +298,7 @@ class RepodataSubset:
         try:
             cache_thread.start()
             network_thread.start()
-            self.pipelined_main_thread(
+            self._pipelined_traversal(
                 root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
             )
         finally:
@@ -268,11 +307,16 @@ class RepodataSubset:
             cache_thread.join(THREAD_WAIT_TIMEOUT)
             network_thread.join(THREAD_WAIT_TIMEOUT)
 
-    def pipelined_main_thread(
-        self, root_packages, cache_in_queue, shard_out_queue, cache_thread, network_thread
+    def _pipelined_traversal(
+        self,
+        root_packages,
+        cache_in_queue: Queue[list[NodeId] | None],
+        shard_out_queue: Queue[list[tuple[NodeId, ShardDict]] | Exception],
+        cache_thread: threading.Thread,
+        network_thread: threading.Thread,
     ):
         """
-        Run reachibility algorithm given queues to submit and receive shards.
+        Run reachability algorithm given queues to submit and receive shards.
         """
         shardlikes_by_url = {s.url: s for s in self.shardlikes}
         pending: set[NodeId] = set()
@@ -401,7 +445,7 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: dict[str, Channel],
+    channels: dict[str, Channel] | list[Channel],
     algorithm: Literal["bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
@@ -409,7 +453,7 @@ def build_repodata_subset(
 
     Params:
         root_packages: iterable of installed and requested package names
-        channels: iterable of Channel objects
+        channels: Channel objects; dict form preferred.
         algorithm: desired traversal algorithm
     """
     if isinstance(channels, dict):  # True when called by LibMambaIndexHelper
@@ -419,7 +463,7 @@ def build_repodata_subset(
     channel_data = fetch_channels(channels_)
 
     subset = RepodataSubset((*channel_data.values(),))
-    getattr(subset, f"reachable_{algorithm}")(root_packages)
+    subset.reachable(root_packages, strategy=algorithm)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
@@ -523,10 +567,10 @@ def cache_fetch_thread(
 
 @exception_to_queue
 def network_fetch_thread(
-    in_queue: Queue[Sequence[NodeId | Future] | None],
+    in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
-    shardlikes: list[ShardBase],
+    shardlikes: Sequence[ShardBase],
 ):
     """
     Fetch shards from the network that are received on in_queue, until we see
@@ -577,7 +621,10 @@ def network_fetch_thread(
         # Simplify waiting by putting responses back into in_queue. This
         # function is called in the ThreadPoolExecutor's thread, but we want to
         # serialize result processing in the network_fetch_thread.
-        in_queue.put([future])
+
+        # Not in our signature; the caller doesn't need to know we are putting
+        # Future in here as well.
+        in_queue.put([future])  # type: ignore
 
     with ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         for node_ids_and_results in combine_batches_until_none(in_queue):
@@ -587,9 +634,37 @@ def network_fetch_thread(
                 else:
                     future = submit(node_id_or_result)
                     future.add_done_callback(result_to_in_queue)
+
         # TODO call executor.shutdown(cancel_futures=True) on error or otherwise
         # prevent new HTTP requests from being started e.g. "skip" flag in
         # fetch() function. Also possible to shutdown(wait=False).
+
+
+@exception_to_queue
+def offline_nofetch_thread(
+    in_queue: Queue[Sequence[NodeId] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    cache: ShardCache,
+    shardlikes: Sequence[ShardBase],
+):
+    """
+    For offline mode, where network requests are not allowed.
+    Pretend that every network request is an empty shard.
+    Don't save those to the cache.
+
+    Depending on how many shards are in sqlite3 and which packages were requested, the user may or may not get enough repodata for a solution.
+
+    Args:
+        in_queue: NodeId (URLs) to fetch.
+        shard_out_queue: fetched shards sent to queue.
+        cache: once shards are decoded they are stored in cache.
+        shardlikes: list of (network-only) shard index objects.
+    """
+
+    for node_ids in combine_batches_until_none(in_queue):
+        for node_id in node_ids:
+            shard: ShardDict = {"packages": {}, "packages.conda": {}}
+            shard_out_queue.put([(node_id, shard)])
 
 
 # endregion
