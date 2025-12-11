@@ -597,6 +597,7 @@ jobs:
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
+        if: matrix.arch != 'osx-64'
         run: conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
