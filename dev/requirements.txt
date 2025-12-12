@@ -6,3 +6,7 @@ conda>=25.9
 conda-forge::libmamba>=2.0.0
 conda-forge::libmambapy>=2.0.0
 msgpack-python>=1.1.1
+# needed for 'pip install -e conda-libmamba-solver'
+hatchling
+hatch-vcs
+editables

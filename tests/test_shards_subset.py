@@ -31,12 +31,7 @@ from conda_libmamba_solver.shards_subset import (
     combine_batches_until_none,
     exception_to_queue,
 )
-from tests.test_shards import (
-    FAKE_SHARD,
-    FAKE_SHARD_2,
-    ROOT_PACKAGES,
-    _timer,
-)
+from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _ensure_hex_hash, _timer
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -168,9 +163,9 @@ def test_traversal_algorithm_benchmarks(
 
         return (subset,), {}
 
-    def target(subset):
+    def target(subset: RepodataSubset):
         with _timer(""):
-            getattr(subset, f"reachable_{algorithm}")(scenario["packages"])
+            subset.reachable(scenario["packages"])
 
     warmup_rounds = 1 if cache_state == "warm" else 0
 
@@ -317,7 +312,9 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
                 assert isinstance(shard, dict)
 
                 # Make sure this is either one of the two packages from above ("foo" or "bar")
-                assert set(shard.get("packages", {}).keys()).intersection(("foo", "bar"))
+                assert set(shard.get("packages", {}).keys()).intersection(
+                    ("foo.tar.bz2", "bar.tar.bz2")
+                )
 
     # Worker produces TypeError if non-network NodeId is sent and one of the
     # shardlikes has its url. (If no shardlike has NodeId's url, it produces
@@ -413,18 +410,22 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
     """
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
-    expected_repodata = {**FAKE_SHARD["packages"], **FAKE_SHARD_2["packages"]}
+    expected_repodata = _ensure_hex_hash(FAKE_REPODATA)
 
     # Override cache dir location for tests; ensures it's empty
     mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
 
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+    channel_data = build_repodata_subset(
+        root_packages, {channel.url() or "": channel}, algorithm=algorithm
+    )
 
     for shardlike in channel_data.values():
         # expanded in fetch_channels() "channel.urls(True, context.subdirs)"
         if "/noarch/" not in shardlike.url:
             continue
-        assert shardlike.build_repodata().get("packages") == expected_repodata
+        actual_repodata = shardlike.build_repodata()
+
+        assert actual_repodata == expected_repodata, (actual_repodata, expected_repodata)
 
 
 def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_path):
@@ -575,9 +576,14 @@ def test_combine_batches_blocking_scenario():
 
 
 @pytest.mark.integration
-def test_pipelined_extreme_race_conditions(http_server_shards, mocker, tmp_path):
+def test_pipelined_extreme_race_conditions(
+    prepare_shards_test,
+    http_server_shards,
+    mocker,
+    tmp_path,
+):
     """
-    Extremely aggressive test that introduces chaos to force race conditions.
+    Introduce random delays in Queue operations to look for race conditions.
 
     This test:
     - Adds random delays at multiple points
