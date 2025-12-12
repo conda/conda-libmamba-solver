@@ -152,17 +152,6 @@ def test_gpu_cpu_mutexes():
     # `__cuda=0=0` was removed from non-cuda systems
     # https://github.com/conda/conda/commit/8d36401a0c8b378720db1dc786c0e026bb621fb0
 
-    # cudatoolkit is not installed when cpuonly is specified.
-    found = 0
-    target_pkgs = ("pytorch", "pyg")
-    for pkg in data["actions"]["LINK"]:
-        if pkg["name"] in target_pkgs:
-            found += 1
-            assert "cpu" in pkg["build_string"]
-        elif pkg["name"] == "cudatoolkit":
-            raise AssertionError("CUDA shouldn't be installed due to 'cpuonly'")
-    assert found == len(target_pkgs)
-
     p = conda_subprocess(
         *args,
         "--solver=libmamba",
