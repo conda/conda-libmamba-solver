@@ -696,6 +696,7 @@ def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
             assert prec.python_site_packages_path is None
 
 
+@pytest.mark.skipif(on_win, reason="Missing free-threaded Python build?")
 @pytest.mark.parametrize("shards", (True, False))
 def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1" if shards else "0")
