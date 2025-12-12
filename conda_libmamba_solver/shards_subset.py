@@ -380,7 +380,7 @@ class RepodataSubset:
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
-                if self._use_only_tar_bz2:
+                if not self._use_only_tar_bz2:
                     # remove_legacy_packages if the ".conda" format is enabled /
                     # conda is not in ".tar.bz2 only" mode.
                     shard = remove_legacy_packages(shard)
