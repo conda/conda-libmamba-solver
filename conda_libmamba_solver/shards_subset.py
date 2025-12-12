@@ -78,7 +78,6 @@ from .shards import (
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
-    remove_legacy_packages,
     shard_mentioned_packages,
 )
 
@@ -137,6 +136,28 @@ def _nodes_from_packages(
                 node = Node(0, package, shardlike.url, shard_url=shardlike.shard_url(package))
                 node_id = node.to_id()
                 yield node_id, node
+
+
+def remove_legacy_packages(repodata: ShardDict) -> ShardDict:
+    """
+    Given repodata or a single shard, remove any .tar.bz2 packages that have a
+    .conda counterpart. Return a shallow copy.
+    """
+    _tar_bz2 = ".tar.bz2"
+    _conda = ".conda"
+    _len_tar_bz2 = len(_tar_bz2)
+
+    legacy_packages = repodata.get("packages", {})
+    conda_packages = repodata.get("packages.conda", {})
+
+    return {
+        **repodata,
+        "packages": {
+            k: v
+            for k, v in legacy_packages.items()
+            if f"{k[:-_len_tar_bz2]}{_conda}" not in conda_packages
+        },
+    }
 
 
 @dataclass

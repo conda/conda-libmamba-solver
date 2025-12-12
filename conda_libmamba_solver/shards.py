@@ -111,28 +111,6 @@ def shard_mentioned_packages(shard: ShardDict) -> Iterable[str]:
             yield name  # not much improvement from only yielding unique names
 
 
-def remove_legacy_packages(repodata: ShardDict) -> ShardDict:
-    """
-    Given repodata or a single shard, remove any .tar.bz2 packages that have a
-    .conda counterpart. Return a shallow copy.
-    """
-    _tar_bz2 = ".tar.bz2"
-    _conda = ".conda"
-    _len_tar_bz2 = len(_tar_bz2)
-
-    legacy_packages = repodata.get("packages", {})
-    conda_packages = repodata.get("packages.conda", {})
-
-    return {
-        **repodata,
-        "packages": {
-            k: v
-            for k, v in legacy_packages.items()
-            if f"{k[:-_len_tar_bz2]}{_conda}" not in conda_packages
-        },
-    }
-
-
 class ShardBase(abc.ABC):
     """
     Abstract base class for shard-like objects.

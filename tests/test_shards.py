@@ -139,7 +139,7 @@ FAKE_REPODATA = {
             "version": "1",
             "build": "0_a",
             "build_number": 0,
-            "depends": ["quux", "warble"],
+            "depends": ["bar", "baz"],
             "constrains": ["splat<3"],
             "sha256": hashlib.sha256().digest(),
         },
@@ -799,7 +799,7 @@ def test_remove_legacy_packages_simple():
             "a.conda": {},
         },
     }
-    trimmed = shards.remove_legacy_packages(simple)  # type: ignore
+    trimmed = shards_subset.remove_legacy_packages(simple)  # type: ignore
     assert trimmed["packages"] == {"b.tar.bz2": {}}
 
 
@@ -817,7 +817,7 @@ def test_remove_legacy_packages_real(channel, benchmark):
 
     def remove():
         nonlocal repodata_trimmed
-        repodata_trimmed = shards.remove_legacy_packages(repodata)  # type: ignore
+        repodata_trimmed = shards_subset.remove_legacy_packages(repodata)  # type: ignore
 
     benchmark(remove)
 
