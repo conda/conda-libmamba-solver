@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import random
 import threading
 import time
@@ -426,6 +427,32 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
         actual_repodata = shardlike.build_repodata()
 
         assert actual_repodata == expected_repodata, (actual_repodata, expected_repodata)
+
+
+@pytest.mark.parametrize("only_tar_bz2", (True, False))
+def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2):
+    """
+    Ensure we avoid tar_bz2 in "use .conda" mode.
+
+    Should we exclude all .conda in "only .tar.bz2" mode? Can we drop this legacy mode?
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    channel_data = fetch_channels({channel.url() or "": channel})
+
+    subset = RepodataSubset((*channel_data.values(),))
+    subset._use_only_tar_bz2 = only_tar_bz2
+    subset.reachable(root_packages)
+
+    repodata = json.dumps(subset.shardlikes[0].build_repodata(), indent=True)
+
+    if only_tar_bz2:
+        assert len(subset.shardlikes[0].build_repodata()["packages"]) > 0, repodata
+    else:
+        assert set(subset.shardlikes[0].build_repodata()["packages"]) == {
+            "no-matching-conda.tar.bz2"
+        }, repodata
 
 
 def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_path):

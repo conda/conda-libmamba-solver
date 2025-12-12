@@ -126,6 +126,12 @@ FAKE_REPODATA = {
             "build_number": 0,
             "depends": ["foo"],
         },
+        "no-matching-conda.tar.bz2": {
+            "name": "foo",
+            "version": "0.1",
+            "build": "0_a",
+            "build_number": 0,
+        },
     },
     "packages.conda": {
         "foo.conda": {
