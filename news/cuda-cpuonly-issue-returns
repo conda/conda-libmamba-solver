@@ -1,0 +1,10 @@
+### Docs
+
+* Updated documentation to reflect that the cudatoolkit/cpuonly issue has returned.
+
+### Other
+
+* The `cpuonly` mutex no longer correctly prevents CUDA packages from being
+  installed. For a time it appeared to work when non-cuda systems showed a
+  virtual package `__cuda=0=0`, but with no `__cuda` package the mutex appears
+  to no longer work. Reversing (#131 via #741)
