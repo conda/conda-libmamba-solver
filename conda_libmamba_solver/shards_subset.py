@@ -197,6 +197,7 @@ class RepodataSubset:
 
             if self._use_only_tar_bz2:
                 shard = remove_legacy_packages(shard)
+                shardlike.visit_shard(node.package, shard)
 
             for package in shard_mentioned_packages(shard):
                 node_id = NodeId(package, shardlike.url)
