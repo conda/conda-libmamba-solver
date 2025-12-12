@@ -39,7 +39,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
-  CONDA_REF: 25.9.0 # pin conda version to latest for more stable tests
+  CONDA_REF: main # pin conda version to latest for more stable tests
 
 jobs:
   # detect whether any code changes are included in this PR
