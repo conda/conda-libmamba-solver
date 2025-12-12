@@ -413,8 +413,7 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
     root_packages = ["foo"]
 
     expected_repodata = _ensure_hex_hash(FAKE_REPODATA)
-    if algorithm == "pipelined":  # other algorithm doesn't implement this feature
-        expected_repodata = shards_subset.remove_legacy_packages(expected_repodata)  # type: ignore
+    expected_repodata = shards_subset.remove_legacy_packages(expected_repodata)  # type: ignore
 
     # Override cache dir location for tests; ensures it's empty
     mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
