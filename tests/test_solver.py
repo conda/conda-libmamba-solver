@@ -13,7 +13,7 @@ from textwrap import dedent
 from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_mac, on_win
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
@@ -694,3 +694,19 @@ def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
                 assert prec.python_site_packages_path == "lib/python3.13t/site-packages"
         else:
             assert prec.python_site_packages_path is None
+
+
+@pytest.mark.parametrize("shards", (True, False))
+def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1" if shards else "0")
+    reset_context()
+    with tmp_env("python=3.14=*_cp314t", "--override-channels", "-c", "conda-forge") as prefix:
+        python = PrefixData(prefix).get("python")
+        print(
+            json.dumps(
+                {k: v for k, v in python.dump().items() if k not in ("files", "paths_data")},
+                indent=2,
+            )
+        )
+        tf = python.track_features
+        assert tf == ("py_freethreading",)
