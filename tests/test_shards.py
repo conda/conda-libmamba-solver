@@ -52,6 +52,9 @@ if TYPE_CHECKING:
 
 HERE = Path(__file__).parent
 
+# was conda-forge-sharded during testing
+CONDA_FORGE_WITH_SHARDS = "conda-forge"
+
 
 def package_names(shard: shards_cache.ShardDict):
     """
@@ -337,7 +340,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
     channels = list(context.default_channels)
     print(channels)
 
-    channels.append(Channel("conda-forge-sharded"))
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     channel_data = fetch_channels(channels)
 
@@ -627,7 +630,7 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     root_packages = ROOT_PACKAGES[:]
 
     channels = list(context.default_channels)
-    channels.append(Channel("conda-forge-sharded"))
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("build_repodata_subset()"):
         channel_data = build_repodata_subset(root_packages, channels)
@@ -675,7 +678,7 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     """
     Test single database query to fetch cached shard URLs in a batch.
     """
-    channels = [*context.default_channels, Channel("conda-forge-sharded")]
+    channels = [*context.default_channels, Channel(CONDA_FORGE_WITH_SHARDS)]
     roots = [
         Node(distance=0, package="ca-certificates", visited=False),
         Node(distance=0, package="icu", visited=False),

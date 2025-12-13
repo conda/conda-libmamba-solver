@@ -33,6 +33,8 @@ from conda_libmamba_solver.shards_subset import (
 )
 from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _ensure_hex_hash, _timer
 
+from .test_shards import CONDA_FORGE_WITH_SHARDS
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -48,42 +50,42 @@ TESTING_SCENARIOS = [
         "name": "python",
         "packages": ["python"],
         "prefetch_packages": [],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "data_science_ml",
         "packages": ["scikit-learn", "matplotlib"],
         "prefetch_packages": ["python", "numpy"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "web_development",
         "packages": ["django", "celery"],
         "prefetch_packages": ["python", "requests"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "scientific_computing",
         "packages": ["scipy", "sympy", "pytorch"],
         "prefetch_packages": ["python", "numpy", "pandas"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "devops_automation",
         "packages": ["ansible", "pyyaml", "jinja2"],
         "prefetch_packages": ["python"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "vaex",
         "packages": ["vaex"],
         "prefetch_packages": ["python", "numpy", "pandas"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
 ]
@@ -209,7 +211,7 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
 
     channels = []
     # channels.extend(context.default_channels)
-    channels.append(Channel("conda-forge-sharded"))
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("fetch_channels()"):
         channel_data = fetch_channels(channels)
