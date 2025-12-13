@@ -144,9 +144,6 @@ def test_load_channel_repo_info_shards(
 ):
     """
     Benchmark shards/not-shards under different dependency tree sizes.
-
-    TODO: This test should eventually switch to just using conda-forge when that channel
-          supports shards and not the `conda-forge-sharded` channel.
     """
     load_channel = "defaults" if load_type == "main" else CONDA_FORGE_WITH_SHARDS
 

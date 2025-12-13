@@ -815,6 +815,9 @@ def test_remove_legacy_packages_simple():
     assert trimmed["packages"] == {"b.tar.bz2": {}}
 
 
+# the function under test is not particularly slow but downloads large repodata
+# unnecessarily. Useful if remove_legacy_packages needs to be debugged.
+@pytest.mark.skip(reason="slow")
 @pytest.mark.benchmark()
 @pytest.mark.parametrize(
     "channel", ("conda-forge/linux-64", "https://repo.anaconda.com/pkgs/main/linux-64")
