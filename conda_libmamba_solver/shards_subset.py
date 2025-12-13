@@ -138,6 +138,28 @@ def _nodes_from_packages(
                 yield node_id, node
 
 
+def remove_legacy_packages(repodata: ShardDict) -> ShardDict:
+    """
+    Given repodata or a single shard, remove any .tar.bz2 packages that have a
+    .conda counterpart. Return a shallow copy.
+    """
+    _tar_bz2 = ".tar.bz2"
+    _conda = ".conda"
+    _len_tar_bz2 = len(_tar_bz2)
+
+    legacy_packages = repodata.get("packages", {})
+    conda_packages = repodata.get("packages.conda", {})
+
+    return {
+        **repodata,
+        "packages": {
+            k: v
+            for k, v in legacy_packages.items()
+            if f"{k[:-_len_tar_bz2]}{_conda}" not in conda_packages
+        },
+    }
+
+
 @dataclass
 class RepodataSubset:
     nodes: dict[NodeId, Node]
@@ -147,6 +169,7 @@ class RepodataSubset:
     def __init__(self, shardlikes: Iterable[ShardBase]):
         self.nodes = {}
         self.shardlikes = list(shardlikes)
+        self._use_only_tar_bz2 = context.use_only_tar_bz2
 
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
@@ -171,6 +194,10 @@ class RepodataSubset:
             shard = shardlike.fetch_shard(
                 node.package
             )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
+
+            if self._use_only_tar_bz2:
+                shard = remove_legacy_packages(shard)
+                shardlike.visit_shard(node.package, shard)
 
             for package in shard_mentioned_packages(shard):
                 node_id = NodeId(package, shardlike.url)
@@ -378,6 +405,11 @@ class RepodataSubset:
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
+                if not self._use_only_tar_bz2:
+                    # remove_legacy_packages if the ".conda" format is enabled /
+                    # conda is not in ".tar.bz2 only" mode.
+                    shard = remove_legacy_packages(shard)
+
                 # add shard to appropriate ShardLike
                 parent_node = self.nodes[node_id]
                 shardlike = shardlikes_by_url[node_id.channel]
@@ -387,7 +419,7 @@ class RepodataSubset:
 
             if not pending and not in_flight and not shutdown_initiated:
                 log.debug("Initiating shutdown: sending None to cache_in_queue")
-                cache_in_queue.put(None)
+                cache_in_queue.put(None)  # XXX caller also sends None
                 shutdown_initiated = True
 
     def visit_node(

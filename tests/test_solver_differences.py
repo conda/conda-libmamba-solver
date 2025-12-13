@@ -144,17 +144,13 @@ def test_gpu_cpu_mutexes():
         env=env,
     )
     data = json.loads(p.stdout)
-    # After recent libsolv/libmamba updates, this now works correctly.
-    # cudatoolkit is not installed when cpuonly is specified.
-    found = 0
-    target_pkgs = ("pytorch", "pyg")
-    for pkg in data["actions"]["LINK"]:
-        if pkg["name"] in target_pkgs:
-            found += 1
-            assert "cpu" in pkg["build_string"]
-        elif pkg["name"] == "cudatoolkit":
-            raise AssertionError("CUDA shouldn't be installed due to 'cpuonly'")
-    assert found == len(target_pkgs)
+
+    # This should not happen, but it does. See docstring.
+    assert next(pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "cudatoolkit")
+
+    # This was working correctly between Oct-Dec 2025, but broke again when
+    # `__cuda=0=0` was removed from non-cuda systems
+    # https://github.com/conda/conda/commit/8d36401a0c8b378720db1dc786c0e026bb621fb0
 
     p = conda_subprocess(
         *args,
@@ -166,7 +162,7 @@ def test_gpu_cpu_mutexes():
         env=env,
     )
     data = json.loads(p.stdout)
-    # With more recent pytorch versions, this works correctly, as there is no cudatoolkit.
+    # This should not happen, but it does. See docstring.
     assert not next((pkg for pkg in data["actions"]["LINK"] if pkg["name"] == "cudatoolkit"), None)
 
 
