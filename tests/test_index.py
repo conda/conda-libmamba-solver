@@ -19,6 +19,8 @@ from conda.models.channel import Channel
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.state import SolverInputState
 
+from .test_shards import CONDA_FORGE_WITH_SHARDS
+
 if TYPE_CHECKING:
     import os
 
@@ -146,7 +148,7 @@ def test_load_channel_repo_info_shards(
     TODO: This test should eventually switch to just using conda-forge when that channel
           supports shards and not the `conda-forge-sharded` channel.
     """
-    load_channel = "defaults" if load_type == "main" else "conda-forge-sharded"
+    load_channel = "defaults" if load_type == "main" else CONDA_FORGE_WITH_SHARDS
 
     monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
     assert _is_sharded_repodata_enabled() == (load_type == "shard")
