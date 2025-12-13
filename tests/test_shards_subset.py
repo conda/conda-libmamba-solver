@@ -548,8 +548,7 @@ def test_pipelined_timeout(http_server_shards, monkeypatch):
 
     # a slow and ineffective get()
     monkeypatch.setattr(
-        "conda.gateways.connection.session.CondaSession.get",
-        lambda *args, **kwargs: queue.get()
+        "conda.gateways.connection.session.CondaSession.get", lambda *args, **kwargs: queue.get()
     )
 
     # faster failure
