@@ -544,10 +544,13 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
         assert found_packages
 
 
-def test_pipelined_timeout(http_server_shards, monkeypatch):
+def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
     """
     Test that pipelined times out if a URL is never fetched.
     """
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
 
     channel = Channel.from_url(f"{http_server_shards}/noarch/")
     root_packages = ["foo"]
