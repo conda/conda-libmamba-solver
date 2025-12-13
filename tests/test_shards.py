@@ -152,6 +152,15 @@ FAKE_REPODATA = {
             "constrains": ["splat<3"],
             "sha256": hashlib.sha256().digest(),
         },
+        "no-matching-tar-bz2.conda": {
+            "name": "foo",
+            "version": "2",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["quux", "warble"],
+            "constrains": ["splat<3"],
+            "sha256": hashlib.sha256().digest(),
+        },
     },
     "repodata_version": 2,
 }
