@@ -92,6 +92,13 @@ TESTING_SCENARIOS = [
     },
 ]
 
+if True:  # one fast, one slow-ish scenario for faster tests unless debugging.
+    TESTING_SCENARIOS = [
+        scenario
+        for scenario in TESTING_SCENARIOS
+        if scenario["name"] in ("python", "devops_automation")
+    ]
+
 
 def codspeed_supported():
     """
@@ -126,7 +133,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
-    ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
+    ids=[scenario["name"] for scenario in TESTING_SCENARIOS],
 )
 def test_traversal_algorithm_benchmarks(
     benchmark: BenchmarkFixture,
@@ -169,7 +176,7 @@ def test_traversal_algorithm_benchmarks(
 
     def target(subset: RepodataSubset):
         with _timer(""):
-            subset.reachable(scenario["packages"])
+            subset.reachable(scenario["packages"], strategy=algorithm)
 
     warmup_rounds = 1 if cache_state == "warm" else 0
 
