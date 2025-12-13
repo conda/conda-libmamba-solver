@@ -544,10 +544,12 @@ def test_pipelined_timeout(http_server_shards, monkeypatch):
 
     shardlikes = fetch_channels([channel])
 
+    queue = SimpleQueue()
+
     # a slow and ineffective get()
     monkeypatch.setattr(
         "conda.gateways.connection.session.CondaSession.get",
-        lambda *args, **kwargs: time.sleep(3),
+        lambda *args, **kwargs: queue.get()
     )
 
     # faster failure
@@ -557,6 +559,8 @@ def test_pipelined_timeout(http_server_shards, monkeypatch):
     subset = RepodataSubset(shardlikes.values())
     with pytest.raises(TimeoutError, match="shard_out_queue"):
         subset.reachable_pipelined(root_packages)
+
+    queue.put(None)
 
 
 def test_combine_batches_blocking_scenario():
