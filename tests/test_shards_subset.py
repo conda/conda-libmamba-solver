@@ -18,13 +18,14 @@ from unittest.mock import patch
 import conda.gateways.repodata
 import pytest
 import pytest_codspeed
+from conda.base.context import reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
-from conda_libmamba_solver.shards import ShardLike, fetch_channels, fetch_shards_index
+from conda_libmamba_solver.shards import ShardLike, Shards, fetch_channels, fetch_shards_index
 from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
@@ -407,18 +408,20 @@ def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, 
 
 
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
-def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocker, tmp_path):
+def test_build_repodata_subset_local_server(http_server_shards, algorithm, monkeypatch, tmp_path):
     """
     Ensure we can fetch and build a valid repodata subset from our mock local server.
     """
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
 
     expected_repodata = _ensure_hex_hash(FAKE_REPODATA)
-    expected_repodata = shards_subset.remove_legacy_packages(expected_repodata)  # type: ignore
-
-    # Override cache dir location for tests; ensures it's empty
-    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+    if algorithm == "pipelined":
+        expected_repodata = shards_subset.remove_legacy_packages(expected_repodata)  # type: ignore
 
     channel_data = build_repodata_subset(
         root_packages, {channel.url() or "": channel}, algorithm=algorithm
@@ -430,7 +433,12 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocke
             continue
         actual_repodata = shardlike.build_repodata()
 
-        assert actual_repodata == expected_repodata, (actual_repodata, expected_repodata)
+        assert actual_repodata == expected_repodata, (
+            "actual",
+            actual_repodata,
+            "expected",
+            expected_repodata,
+        )
 
 
 @pytest.mark.parametrize("only_tar_bz2", (True, False))
@@ -541,10 +549,15 @@ def test_pipelined_timeout(http_server_shards, monkeypatch):
     Test that pipelined times out if a URL is never fetched.
     """
 
-    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    channel = Channel.from_url(f"{http_server_shards}/noarch/")
     root_packages = ["foo"]
 
-    shardlikes = fetch_channels([channel])
+    # fetch_channels() will expand noarch/ to include context.subdirs, but we only want a single subdir here.
+    # shardlikes = fetch_channels([channel])
+
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+    shardlikes = [fetch_shards_index(subdir_data)]
 
     queue = SimpleQueue()
 
@@ -557,7 +570,11 @@ def test_pipelined_timeout(http_server_shards, monkeypatch):
     monkeypatch.setattr("conda_libmamba_solver.shards_subset.REACHABLE_PIPELINED_MAX_TIMEOUTS", 1)
     monkeypatch.setattr("conda_libmamba_solver.shards_subset.THREAD_WAIT_TIMEOUT", 0)
 
-    subset = RepodataSubset(shardlikes.values())
+    assert len(shardlikes) == 1, "test expects a single channel"
+    assert all(isinstance(shardlike, Shards) for shardlike in shardlikes), (
+        "test expects real sharded channel"
+    )
+    subset = RepodataSubset(shardlikes)
     with pytest.raises(TimeoutError, match="shard_out_queue"):
         subset.reachable_pipelined(root_packages)
 
