@@ -81,11 +81,17 @@ def repodata_subset_size(channel_data):
 
 
 @contextmanager
-def _timer(name: str):
+def _timer(name: str, callback=None):
+    """
+    Print measured time with name as part of message. Call
+    callback(nanoseconds_elapsed) if given.
+    """
     begin = time.monotonic_ns()
     yield
     end = time.monotonic_ns()
     print(f"{name} took {(end - begin) / 1e9:0.6f}s")
+    if callback:
+        callback(end - begin)
 
 
 @pytest.fixture

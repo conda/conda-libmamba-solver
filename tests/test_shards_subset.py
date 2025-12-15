@@ -211,13 +211,16 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
 # region pipelined
 
 
-def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
+# try with big, and empty root_packages.
+@pytest.mark.parametrize(
+    "root_packages", [ROOT_PACKAGES[:] + ["vaex"], []], ids=["complex", "empty"]
+)
+def test_build_repodata_subset_pipelined(
+    prepare_shards_test: None, root_packages: list[str], tmp_path
+):
     """
     Build repodata subset using a worker threads dependency traversal algorithm.
     """
-    # installed, plus what we want to add (twine)
-    root_packages = ROOT_PACKAGES[:] + ["vaex"]
-
     channels = []
     # channels.extend(context.default_channels)
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
@@ -225,7 +228,13 @@ def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
     with _timer("fetch_channels()"):
         channel_data = fetch_channels(channels)
 
-    with _timer("RepodataSubset.reachable_pipelined()"):
+    def assert_quick(ns: int):
+        # Check that the 1 second queue timeout doesn't happen on an empty
+        # traversal.
+        if not root_packages:
+            assert (ns / 1e9) < 0.05, "Empty shard traversal should be quick."
+
+    with _timer("RepodataSubset.reachable_pipelined()", assert_quick):
         subset = RepodataSubset((*channel_data.values(),))
         subset.reachable_pipelined(root_packages)
         print(f"{len(subset.nodes)} (channel, package) nodes discovered")
