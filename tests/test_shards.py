@@ -804,15 +804,17 @@ def test_shards_connections(monkeypatch):
     assert _shards_connections() == 4
 
 
-def test_remove_legacy_packages_simple():
+def test_filter_packages_simple():
     simple = {
         "packages": {"a.tar.bz2": {}, "b.tar.bz2": {}},
         "packages.conda": {
             "a.conda": {},
         },
     }
-    trimmed = shards_subset.remove_legacy_packages(simple)  # type: ignore
+    trimmed = shards_subset.filter_redundant_packages(simple)  # type: ignore
     assert trimmed["packages"] == {"b.tar.bz2": {}}
+
+    assert shards_subset.filter_redundant_packages(simple, use_only_tar_bz2=True) is simple  # type: ignore
 
 
 # the function under test is not particularly slow but downloads large repodata
@@ -822,7 +824,7 @@ def test_remove_legacy_packages_simple():
 @pytest.mark.parametrize(
     "channel", ("conda-forge/linux-64", "https://repo.anaconda.com/pkgs/main/linux-64")
 )
-def test_remove_legacy_packages_real(channel, benchmark):
+def test_filter_packages_repodata(channel, benchmark):
     repodata, _ = SubdirData(Channel(channel)).repo_fetch.fetch_latest_parsed()
     print(
         f"Original {channel} has {len(repodata['packages'])} .tar.bz2 packages and {len(repodata['packages.conda'])} .conda packages"
@@ -832,7 +834,7 @@ def test_remove_legacy_packages_real(channel, benchmark):
 
     def remove():
         nonlocal repodata_trimmed
-        repodata_trimmed = shards_subset.remove_legacy_packages(repodata)  # type: ignore
+        repodata_trimmed = shards_subset.filter_redundant_packages(repodata)  # type: ignore
 
     benchmark(remove)
 

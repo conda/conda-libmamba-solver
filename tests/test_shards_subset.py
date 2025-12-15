@@ -428,7 +428,7 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, monke
 
     expected_repodata = _ensure_hex_hash(FAKE_REPODATA)
     if algorithm == "pipelined":
-        expected_repodata = shards_subset.remove_legacy_packages(expected_repodata)  # type: ignore
+        expected_repodata = shards_subset.filter_redundant_packages(expected_repodata, False)  # type: ignore
 
     channel_data = build_repodata_subset(
         root_packages, {channel.url() or "": channel}, algorithm=algorithm

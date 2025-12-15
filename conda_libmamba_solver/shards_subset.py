@@ -138,11 +138,16 @@ def _nodes_from_packages(
                 yield node_id, node
 
 
-def remove_legacy_packages(repodata: ShardDict) -> ShardDict:
+def filter_redundant_packages(repodata: ShardDict, use_only_tar_bz2=False) -> ShardDict:
     """
     Given repodata or a single shard, remove any .tar.bz2 packages that have a
-    .conda counterpart. Return a shallow copy.
+    .conda counterpart.
+
+    Return a shallow copy if use_only_tar_bz2==False, else unmodified input.
     """
+    if use_only_tar_bz2:
+        return repodata
+
     _tar_bz2 = ".tar.bz2"
     _conda = ".conda"
     _len_tar_bz2 = len(_tar_bz2)
@@ -195,9 +200,8 @@ class RepodataSubset:
                 node.package
             )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
 
-            if not self._use_only_tar_bz2:
-                shard = remove_legacy_packages(shard)
-                shardlike.visit_shard(node.package, shard)
+            shard = filter_redundant_packages(shard, self._use_only_tar_bz2)
+            shardlike.visit_shard(node.package, shard)
 
             for package in shard_mentioned_packages(shard):
                 node_id = NodeId(package, shardlike.url)
@@ -405,10 +409,9 @@ class RepodataSubset:
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
-                if not self._use_only_tar_bz2:
-                    # remove_legacy_packages if the ".conda" format is enabled /
-                    # conda is not in ".tar.bz2 only" mode.
-                    shard = remove_legacy_packages(shard)
+                # remove_legacy_packages if the ".conda" format is enabled /
+                # conda is not in ".tar.bz2 only" mode.
+                shard = filter_redundant_packages(shard, self._use_only_tar_bz2)
 
                 # add shard to appropriate ShardLike
                 parent_node = self.nodes[node_id]
