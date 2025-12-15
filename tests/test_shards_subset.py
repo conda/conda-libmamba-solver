@@ -33,7 +33,7 @@ from conda_libmamba_solver.shards_subset import (
     combine_batches_until_none,
     exception_to_queue,
 )
-from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _ensure_hex_hash, _timer
+from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _timer, ensure_hex_hash
 
 from .test_shards import CONDA_FORGE_WITH_SHARDS
 
@@ -426,9 +426,8 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, monke
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
 
-    expected_repodata = _ensure_hex_hash(FAKE_REPODATA)
-    if algorithm == "pipelined":
-        expected_repodata = shards_subset.filter_redundant_packages(expected_repodata, False)  # type: ignore
+    expected_repodata = ensure_hex_hash(FAKE_REPODATA)
+    expected_repodata = shards_subset.filter_redundant_packages(expected_repodata)  # type: ignore
 
     channel_data = build_repodata_subset(
         root_packages, {channel.url() or "": channel}, algorithm=algorithm

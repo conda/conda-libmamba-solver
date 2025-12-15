@@ -169,7 +169,7 @@ FAKE_REPODATA = {
 }
 
 
-def _ensure_hex_hash(repodata: dict):
+def ensure_hex_hash(repodata: dict):
     """
     Convert every hash in a repodata to hex. Copy repodata.
     """
@@ -185,15 +185,15 @@ def _ensure_hex_hash(repodata: dict):
     return new_repodata
 
 
-def _shard_for_name(repodata, name):
+def shard_for_name(repodata, name):
     return {
         group: {k: v for (k, v) in repodata[group].items() if v["name"] == name}
         for group in ("packages", "packages.conda")
     }
 
 
-FAKE_SHARD = _shard_for_name(FAKE_REPODATA, "foo")
-FAKE_SHARD_2 = _shard_for_name(FAKE_REPODATA, "bar")
+FAKE_SHARD = shard_for_name(FAKE_REPODATA, "foo")
+FAKE_SHARD_2 = shard_for_name(FAKE_REPODATA, "bar")
 
 
 @pytest.fixture(scope="session")
