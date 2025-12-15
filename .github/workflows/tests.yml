@@ -52,7 +52,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
     steps:
       - name: Checkout Source
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         # dorny/paths-filter needs git clone for non-PR events
         # https://github.com/dorny/paths-filter#supported-workflows
         if: github.event_name != 'pull_request'
@@ -103,7 +103,7 @@ jobs:
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -111,7 +111,7 @@ jobs:
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
@@ -122,7 +122,7 @@ jobs:
         run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
 
       - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/conda_pkgs_dir
           key: cache-${{ env.HASH }}
@@ -207,14 +207,14 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       - name: Upload Test Results
         if: '!cancelled()'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: test-results-${{ env.HASH }}
           # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
@@ -269,7 +269,7 @@ jobs:
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -277,7 +277,7 @@ jobs:
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
@@ -287,7 +287,7 @@ jobs:
         run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
 
       - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/conda_pkgs_dir
           key: cache-${{ env.HASH }}
@@ -367,14 +367,14 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         if: false # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       - name: Upload Test Results
         if: '!cancelled()'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: test-results-${{ env.HASH }}
           path: |
@@ -400,7 +400,7 @@ jobs:
 
     steps:
       - name: Checkout Source
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
 
@@ -408,7 +408,7 @@ jobs:
         run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-benchmark-$(date -u "+%Y%m")" >> $GITHUB_ENV
 
       - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/conda_pkgs_dir
           key: cache-${{ env.HASH }}
@@ -471,7 +471,7 @@ jobs:
 
     steps:
       - name: Checkout Source
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
 
@@ -548,7 +548,7 @@ jobs:
 
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -556,7 +556,7 @@ jobs:
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
@@ -566,7 +566,7 @@ jobs:
         run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-${{ matrix.default-channel }}-${{ matrix.test-type }}-${{ matrix.test-group }}-$(date -u "+%Y%m")" >> $GITHUB_ENV
 
       - name: Cache Conda
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
           path: ~/conda_pkgs_dir
           key: cache-${{ env.HASH }}
@@ -648,14 +648,14 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@5a1091511ad55cbe89839c7260b706298ca349f7 # v5.5.1
+        uses: codecov/codecov-action@671740ac38dd9b0130fbe1cec585b89eea48d3de # v5.5.2
         if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       - name: Upload Test Results
         if: '!cancelled()'
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: test-results-${{ env.HASH }}
           # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
@@ -676,11 +676,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
 
       - name: Upload Combined Test Results
         # provides one downloadable archive of all matrix run test results for further analysis
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: test-results-${{ github.sha }}-all
           path: test-results-*
@@ -708,7 +708,7 @@ jobs:
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout our source
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         if: always() && github.event_name == 'schedule' && steps.alls-green.outputs.result == 'failure'
 
       - name: Report failures
@@ -744,7 +744,7 @@ jobs:
       # Clean checkout of specific git ref needed for package metadata version
       # which needs env vars GIT_DESCRIBE_TAG and GIT_BUILD_STR:
       - name: Checkout Source
-        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           ref: ${{ github.ref }}
           clean: true
@@ -752,7 +752,7 @@ jobs:
 
       # Explicitly use Python 3.11 since each of the OSes has a different default Python
       - name: Setup Python
-        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+        uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
           python-version: '3.11'
 
