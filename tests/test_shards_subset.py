@@ -449,7 +449,8 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, monke
 
 
 @pytest.mark.parametrize("only_tar_bz2", (True, False))
-def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2):
+@pytest.mark.parametrize("strategy", ("pipelined", "bfs"))
+def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
     """
     Ensure we avoid tar_bz2 in "use .conda" mode.
 
@@ -462,7 +463,7 @@ def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2):
 
     subset = RepodataSubset((*channel_data.values(),))
     subset._use_only_tar_bz2 = only_tar_bz2
-    subset.reachable(root_packages)
+    subset.reachable(root_packages, strategy=strategy)
 
     repodata = json.dumps(subset.shardlikes[0].build_repodata(), indent=True)
 

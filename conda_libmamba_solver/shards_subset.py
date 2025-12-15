@@ -195,7 +195,7 @@ class RepodataSubset:
                 node.package
             )  # XXX this is the only place that in-memory (repodata.json) shards are found for the first time
 
-            if self._use_only_tar_bz2:
+            if not self._use_only_tar_bz2:
                 shard = remove_legacy_packages(shard)
                 shardlike.visit_shard(node.package, shard)
 
