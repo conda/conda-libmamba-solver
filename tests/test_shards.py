@@ -52,6 +52,9 @@ if TYPE_CHECKING:
 
 HERE = Path(__file__).parent
 
+# was conda-forge-sharded during testing
+CONDA_FORGE_WITH_SHARDS = "conda-forge"
+
 
 def package_names(shard: shards_cache.ShardDict):
     """
@@ -78,11 +81,17 @@ def repodata_subset_size(channel_data):
 
 
 @contextmanager
-def _timer(name: str):
+def _timer(name: str, callback=None):
+    """
+    Print measured time with name as part of message. Call
+    callback(nanoseconds_elapsed) if given.
+    """
     begin = time.monotonic_ns()
     yield
     end = time.monotonic_ns()
     print(f"{name} took {(end - begin) / 1e9:0.6f}s")
+    if callback:
+        callback(end - begin)
 
 
 @pytest.fixture
@@ -126,6 +135,12 @@ FAKE_REPODATA = {
             "build_number": 0,
             "depends": ["foo"],
         },
+        "no-matching-conda.tar.bz2": {
+            "name": "foo",
+            "version": "0.1",
+            "build": "0_a",
+            "build_number": 0,
+        },
     },
     "packages.conda": {
         "foo.conda": {
@@ -133,7 +148,7 @@ FAKE_REPODATA = {
             "version": "1",
             "build": "0_a",
             "build_number": 0,
-            "depends": ["quux", "warble"],
+            "depends": ["bar", "baz"],
             "constrains": ["splat<3"],
             "sha256": hashlib.sha256().digest(),
         },
@@ -146,12 +161,21 @@ FAKE_REPODATA = {
             "constrains": ["splat<3"],
             "sha256": hashlib.sha256().digest(),
         },
+        "no-matching-tar-bz2.conda": {
+            "name": "foo",
+            "version": "2",
+            "build": "0_a",
+            "build_number": 0,
+            "depends": ["quux", "warble"],
+            "constrains": ["splat<3"],
+            "sha256": hashlib.sha256().digest(),
+        },
     },
     "repodata_version": 2,
 }
 
 
-def _ensure_hex_hash(repodata: dict):
+def ensure_hex_hash(repodata: dict):
     """
     Convert every hash in a repodata to hex. Copy repodata.
     """
@@ -167,15 +191,15 @@ def _ensure_hex_hash(repodata: dict):
     return new_repodata
 
 
-def _shard_for_name(repodata, name):
+def shard_for_name(repodata, name):
     return {
         group: {k: v for (k, v) in repodata[group].items() if v["name"] == name}
         for group in ("packages", "packages.conda")
     }
 
 
-FAKE_SHARD = _shard_for_name(FAKE_REPODATA, "foo")
-FAKE_SHARD_2 = _shard_for_name(FAKE_REPODATA, "bar")
+FAKE_SHARD = shard_for_name(FAKE_REPODATA, "foo")
+FAKE_SHARD_2 = shard_for_name(FAKE_REPODATA, "bar")
 
 
 @pytest.fixture(scope="session")
@@ -337,7 +361,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
     channels = list(context.default_channels)
     print(channels)
 
-    channels.append(Channel("conda-forge-sharded"))
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     channel_data = fetch_channels(channels)
 
@@ -627,7 +651,7 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     root_packages = ROOT_PACKAGES[:]
 
     channels = list(context.default_channels)
-    channels.append(Channel("conda-forge-sharded"))
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("build_repodata_subset()"):
         channel_data = build_repodata_subset(root_packages, channels)
@@ -675,7 +699,7 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     """
     Test single database query to fetch cached shard URLs in a batch.
     """
-    channels = [*context.default_channels, Channel("conda-forge-sharded")]
+    channels = [*context.default_channels, Channel(CONDA_FORGE_WITH_SHARDS)]
     roots = [
         Node(distance=0, package="ca-certificates", visited=False),
         Node(distance=0, package="icu", visited=False),
@@ -784,6 +808,45 @@ def test_shards_connections(monkeypatch):
 
     monkeypatch.setattr(context, "_repodata_threads", 4)
     assert _shards_connections() == 4
+
+
+def test_filter_packages_simple():
+    simple = {
+        "packages": {"a.tar.bz2": {}, "b.tar.bz2": {}},
+        "packages.conda": {
+            "a.conda": {},
+        },
+    }
+    trimmed = shards_subset.filter_redundant_packages(simple)  # type: ignore
+    assert trimmed["packages"] == {"b.tar.bz2": {}}
+
+    assert shards_subset.filter_redundant_packages(simple, use_only_tar_bz2=True) is simple  # type: ignore
+
+
+# the function under test is not particularly slow but downloads large repodata
+# unnecessarily. Useful if remove_legacy_packages needs to be debugged.
+@pytest.mark.skip(reason="slow")
+@pytest.mark.benchmark()
+@pytest.mark.parametrize(
+    "channel", ("conda-forge/linux-64", "https://repo.anaconda.com/pkgs/main/linux-64")
+)
+def test_filter_packages_repodata(channel, benchmark):
+    repodata, _ = SubdirData(Channel(channel)).repo_fetch.fetch_latest_parsed()
+    print(
+        f"Original {channel} has {len(repodata['packages'])} .tar.bz2 packages and {len(repodata['packages.conda'])} .conda packages"
+    )
+
+    repodata_trimmed = {}
+
+    def remove():
+        nonlocal repodata_trimmed
+        repodata_trimmed = shards_subset.filter_redundant_packages(repodata)  # type: ignore
+
+    benchmark(remove)
+
+    print(
+        f"Trimmed {channel} has {len(repodata_trimmed['packages'])} .tar.bz2 packages and {len(repodata['packages.conda'])} .conda packages"
+    )
 
 
 def test_offline_mode_expired_cache(http_server_shards, monkeypatch, tmp_path):
