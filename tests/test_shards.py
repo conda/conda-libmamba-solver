@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING, NamedTuple
 import conda.gateways.repodata
 import msgpack
 import pytest
-import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 
+import conda_libmamba_solver.zstd as zstandard
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
     _is_sharded_repodata_enabled,
