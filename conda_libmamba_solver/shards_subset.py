@@ -346,6 +346,9 @@ class RepodataSubset:
         def log_timeout(timeouts: int, pump_count: int):
             """
             Log timeout information and raise TimeoutError if max timeouts exceeded.
+
+            This function is called with the timeout count before incrementing.
+            It checks if the NEXT timeout (after increment) would exceed the max.
             """
             log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
             log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
@@ -356,9 +359,9 @@ class RepodataSubset:
             log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
             if not pending and not in_flight:
                 log.debug("All shards have finished processing")
-            elif timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+            elif timeouts + 1 > REACHABLE_PIPELINED_MAX_TIMEOUTS:
                 raise TimeoutError(
-                    f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
+                    f"Timeout waiting for shard_out_queue after {timeouts + 1} attempts. "
                     f"pending={len(pending)}, in_flight={len(in_flight)}, "
                     f"cache_thread_alive={cache_thread.is_alive()}, "
                     f"network_thread_alive={network_thread.is_alive()}"
@@ -376,10 +379,10 @@ class RepodataSubset:
                     raise new_shards
             except queue.Empty:
                 pump_count = pump()
-                timeouts += 1
                 log_timeout(timeouts, pump_count)
                 if not pending and not in_flight:
                     break
+                timeouts += 1
                 continue  # immediately calls pump() at top of loop
 
             for node_id, shard in new_shards:
