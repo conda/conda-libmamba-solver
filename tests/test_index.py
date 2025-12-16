@@ -21,6 +21,8 @@ from conda_libmamba_solver.shards_subset import build_repodata_subset
 from conda_libmamba_solver.state import SolverInputState
 from tests.test_shards import _timer
 
+from .test_shards import CONDA_FORGE_WITH_SHARDS
+
 if TYPE_CHECKING:
     import os
     from collections.abc import Iterable
@@ -146,11 +148,8 @@ def test_load_channel_repo_info_shards(
 ):
     """
     Benchmark shards/not-shards under different dependency tree sizes.
-
-    TODO: This test should eventually switch to just using conda-forge when that channel
-          supports shards and not the `conda-forge-sharded` channel.
     """
-    load_channel = "defaults" if load_type == "main" else "conda-forge-sharded"
+    load_channel = "defaults" if load_type == "main" else CONDA_FORGE_WITH_SHARDS
 
     monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
     assert _is_sharded_repodata_enabled() == (load_type == "shard")
