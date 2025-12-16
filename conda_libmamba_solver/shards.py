@@ -657,12 +657,14 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
+def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase] | None:
     """
     Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
 
     Attempt to fetch the sharded index first and then fall back to retrieving
     a traditional `repodata.json` file.
+
+    If no channels have shards, return None.
     """
     # metaclass returns same channel, or casts to channel.
     channels = [Channel(c) for c in channels]  # type: ignore
@@ -701,22 +703,20 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
             if found:
                 channel_data[channel_url] = found
             else:
-                non_sharded_channels.append(Channel(channel_url))
+                non_sharded_channels.append((channel_url, Channel(channel_url)))
 
-        # if all are None then don't do ShardLike... will get here very quickly once "there are no shards" is cached.
+        # If all are None then don't do ShardLike... will get here very quickly once
+        # "there are no shards" is cached.
         if not channel_data:
-            return None # caller should interpret this as falling back to the older code path
+            return None  # caller should interpret this as falling back to the older code path
 
-        # On the other hand, shard traversal saves libmamba parse time even if there are no real shards;
-        # fallback to the old code seems to be a conservative move more than a performance one.
-        
-        # Latency penalty launching these requests here instead of when we non_sharded_channels.append()
-        for channel in non_sharded_channels:
-                futures_non_sharded[
-                    executor.submit(
-                        SubdirData(channel).repo_fetch.fetch_latest_parsed
-                    )
-                ] = channel_url
+        # Latency penalty launching these requests here instead of when we
+        # non_sharded_channels.append(), but we want to leave a fallback to the
+        # non-sharded path open.
+        for channel_url, channel in non_sharded_channels:
+            futures_non_sharded[
+                executor.submit(SubdirData(channel).repo_fetch.fetch_latest_parsed)
+            ] = channel_url
 
         for future in concurrent.futures.as_completed(futures_non_sharded):
             channel_url = futures_non_sharded[future]
