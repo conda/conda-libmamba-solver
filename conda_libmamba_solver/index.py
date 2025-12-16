@@ -188,6 +188,11 @@ def _package_info_from_package_dict(
 
     # filename, the key from repodata
 
+    track_features = record.get("track_features") or []
+    # track_features can be stored as a space- or comma-separated string
+    if track_features and isinstance(track_features, str):
+        track_features = track_features.replace(" ", ",").split(",")
+        track_features = list(f for f in (ff.strip() for ff in track_features) if f)
     return PackageInfo(
         name=record["name"],
         version=record["version"],
@@ -201,8 +206,8 @@ def _package_info_from_package_dict(
         md5=record.get("md5") or "",
         sha256=record.get("sha256") or "",
         signatures=record.get("signatures") or "",
+        track_features=track_features,
         # conda can have list or tuple, but libmamba only accepts lists
-        track_features=list(record.get("track_features") or []),
         depends=list(record.get("depends") or []),
         constrains=list(record.get("constrains") or []),
         defaulted_keys=list(record.get("defaulted_keys") or []),

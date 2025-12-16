@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import json
 import random
 import threading
 import time
@@ -17,13 +18,14 @@ from unittest.mock import patch
 import conda.gateways.repodata
 import pytest
 import pytest_codspeed
+from conda.base.context import reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
-from conda_libmamba_solver.shards import ShardLike, fetch_channels, fetch_shards_index
+from conda_libmamba_solver.shards import ShardLike, Shards, fetch_channels, fetch_shards_index
 from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
@@ -31,12 +33,9 @@ from conda_libmamba_solver.shards_subset import (
     combine_batches_until_none,
     exception_to_queue,
 )
-from tests.test_shards import (
-    FAKE_SHARD,
-    FAKE_SHARD_2,
-    ROOT_PACKAGES,
-    _timer,
-)
+from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _timer, ensure_hex_hash
+
+from .test_shards import CONDA_FORGE_WITH_SHARDS
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -53,45 +52,52 @@ TESTING_SCENARIOS = [
         "name": "python",
         "packages": ["python"],
         "prefetch_packages": [],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "data_science_ml",
         "packages": ["scikit-learn", "matplotlib"],
         "prefetch_packages": ["python", "numpy"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "web_development",
         "packages": ["django", "celery"],
         "prefetch_packages": ["python", "requests"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "scientific_computing",
         "packages": ["scipy", "sympy", "pytorch"],
         "prefetch_packages": ["python", "numpy", "pandas"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "devops_automation",
         "packages": ["ansible", "pyyaml", "jinja2"],
         "prefetch_packages": ["python"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
     {
         "name": "vaex",
         "packages": ["vaex"],
         "prefetch_packages": ["python", "numpy", "pandas"],
-        "channel": "conda-forge-sharded",
+        "channel": CONDA_FORGE_WITH_SHARDS,
         "platform": "linux-64",
     },
 ]
+
+if True:  # one fast, one slow-ish scenario for faster tests unless debugging.
+    TESTING_SCENARIOS = [
+        scenario
+        for scenario in TESTING_SCENARIOS
+        if scenario["name"] in ("python", "devops_automation")
+    ]
 
 
 def codspeed_supported():
@@ -127,7 +133,7 @@ def clean_cache(conda_cli: CondaCLIFixture):
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
-    ids=[scenario.get("name") for scenario in TESTING_SCENARIOS],
+    ids=[scenario["name"] for scenario in TESTING_SCENARIOS],
 )
 def test_traversal_algorithm_benchmarks(
     benchmark: BenchmarkFixture,
@@ -168,9 +174,9 @@ def test_traversal_algorithm_benchmarks(
 
         return (subset,), {}
 
-    def target(subset):
+    def target(subset: RepodataSubset):
         with _timer(""):
-            getattr(subset, f"reachable_{algorithm}")(scenario["packages"])
+            subset.reachable(scenario["packages"], strategy=algorithm)
 
     warmup_rounds = 1 if cache_state == "warm" else 0
 
@@ -205,21 +211,30 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
 # region pipelined
 
 
-def test_build_repodata_subset_pipelined(prepare_shards_test: None, tmp_path):
+# try with big, and empty root_packages.
+@pytest.mark.parametrize(
+    "root_packages", [ROOT_PACKAGES[:] + ["vaex"], []], ids=["complex", "empty"]
+)
+def test_build_repodata_subset_pipelined(
+    prepare_shards_test: None, root_packages: list[str], tmp_path
+):
     """
     Build repodata subset using a worker threads dependency traversal algorithm.
     """
-    # installed, plus what we want to add (twine)
-    root_packages = ROOT_PACKAGES[:] + ["vaex"]
-
     channels = []
     # channels.extend(context.default_channels)
-    channels.append(Channel("conda-forge-sharded"))
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("fetch_channels()"):
         channel_data = fetch_channels(channels)
 
-    with _timer("RepodataSubset.reachable_pipelined()"):
+    def assert_quick(ns: int):
+        # Check that the 1 second queue timeout doesn't happen on an empty
+        # traversal.
+        if not root_packages:
+            assert (ns / 1e9) < 0.05, "Empty shard traversal should be quick."
+
+    with _timer("RepodataSubset.reachable_pipelined()", assert_quick):
         subset = RepodataSubset((*channel_data.values(),))
         subset.reachable_pipelined(root_packages)
         print(f"{len(subset.nodes)} (channel, package) nodes discovered")
@@ -317,7 +332,9 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
                 assert isinstance(shard, dict)
 
                 # Make sure this is either one of the two packages from above ("foo" or "bar")
-                assert set(shard.get("packages", {}).keys()).intersection(("foo", "bar"))
+                assert set(shard.get("packages", {}).keys()).intersection(
+                    ("foo.tar.bz2", "bar.tar.bz2")
+                )
 
     # Worker produces TypeError if non-network NodeId is sent and one of the
     # shardlikes has its url. (If no shardlike has NodeId's url, it produces
@@ -407,24 +424,63 @@ def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, 
 
 
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
-def test_build_repodata_subset_local_server(http_server_shards, algorithm, mocker, tmp_path):
+def test_build_repodata_subset_local_server(http_server_shards, algorithm, monkeypatch, tmp_path):
     """
     Ensure we can fetch and build a valid repodata subset from our mock local server.
     """
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
-    expected_repodata = {**FAKE_SHARD["packages"], **FAKE_SHARD_2["packages"]}
 
-    # Override cache dir location for tests; ensures it's empty
-    mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
+    expected_repodata = ensure_hex_hash(FAKE_REPODATA)
+    expected_repodata = shards_subset.filter_redundant_packages(expected_repodata)  # type: ignore
 
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+    channel_data = build_repodata_subset(
+        root_packages, {channel.url() or "": channel}, algorithm=algorithm
+    )
 
     for shardlike in channel_data.values():
         # expanded in fetch_channels() "channel.urls(True, context.subdirs)"
         if "/noarch/" not in shardlike.url:
             continue
-        assert shardlike.build_repodata().get("packages") == expected_repodata
+        actual_repodata = shardlike.build_repodata()
+
+        assert actual_repodata == expected_repodata, (
+            "actual",
+            actual_repodata,
+            "expected",
+            expected_repodata,
+        )
+
+
+@pytest.mark.parametrize("only_tar_bz2", (True, False))
+@pytest.mark.parametrize("strategy", ("pipelined", "bfs"))
+def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
+    """
+    Ensure we avoid tar_bz2 in "use .conda" mode.
+
+    Should we exclude all .conda in "only .tar.bz2" mode? Can we drop this legacy mode?
+    """
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    root_packages = ["foo"]
+
+    channel_data = fetch_channels({channel.url() or "": channel})
+
+    subset = RepodataSubset((*channel_data.values(),))
+    subset._use_only_tar_bz2 = only_tar_bz2
+    subset.reachable(root_packages, strategy=strategy)
+
+    repodata = json.dumps(subset.shardlikes[0].build_repodata(), indent=True)
+
+    if only_tar_bz2:
+        assert len(subset.shardlikes[0].build_repodata()["packages"]) > 0, repodata
+    else:
+        assert set(subset.shardlikes[0].build_repodata()["packages"]) == {
+            "no-matching-conda.tar.bz2"
+        }, repodata
 
 
 def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_path):
@@ -504,29 +560,44 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
         assert found_packages
 
 
-def test_pipelined_timeout(http_server_shards, monkeypatch):
+def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
     """
     Test that pipelined times out if a URL is never fetched.
     """
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
 
-    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    channel = Channel.from_url(f"{http_server_shards}/noarch/")
     root_packages = ["foo"]
 
-    shardlikes = fetch_channels([channel])
+    # fetch_channels() will expand noarch/ to include context.subdirs, but we only want a single subdir here.
+    # shardlikes = fetch_channels([channel])
+
+    channel = Channel.from_url(f"{http_server_shards}/noarch")
+    subdir_data = SubdirData(channel)
+    shardlikes = [fetch_shards_index(subdir_data)]
+
+    queue = SimpleQueue()
 
     # a slow and ineffective get()
     monkeypatch.setattr(
-        "conda.gateways.connection.session.CondaSession.get",
-        lambda *args, **kwargs: time.sleep(3),
+        "conda.gateways.connection.session.CondaSession.get", lambda *args, **kwargs: queue.get()
     )
 
     # faster failure
     monkeypatch.setattr("conda_libmamba_solver.shards_subset.REACHABLE_PIPELINED_MAX_TIMEOUTS", 1)
     monkeypatch.setattr("conda_libmamba_solver.shards_subset.THREAD_WAIT_TIMEOUT", 0)
 
-    subset = RepodataSubset(shardlikes.values())
-    with pytest.raises(TimeoutError, match="shard_out_queue"):
+    assert len(shardlikes) == 1, "test expects a single channel"
+    assert all(isinstance(shardlike, Shards) for shardlike in shardlikes), (
+        "test expects real sharded channel"
+    )
+    subset = RepodataSubset(shardlikes)
+    with pytest.raises(TimeoutError, match="shard"):
         subset.reachable_pipelined(root_packages)
+
+    queue.put(None)
 
 
 def test_combine_batches_blocking_scenario():
@@ -575,9 +646,14 @@ def test_combine_batches_blocking_scenario():
 
 
 @pytest.mark.integration
-def test_pipelined_extreme_race_conditions(http_server_shards, mocker, tmp_path):
+def test_pipelined_extreme_race_conditions(
+    prepare_shards_test,
+    http_server_shards,
+    mocker,
+    tmp_path,
+):
     """
-    Extremely aggressive test that introduces chaos to force race conditions.
+    Introduce random delays in Queue operations to look for race conditions.
 
     This test:
     - Adds random delays at multiple points
