@@ -376,6 +376,22 @@ class RepodataSubset:
                 shard_out_queue.put(have)
             return len(have) + len(need)
 
+        def log_timeout():
+            """
+            Log timeout information and raise TimeoutError if max timeouts
+            exceeded.
+            """
+            nonlocal timeouts
+            timeouts += 1
+            log.debug("Shard timeout %s", timeouts)
+            log.debug("in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10])
+            log.debug("nodes: %d", len(self.nodes))
+            log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
+            log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
+            log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
+            if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+                raise TimeoutError("Timeout while fetching repodata shards.")
+
         while True:
             pump()
             if not in_flight:  # pending is empty right after calling pump()
@@ -391,23 +407,8 @@ class RepodataSubset:
                     raise new_shards
 
             except queue.Empty:
-                # Count timeouts. No need to call pump() again since 'pending'
-                # has not changed since top-of-loop pump().
-                timeouts += 1
-                log.debug("Shard timeout %s", timeouts)
-                log.debug("in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10])
-                log.debug("nodes: %d", len(self.nodes))
-                log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
-                log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
-                log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-                if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
-                    raise TimeoutError(
-                        f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
-                        f"pending={len(pending)}, in_flight={len(in_flight)}, "
-                        f"cache_thread_alive={cache_thread.is_alive()}, "
-                        f"network_thread_alive={network_thread.is_alive()}"
-                    )
-                continue  # immediately calls pump() at top of loop
+                log_timeout()
+                continue
 
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
