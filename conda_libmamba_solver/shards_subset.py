@@ -357,9 +357,7 @@ class RepodataSubset:
             log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
             log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
             log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-            if not pending and not in_flight:
-                log.debug("All shards have finished processing")
-            elif timeouts + 1 > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+            if timeouts + 1 > REACHABLE_PIPELINED_MAX_TIMEOUTS:
                 raise TimeoutError(
                     f"Timeout waiting for shard_out_queue after {timeouts + 1} attempts. "
                     f"pending={len(pending)}, in_flight={len(in_flight)}, "
@@ -381,6 +379,7 @@ class RepodataSubset:
                 pump_count = pump()
                 log_timeout(timeouts, pump_count)
                 if not pending and not in_flight:
+                    log.debug("All shards have finished processing")
                     break
                 timeouts += 1
                 continue  # immediately calls pump() at top of loop
