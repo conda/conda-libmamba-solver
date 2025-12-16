@@ -594,7 +594,7 @@ def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
         "test expects real sharded channel"
     )
     subset = RepodataSubset(shardlikes)
-    with pytest.raises(TimeoutError, match="shard_out_queue"):
+    with pytest.raises(TimeoutError, match="shard"):
         subset.reachable_pipelined(root_packages)
 
     queue.put(None)
