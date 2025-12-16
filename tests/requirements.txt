@@ -7,3 +7,7 @@ pytest-codspeed >=4
 conda-forge::pytest-mock
 # needed for many conda tests
 flask
+httpx
+h2
+hpack
+hyperframe
