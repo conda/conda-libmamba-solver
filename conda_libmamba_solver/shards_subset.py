@@ -343,6 +343,27 @@ class RepodataSubset:
                 shard_out_queue.put(have)
             return len(have) + len(need)
 
+        def log_timeout(timeouts: int, pump_count: int):
+            """
+            Log timeout information and raise TimeoutError if max timeouts exceeded.
+            """
+            log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
+            log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
+            log.debug("in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10])
+            log.debug("nodes: %d", len(self.nodes))
+            log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
+            log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
+            log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
+            if not pending and not in_flight:
+                log.debug("All shards have finished processing")
+            elif timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+                raise TimeoutError(
+                    f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
+                    f"pending={len(pending)}, in_flight={len(in_flight)}, "
+                    f"cache_thread_alive={cache_thread.is_alive()}, "
+                    f"network_thread_alive={network_thread.is_alive()}"
+                )
+
         running = True
         while running:
             pump()
@@ -355,24 +376,10 @@ class RepodataSubset:
                     raise new_shards
             except queue.Empty:
                 pump_count = pump()
-                log.debug("Shard timeout %s, pump_count=%d", timeouts, pump_count)
-                log.debug("pending: %s...", sorted(str(node_id) for node_id in pending)[:10])
-                log.debug("in_flight: %s...", sorted(str(node_id) for node_id in in_flight)[:10])
-                log.debug("nodes: %d", len(self.nodes))
-                log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
-                log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
-                log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-                if not pending and not in_flight:
-                    log.debug("All shards have finished processing")
-                    break
                 timeouts += 1
-                if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
-                    raise TimeoutError(
-                        f"Timeout waiting for shard_out_queue after {timeouts} attempts. "
-                        f"pending={len(pending)}, in_flight={len(in_flight)}, "
-                        f"cache_thread_alive={cache_thread.is_alive()}, "
-                        f"network_thread_alive={network_thread.is_alive()}"
-                    )
+                log_timeout(timeouts, pump_count)
+                if not pending and not in_flight:
+                    break
                 continue  # immediately calls pump() at top of loop
 
             for node_id, shard in new_shards:
