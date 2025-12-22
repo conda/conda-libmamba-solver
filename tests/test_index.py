@@ -8,6 +8,7 @@ import shutil
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 from conda.base.context import context, reset_context
@@ -168,3 +169,30 @@ def test_load_channel_repo_info_shards(
     index_helper = benchmark.pedantic(index, rounds=1)
 
     assert len(index_helper.repos) > 0
+
+
+def test_load_channels_order():
+    index_args = {
+        "channels": [
+                Channel("defaults"),
+                Channel("conda-forge"),
+            ],
+        "in_state": SolverInputState(prefix="idontexist"),
+    }
+
+    with patch(
+        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
+        return_value=True,
+    ):
+        shard_enabled_index = LibMambaIndexHelper(**index_args)
+
+    with patch(
+        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
+        return_value=False,
+    ):
+        shard_disabled_index = LibMambaIndexHelper(**index_args)
+
+    disabled_shards_channels = [repo.channel for repo in shard_disabled_index.repos]
+    enabled_shard_channels = [repo.channel for repo in shard_enabled_index.repos]
+
+    assert disabled_shards_channels == enabled_shard_channels
