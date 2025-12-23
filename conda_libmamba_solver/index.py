@@ -375,7 +375,7 @@ class LibMambaIndexHelper:
             # reorder the list to match the intended channel order.
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
             return sorted(channel_repos_info, key=lambda x: list(urls_to_channel.keys()).index(x.channel))
-
+        
         # Fallback to repodata.json loading
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
@@ -389,7 +389,7 @@ class LibMambaIndexHelper:
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
         channel_data = build_repodata_subset(root_packages, urls_to_channel)
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
-        # TODO: ensure channels have the right order
+
         return channel_repo_infos
 
     def _load_channel_repo_info_json(
@@ -412,7 +412,7 @@ class LibMambaIndexHelper:
             )
             channel_repo_infos.append(
                 _ChannelRepoInfo(
-                    channel=Channel(url_w_cred),
+                    channel=urls_to_channel[url_w_cred],
                     repo=repo,
                     url_w_cred=url_w_cred,
                     url_no_cred=url_no_cred,
