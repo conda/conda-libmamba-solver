@@ -171,12 +171,20 @@ def test_load_channel_repo_info_shards(
     assert len(index_helper.repos) > 0
 
 
-def test_load_channels_order():
+def test_load_channels_order(shard_factory):
+    def finish_request_pause():
+        time.sleep(0.2)
+    
+    server_one = shard_factory.http_server_shards("one", finish_request_action=finish_request_pause)
+    server_two = shard_factory.http_server_shards("two")
+    
+    channel_one = Channel.from_url(f"{server_one}/noarch")
+    channel_two = Channel.from_url(f"{server_two}/noarch")
     index_args = {
         "channels": [
-                Channel("defaults"),
-                Channel("conda-forge"),
-            ],
+            channel_one,
+            channel_two,
+        ],
         "in_state": SolverInputState(prefix="idontexist"),
     }
 
@@ -186,13 +194,13 @@ def test_load_channels_order():
     ):
         shard_enabled_index = LibMambaIndexHelper(**index_args)
 
-    with patch(
-        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
-        return_value=False,
-    ):
-        shard_disabled_index = LibMambaIndexHelper(**index_args)
 
-    disabled_shards_channels = [repo.channel for repo in shard_disabled_index.repos]
-    enabled_shard_channels = [repo.channel for repo in shard_enabled_index.repos]
-
-    assert disabled_shards_channels == enabled_shard_channels
+    # The expected output is that all of channel_one subdirs (noarch and current 
+    # platform) are ordered higher than channel_two subdirs.
+    expected_output_channels = [
+        channel_one.canonical_name,
+        channel_one.canonical_name,
+        channel_two.canonical_name,
+        channel_two.canonical_name,
+    ]
+    assert [repo.channel.canonical_name for repo in shard_enabled_index.repos] == expected_output_channels

@@ -46,7 +46,7 @@ from conda_libmamba_solver.shards_subset import (
 from tests import http_test_server
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
 
     from conda_libmamba_solver.shards_typing import ShardsIndexDict
 
@@ -211,7 +211,7 @@ class ShardFactory:
             http.shutdown()
         self._http_servers = []
 
-    def http_server_shards(self, dir_name: str) -> Iterable[str]:
+    def http_server_shards(self, dir_name: str, finish_request_action: Callable | None = None) -> Iterable[str]:
         shards_repository = self.root / dir_name / "sharded_repo"
         shards_repository.mkdir(parents=True)
         noarch = shards_repository / "noarch"
@@ -251,7 +251,7 @@ class ShardFactory:
             zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
         )
 
-        http = http_test_server.run_test_server(str(shards_repository))
+        http = http_test_server.run_test_server(str(shards_repository), finish_request_action=finish_request_action)
         self._http_servers.append(http)
 
         host, port = http.socket.getsockname()[:2]
