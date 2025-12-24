@@ -374,8 +374,10 @@ class LibMambaIndexHelper:
             # Channels are not loaded in order from shards. Once we load the shards,
             # reorder the list to match the intended channel order.
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
-            return sorted(channel_repos_info, key=lambda x: list(urls_to_channel.keys()).index(x.channel))
-        
+            return sorted(
+                channel_repos_info, key=lambda x: list(urls_to_channel.keys()).index(x.channel)
+            )
+
         # Fallback to repodata.json loading
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 

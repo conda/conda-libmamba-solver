@@ -487,7 +487,7 @@ def test_channels_are_percent_encoded(tmp_path):
 @pytest.mark.integration
 def test_channel_ordering(conda_cli: CondaCLIFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """https://github.com/conda/conda-libmamba-solver/issues/824"""
-    monkeypatch.setenv("CONDA_CHANNELS", str("conda-forge"))
+    monkeypatch.setenv("CONDA_CHANNELS", "conda-forge")
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
     out, err, rc = conda_cli(
         "create",

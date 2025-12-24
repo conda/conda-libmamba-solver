@@ -201,6 +201,7 @@ def shard_for_name(repodata, name):
 FAKE_SHARD = shard_for_name(FAKE_REPODATA, "foo")
 FAKE_SHARD_2 = shard_for_name(FAKE_REPODATA, "bar")
 
+
 class ShardFactory:
     def __init__(self, root: Path):
         self.root = root
@@ -211,7 +212,9 @@ class ShardFactory:
             http.shutdown()
         self._http_servers = []
 
-    def http_server_shards(self, dir_name: str, finish_request_action: Callable | None = None) -> Iterable[str]:
+    def http_server_shards(
+        self, dir_name: str, finish_request_action: Callable | None = None
+    ) -> Iterable[str]:
         shards_repository = self.root / dir_name / "sharded_repo"
         shards_repository.mkdir(parents=True)
         noarch = shards_repository / "noarch"
@@ -233,7 +236,9 @@ class ShardFactory:
         not_zstd = b"not zstd"
         (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
         not_msgpack = zstandard.compress(b"not msgpack")
-        (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
+        (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(
+            not_msgpack
+        )
         fake_shards: ShardsIndexDict = {
             "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
             "version": 1,
@@ -251,7 +256,9 @@ class ShardFactory:
             zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
         )
 
-        http = http_test_server.run_test_server(str(shards_repository), finish_request_action=finish_request_action)
+        http = http_test_server.run_test_server(
+            str(shards_repository), finish_request_action=finish_request_action
+        )
         self._http_servers.append(http)
 
         host, port = http.socket.getsockname()[:2]
