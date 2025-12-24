@@ -174,10 +174,12 @@ def test_load_channel_repo_info_shards(
 def test_load_channels_order(shard_factory):
     def finish_request_pause():
         time.sleep(0.2)
-    
-    server_one = shard_factory.http_server_shards("one", finish_request_action=finish_request_pause)
+
+    server_one = shard_factory.http_server_shards(
+        "one", finish_request_action=finish_request_pause
+    )
     server_two = shard_factory.http_server_shards("two")
-    
+
     channel_one = Channel.from_url(f"{server_one}/noarch")
     channel_two = Channel.from_url(f"{server_two}/noarch")
     index_args = {
@@ -194,8 +196,7 @@ def test_load_channels_order(shard_factory):
     ):
         shard_enabled_index = LibMambaIndexHelper(**index_args)
 
-
-    # The expected output is that all of channel_one subdirs (noarch and current 
+    # The expected output is that all of channel_one subdirs (noarch and current
     # platform) are ordered higher than channel_two subdirs.
     expected_output_channels = [
         channel_one.canonical_name,
@@ -203,4 +204,6 @@ def test_load_channels_order(shard_factory):
         channel_two.canonical_name,
         channel_two.canonical_name,
     ]
-    assert [repo.channel.canonical_name for repo in shard_enabled_index.repos] == expected_output_channels
+    assert [
+        repo.channel.canonical_name for repo in shard_enabled_index.repos
+    ] == expected_output_channels

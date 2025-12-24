@@ -4,6 +4,7 @@
 """
 Local test server based on http.server
 """
+
 # From conda/tests; data/reposerver.py was refusing connections on Windows for shards tests.
 from __future__ import annotations
 
@@ -12,14 +13,15 @@ import http.server
 import queue
 import socket
 import threading
-
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
 
-def run_test_server(directory: str, finish_request_action: Callable | None = None) -> http.server.ThreadingHTTPServer:
+def run_test_server(
+    directory: str, finish_request_action: Callable | None = None
+) -> http.server.ThreadingHTTPServer:
     """
     Run a test server on a random port. Inspect returned server to get port,
     shutdown etc.
