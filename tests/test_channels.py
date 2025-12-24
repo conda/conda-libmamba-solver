@@ -482,3 +482,24 @@ def test_channels_are_percent_encoded(tmp_path):
     for repo in index.repos:
         assert "%20" in repo.url_no_cred
         assert "%20" in repo.url_w_cred
+
+
+@pytest.mark.integration
+def test_channel_ordering(conda_cli: CondaCLIFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """https://github.com/conda/conda-libmamba-solver/issues/824"""
+    monkeypatch.setenv("CONDA_CHANNELS", "conda-forge")
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    out, err, rc = conda_cli(
+        "create",
+        "--dry-run",
+        "--solver=libmamba",
+        "--channel=main",
+        "python",
+        "--json",
+        raises=DryRunExit,
+    )
+    data = json.loads(out)
+    assert data.get("success") is True
+    for link_package in data["actions"]["LINK"]:
+        if link_package["name"] == "python":
+            assert link_package["channel"] == "main"
