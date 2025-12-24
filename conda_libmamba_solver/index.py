@@ -372,10 +372,12 @@ class LibMambaIndexHelper:
             # TODO: It may be better to directly pass channel objects without URL encoding
 
             # Channels are not loaded in order from shards. Once we load the shards,
-            # reorder the list to match the intended channel order.
+            # reorder the list to match the intended channel order. If the channel
+            # is not in the urls_to_channel, we'll add it to the back
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
             return sorted(
-                channel_repos_info, key=lambda x: list(urls_to_channel.keys()).index(x.channel)
+                channel_repos_info,
+                key=lambda x: list(urls_to_channel.keys()).index(x.channel) or 0,
             )
 
         # Fallback to repodata.json loading
