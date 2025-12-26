@@ -14,4 +14,5 @@ from .test_shards import (  # noqa: F401
     http_server_shards,
     prepare_shards_test,
     shard_cache_with_data,
+    shard_factory,
 )
