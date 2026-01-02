@@ -15,6 +15,7 @@ import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
+import tempfile
 
 import conda.gateways.repodata
 import msgpack
@@ -203,11 +204,35 @@ FAKE_SHARD_2 = shard_for_name(FAKE_REPODATA, "bar")
 
 
 class ShardFactory:
-    def __init__(self, root: Path):
+    """
+    Create http server shards in a temporary directory. Use this
+    class in the context of tests to generate multiple shard servers
+    that can be cleaned up after use.
+
+    Example:
+
+    ```
+    # create shard factory with its root in a temporary directory
+    shard_factory = ShardFactory(tmp_path_factory.mktemp("sharded_repo"))
+    
+    # create an http server serving the testing data
+    url = shard_factory.http_server_shards("http_server_shards")
+
+    # make a request to the server
+    subdir_data = SubdirData(Channel.from_url(f"{url}/noarch"))
+    found = fetch_shards_index(subdir_data)
+
+    # shutdown up all servers created by this factory
+    shard_factory.clean_up_http_servers()
+    ```
+    """
+
+    def __init__(self, root: Path = tempfile.gettempdir()):
         self.root = root
         self._http_servers = []
 
     def clean_up_http_servers(self):
+        """Shutdown all the servers created by this factory."""
         for http in self._http_servers:
             http.shutdown()
         self._http_servers = []
@@ -215,6 +240,12 @@ class ShardFactory:
     def http_server_shards(
         self, dir_name: str, finish_request_action: Callable | None = None
     ) -> Iterable[str]:
+        """Create a new http server serving shards from a temporary directory.
+        
+        :param dir_name: The name of the directory to create the shards in.
+        :param finish_request_action: An optional callable to be called after each request is finished.
+        :return: The URL of the http server serving the shards.
+        """
         shards_repository = self.root / dir_name / "sharded_repo"
         shards_repository.mkdir(parents=True)
         noarch = shards_repository / "noarch"
@@ -268,6 +299,18 @@ class ShardFactory:
 
 @pytest.fixture(scope="session")
 def shard_factory(tmp_path_factory, request: pytest.FixtureRequest) -> ShardFactory:
+    """
+    Use ShardFactory to manage creating and cleaning up shards for testing. 
+    
+    Example:
+
+    ```
+    def test_something(shard_factory: ShardFactory):
+        server_one = shard_factory.http_server_shards("one")
+        server_two = shard_factory.http_server_shards("two")
+        ...
+    ```
+    """
     shards_repository = tmp_path_factory.mktemp("sharded_repo")
     shard_factory = ShardFactory(shards_repository)
 
