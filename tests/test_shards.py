@@ -214,7 +214,7 @@ class ShardFactory:
     ```
     # create shard factory with its root in a temporary directory
     shard_factory = ShardFactory(tmp_path_factory.mktemp("sharded_repo"))
-    
+
     # create an http server serving the testing data
     url = shard_factory.http_server_shards("http_server_shards")
 
@@ -241,7 +241,7 @@ class ShardFactory:
         self, dir_name: str, finish_request_action: Callable | None = None
     ) -> Iterable[str]:
         """Create a new http server serving shards from a temporary directory.
-        
+
         :param dir_name: The name of the directory to create the shards in.
         :param finish_request_action: An optional callable to be called after each request is finished.
         :return: The URL of the http server serving the shards.
@@ -300,8 +300,8 @@ class ShardFactory:
 @pytest.fixture(scope="session")
 def shard_factory(tmp_path_factory, request: pytest.FixtureRequest) -> ShardFactory:
     """
-    Use ShardFactory to manage creating and cleaning up shards for testing. 
-    
+    Use ShardFactory to manage creating and cleaning up shards for testing.
+
     Example:
 
     ```

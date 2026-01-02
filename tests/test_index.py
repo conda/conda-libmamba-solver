@@ -172,11 +172,10 @@ def test_load_channel_repo_info_shards(
 
 
 def test_load_channels_order(shard_factory):
-    def finish_request_pause():
-        time.sleep(0.2)
-
+    # Setup two shard servers. server_one will have a small
+    # delay in the response to mimic a slower response.
     server_one = shard_factory.http_server_shards(
-        "one", finish_request_action=finish_request_pause
+        "one", finish_request_action=lambda: time.sleep(0.2)
     )
     server_two = shard_factory.http_server_shards("two")
 
