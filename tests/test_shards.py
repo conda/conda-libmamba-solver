@@ -10,12 +10,12 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import tempfile
 import time
 import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
-import tempfile
 
 import conda.gateways.repodata
 import msgpack

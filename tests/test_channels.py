@@ -33,8 +33,9 @@ from .channel_testing.helpers import (
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
-    from .test_shards import ShardFactory
     from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
+
+    from .test_shards import ShardFactory
 
 DATA = Path(__file__).parent / "data"
 
