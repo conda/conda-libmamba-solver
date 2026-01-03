@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 from subprocess import check_call
 from typing import TYPE_CHECKING
@@ -33,6 +34,8 @@ from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
+
+    from .test_shards import ShardFactory
 
 DATA = Path(__file__).parent / "data"
 
@@ -482,3 +485,54 @@ def test_channels_are_percent_encoded(tmp_path):
     for repo in index.repos:
         assert "%20" in repo.url_no_cred
         assert "%20" in repo.url_w_cred
+
+
+def test_channel_ordering(
+    conda_cli: CondaCLIFixture, monkeypatch: pytest.MonkeyPatch, shard_factory: ShardFactory
+) -> None:
+    """https://github.com/conda/conda-libmamba-solver/issues/824"""
+    # Setup two shard servers. server_one will have a small
+    # delay in the response to mimic a slower response.
+    server_one = shard_factory.http_server_shards(
+        "channel-ordering-one", finish_request_action=lambda: time.sleep(0.2)
+    )
+    server_two = shard_factory.http_server_shards("channel-ordering-two")
+
+    monkeypatch.setenv("CONDA_CHANNELS", server_two)
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    out, err, rc = conda_cli(
+        "create",
+        "--dry-run",
+        "--solver=libmamba",
+        f"--channel={server_one}",
+        "foo",
+        "--json",
+        raises=DryRunExit,
+    )
+    data = json.loads(out)
+    assert data.get("success") is True
+    for link_package in data["actions"]["LINK"]:
+        if link_package["name"] == "foo":
+            # Match the base url of the package to the server url. But clip
+            # the trailing slash from the server url.
+            assert link_package["base_url"] == server_one[:-1]
+
+    # Ensure that the ordering is respected in the other direction as well.
+    monkeypatch.setenv("CONDA_CHANNELS", server_one)
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    out, err, rc = conda_cli(
+        "create",
+        "--dry-run",
+        "--solver=libmamba",
+        f"--channel={server_two}",
+        "foo",
+        "--json",
+        raises=DryRunExit,
+    )
+    data = json.loads(out)
+    assert data.get("success") is True
+    for link_package in data["actions"]["LINK"]:
+        if link_package["name"] == "foo":
+            # Match the base url of the package to the server url. But clip
+            # the trailing slash from the server url.
+            assert link_package["base_url"] == server_two[:-1]
