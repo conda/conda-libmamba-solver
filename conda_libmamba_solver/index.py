@@ -385,13 +385,16 @@ class LibMambaIndexHelper:
 
     def _load_channel_repo_info_shards(
         self, urls_to_channel: dict[str, Channel]
-    ) -> list[_ChannelRepoInfo]:
+    ) -> list[_ChannelRepoInfo] | None:
         """
         Load repository information from sharded repodata cache.
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
         channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        if channel_data is None:
+            return  # caller should fall back to repodata.json
+
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
         return channel_repo_infos
