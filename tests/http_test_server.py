@@ -4,16 +4,24 @@
 """
 Local test server based on http.server
 """
+
 # From conda/tests; data/reposerver.py was refusing connections on Windows for shards tests.
+from __future__ import annotations
 
 import contextlib
 import http.server
 import queue
 import socket
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
-def run_test_server(directory: str) -> http.server.ThreadingHTTPServer:
+def run_test_server(
+    directory: str, finish_request_action: Callable | None = None
+) -> http.server.ThreadingHTTPServer:
     """
     Run a test server on a random port. Inspect returned server to get port,
     shutdown etc.
@@ -31,6 +39,8 @@ def run_test_server(directory: str) -> http.server.ThreadingHTTPServer:
             return super().server_bind()
 
         def finish_request(self, request, client_address):
+            if finish_request_action:
+                finish_request_action()
             self.RequestHandlerClass(request, client_address, self, directory=directory)
 
     def start_server(queue):
