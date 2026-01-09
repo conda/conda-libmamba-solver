@@ -40,7 +40,7 @@ from conda_libmamba_solver.shards_subset import (
 )
 from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _timer, ensure_hex_hash
 
-from .test_shards import CONDA_FORGE_WITH_SHARDS, expand_channels
+from .test_shards import CONDA_FORGE_WITH_SHARDS, channels_to_dict
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -171,7 +171,7 @@ def test_traversal_algorithm_benchmarks(
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
-        channel_data = fetch_channels(expand_channels(channels))
+        channel_data = fetch_channels(channels_to_dict(channels))
 
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
@@ -200,8 +200,12 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
     channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
 
     repodata_algorithm_map = {
-        "bfs": build_repodata_subset(scenario["packages"], [channel], algorithm="bfs"),
-        "pipelined": build_repodata_subset(scenario["packages"], [channel], algorithm="pipelined"),
+        "bfs": build_repodata_subset(
+            scenario["packages"], channels_to_dict([channel], True), algorithm="bfs"
+        ),
+        "pipelined": build_repodata_subset(
+            scenario["packages"], channels_to_dict([channel], True), algorithm="pipelined"
+        ),
     }
 
     for subdir in repodata_algorithm_map["bfs"].keys():
@@ -231,7 +235,7 @@ def test_build_repodata_subset_pipelined(
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("fetch_channels()"):
-        channel_data = fetch_channels(expand_channels(channels))
+        channel_data = fetch_channels(channels_to_dict(channels))
 
     def assert_quick(ns: int):
         # Check that the 1 second queue timeout doesn't happen on an empty
@@ -381,7 +385,11 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
             mock_batch.side_effect = HTTPError("Simulated network error")
 
             with pytest.raises(HTTPError, match="Simulated network error"):
-                build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+                build_repodata_subset(
+                    root_packages,
+                    channels_to_dict([channel], True),
+                    algorithm=algorithm,
+                )
 
     # For pipelined algorithm, mock the session.get to raise an error
     elif algorithm == "pipelined":
@@ -403,7 +411,11 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
         with patch("conda_libmamba_solver.shards_subset.ThreadPoolExecutor", mock_executor):
             # The pipelined algorithm should propagate this error
             with pytest.raises(HTTPError, match="Simulated network error during pipelined fetch"):
-                build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+                build_repodata_subset(
+                    root_packages,
+                    channels_to_dict([channel], True),
+                    algorithm=algorithm,
+                )
 
 
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
@@ -422,7 +434,9 @@ def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, 
     # Override cache dir location for tests; ensures it's empty
     mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
 
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+    channel_data = build_repodata_subset(
+        root_packages, channels_to_dict([channel], True), algorithm=algorithm
+    )
 
     for shardlike in channel_data.values():
         assert not shardlike.build_repodata().get("packages")
@@ -472,7 +486,7 @@ def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
 
-    channel_data = fetch_channels(expand_channels([channel]))
+    channel_data = fetch_channels(channels_to_dict([channel], True))
 
     subset = RepodataSubset((*channel_data.values(),))
     subset._use_only_tar_bz2 = only_tar_bz2
@@ -519,7 +533,9 @@ def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_pa
     mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", slow_simple_queue_factory)
 
     # This should complete despite slow queue operations
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+    channel_data = build_repodata_subset(
+        root_packages, channels_to_dict([channel], True), algorithm="pipelined"
+    )
 
     # Verify results
     found_packages = False
@@ -555,7 +571,9 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
 
     # Run multiple times to increase chance of hitting race condition
     for _ in range(10):
-        channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+        channel_data = build_repodata_subset(
+            root_packages, channels_to_dict([channel], True), algorithm="pipelined"
+        )
 
         # Verify we got valid results
         found_packages = False
@@ -577,7 +595,7 @@ def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
     root_packages = ["foo"]
 
     # fetch_channels() will expand noarch/ to include context.subdirs, but we only want a single subdir here.
-    # shardlikes = fetch_channels([channel])
+    # shardlikes = fetch_channels(expand_channel([channel], True))
 
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
@@ -692,7 +710,9 @@ def test_pipelined_extreme_race_conditions(
     failures = []
     for iteration in range(20):
         try:
-            channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+            channel_data = build_repodata_subset(
+                root_packages, channels_to_dict([channel], True), algorithm="pipelined"
+            )
 
             # Verify we got results
             found = any(
@@ -722,7 +742,9 @@ def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_t
 
     def run_subset():
         try:
-            channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+            channel_data = build_repodata_subset(
+                root_packages, channels_to_dict([channel], True), algorithm="pipelined"
+            )
             # Verify results
             for shardlike in channel_data.values():
                 if "/noarch/" in shardlike.url:
@@ -810,7 +832,9 @@ def test_shutdown_with_pending_work(http_server_shards, mocker, tmp_path):
     mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", TrackShutdownQueue)
 
     # Run the algorithm
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+    channel_data = build_repodata_subset(
+        root_packages, channels_to_dict([channel], True), algorithm="pipelined"
+    )
 
     # Verify we got results
     found = any(
