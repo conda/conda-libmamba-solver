@@ -27,6 +27,7 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
@@ -35,6 +36,7 @@ from conda_libmamba_solver.shards import (
     Shards,
     _shards_connections,
     batch_retrieve_from_cache,
+    fetch_channels,
     fetch_shards_index,
     shard_mentioned_packages,
 )
@@ -42,7 +44,6 @@ from conda_libmamba_solver.shards_subset import (
     Node,
     RepodataSubset,
     build_repodata_subset,
-    fetch_channels,
 )
 from tests import http_test_server
 
@@ -429,6 +430,12 @@ def test_shard_mentioned_packages_2():
     assert FAKE_SHARD["packages.conda"]["foo.conda"]["sha256"] == hashlib.sha256().hexdigest()  # type: ignore
 
 
+def expand_channels(channels: list[Channel]):
+    return LibMambaIndexHelper._encoded_urls_to_channels(
+        LibMambaIndexHelper._channel_urls(context.subdirs, channels)
+    )
+
+
 def test_fetch_shards_channels(prepare_shards_test: None):
     """
     Test all channels fetch as Shards or ShardLike, depending on availability.
@@ -438,7 +445,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
 
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
-    channel_data = fetch_channels(channels)
+    channel_data = fetch_channels(expand_channels(channels))
 
     # at least one should be real shards, not repodata.json presented as shards.
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
@@ -799,7 +806,7 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     ]
 
     with _timer("repodata.json/shards index fetch"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
     with _timer("Shard fetch"):
         sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]

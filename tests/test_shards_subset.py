@@ -25,7 +25,12 @@ from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
-from conda_libmamba_solver.shards import ShardLike, Shards, fetch_channels, fetch_shards_index
+from conda_libmamba_solver.shards import (
+    ShardLike,
+    Shards,
+    fetch_channels,
+    fetch_shards_index,
+)
 from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
@@ -35,7 +40,7 @@ from conda_libmamba_solver.shards_subset import (
 )
 from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _timer, ensure_hex_hash
 
-from .test_shards import CONDA_FORGE_WITH_SHARDS
+from .test_shards import CONDA_FORGE_WITH_SHARDS, expand_channels
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -166,7 +171,7 @@ def test_traversal_algorithm_benchmarks(
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
@@ -226,7 +231,7 @@ def test_build_repodata_subset_pipelined(
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("fetch_channels()"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
     def assert_quick(ns: int):
         # Check that the 1 second queue timeout doesn't happen on an empty
@@ -467,7 +472,7 @@ def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
 
-    channel_data = fetch_channels({channel.url() or "": channel})
+    channel_data = fetch_channels(expand_channels([channel]))
 
     subset = RepodataSubset((*channel_data.values(),))
     subset._use_only_tar_bz2 = only_tar_bz2
