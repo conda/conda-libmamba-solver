@@ -27,6 +27,7 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
@@ -35,6 +36,7 @@ from conda_libmamba_solver.shards import (
     Shards,
     _shards_connections,
     batch_retrieve_from_cache,
+    fetch_channels,
     fetch_shards_index,
     shard_mentioned_packages,
 )
@@ -42,7 +44,6 @@ from conda_libmamba_solver.shards_subset import (
     Node,
     RepodataSubset,
     build_repodata_subset,
-    fetch_channels,
 )
 from tests import http_test_server
 
@@ -79,6 +80,16 @@ def repodata_subset_size(channel_data):
         repodata_size += len(repodata_text.encode("utf-8"))
 
     return repodata_size
+
+
+def channels_to_dict(channels: list[Channel], noarch_only=False):
+    """
+    Perform similar channel expansion/normalization as LibMambaIndexHelper.
+    """
+    subdirs = ("noarch",) if noarch_only else context.subdirs
+    return LibMambaIndexHelper._encoded_urls_to_channels(
+        LibMambaIndexHelper._channel_urls(subdirs, channels)
+    )
 
 
 @contextmanager
@@ -438,7 +449,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
 
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
-    channel_data = fetch_channels(channels)
+    channel_data = fetch_channels(channels_to_dict(channels))
 
     # at least one should be real shards, not repodata.json presented as shards.
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
@@ -718,8 +729,7 @@ ROOT_PACKAGES = [
 
 def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     """
-    Build repodata subset using the third attempt at a dependency traversal
-    algorithm.
+    Build repodata subset.
     """
 
     # installed, plus what we want to add (twine)
@@ -727,6 +737,8 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 
     channels = list(context.default_channels)
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
+
+    channels = channels_to_dict(channels)
 
     with _timer("build_repodata_subset()"):
         channel_data = build_repodata_subset(root_packages, channels)
@@ -799,7 +811,7 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     ]
 
     with _timer("repodata.json/shards index fetch"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(channels_to_dict(channels))
 
     with _timer("Shard fetch"):
         sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]

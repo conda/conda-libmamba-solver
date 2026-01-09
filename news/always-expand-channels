@@ -1,0 +1,4 @@
+### Other
+
+* Refactor LibMambaIndexHelper, shards code to accept a channels dict instead of a list
+  or dict. (#837)
