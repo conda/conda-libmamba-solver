@@ -7,7 +7,6 @@ import json
 import os
 import shutil
 import sys
-import time
 from pathlib import Path
 from subprocess import check_call
 from typing import TYPE_CHECKING
@@ -34,8 +33,6 @@ from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
-
-    from .test_shards import ShardFactory
 
 DATA = Path(__file__).parent / "data"
 
@@ -488,15 +485,16 @@ def test_channels_are_percent_encoded(tmp_path):
 
 
 def test_channel_ordering(
-    conda_cli: CondaCLIFixture, monkeypatch: pytest.MonkeyPatch, shard_factory: ShardFactory
+    conda_cli: CondaCLIFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    http_server_shards,
+    http_server_shards_slow,
 ) -> None:
     """https://github.com/conda/conda-libmamba-solver/issues/824"""
     # Setup two shard servers. server_one will have a small
     # delay in the response to mimic a slower response.
-    server_one = shard_factory.http_server_shards(
-        "channel-ordering-one", finish_request_action=lambda: time.sleep(0.2)
-    )
-    server_two = shard_factory.http_server_shards("channel-ordering-two")
+    server_one = http_server_shards
+    server_two = http_server_shards_slow
 
     monkeypatch.setenv("CONDA_CHANNELS", server_two)
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")

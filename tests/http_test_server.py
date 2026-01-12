@@ -41,7 +41,7 @@ def run_test_server(
         def finish_request(self, request, client_address):
             if finish_request_action:
                 finish_request_action()
-            self.RequestHandlerClass(request, client_address, self, directory=directory)
+            self.RequestHandlerClass(request, client_address, self, directory=directory)  # type: ignore
 
     def start_server(queue):
         with DualStackServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as httpd:

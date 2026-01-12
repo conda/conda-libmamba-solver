@@ -256,8 +256,8 @@ class ShardFactory:
         :param finish_request_action: An optional callable to be called after each request is finished.
         :return: The URL of the http server serving the shards.
         """
-        shards_repository = self.root / dir_name / "sharded_repo"
-        shards_repository.mkdir(parents=True, exist_ok=True)
+        shards_repository = self.root / dir_name
+        shards_repository.mkdir(parents=True, exist_ok=False)
         noarch = shards_repository / "noarch"
         noarch.mkdir()
 
@@ -332,15 +332,23 @@ def shard_factory(tmp_path_factory, request: pytest.FixtureRequest) -> ShardFact
 
 
 @pytest.fixture(scope="session")
-def http_server_shards(tmp_path_factory) -> Iterable[str]:
+def http_server_shards(shard_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
-    shard_path = tmp_path_factory.mktemp("sharded_repo")
-    shard_factory = ShardFactory(shard_path)
-    url = shard_factory.http_server_shards("http_server_shards")
+    url = shard_factory.http_server_shards("shards")
     yield url
-    shard_factory.clean_up_http_servers()
+
+
+@pytest.fixture(scope="session")
+def http_server_shards_slow(shard_factory) -> Iterable[str]:
+    """
+    A shard repository with a delay, for channel ordering tests.
+    """
+    url = shard_factory.http_server_shards(
+        "shards_slow", finish_request_action=lambda: time.sleep(0.2)
+    )
+    yield url
 
 
 def test_fetch_shards_error(http_server_shards):
