@@ -18,15 +18,20 @@ from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
+from conda_libmamba_solver.shards_subset import build_repodata_subset
 from conda_libmamba_solver.state import SolverInputState
+from tests.test_shards import _timer
 
 from .test_shards import CONDA_FORGE_WITH_SHARDS
 
 if TYPE_CHECKING:
     import os
+    from collections.abc import Iterable
 
-    from conda.testing.fixtures import CondaCLIFixture
+    from conda.gateways.repodata import RepodataState
     from pytest_benchmark.plugin import BenchmarkFixture
+
+    from conda_libmamba_solver.shards import ShardBase
 
 
 initialize_logging()
@@ -139,7 +144,6 @@ def test_load_channel_repo_info_shards(
     load_type: str,
     requested: tuple[str, ...],
     tmp_path: Path,
-    conda_cli: CondaCLIFixture,
     monkeypatch: pytest.MonkeyPatch,
     benchmark: BenchmarkFixture,
 ):
@@ -165,7 +169,121 @@ def test_load_channel_repo_info_shards(
             pkgs_dirs=(),  # do not load local cache as a channel
             in_state=in_state,
         )
+        pass
 
+    # this fails for some reason if run twice
+    # cuda finder function crashes when run twice, sys.exit() called?
+    index_helper = benchmark.pedantic(index, rounds=1)
+
+    assert len(index_helper.repos) > 0
+
+
+@pytest.mark.parametrize(
+    "load_type,requested",
+    [
+        ("shard", ("python",)),
+        ("shard", ("django", "celery")),
+        ("shard", ("vaex",)),
+        ("repodata", ("vaex",)),
+        ("main", ()),
+        ("shard-unavailable", ("vaex",)),
+    ],
+    ids=[
+        "shard-small",
+        "shard-medium",
+        "shard-large",
+        "noshard",
+        "main",
+        "shard-unavailable",
+    ],
+)
+def test_load_channel_repo_info_shards_parse_only(
+    load_type: str,
+    requested: tuple[str, ...],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    benchmark: BenchmarkFixture,
+):
+    """
+    Benchmark shards/not-shards under different dependency tree sizes.
+
+    Only measure parse time, not "download + parse" time.
+
+    TODO: This test should eventually switch to just using conda-forge when that channel
+          supports shards and not the `conda-forge-sharded` channel.
+    """
+    # defaults is more than one channel but I don't think that matters here.
+    load_channel = {"main": "main", "shard-unavailable": "conda-forge"}.get(
+        load_type, "conda-forge-sharded"
+    )
+
+    monkeypatch.setattr(
+        context.plugins,
+        "use_sharded_repodata",
+        load_type in ("shard", "shard-unavailable"),
+    )
+    assert _is_sharded_repodata_enabled() == (load_type in ("shard", "shard-unavailable"))
+
+    in_state = SolverInputState(str(tmp_path / "env"), requested=requested)
+
+    urls_to_channel_ = {
+        f"https://conda.anaconda.org/{load_channel}/noarch": Channel(f"{load_channel}/noarch"),
+        f"https://conda.anaconda.org/{load_channel}/linux-64": Channel(f"{load_channel}/linux-64"),
+    }
+
+    repodata_jsons = {}
+    channel_data = {}
+    root_packages_ = (*in_state.installed.keys(), *in_state.requested)
+    if load_type in ("shard", "shard-unavailable"):  # shards
+        with _timer("subset monolithic repodata.json"):
+            channel_data = build_repodata_subset(root_packages_, urls_to_channel_)
+
+    else:  # no shards
+        # this is an inefficient way to fetch repodata.json in the format
+        # expected by LibMambaIndexHelper since it loads it into the solver.
+        helper = LibMambaIndexHelper(
+            # this is expanded to noarch, linux-64 for shards.
+            channels=[Channel(f"{load_channel}/linux-64")],
+            subdirs=(
+                "noarch",
+                "linux-64",
+            ),
+            installed_records=(),  # do not load installed
+            pkgs_dirs=(),  # do not load local cache as a channel
+            in_state=in_state,
+        )
+        repodata_jsons = helper._fetch_repodata_jsons(urls_to_channel_.keys())
+
+    class LibMambaIndexHelperParseOnly(LibMambaIndexHelper):
+        def _build_repodata_subset(
+            self, root_packages: tuple[str, ...], urls_to_channel: dict[str, Channel]
+        ) -> dict[str, ShardBase]:
+            assert root_packages == root_packages_
+            assert urls_to_channel == urls_to_channel
+            return channel_data
+
+        def _fetch_repodata_jsons(
+            self, urls: Iterable[str]
+        ) -> dict[str, tuple[str, RepodataState]]:
+            assert sorted(urls) == sorted(urls_to_channel_.keys())
+            return repodata_jsons
+
+    def index():
+        return LibMambaIndexHelperParseOnly(
+            # this is expanded to noarch, linux-64 for shards.
+            channels=[Channel(f"{load_channel}/linux-64")],
+            subdirs=(
+                "noarch",
+                "linux-64",
+            ),
+            installed_records=(),  # do not load installed
+            pkgs_dirs=(),  # do not load local cache as a channel
+            in_state=in_state,
+        )
+        pass
+
+    # this fails for some reason if run twice
+    # cuda finder function crashes when rounds > 1, sys.exit() called?
     index_helper = benchmark.pedantic(index, rounds=1)
 
     assert len(index_helper.repos) > 0

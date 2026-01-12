@@ -108,7 +108,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+from conda_libmamba_solver.shards_subset import RepodataSubset, build_repodata_subset
 
 from .mamba_utils import logger_callback
 
@@ -154,6 +154,21 @@ def _is_sharded_repodata_enabled():
     Flag to see whether we should check for sharded repodata.
     """
     return context.plugins.use_sharded_repodata is True  # type: ignore
+
+
+def _sharded_repodata_strategy():
+    """
+    Which algorithm should we use to collect sharded repodata?
+    """
+    strategy = context.plugins.sharded_repodata_strategy.lower()  # type: ignore
+    if RepodataSubset.has_strategy(strategy):
+        return strategy
+    log.warning(
+        "Unknown sharded_repodata_strategy '%s', falling back to '%s'.",
+        strategy,
+        RepodataSubset.DEFAULT_STRATEGY,
+    )
+    return RepodataSubset.DEFAULT_STRATEGY
 
 
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
@@ -387,14 +402,22 @@ class LibMambaIndexHelper:
         self, urls_to_channel: dict[str, Channel]
     ) -> list[_ChannelRepoInfo]:
         """
-        Load repository information from sharded repodata cache.
+        Load repository information by fetching and processing repodata shards.
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        channel_data = build_repodata_subset(root_packages, urls_to_channel)
-        channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
+        channel_data = self._build_repodata_subset(root_packages, urls_to_channel)
+        channel_repo_infos = self._load_repo_info_from_repodata_shards(channel_data)
 
         return channel_repo_infos
+
+    def _build_repodata_subset(
+        self, root_packages: tuple[str, ...], urls_to_channel: dict[str, Channel]
+    ) -> dict[str, ShardBase]:
+        # split into a separate method for tests
+        return build_repodata_subset(
+            root_packages, urls_to_channel, algorithm=_sharded_repodata_strategy()
+        )
 
     def _load_channel_repo_info_json(
         self, urls_to_channel: dict[str, Channel], try_solv: bool
@@ -607,12 +630,12 @@ class LibMambaIndexHelper:
         return repos
 
     @time_recorder(module_name=__name__)
-    def _load_repo_info_from_repodata_dict(
+    def _load_repo_info_from_repodata_shards(
         self, repodata_subset: dict[str, ShardBase]
     ) -> list[_ChannelRepoInfo]:
         """
-        Load repository information from deserialized repodata.json-like
-        structures.
+        Load repository information from already-fetched ShardBase objects, that
+        produce in-memory repodata.json-like dicts.
         """
         repos = []
         for channel_url, shardlike in repodata_subset.items():
