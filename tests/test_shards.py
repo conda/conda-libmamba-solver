@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import tempfile
 import time
 import urllib.parse
 from contextlib import contextmanager
@@ -238,7 +237,7 @@ class ShardFactory:
     ```
     """
 
-    def __init__(self, root: Path = tempfile.gettempdir()):
+    def __init__(self, root: Path):
         self.root = root
         self._http_servers = []
 
@@ -250,7 +249,7 @@ class ShardFactory:
 
     def http_server_shards(
         self, dir_name: str, finish_request_action: Callable | None = None
-    ) -> Iterable[str]:
+    ) -> str:
         """Create a new http server serving shards from a temporary directory.
 
         :param dir_name: The name of the directory to create the shards in.
@@ -258,7 +257,7 @@ class ShardFactory:
         :return: The URL of the http server serving the shards.
         """
         shards_repository = self.root / dir_name / "sharded_repo"
-        shards_repository.mkdir(parents=True)
+        shards_repository.mkdir(parents=True, exist_ok=True)
         noarch = shards_repository / "noarch"
         noarch.mkdir()
 
@@ -322,8 +321,8 @@ def shard_factory(tmp_path_factory, request: pytest.FixtureRequest) -> ShardFact
         ...
     ```
     """
-    shards_repository = tmp_path_factory.mktemp("sharded_repo")
-    shard_factory = ShardFactory(shards_repository)
+    shard_path = tmp_path_factory.mktemp("shards")
+    shard_factory = ShardFactory(shard_path)
 
     def close_servers():
         shard_factory.clean_up_http_servers()
@@ -337,7 +336,8 @@ def http_server_shards(tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
-    shard_factory = ShardFactory(tmp_path_factory.mktemp("sharded_repo"))
+    shard_path = tmp_path_factory.mktmp("sharded_repo")
+    shard_factory = ShardFactory(shard_path)
     url = shard_factory.http_server_shards("http_server_shards")
     yield url
     shard_factory.clean_up_http_servers()
