@@ -171,13 +171,11 @@ def test_load_channel_repo_info_shards(
     assert len(index_helper.repos) > 0
 
 
-def test_load_channels_order(shard_factory):
+def test_load_channels_order(http_server_shards, http_server_shards_slow):
     # Setup two shard servers. server_one will have a small
     # delay in the response to mimic a slower response.
-    server_one = shard_factory.http_server_shards(
-        "one", finish_request_action=lambda: time.sleep(0.2)
-    )
-    server_two = shard_factory.http_server_shards("two")
+    server_one = http_server_shards_slow
+    server_two = http_server_shards
 
     channel_one = Channel.from_url(f"{server_one}/noarch")
     channel_two = Channel.from_url(f"{server_two}/noarch")
