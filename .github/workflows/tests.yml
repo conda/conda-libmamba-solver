@@ -40,6 +40,7 @@ env:
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
   CONDA_REF: main # pin conda version to latest for more stable tests
+  PIP_DISABLE_PIP_VERSION_CHECK: true
 
 jobs:
   # detect whether any code changes are included in this PR
