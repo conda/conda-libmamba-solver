@@ -336,7 +336,7 @@ def http_server_shards(tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
-    shard_path = tmp_path_factory.mktmp("sharded_repo")
+    shard_path = tmp_path_factory.mktemp("sharded_repo")
     shard_factory = ShardFactory(shard_path)
     url = shard_factory.http_server_shards("http_server_shards")
     yield url
