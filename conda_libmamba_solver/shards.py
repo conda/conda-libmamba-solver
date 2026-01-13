@@ -657,6 +657,7 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
+# TODO update tests to only use fetch_channels_dict
 def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
     """
     Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
@@ -679,7 +680,19 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
         for channel_url in channel.urls(True, context.subdirs)
     )
 
-    channel_data: dict[str, ShardBase] = {}
+    return fetch_channels_dict(url_to_channel)
+
+
+def fetch_channels_dict(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
+    """
+    Args:
+        url_to_channel: not modified, must already be expanded to subdirs.
+
+    Returns:
+        A dict mapping channel URLs to `Shard` or `ShardLike` objects.
+    """
+    # retain order from incoming dict:
+    channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
 
     # share single disk cache for all Shards() instances
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
@@ -718,4 +731,4 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
             found = ShardLike(repodata_json, url)
             channel_data[channel_url] = found
 
-    return channel_data
+    return {url: channel for url, channel in channel_data.items() if channel is not None}

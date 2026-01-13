@@ -78,6 +78,7 @@ from .shards import (
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
+    fetch_channels_dict,
     shard_mentioned_packages,
 )
 
@@ -484,10 +485,9 @@ def build_repodata_subset(
         algorithm: desired traversal algorithm
     """
     if isinstance(channels, dict):  # True when called by LibMambaIndexHelper
-        channels_: list[Channel] = list(channels.values())
+        channel_data = fetch_channels_dict(channels)
     else:
-        channels_ = channels
-    channel_data = fetch_channels(channels_)
+        channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.reachable(root_packages, strategy=algorithm)
