@@ -731,4 +731,5 @@ def fetch_channels_dict(url_to_channel: dict[str, Channel]) -> dict[str, ShardBa
             found = ShardLike(repodata_json, url)
             channel_data[channel_url] = found
 
+    assert not any(c is None for c in channel_data.values())
     return {url: channel for url, channel in channel_data.items() if channel is not None}

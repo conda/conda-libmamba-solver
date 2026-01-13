@@ -25,7 +25,13 @@ from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
-from conda_libmamba_solver.shards import ShardLike, Shards, fetch_channels, fetch_shards_index
+from conda_libmamba_solver.shards import (
+    ShardLike,
+    Shards,
+    fetch_channels,
+    fetch_channels_dict,
+    fetch_shards_index,
+)
 from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
@@ -467,7 +473,7 @@ def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
 
-    channel_data = fetch_channels({channel.url() or "": channel})
+    channel_data = fetch_channels_dict({channel.url() or "": channel})
 
     subset = RepodataSubset((*channel_data.values(),))
     subset._use_only_tar_bz2 = only_tar_bz2
