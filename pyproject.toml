@@ -28,7 +28,7 @@ dependencies = [
   "boltons >=23.0.0",
   "msgpack >=1.1.1",
   "requests >=2.28.0,<3",
-  "zstandard >=0.15"
+  "backports.zstd; python_version<'3.14'"
 ]
 dynamic = [
   "version"
