@@ -251,7 +251,7 @@ class ShardFactory:
 
     def http_server_shards(
         self, dir_name: str, finish_request_action: Callable | None = None
-    ) -> Iterable[str]:
+    ) -> str:
         """Create a new http server serving shards from a temporary directory.
 
         :param dir_name: The name of the directory to create the shards in.
