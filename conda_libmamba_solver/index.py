@@ -430,7 +430,7 @@ class LibMambaIndexHelper:
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
             noauth_urls = [
-                url for url in channel.urls(with_credentials=False) if url.endswith(tuple(subdirs))
+                url for url in channel.urls(with_credentials=False) if url.endswith(channel.subdir)
             ]
             if seen_noauth.issuperset(noauth_urls):
                 continue
