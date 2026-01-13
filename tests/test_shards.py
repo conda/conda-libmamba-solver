@@ -81,14 +81,17 @@ def repodata_subset_size(channel_data):
     return repodata_size
 
 
-def channels_to_dict(channels: list[Channel], noarch_only=False):
+def channels_to_dict(channels: list[Channel], noarch_only=False, subdirs=None):
     """
     Perform similar channel expansion/normalization as LibMambaIndexHelper.
     """
-    subdirs = ("noarch",) if noarch_only else context.subdirs
-    return LibMambaIndexHelper._encoded_urls_to_channels(
-        LibMambaIndexHelper._channel_urls(subdirs, channels)
-    )
+    if noarch_only:
+        subdirs = ("noarch",)
+    elif subdirs is None:
+        subdirs = context.subdirs
+
+    channel_urls = LibMambaIndexHelper._channel_urls(subdirs, channels)
+    return LibMambaIndexHelper._encoded_urls_to_channels(channel_urls)
 
 
 def test_channels_to_dict():
