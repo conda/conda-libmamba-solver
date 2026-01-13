@@ -310,7 +310,7 @@ class ShardFactory:
         )
 
         http = http_test_server.run_test_server(
-            str(shards_repository), finish_request_action=finish_request_action
+            str(self.root), finish_request_action=finish_request_action
         )
         self._http_servers.append(http)
 
