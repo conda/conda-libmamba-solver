@@ -27,6 +27,7 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
@@ -35,6 +36,7 @@ from conda_libmamba_solver.shards import (
     Shards,
     _shards_connections,
     batch_retrieve_from_cache,
+    fetch_channels,
     fetch_shards_index,
     shard_mentioned_packages,
 )
@@ -42,7 +44,6 @@ from conda_libmamba_solver.shards_subset import (
     Node,
     RepodataSubset,
     build_repodata_subset,
-    fetch_channels,
 )
 from tests import http_test_server
 
@@ -79,6 +80,17 @@ def repodata_subset_size(channel_data):
         repodata_size += len(repodata_text.encode("utf-8"))
 
     return repodata_size
+
+
+def expand_channels(channels: list[Channel], subdirs: Iterable[str] | None = None):
+    """
+    Expand channels list into a dict of subdir-aware channels, matching
+    LibMambaIndexHelper behavior.
+    """
+    subdirs_ = list(context.subdirs) if subdirs is None else subdirs
+    channels_urls = LibMambaIndexHelper._channel_urls(subdirs_, channels)
+    channels_urls = LibMambaIndexHelper._encoded_urls_to_channels(channels_urls)
+    return channels_urls
 
 
 @contextmanager
@@ -239,7 +251,7 @@ class ShardFactory:
 
     def http_server_shards(
         self, dir_name: str, finish_request_action: Callable | None = None
-    ) -> Iterable[str]:
+    ) -> str:
         """Create a new http server serving shards from a temporary directory.
 
         :param dir_name: The name of the directory to create the shards in.
@@ -438,7 +450,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
 
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
-    channel_data = fetch_channels(channels)
+    channel_data = fetch_channels(expand_channels(channels))
 
     # at least one should be real shards, not repodata.json presented as shards.
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
@@ -727,9 +739,10 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 
     channels = list(context.default_channels)
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
+    channel_dict = expand_channels(channels)
 
     with _timer("build_repodata_subset()"):
-        channel_data = build_repodata_subset(root_packages, channels)
+        channel_data = build_repodata_subset(root_packages, channel_dict)
 
     # convert to PackageInfo for libmamba, without temporary files
     package_info = []
@@ -799,7 +812,7 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     ]
 
     with _timer("repodata.json/shards index fetch"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
     with _timer("Shard fetch"):
         sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]
