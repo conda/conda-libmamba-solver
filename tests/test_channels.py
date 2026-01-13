@@ -489,10 +489,16 @@ def test_channel_ordering(
     monkeypatch: pytest.MonkeyPatch,
     http_server_shards,
     http_server_shards_slow,
+    tmp_path,
 ) -> None:
     """https://github.com/conda/conda-libmamba-solver/issues/824"""
     # Setup two shard servers. server_one will have a small
     # delay in the response to mimic a slower response.
+
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+    reset_context()
 
     # This may have been noarch-only previously, but now it always tries
     # to fetch the current platform and fails.
