@@ -304,7 +304,7 @@ class ShardFactory:
 
         host, port = http.socket.getsockname()[:2]
         url_host = f"[{host}]" if ":" in host else host
-        return f"http://{url_host}:{port}/"
+        return f"http://{url_host}:{port}/{dir_name}"
 
 
 @pytest.fixture(scope="session")
