@@ -12,7 +12,7 @@ pytest_plugins = (
 # test_shards_subset:
 from .test_shards import (  # noqa: F401
     http_server_shards,
+    http_server_shards_slow,
     prepare_shards_test,
     shard_cache_with_data,
-    shard_factory,
 )
