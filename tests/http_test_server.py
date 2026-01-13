@@ -4,16 +4,24 @@
 """
 Local test server based on http.server
 """
+
 # From conda/tests; data/reposerver.py was refusing connections on Windows for shards tests.
+from __future__ import annotations
 
 import contextlib
 import http.server
 import queue
 import socket
 import threading
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
-def run_test_server(directory: str) -> http.server.ThreadingHTTPServer:
+def run_test_server(
+    directory: str, finish_request_action: Callable | None = None
+) -> http.server.ThreadingHTTPServer:
     """
     Run a test server on a random port. Inspect returned server to get port,
     shutdown etc.
@@ -31,24 +39,32 @@ def run_test_server(directory: str) -> http.server.ThreadingHTTPServer:
             return super().server_bind()
 
         def finish_request(self, request, client_address):
+            if finish_request_action:
+                finish_request_action()
             self.RequestHandlerClass(request, client_address, self, directory=directory)
 
     def start_server(queue):
-        with DualStackServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as httpd:
-            host, port = httpd.socket.getsockname()[:2]
-            queue.put(httpd)
-            url_host = f"[{host}]" if ":" in host else host
-            print(f"Serving HTTP on {host} port {port} (http://{url_host}:{port}/) ...")
-            try:
-                httpd.serve_forever()
-            except KeyboardInterrupt:
-                print("\nKeyboard interrupt received, exiting.")
+        try:
+            with DualStackServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler) as httpd:
+                host, port = httpd.socket.getsockname()[:2]
+                queue.put(httpd)
+                url_host = f"[{host}]" if ":" in host else host
+                print(f"Serving HTTP on {host} port {port} (http://{url_host}:{port}/) ...")
+                try:
+                    httpd.serve_forever()
+                except KeyboardInterrupt:
+                    print("\nKeyboard interrupt received, exiting.")
+        except Exception as exc:
+            queue.put(exc)
 
     started = queue.Queue()
 
     threading.Thread(target=start_server, args=(started,), daemon=True).start()
 
-    return started.get(timeout=1)
+    result = started.get(timeout=1)
+    if isinstance(result, Exception):
+        raise result
+    return result
 
 
 if __name__ == "__main__":

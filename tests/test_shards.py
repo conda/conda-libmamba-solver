@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import tempfile
 import time
 import urllib.parse
 from contextlib import contextmanager
@@ -26,6 +27,7 @@ from conda.models.channel import Channel
 import conda_libmamba_solver.zstd as zstandard
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
@@ -34,6 +36,7 @@ from conda_libmamba_solver.shards import (
     Shards,
     _shards_connections,
     batch_retrieve_from_cache,
+    fetch_channels,
     fetch_shards_index,
     shard_mentioned_packages,
 )
@@ -41,12 +44,11 @@ from conda_libmamba_solver.shards_subset import (
     Node,
     RepodataSubset,
     build_repodata_subset,
-    fetch_channels,
 )
 from tests import http_test_server
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
 
     from conda_libmamba_solver.shards_typing import ShardsIndexDict
 
@@ -78,6 +80,17 @@ def repodata_subset_size(channel_data):
         repodata_size += len(repodata_text.encode("utf-8"))
 
     return repodata_size
+
+
+def expand_channels(channels: list[Channel], subdirs: Iterable[str] | None = None):
+    """
+    Expand channels list into a dict of subdir-aware channels, matching
+    LibMambaIndexHelper behavior.
+    """
+    subdirs_ = list(context.subdirs) if subdirs is None else subdirs
+    channels_urls = LibMambaIndexHelper._channel_urls(subdirs_, channels)
+    channels_urls = LibMambaIndexHelper._encoded_urls_to_channels(channels_urls)
+    return channels_urls
 
 
 @contextmanager
@@ -202,59 +215,133 @@ FAKE_SHARD = shard_for_name(FAKE_REPODATA, "foo")
 FAKE_SHARD_2 = shard_for_name(FAKE_REPODATA, "bar")
 
 
+class ShardFactory:
+    """
+    Create http server shards in a temporary directory. Use this
+    class in the context of tests to generate multiple shard servers
+    that can be cleaned up after use.
+
+    Example:
+
+    ```
+    # create shard factory with its root in a temporary directory
+    shard_factory = ShardFactory(tmp_path_factory.mktemp("sharded_repo"))
+
+    # create an http server serving the testing data
+    url = shard_factory.http_server_shards("http_server_shards")
+
+    # make a request to the server
+    subdir_data = SubdirData(Channel.from_url(f"{url}/noarch"))
+    found = fetch_shards_index(subdir_data)
+
+    # shutdown up all servers created by this factory
+    shard_factory.clean_up_http_servers()
+    ```
+    """
+
+    def __init__(self, root: Path = tempfile.gettempdir()):
+        self.root = root
+        self._http_servers = []
+
+    def clean_up_http_servers(self):
+        """Shutdown all the servers created by this factory."""
+        for http in self._http_servers:
+            http.shutdown()
+        self._http_servers = []
+
+    def http_server_shards(
+        self, dir_name: str, finish_request_action: Callable | None = None
+    ) -> str:
+        """Create a new http server serving shards from a temporary directory.
+
+        :param dir_name: The name of the directory to create the shards in.
+        :param finish_request_action: An optional callable to be called after each request is finished.
+        :return: The URL of the http server serving the shards.
+        """
+        shards_repository = self.root / dir_name / "sharded_repo"
+        shards_repository.mkdir(parents=True)
+        noarch = shards_repository / "noarch"
+        noarch.mkdir()
+
+        foo_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
+        foo_shard_digest = hashlib.sha256(foo_shard).digest()
+        (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
+
+        bar_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
+        bar_shard_digest = hashlib.sha256(bar_shard).digest()
+        (noarch / f"{bar_shard_digest.hex()}.msgpack.zst").write_bytes(bar_shard)
+
+        malformed = {"follows_schema": False}
+        bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
+        malformed_digest = hashlib.sha256(bad_schema).digest()
+
+        (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
+        not_zstd = b"not zstd"
+        (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
+        not_msgpack = zstandard.compress(b"not msgpack")
+        (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(
+            not_msgpack
+        )
+        fake_shards: ShardsIndexDict = {
+            "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
+            "version": 1,
+            "shards": {
+                "foo": foo_shard_digest,
+                "bar": bar_shard_digest,
+                "wrong_package_name": foo_shard_digest,
+                "fake_package": b"",
+                "malformed": hashlib.sha256(bad_schema).digest(),
+                "not_zstd": hashlib.sha256(not_zstd).digest(),
+                "not_msgpack": hashlib.sha256(not_msgpack).digest(),
+            },
+        }
+        (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
+            zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
+        )
+
+        http = http_test_server.run_test_server(
+            str(shards_repository), finish_request_action=finish_request_action
+        )
+        self._http_servers.append(http)
+
+        host, port = http.socket.getsockname()[:2]
+        url_host = f"[{host}]" if ":" in host else host
+        return f"http://{url_host}:{port}/"
+
+
+@pytest.fixture(scope="session")
+def shard_factory(tmp_path_factory, request: pytest.FixtureRequest) -> ShardFactory:
+    """
+    Use ShardFactory to manage creating and cleaning up shards for testing.
+
+    Example:
+
+    ```
+    def test_something(shard_factory: ShardFactory):
+        server_one = shard_factory.http_server_shards("one")
+        server_two = shard_factory.http_server_shards("two")
+        ...
+    ```
+    """
+    shards_repository = tmp_path_factory.mktemp("sharded_repo")
+    shard_factory = ShardFactory(shards_repository)
+
+    def close_servers():
+        shard_factory.clean_up_http_servers()
+
+    request.addfinalizer(close_servers)
+    return shard_factory
+
+
 @pytest.fixture(scope="session")
 def http_server_shards(tmp_path_factory) -> Iterable[str]:
     """
     A shard repository with a difference.
     """
-    shards_repository = tmp_path_factory.mktemp("sharded_repo")
-    noarch = shards_repository / "noarch"
-    noarch.mkdir()
-
-    foo_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
-    foo_shard_digest = hashlib.sha256(foo_shard).digest()
-    (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
-
-    bar_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
-    bar_shard_digest = hashlib.sha256(bar_shard).digest()
-    (noarch / f"{bar_shard_digest.hex()}.msgpack.zst").write_bytes(bar_shard)
-
-    malformed = {"follows_schema": False}
-    bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
-    malformed_digest = hashlib.sha256(bad_schema).digest()
-
-    (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
-    not_zstd = b"not zstd"
-    (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
-    not_msgpack = zstandard.compress(b"not msgpack")
-    (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(not_msgpack)
-    fake_shards: ShardsIndexDict = {
-        "info": {"subdir": "noarch", "base_url": "", "shards_base_url": ""},
-        "version": 1,
-        "shards": {
-            "foo": foo_shard_digest,
-            "bar": bar_shard_digest,
-            "wrong_package_name": foo_shard_digest,
-            "fake_package": b"",
-            "malformed": hashlib.sha256(bad_schema).digest(),
-            "not_zstd": hashlib.sha256(not_zstd).digest(),
-            "not_msgpack": hashlib.sha256(not_msgpack).digest(),
-        },
-    }
-    (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
-        zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
-    )
-
-    http = http_test_server.run_test_server(str(shards_repository))
-
-    host, port = http.socket.getsockname()[:2]
-    url_host = f"[{host}]" if ":" in host else host
-    url = f"http://{url_host}:{port}/"
-
+    shard_factory = ShardFactory(tmp_path_factory.mktemp("sharded_repo"))
+    url = shard_factory.http_server_shards("http_server_shards")
     yield url
-    # shutdown is checked at a polling interval, or the daemon thread will shut
-    # down when the test suite exits.
-    http.shutdown()
+    shard_factory.clean_up_http_servers()
 
 
 def test_fetch_shards_error(http_server_shards):
@@ -363,7 +450,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
 
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
-    channel_data = fetch_channels(channels)
+    channel_data = fetch_channels(expand_channels(channels))
 
     # at least one should be real shards, not repodata.json presented as shards.
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
@@ -652,9 +739,10 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
 
     channels = list(context.default_channels)
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
+    channel_dict = expand_channels(channels)
 
     with _timer("build_repodata_subset()"):
-        channel_data = build_repodata_subset(root_packages, channels)
+        channel_data = build_repodata_subset(root_packages, channel_dict)
 
     # convert to PackageInfo for libmamba, without temporary files
     package_info = []
@@ -724,7 +812,7 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
     ]
 
     with _timer("repodata.json/shards index fetch"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
     with _timer("Shard fetch"):
         sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]
