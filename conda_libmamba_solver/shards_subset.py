@@ -472,7 +472,7 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: dict[str, Channel] | list[Channel],
+    channels: dict[str, Channel],
     algorithm: Literal["bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase] | None:
     """
@@ -487,17 +487,11 @@ def build_repodata_subset(
         None if there are no shards available, or a mapping of channel URL's to
         ShardBase objects where build_repodata() returns the computed subset..
     """
-    if isinstance(channels, dict):  # True when called by LibMambaIndexHelper
-        channels_: list[Channel] = list(channels.values())
-    else:
-        channels_ = channels
-    channel_data = fetch_channels(channels_)
-    if channel_data is None:
-        return None
-
-    subset = RepodataSubset((*channel_data.values(),))
-    subset.reachable(root_packages, strategy=algorithm)
-    log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
+    channel_data = fetch_channels(channels)
+    if channel_data is not None:
+        subset = RepodataSubset((*channel_data.values(),))
+        subset.reachable(root_packages, strategy=algorithm)
+        log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
 
     return channel_data
 

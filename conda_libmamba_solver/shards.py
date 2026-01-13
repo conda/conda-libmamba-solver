@@ -657,31 +657,20 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase] | None:
+def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] | None:
     """
-    Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
+    Args:
+        url_to_channel: not modified, must already be expanded to subdirs.
 
     Attempt to fetch the sharded index first and then fall back to retrieving
     a traditional `repodata.json` file.
 
-    If no channels have shards, return None.
+    Returns:
+        A dict mapping channel URLs to `Shard` or `ShardLike` objects.
+        None if no channels have shards.
     """
-    # metaclass returns same channel, or casts to channel.
-    channels = [Channel(c) for c in channels]  # type: ignore
-
-    # Eliminate duplicates for example if this class is called with
-    # channels=[Channel(f"{load_channel}/linux-64")],
-    # subdirs=(
-    #     "noarch",
-    #     "linux-64",
-    # ),
-    url_to_channel = dict(
-        (channel_url, Channel(channel_url))
-        for channel in channels
-        for channel_url in channel.urls(True, context.subdirs)
-    )
-
-    channel_data: dict[str, ShardBase] = {}
+    # retain order from incoming dict:
+    channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
 
     # share single disk cache for all Shards() instances
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
@@ -729,4 +718,4 @@ def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase] | 
             found = ShardLike(repodata_json, url)
             channel_data[channel_url] = found
 
-    return channel_data
+    return {url: channel for url, channel in channel_data.items() if channel is not None}

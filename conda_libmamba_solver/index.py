@@ -240,7 +240,7 @@ class LibMambaIndexHelper:
         pkgs_dirs: PathsType = (),
         in_state: SolverInputState | None = None,
     ):
-        platform_less_channels = []
+        platform_less_channels: list[Channel] = []
         for channel in channels:
             if channel.platform:
                 # When .platform is defined, .urls() will ignore subdirs kw. Remove!
@@ -357,15 +357,9 @@ class LibMambaIndexHelper:
         try_solv: bool = True,
     ) -> list[_ChannelRepoInfo]:
         if urls_to_channel is None:
-            urls_to_channel = self._channel_urls()
+            urls_to_channel = self._channel_urls(self.subdirs, self.channels)
 
-        # conda.common.url.path_to_url does not %-encode spaces
-        encoded_urls_to_channel = {}
-        for url, channel in urls_to_channel.items():
-            if url.startswith("file://"):
-                url = url.replace(" ", "%20")
-            encoded_urls_to_channel[url] = channel
-        urls_to_channel = encoded_urls_to_channel
+        urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
         # Prefer sharded repodata loading if it's enabled
         if self.in_state and _is_sharded_repodata_enabled():
@@ -427,26 +421,26 @@ class LibMambaIndexHelper:
             )
         return channel_repo_infos
 
-    def _channel_urls(self) -> dict[str, Channel]:
-        "Maps authenticated URLs to channel objects"
+    @staticmethod
+    def _channel_urls(subdirs: Iterable[str], channels: list[Channel]) -> dict[str, Channel]:
+        "Map authenticated URLs to channel objects."
+        # class method for testing etc.
         urls = {}
         seen_noauth = set()
         channels_with_subdirs = []
-        for channel in self.channels:
-            for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
+        for channel in channels:
+            for url in channel.urls(with_credentials=True, subdirs=subdirs):
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
             noauth_urls = [
-                url
-                for url in channel.urls(with_credentials=False)
-                if url.endswith(tuple(self.subdirs))
+                url for url in channel.urls(with_credentials=False) if url.endswith(channel.subdir)
             ]
             if seen_noauth.issuperset(noauth_urls):
                 continue
             auth_urls = [
                 url.replace(" ", "%20")
                 for url in channel.urls(with_credentials=True)
-                if url.endswith(tuple(self.subdirs))
+                if url.endswith(tuple(subdirs))
             ]
             if noauth_urls != auth_urls:  # authed channel always takes precedence
                 urls.update({url: channel for url in auth_urls})
@@ -460,6 +454,21 @@ class LibMambaIndexHelper:
                     urls[url] = channel
                     seen_noauth.add(url)
         return urls
+
+    @staticmethod
+    def _encoded_urls_to_channels(urls_to_channel: dict[str, Channel]) -> dict[str, Channel]:
+        """
+        Return copy of urls_to_channel with %-encoded spaces.
+
+        Usage: _encoded_urls_to_channels(_channel_urls(subdirs, channels))
+        """
+        # conda.common.url.path_to_url does not %-encode spaces
+        encoded_urls_to_channel: dict[str, Channel] = {}
+        for url, channel in urls_to_channel.items():
+            if url.startswith("file://"):
+                url = url.replace(" ", "%20")
+            encoded_urls_to_channel[url] = channel
+        return encoded_urls_to_channel
 
     def _fetch_repodata_jsons(self, urls: Iterable[str]) -> dict[str, tuple[str, RepodataState]]:
         Executor = (
