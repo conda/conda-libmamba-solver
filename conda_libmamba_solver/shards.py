@@ -657,33 +657,7 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-# TODO update tests to only use fetch_channels_dict
-def fetch_channels(channels: Iterable[Channel | str]) -> dict[str, ShardBase]:
-    """
-    Return a dict mapping of a channel URL to a `Shard` or `ShardLike` object.
-
-    Attempt to fetch the sharded index first and then fall back to retrieving
-    a traditional `repodata.json` file.
-    """
-    # metaclass returns same channel, or casts to channel.
-    channels = [Channel(c) for c in channels]  # type: ignore
-
-    # Eliminate duplicates for example if this class is called with
-    # channels=[Channel(f"{load_channel}/linux-64")],
-    # subdirs=(
-    #     "noarch",
-    #     "linux-64",
-    # ),
-    url_to_channel = dict(
-        (channel_url, Channel(channel_url))
-        for channel in channels
-        for channel_url in channel.urls(True, context.subdirs)
-    )
-
-    return fetch_channels_dict(url_to_channel)
-
-
-def fetch_channels_dict(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
+def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
     """
     Args:
         url_to_channel: not modified, must already be expanded to subdirs.
@@ -731,5 +705,4 @@ def fetch_channels_dict(url_to_channel: dict[str, Channel]) -> dict[str, ShardBa
             found = ShardLike(repodata_json, url)
             channel_data[channel_url] = found
 
-    assert not any(c is None for c in channel_data.values())
     return {url: channel for url, channel in channel_data.items() if channel is not None}

@@ -78,7 +78,6 @@ from .shards import (
     batch_retrieve_from_cache,
     batch_retrieve_from_network,
     fetch_channels,
-    fetch_channels_dict,
     shard_mentioned_packages,
 )
 
@@ -473,7 +472,7 @@ class RepodataSubset:
 
 def build_repodata_subset(
     root_packages: Iterable[str],
-    channels: dict[str, Channel] | list[Channel],
+    channels: dict[str, Channel],
     algorithm: Literal["bfs", "pipelined"] = RepodataSubset.DEFAULT_STRATEGY,
 ) -> dict[str, ShardBase]:
     """
@@ -484,10 +483,7 @@ def build_repodata_subset(
         channels: Channel objects; dict form preferred.
         algorithm: desired traversal algorithm
     """
-    if isinstance(channels, dict):  # True when called by LibMambaIndexHelper
-        channel_data = fetch_channels_dict(channels)
-    else:
-        channel_data = fetch_channels(channels)
+    channel_data = fetch_channels(channels)
 
     subset = RepodataSubset((*channel_data.values(),))
     subset.reachable(root_packages, strategy=algorithm)

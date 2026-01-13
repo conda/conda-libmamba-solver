@@ -29,7 +29,6 @@ from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
     fetch_channels,
-    fetch_channels_dict,
     fetch_shards_index,
 )
 from conda_libmamba_solver.shards_subset import (
@@ -39,7 +38,13 @@ from conda_libmamba_solver.shards_subset import (
     combine_batches_until_none,
     exception_to_queue,
 )
-from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _timer, ensure_hex_hash
+from tests.test_shards import (
+    FAKE_REPODATA,
+    ROOT_PACKAGES,
+    _timer,
+    ensure_hex_hash,
+    expand_channels,
+)
 
 from .test_shards import CONDA_FORGE_WITH_SHARDS
 
@@ -172,7 +177,7 @@ def test_traversal_algorithm_benchmarks(
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
@@ -200,9 +205,13 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
     """
     channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
 
+    channel_dict = {channel.url(): channel for channel in [channel]}
+
     repodata_algorithm_map = {
-        "bfs": build_repodata_subset(scenario["packages"], [channel], algorithm="bfs"),
-        "pipelined": build_repodata_subset(scenario["packages"], [channel], algorithm="pipelined"),
+        "bfs": build_repodata_subset(scenario["packages"], channel_dict, algorithm="bfs"),
+        "pipelined": build_repodata_subset(
+            scenario["packages"], channel_dict, algorithm="pipelined"
+        ),
     }
 
     for subdir in repodata_algorithm_map["bfs"].keys():
@@ -232,7 +241,7 @@ def test_build_repodata_subset_pipelined(
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("fetch_channels()"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
     def assert_quick(ns: int):
         # Check that the 1 second queue timeout doesn't happen on an empty
@@ -473,8 +482,7 @@ def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
 
-    channel_data = fetch_channels_dict({channel.url() or "": channel})
-
+    channel_data = fetch_channels({channel.url() or "": channel})
     subset = RepodataSubset((*channel_data.values(),))
     subset._use_only_tar_bz2 = only_tar_bz2
     subset.reachable(root_packages, strategy=strategy)
