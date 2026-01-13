@@ -91,6 +91,15 @@ def channels_to_dict(channels: list[Channel], noarch_only=False):
     )
 
 
+def test_channels_to_dict():
+    subdirs = ("osx-arm64", "noarch")
+    channel_url = "http://127.0.0.1:60000/shards/osx-arm64"
+    channels_dict = channels_to_dict([Channel(channel_url)])
+    urls = [v.url() for v in channels_dict.values()]
+    for subdir in subdirs:
+        assert any(v.url().endswith(subdir) for v in channels_dict.values()), urls
+
+
 @contextmanager
 def _timer(name: str, callback=None):
     """
