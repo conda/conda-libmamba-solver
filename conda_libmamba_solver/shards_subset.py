@@ -668,11 +668,11 @@ def offline_nofetch_thread(
     shardlikes: Sequence[ShardBase],
 ):
     """
-    For offline mode, where network requests are not allowed.
-    Pretend that every network request is an empty shard.
-    Don't save those to the cache.
+    For offline mode, where network requests are not allowed. Pretend that every
+    network request is an empty shard. Don't save those to the cache.
 
-    Depending on how many shards are in sqlite3 and which packages were requested, the user may or may not get enough repodata for a solution.
+    Depending on how many shards are in sqlite3 and which packages were
+    requested, the user may or may not get enough repodata for a solution.
 
     Args:
         in_queue: NodeId (URLs) to fetch.
