@@ -528,9 +528,19 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
     return response_bytes
 
 
-def fetch_shards_index(
-    sd: SubdirData, cache: shards_cache.ShardCache | None = None
-) -> Shards | None:
+# From conda.gateways.repodata.jlap.fetch. If this returns True, then we mark
+# shards as not supported; otherwise, we will check again next time.
+def _is_http_error_most_400_codes(e: HTTPError) -> bool:
+    """
+    Determine whether the `HTTPError` is an HTTP 400 error code (except for 416).
+    """
+    if e.response is None:  # 404 e.response is falsey
+        return False
+    status_code = e.response.status_code
+    return 400 <= status_code < 500 and status_code != 416
+
+
+def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) -> Shards | None:
     """
     Check a SubdirData's URL for shards.
 
@@ -591,9 +601,10 @@ def fetch_shards_index(
                 # this will also set state["refresh_ns"] = time.time_ns(); we could
                 # call cache.refresh() if we got a 304 instead:
                 repo_cache.save(shards_data)
-            except (HTTPError, conda.gateways.repodata.RepodataIsEmpty):
+            except (HTTPError, conda.gateways.repodata.RepodataIsEmpty) as err:
                 # fetch repodata.json / repodata.json.zst instead
-                cache_state.set_has_format("shards", False)
+                if isinstance(err, HTTPError) and _is_http_error_most_400_codes(err):
+                    cache_state.set_has_format("shards", False)
                 repo_cache.refresh()
 
         if shards_data:
