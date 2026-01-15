@@ -582,7 +582,7 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
         assert found_packages
 
 
-def test_pipelined_timeout(http_server_shards, empty_shards_cache, monkeypatch, tmp_path):
+def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
     """
     Test that pipelined times out if a URL is never fetched.
     """
@@ -598,7 +598,7 @@ def test_pipelined_timeout(http_server_shards, empty_shards_cache, monkeypatch, 
 
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    shardlikes = [fetch_shards_index(subdir_data, empty_shards_cache)]
+    shardlikes = [fetch_shards_index(subdir_data, None)]
 
     queue = SimpleQueue()
 
