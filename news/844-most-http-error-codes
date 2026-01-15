@@ -1,0 +1,4 @@
+### Bug fixes
+
+* Fall back to `repodata.json`, but don't mark shards as unavailable, unless we
+  receive a 4xx error code besides 416. (#844)
