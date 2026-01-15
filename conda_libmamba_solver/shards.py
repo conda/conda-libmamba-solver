@@ -691,7 +691,7 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
                 non_sharded_channels.append((channel_url, Channel(channel_url)))
 
         # If all are None then don't do ShardLike.
-        if not any(value is not None for value in channel_data.values()):
+        if all(value is None for value in channel_data.values()):
             return None  # caller should interpret this as falling back to the older code path
 
         # Latency penalty launching these requests here instead of when we
