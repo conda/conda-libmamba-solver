@@ -123,6 +123,16 @@ def prepare_shards_test(monkeypatch: pytest.MonkeyPatch):
     assert _is_sharded_repodata_enabled()
 
 
+@pytest.fixture
+def empty_shards_cache(tmp_path):
+    """
+    Empty shards cache, with cleanup.
+    """
+    with shards_cache.ShardCache(tmp_path) as cache:
+        yield cache
+        cache.remove_cache()
+
+
 # 'foo' and 'bar' have circular dependencies on each other; dependencies on
 # missing shards (which are not an error during traversal; the solver may or may
 # not complain if ran); and 'constrains' to exercise other parts of the code.
@@ -344,13 +354,15 @@ def http_server_shards(tmp_path_factory) -> Iterable[str]:
     shard_factory.clean_up_http_servers()
 
 
-def test_fetch_shards_error(http_server_shards):
+def test_fetch_shards_error(http_server_shards, empty_shards_cache):
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, empty_shards_cache)
     assert found
 
-    not_found = fetch_shards_index(SubdirData(Channel.from_url(f"{http_server_shards}/linux-64")))
+    not_found = fetch_shards_index(
+        SubdirData(Channel.from_url(f"{http_server_shards}/linux-64")), empty_shards_cache
+    )
     assert not not_found
 
     # cover "unexpected package name in shard" branch
@@ -459,6 +471,10 @@ def test_fetch_shards_channels(prepare_shards_test: None):
 def test_shard_cache(tmp_path: Path):
     cache = shards_cache.ShardCache(tmp_path)
 
+    # test copy, context manager features
+    with cache.copy() as cache2:
+        assert cache2.conn is not cache.conn
+
     fake_shard = {"foo": "bar"}
     annotated_shard = shards_cache.AnnotatedRawShard(
         "https://foo",
@@ -475,6 +491,8 @@ def test_shard_cache(tmp_path: Path):
     assert data2 is None
 
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
+
+    cache.close()
 
 
 NUM_FAKE_SHARDS = 64
@@ -562,6 +580,8 @@ def test_shard_cache_clear_remove(tmp_path):
     assert (cache.base / shards_cache.SHARD_CACHE_NAME).exists()
     cache.remove_cache()
     assert not (cache.base / shards_cache.SHARD_CACHE_NAME).exists()
+
+    cache.close()
 
 
 def test_shardlike():
@@ -783,7 +803,9 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
 
 
-def test_batch_retrieve_from_cache(prepare_shards_test: None):
+def test_batch_retrieve_from_cache(
+    prepare_shards_test: None, empty_shards_cache: shards_cache.ShardCache
+):
     """
     Test single database query to fetch cached shard URLs in a batch.
     """
@@ -816,6 +838,8 @@ def test_batch_retrieve_from_cache(prepare_shards_test: None):
 
     with _timer("Shard fetch"):
         sharded = [channel for channel in channel_data.values() if isinstance(channel, Shards)]
+        for shard in sharded:
+            shard.shards_cache = empty_shards_cache
         assert sharded, "No sharded repodata found"
         remaining = batch_retrieve_from_cache(sharded, [node.package for node in roots])
         print(f"{len(remaining)} shards to fetch from network")
@@ -842,25 +866,22 @@ def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
     """
     Set up a mock shard cache that will be used by multiple benchmark tests.
     """
-    cache = shards_cache.ShardCache(tmp_path)
+    with shards_cache.ShardCache(tmp_path) as cache:
+        NUM_FAKE_SHARDS = 64
+        fake_shards = []
 
-    NUM_FAKE_SHARDS = 64
-    fake_shards = []
+        compressor = zstandard.ZstdCompressor(level=1)
+        for i in range(NUM_FAKE_SHARDS):
+            fake_shard = {f"foo{i}": "bar"}
+            annotated_shard = shards_cache.AnnotatedRawShard(
+                f"https://foo{i}",
+                f"foo{i}",
+                compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
+            )
+            cache.insert(annotated_shard)
+            fake_shards.append(annotated_shard)
 
-    compressor = zstandard.ZstdCompressor(level=1)
-    for i in range(NUM_FAKE_SHARDS):
-        fake_shard = {f"foo{i}": "bar"}
-        annotated_shard = shards_cache.AnnotatedRawShard(
-            f"https://foo{i}",
-            f"foo{i}",
-            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
-        )
-        cache.insert(annotated_shard)
-        fake_shards.append(annotated_shard)
-
-    yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
-
-    cache.clear_cache()
+        yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
 
 
 @pytest.mark.benchmark
@@ -949,11 +970,12 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, tmp_path):
     subdir_data = SubdirData(channel)
 
     # Populate cache
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, None)
     assert found is not None
 
-    # Fetch a shard to populate the sqlite3 cache
-    found.fetch_shard("foo")
+    # Fetch a shard to populate the sqlite3 cache. Install shards cache, since found will have None cache.
+    with shards_subset._install_shards_cache([found]):
+        found.fetch_shard("foo")
 
     repo_cache = subdir_data.repo_fetch.repo_cache
     assert repo_cache.cache_path_shards.exists()
@@ -975,7 +997,7 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, tmp_path):
     monkeypatch.setattr(context, "offline", True)
     reset_context()
 
-    found_offline = fetch_shards_index(subdir_data)
+    found_offline = fetch_shards_index(subdir_data, None)
     assert found_offline is not None
 
     subset = RepodataSubset([found_offline])
@@ -984,7 +1006,7 @@ def test_offline_mode_expired_cache(http_server_shards, monkeypatch, tmp_path):
     assert len(repodata["packages"]) + len(repodata["packages.conda"]) > 0, "no package records"
 
 
-def test_offline_mode_no_cache(http_server_shards, monkeypatch, tmp_path):
+def test_offline_mode_no_cache(http_server_shards, empty_shards_cache, monkeypatch, tmp_path):
     """
     Test that offline mode falls back gracefully when no cache exists.
 
@@ -1008,11 +1030,13 @@ def test_offline_mode_no_cache(http_server_shards, monkeypatch, tmp_path):
 
     # Try to fetch shards index in offline mode without cache
     # Should return None (fallback to non-sharded repodata)
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, empty_shards_cache)
     assert found is None
 
 
-def test_offline_mode_missing_shard_in_cache(http_server_shards, tmp_path, monkeypatch):
+def test_offline_mode_missing_shard_in_cache(
+    http_server_shards, empty_shards_cache, tmp_path, monkeypatch
+):
     """
     Test that offline mode handles missing shards gracefully when the package
     exists in the shard index but the shard is not cached.
@@ -1029,7 +1053,7 @@ def test_offline_mode_missing_shard_in_cache(http_server_shards, tmp_path, monke
     subdir_data = SubdirData(channel)
 
     # Fetch the shards index (so "bar" is in the index)
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, empty_shards_cache)
     assert found is not None
     # Verify "bar" is in the index
     assert "bar" in found
@@ -1047,7 +1071,7 @@ def test_offline_mode_missing_shard_in_cache(http_server_shards, tmp_path, monke
     reset_context()
 
     # Fetch shards index again in offline mode (should use cached index)
-    found_offline = fetch_shards_index(subdir_data)
+    found_offline = fetch_shards_index(subdir_data, empty_shards_cache)
     assert found_offline is not None
 
     # Try to reach "bar" which is in index but not in cache

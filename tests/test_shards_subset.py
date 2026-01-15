@@ -179,6 +179,7 @@ def test_traversal_algorithm_benchmarks(
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
         channel_data = fetch_channels(expand_channels(channels))
 
+        assert channel_data is not None
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
         subset = RepodataSubset((*channel_data.values(),))
@@ -310,7 +311,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     cache, fake_shards = shard_cache_with_data
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, None)
     assert found
 
     invalid_shardlike = ShardLike(
@@ -581,7 +582,7 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
         assert found_packages
 
 
-def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
+def test_pipelined_timeout(http_server_shards, empty_shards_cache, monkeypatch, tmp_path):
     """
     Test that pipelined times out if a URL is never fetched.
     """
@@ -597,7 +598,7 @@ def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
 
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    shardlikes = [fetch_shards_index(subdir_data)]
+    shardlikes = [fetch_shards_index(subdir_data, empty_shards_cache)]
 
     queue = SimpleQueue()
 

@@ -14,7 +14,6 @@ import functools
 import json
 import logging
 from collections import defaultdict
-from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
@@ -317,8 +316,11 @@ class Shards(ShardBase):
     # cache for shards_base_url()
     _shards_base_url = ""
     _shards_base_url_key = (None, None)
+    shards_cache: shards_cache.ShardCache | None
 
-    def __init__(self, shards_index: ShardsIndexDict, url: str, cache: shards_cache.ShardCache):
+    def __init__(
+        self, shards_index: ShardsIndexDict, url: str, cache: shards_cache.ShardCache | None = None
+    ):
         """
         Args:
             shards_index: raw parsed msgpack dict
@@ -458,7 +460,9 @@ class Shards(ShardBase):
             )
         )
 
-        # Cache fetched shard
+        # Cache fetched shard; fail if shards_cache is None.
+        if self.shards_cache is None:
+            raise ValueError("self.shards_cache is None")
         self.shards_cache.insert(fetch_result)
 
 
@@ -557,7 +561,7 @@ def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) ->
     fetch = sd.repo_fetch
     repo_cache = fetch.repo_cache
 
-    # cache.load_state() will clear the file on JSONDecodeError but cache.load()
+    # repo_cache.load_state() will clear the file on JSONDecodeError but cache.load()
     # will raise the exception.
     # repo_cache.load_state(
     #     binary=True
@@ -576,9 +580,6 @@ def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) ->
         pass
 
     cache_state = repo_cache.state
-
-    if cache is None:
-        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
     if cache_state.should_check_format("shards"):
         # look for shards index
@@ -683,16 +684,13 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
     # retain order from incoming dict:
     channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
 
-    # share single disk cache for all Shards() instances
-    cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
-
     # The parallel version may reorder channels, does this matter?
 
     non_sharded_channels = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         futures = {
-            executor.submit(fetch_shards_index, SubdirData(channel), cache): channel_url
+            executor.submit(fetch_shards_index, SubdirData(channel), None): channel_url
             for (channel_url, channel) in url_to_channel.items()
         }
         futures_non_sharded = {}
