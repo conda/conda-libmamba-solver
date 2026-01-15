@@ -853,6 +853,15 @@ def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
 
 
+def test_build_repodata_subset_no_shards(http_server_shards):
+    """
+    If no channel has repodata_shards.msgpack.zst, build_repodata_subset()
+    returns None.
+    """
+    channels = expand_channels([Channel(http_server_shards + "/notfound")])
+    assert build_repodata_subset([], channels) is None
+
+
 def test_batch_retrieve_from_cache(
     prepare_shards_test: None, empty_shards_cache: shards_cache.ShardCache
 ):
