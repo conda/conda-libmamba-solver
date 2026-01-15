@@ -395,18 +395,30 @@ def test_fetch_shards_error(http_server_shards, empty_shards_cache):
 
 
 def test_shards_base_url():
-    shards = Shards(
-        {
-            "info": {
-                "subdir": "noarch",
-                "base_url": "",
-                "shards_base_url": "https://shards.example.com/channel-name",
+    """
+    Test Shards() URL functions.
+    """
+
+    def with_urls(url, base_url, shards_base_url):
+        # Shards() with different url's
+        return Shards(
+            {
+                "info": {
+                    "subdir": "noarch",
+                    "base_url": base_url,
+                    "shards_base_url": shards_base_url,
+                },
+                "version": 1,
+                "shards": {"fake_package": b""},
             },
-            "version": 1,
-            "shards": {"fake_package": b""},
-        },
+            url,
+            None,  # type: ignore
+        )
+
+    shards = with_urls(
         "https://conda.anaconda.org/channel-name/noarch/",
-        None,  # type: ignore
+        "",
+        "https://shards.example.com/channel-name",
     )
 
     assert (
@@ -420,20 +432,46 @@ def test_shards_base_url():
         == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
     )
 
+    # where packages are stored
+    assert shards.base_url == "https://conda.anaconda.org/channel-name/noarch/"
+
+    # packages on a different domain than shards.url
+    shards = with_urls(
+        "https://conda.anaconda.org/channel-name/noarch/",
+        "https://prefix.dev/conda-forge/noarch/",
+        "https://shards.example.com/channel-name",
+    )
+
+    assert shards.base_url == "https://prefix.dev/conda-forge/noarch/"
+
     # no-trailing-/ example from prefix.dev metadata
-    shards.url = "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst"
-    shards.shards_index["info"]["base_url"] = "https://prefix.dev/conda-forge/osx-arm64"
-    # shards_base_url should be suitable for string concatenation
+
+    shards = with_urls(
+        "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst",
+        "https://prefix.dev/conda-forge/osx-arm64",
+        "",
+    )
+
+    # shards_base_url is url joined with shards_base_url, suitable for string concatenation
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/"
     assert (
         shards.shard_url("fake_package") == "https://prefix.dev/conda-forge/osx-arm64/.msgpack.zst"
     )
 
     # relative shards_base_url
-    shards.shards_index["info"]["shards_base_url"] = "./shards/"
+    shards = with_urls(
+        "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst",
+        "https://prefix.dev/conda-forge/noarch/",
+        "./shards/",
+    )
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/shards/"
 
-    # relative shards_base_url, with parent directory (not likely in the wild)
+    # relative shards_base_url, with parent directory
+    shards = with_urls(
+        "https://prefix.dev/conda-forge/osx-arm64/repodata_shards.msgpack.zst",
+        "https://prefix.dev/conda-forge/noarch/",
+        "../shards/",
+    )
     shards.shards_index["info"]["shards_base_url"] = "../shards"
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/shards/"
 
@@ -679,11 +717,18 @@ def test_shard_hash_as_array():
     assert shard_url == shard_url_2
 
 
-def test_shard_coverage():
+def test_shards_coverage():
     """
     Call Shards() methods that are not otherwise called.
     """
-    shard = shards.Shards({"info": {"base_url": ""}}, "url", None)  # type: ignore
+    shard = shards.Shards(
+        {
+            "info": {"subdir": "noarch", "base_url": "", "shards_base_url": "./shards/"},
+            "version": 1,
+            "shards": {},
+        },
+        "https://example.org/noarch/repodata_shards.msgpack.zst",
+    )  # type: ignore
     with pytest.raises(KeyError):
         # The visit_shard() method is used for ShardLike (from monolithic
         # repodata) and makes a package part of the generated repodata. For
@@ -692,6 +737,10 @@ def test_shard_coverage():
         shard.visit_package("package")
     shard.visited["package"] = {}  # type: ignore[assign]
     assert shard.visit_package("package") == {}
+
+    assert shard.shards_cache is None
+    with pytest.raises(ValueError, match="shards_cache"):
+        shard._process_fetch_result(None, None, None, None)
 
 
 def test_ensure_hex_hash_in_record():

@@ -306,7 +306,12 @@ class RepodataSubset:
         else:
             network_worker = network_fetch_thread
 
-        return self._reachable_pipelined(root_packages, network_worker=network_worker)
+        # Ignore cache on shards object, use our own. Necessary if there are no
+        # sharded channels.
+        with shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())) as cache:
+            return self._reachable_pipelined(
+                root_packages, network_worker=network_worker, cache=cache
+            )
 
     def _reachable_pipelined(
         self,
@@ -314,21 +319,18 @@ class RepodataSubset:
         network_worker: Callable[
             [
                 Queue[Sequence[NodeId] | None],
-                Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+                Queue[list[tuple[NodeId, ShardDict] | Exception]],
                 ShardCache,
                 Sequence[ShardBase],
             ],
             None,
         ],
+        cache: shards_cache.ShardCache,
     ):
         """
         Set up queues and threads for shard traversal with a configurable
         network_worker. Called by reachable_pipelined()
         """
-
-        # Ignore cache on shards object, use our own. Necessary if there are no
-        # sharded channels.
-        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
         cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
         shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]] | Exception] = SimpleQueue()
@@ -357,7 +359,6 @@ class RepodataSubset:
             # These should finish almost immediately, but if not, raise an error:
             cache_thread.join(THREAD_WAIT_TIMEOUT)
             network_thread.join(THREAD_WAIT_TIMEOUT)
-            cache.close()
 
     def _pipelined_traversal(
         self,
@@ -422,9 +423,6 @@ class RepodataSubset:
 
             try:
                 new_shards = shard_out_queue.get(timeout=1)
-                if new_shards is None:
-                    break
-
                 if isinstance(new_shards, Exception):  # error propagated from worker thread
                     raise new_shards
 
@@ -573,7 +571,7 @@ def exception_to_queue(func):
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
-    shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception] | None],
+    shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception]],
     network_out_queue: Queue[Sequence[NodeId] | None],
     cache: ShardCache,
 ):
@@ -610,13 +608,13 @@ def cache_fetch_thread(
                 shard_out_queue.put(found)
 
     network_out_queue.put(None)
-    shard_out_queue.put(None)
+    # no shard_out_queue.put(None); this is during mainloop shutdown.
 
 
 @exception_to_queue
 def network_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception]],
     cache: ShardCache,
     shardlikes: Sequence[ShardBase],
 ):
@@ -690,7 +688,7 @@ def network_fetch_thread(
 @exception_to_queue
 def offline_nofetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception]],
     cache: ShardCache,
     shardlikes: Sequence[ShardBase],
 ):

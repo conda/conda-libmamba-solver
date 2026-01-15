@@ -450,6 +450,10 @@ class Shards(ShardBase):
         """
         Process a single fetched shard.
         """
+        # Fail early if no cache to store the result.
+        if self.shards_cache is None:
+            raise ValueError("self.shards_cache is None")
+
         with conda_http_errors(url, package):
             fetch_result = future.result()
 
@@ -459,10 +463,6 @@ class Shards(ShardBase):
                 fetch_result.compressed_shard, max_output_size=ZSTD_MAX_SHARD_SIZE
             )
         )
-
-        # Cache fetched shard; fail if shards_cache is None.
-        if self.shards_cache is None:
-            raise ValueError("self.shards_cache is None")
         self.shards_cache.insert(fetch_result)
 
 

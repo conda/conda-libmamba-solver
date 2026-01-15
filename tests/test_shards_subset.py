@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import queue
 import random
 import threading
 import time
@@ -291,10 +292,15 @@ def test_shards_cache_thread(
 
     cache_thread.start()
 
-    while batch := shard_out_queue.get(timeout=1):
-        for node_id, shard in batch:
-            assert node_id in fake_nodes
-            assert shard == cache.retrieve(node_id.shard_url)
+    # combined into a single output batch
+    batch = shard_out_queue.get(timeout=1)
+    for node_id, shard in batch:
+        assert node_id in fake_nodes
+        assert shard == cache.retrieve(node_id.shard_url)
+
+    # no "done" sentinel in shard_out_queue
+    with pytest.raises(queue.Empty):
+        shard_out_queue.get_nowait()
 
     while notfound := network_out_queue.get(timeout=1):
         for node_id in notfound:
