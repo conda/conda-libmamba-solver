@@ -1,0 +1,8 @@
+### Bug fixes
+
+* Fall back to `repodata.json` path if no channel has
+  `repodata_shards.msgpack.zst` instead of computing repodata subsets for
+  monolithic channels. (#716)
+
+* Explicitly close sqlite3 connections after shard traversal to avoid a possible
+  warning. (#843).
