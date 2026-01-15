@@ -466,7 +466,7 @@ class Shards(ShardBase):
         self.shards_cache.insert(fetch_result)
 
 
-def repodata_shards(url, cache: RepodataCache) -> bytes:
+def _repodata_shards(url, cache: RepodataCache) -> bytes:
     """
     Fetch shards index with cache.
 
@@ -585,7 +585,7 @@ def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) ->
         # If we don't have shards_data yet, try fetching (repodata_shards handles offline mode)
         if shards_data is None:
             try:
-                shards_data = repodata_shards(shards_index_url, repo_cache)
+                shards_data = _repodata_shards(shards_index_url, repo_cache)
                 cache_state.set_has_format("shards", True)
                 # this will also set state["refresh_ns"] = time.time_ns(); we could
                 # call cache.refresh() if we got a 304 instead:

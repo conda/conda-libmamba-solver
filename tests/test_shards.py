@@ -34,6 +34,7 @@ from conda_libmamba_solver.index import (
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
+    _repodata_shards,
     _shards_connections,
     batch_retrieve_from_cache,
     fetch_channels,
@@ -1132,3 +1133,41 @@ def test_offline_mode_missing_shard_in_cache(
     repodata = found_offline.build_repodata()
     # The repodata may be empty since "bar" is not cached and returns empty shard
     assert isinstance(repodata, dict)
+
+
+def test_repodata_shards_sends_etag(monkeypatch, tmp_path):
+    """
+    Test that repodata_shards(), normally only called by fetch_shards_index, can
+    send etag. (Our test web server doesn't use etag).
+    """
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
+    class MockSession:
+        proxies = None
+        get_count = 0
+
+        def __call__(self, *args):
+            return self
+
+        def get(self, url, headers, **kwargs):
+            self.url = url
+            self.headers = headers
+            self.kwargs = kwargs
+            raise NotImplementedError()
+
+    mock_session = MockSession()
+    monkeypatch.setattr(shards, "get_session", mock_session)
+
+    channel = Channel("http://localhost/mock/noarch")
+    subdir_data = SubdirData(channel)
+
+    repo_cache = subdir_data.repo_cache
+    repo_cache.load_state()
+    repo_cache.state["etag"] = "etag"
+
+    with pytest.raises(NotImplementedError):
+        _repodata_shards(channel.url(), repo_cache)
+
+    assert mock_session.headers == {"If-None-Match": "etag"}
