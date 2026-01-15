@@ -361,20 +361,25 @@ class LibMambaIndexHelper:
 
         urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
-        # Prefer sharded repodata loading if it's enabled
+        # Prefer sharded repodata loading if it's enabled.
         if self.in_state and _is_sharded_repodata_enabled():
-            # TODO: It may be better to directly pass channel objects without URL encoding
-
-            # Channels are not loaded in order from shards. Once we load the shards,
-            # reorder the list to match the intended channel order. If the channel
-            # is not in the urls_to_channel, we'll add it to the back
+            # Channels are not necessarily loaded in order from shards. Once we
+            # load the shards, reorder the list to match the intended channel
+            # order. If the channel is not in the urls_to_channel, we'll add it.
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
-            return sorted(
-                channel_repos_info,
-                key=lambda x: list(urls_to_channel.keys()).index(x.channel) or 0,
-            )
+            if channel_repos_info is not None:
+                urls_to_channel_keys = list(urls_to_channel.keys())
+                # Searching for the index of Channel() in a list[str] of URLs
+                # works because curiously Channel('conda-forge/noarch') ==
+                # 'https://conda.anaconda.org/conda-forge/noarch. Should we
+                # search over .values() instead?
+                return sorted(
+                    channel_repos_info,
+                    key=lambda x: urls_to_channel_keys.index(x.channel) or 0,
+                )
+            log.debug("No sharded channels available. Fall back to non-sharded path.")
 
-        # Fallback to repodata.json loading
+        # Classic "monolithic repodata.json" path.
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
     def _load_channel_repo_info_shards(
