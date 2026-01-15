@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
+import conda.exceptions
 import conda.gateways.repodata
 import msgpack
 import zstandard
@@ -30,7 +31,6 @@ from conda.gateways.repodata import (
 )
 from conda.models.channel import Channel
 from libmambapy.bindings import specs
-from requests import HTTPError
 
 from . import shards_cache
 
@@ -528,19 +528,18 @@ def repodata_shards(url, cache: RepodataCache) -> bytes:
     return response_bytes
 
 
-# From conda.gateways.repodata.jlap.fetch. If this returns True, then we mark
+# Like conda.gateways.repodata.jlap.fetch. If this returns True, then we mark
 # shards as not supported; otherwise, we will check again next time.
-def _is_http_error_most_400_codes(e: HTTPError) -> bool:
+def _is_http_error_most_400_codes(status_code: str | int) -> bool:
     """
     Determine whether the `HTTPError` is an HTTP 400 error code (except for 416).
     """
-    if e.response is None:  # 404 e.response is falsey
-        return False
-    status_code = e.response.status_code
-    return 400 <= status_code < 500 and status_code != 416
+    return isinstance(status_code, int) and 400 <= status_code < 500 and status_code != 416
 
 
-def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) -> Shards | None:
+def fetch_shards_index(
+    sd: SubdirData, cache: shards_cache.ShardCache | None = None
+) -> Shards | None:
     """
     Check a SubdirData's URL for shards.
 
@@ -601,9 +600,20 @@ def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) ->
                 # this will also set state["refresh_ns"] = time.time_ns(); we could
                 # call cache.refresh() if we got a 304 instead:
                 repo_cache.save(shards_data)
-            except (HTTPError, conda.gateways.repodata.RepodataIsEmpty) as err:
+            except conda.gateways.repodata.UnavailableInvalidChannel as err:
+                # repodata_shards converts HTTP errors to conda errors.
                 # fetch repodata.json / repodata.json.zst instead
-                if isinstance(err, HTTPError) and _is_http_error_most_400_codes(err):
+                if _is_http_error_most_400_codes(err.status_code):
+                    cache_state.set_has_format("shards", False)
+                repo_cache.refresh()
+            except conda.exceptions.CondaHTTPError as err:
+                # repodata_shards converts HTTP errors to conda errors.
+                # fetch repodata.json / repodata.json.zst instead
+                if (
+                    hasattr(err._caused_by, "response")
+                    and hasattr(err._caused_by.response, "status_code")
+                    and _is_http_error_most_400_codes(err._caused_by.response.status_code)
+                ):
                     cache_state.set_has_format("shards", False)
                 repo_cache.refresh()
 
