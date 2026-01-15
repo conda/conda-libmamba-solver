@@ -426,7 +426,7 @@ def test_shards_base_url():
         shards.shard_url("fake_package") == "https://shards.example.com/channel-name/.msgpack.zst"
     )
 
-    shards.shards_index["info"]["shards_base_url"] = ""
+    shards = with_urls(shards.url, "", "")
 
     assert (
         shards.shard_url("fake_package")

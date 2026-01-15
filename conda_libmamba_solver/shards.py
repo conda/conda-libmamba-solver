@@ -313,9 +313,7 @@ class Shards(ShardBase):
     Handle repodata_shards.msgpack.zst and individual per-package shards.
     """
 
-    # cache for shards_base_url()
-    _shards_base_url = ""
-    _shards_base_url_key = (None, None)
+    _shards_base_url: str
     shards_cache: shards_cache.ShardCache | None
 
     def __init__(
@@ -323,12 +321,23 @@ class Shards(ShardBase):
     ):
         """
         Args:
-            shards_index: raw parsed msgpack dict
+            shards_index: raw parsed msgpack dict. Don't change it or base_url,
+            shards_base_url will be wrong.
             url: URL of repodata_shards.msgpack.zst
         """
         self.shards_index = shards_index
         self.url = url
         self.shards_cache = cache
+
+        # https://github.com/conda/conda-index/pull/209 ensures that sharded
+        # repodata will always include base_url, even if it is an empty string;
+        # rattler/pixi require these keys.
+        self._base_url = shards_index["info"]["base_url"]
+
+        # doesn't track changes to self.shards_index
+        self._shards_base_url = _shards_base_url(
+            self.url, self.shards_index["info"].get("shards_base_url", "")
+        )
 
         # Use the channel's base URL to share session amongst subdir locations
         channel_base_url = Channel(self.shards_base_url).base_url
@@ -345,11 +354,6 @@ class Shards(ShardBase):
         # not used in traversal algorithm
         self.visited: dict[str, ShardDict | None] = {}
 
-        # https://github.com/conda/conda-index/pull/209 ensures that sharded
-        # repodata will always include base_url, even if it is an empty string;
-        # rattler/pixi require these keys.
-        self._base_url = shards_index["info"]["base_url"]
-
     @property
     def package_names(self):
         return self.packages_index.keys()
@@ -364,12 +368,6 @@ class Shards(ShardBase):
         Return self.url joined with shards_base_url.
         Note shards_base_url can be a relative or an absolute url.
         """
-        # could be simplified by restricting self.shards_index assignment
-        shards_base_url_ = self.shards_index["info"].get("shards_base_url", "")
-        cache_key = (self.url, shards_base_url_)
-        if self._shards_base_url_key != cache_key:
-            self._shards_base_url_key = cache_key
-            self._shards_base_url = _shards_base_url(self.url, shards_base_url_)
         return self._shards_base_url
 
     def shard_url(self, package: str) -> str:

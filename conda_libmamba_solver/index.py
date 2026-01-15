@@ -361,7 +361,7 @@ class LibMambaIndexHelper:
 
         urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
-        # Prefer sharded repodata loading if it's enabled.
+        # Prefer sharded repodata loading if enabled
         if self.in_state and _is_sharded_repodata_enabled():
             # Channels are not necessarily loaded in order from shards. Once we
             # load the shards, reorder the list to match the intended channel
@@ -379,7 +379,7 @@ class LibMambaIndexHelper:
                 )
             log.debug("No sharded channels available. Fall back to non-sharded path.")
 
-        # Classic "monolithic repodata.json" path.
+        # Classic "monolithic repodata.json" path
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
     def _load_channel_repo_info_shards(
