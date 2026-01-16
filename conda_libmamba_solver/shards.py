@@ -686,9 +686,8 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
     Returns:
         A dict mapping channel URLs to `Shard` or `ShardLike` objects.
     """
-    # retain order from incoming dict:
-    # channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
-    channel_data = {}
+    # copy incoming dict to retain order:
+    channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
 
     # share single disk cache for all Shards() instances
     cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
