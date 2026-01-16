@@ -12,7 +12,6 @@ import json
 import logging
 import tempfile
 import time
-import urllib.parse
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
@@ -29,7 +28,6 @@ from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
     LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
-    _package_info_from_package_dict,
 )
 from conda_libmamba_solver.shards import (
     ShardLike,
@@ -42,9 +40,7 @@ from conda_libmamba_solver.shards import (
     shard_mentioned_packages,
 )
 from conda_libmamba_solver.shards_subset import (
-    Node,
     RepodataSubset,
-    build_repodata_subset,
 )
 from tests import http_test_server
 
@@ -58,6 +54,34 @@ HERE = Path(__file__).parent
 # was conda-forge-sharded during testing
 CONDA_FORGE_WITH_SHARDS = "conda-forge"
 
+ROOT_PACKAGES = [
+    "__archspec",
+    "__conda",
+    "__osx",
+    "__unix",
+    "bzip2",
+    "ca-certificates",
+    "expat",
+    "icu",
+    "libexpat",
+    "libffi",
+    "liblzma",
+    "libmpdec",
+    "libsqlite",
+    "libzlib",
+    "ncurses",
+    "openssl",
+    "pip",
+    "python",
+    "python_abi",
+    "readline",
+    "tk",
+    "twine",
+    "tzdata",
+    "xz",
+    "zlib",
+]
+
 
 def package_names(shard: shards_cache.ShardDict):
     """
@@ -66,21 +90,6 @@ def package_names(shard: shards_cache.ShardDict):
     return set(package["name"] for package in shard["packages"].values()) | set(
         package["name"] for package in shard["packages.conda"].values()
     )
-
-
-def repodata_subset_size(channel_data):
-    """
-    Measure the size of a repodata subset as serialized to JSON. Discard data.
-    """
-    repodata_size = 0
-    for _, shardlike in channel_data.items():
-        repodata = shardlike.build_repodata()
-        repodata_text = json.dumps(
-            repodata, indent=0, separators=(",", ":"), sort_keys=True, ensure_ascii=False
-        )
-        repodata_size += len(repodata_text.encode("utf-8"))
-
-    return repodata_size
 
 
 def expand_channels(channels: list[Channel], subdirs: Iterable[str] | None = None):
@@ -769,99 +778,6 @@ def test_ensure_hex_hash_in_record():
         assert updated["md5"] == md5_hash.hexdigest()  # type: ignore
 
 
-ROOT_PACKAGES = [
-    "__archspec",
-    "__conda",
-    "__osx",
-    "__unix",
-    "bzip2",
-    "ca-certificates",
-    "expat",
-    "icu",
-    "libexpat",
-    "libffi",
-    "liblzma",
-    "libmpdec",
-    "libsqlite",
-    "libzlib",
-    "ncurses",
-    "openssl",
-    "pip",
-    "python",
-    "python_abi",
-    "readline",
-    "tk",
-    "twine",
-    "tzdata",
-    "xz",
-    "zlib",
-]
-
-
-def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
-    """
-    Build repodata subset using the third attempt at a dependency traversal
-    algorithm.
-    """
-
-    # installed, plus what we want to add (twine)
-    root_packages = ROOT_PACKAGES[:]
-
-    channels = list(context.default_channels)
-    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
-    channel_dict = expand_channels(channels)
-
-    with _timer("build_repodata_subset()"):
-        channel_data = build_repodata_subset(root_packages, channel_dict)
-
-    # convert to PackageInfo for libmamba, without temporary files
-    package_info = []
-    for channel, shardlike in channel_data.items():
-        repodata = shardlike.build_repodata()
-        # Don't like going back and forth between channel objects and URLs;
-        # build_repodata_subset() expands channels into per-subdir URLs as
-        # part of fetch:
-        channel_object = Channel(channel)
-        channel_id = str(channel_object)
-        for package_group in ("packages", "packages.conda"):
-            for filename, record in repodata.get(package_group, {}).items():
-                package_info.append(
-                    _package_info_from_package_dict(
-                        record,
-                        filename,
-                        url=shardlike.url,
-                        channel_id=channel_id,
-                    )
-                )
-
-    assert len(package_info), "no packages in subset"
-
-    print(f"{len(package_info)} packages in subset")
-
-    with _timer("write_repodata_subset()"):
-        repodata_size = repodata_subset_size(channel_data)
-    print(f"Repodata subset would be {repodata_size} bytes as json")
-
-    # e.g. this for noarch and osx-arm64
-    # % curl https://conda.anaconda.org/conda-forge-sharded/noarch/repodata.json.zst | zstd -d | wc
-    full_repodata_benchmark = 138186556 + 142680224
-
-    print(
-        f"Versus only noarch and osx-arm64 full repodata: {repodata_size / full_repodata_benchmark:.02f} times as large"
-    )
-
-    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
-
-
-def test_build_repodata_subset_no_shards(http_server_shards):
-    """
-    If no channel has repodata_shards.msgpack.zst, build_repodata_subset()
-    returns None.
-    """
-    channels = expand_channels([Channel(http_server_shards + "/notfound")])
-    assert build_repodata_subset([], channels) is None
-
-
 def test_batch_retrieve_from_cache(
     prepare_shards_test: None, empty_shards_cache: shards_cache.ShardCache
 ):
@@ -869,28 +785,7 @@ def test_batch_retrieve_from_cache(
     Test single database query to fetch cached shard URLs in a batch.
     """
     channels = [*context.default_channels, Channel(CONDA_FORGE_WITH_SHARDS)]
-    roots = [
-        Node(distance=0, package="ca-certificates", visited=False),
-        Node(distance=0, package="icu", visited=False),
-        Node(distance=0, package="expat", visited=False),
-        Node(distance=0, package="libexpat", visited=False),
-        Node(distance=0, package="libffi", visited=False),
-        Node(distance=0, package="libmpdec", visited=False),
-        Node(distance=0, package="libzlib", visited=False),
-        Node(distance=0, package="openssl", visited=False),
-        Node(distance=0, package="python", visited=False),
-        Node(distance=0, package="readline", visited=False),
-        Node(distance=0, package="liblzma", visited=False),
-        Node(distance=0, package="xz", visited=False),
-        Node(distance=0, package="libsqlite", visited=False),
-        Node(distance=0, package="tk", visited=False),
-        Node(distance=0, package="ncurses", visited=False),
-        Node(distance=0, package="zlib", visited=False),
-        Node(distance=0, package="pip", visited=False),
-        Node(distance=0, package="twine", visited=False),
-        Node(distance=0, package="python_abi", visited=False),
-        Node(distance=0, package="tzdata", visited=False),
-    ]
+    roots = ROOT_PACKAGES[:]
 
     with _timer("repodata.json/shards index fetch"):
         channel_data = fetch_channels(expand_channels(channels))
@@ -900,14 +795,12 @@ def test_batch_retrieve_from_cache(
         for shard in sharded:
             shard.shards_cache = empty_shards_cache
         assert sharded, "No sharded repodata found"
-        remaining = batch_retrieve_from_cache(sharded, [node.package for node in roots])
+        remaining = batch_retrieve_from_cache(sharded, roots)
         print(f"{len(remaining)} shards to fetch from network")
 
     # execute "no sharded channels" branch
     remaining = batch_retrieve_from_cache([], ["python"])
     assert remaining == []
-
-    # XXX don't call everything Shard/Shards
 
 
 class MockCache(NamedTuple):
