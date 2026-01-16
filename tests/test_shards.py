@@ -23,6 +23,7 @@ import zstandard
 from conda.base.context import context, reset_context
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
+from requests import Request, Response
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
@@ -362,6 +363,58 @@ def http_server_shards(tmp_path_factory) -> Iterable[str]:
     url = shard_factory.http_server_shards("http_server_shards")
     yield url
     shard_factory.clean_up_http_servers()
+
+
+@pytest.mark.parametrize("error_code", [404, 405, 416, 511])
+def test_fetch_shards_index_mark_unavailable(monkeypatch, tmp_path, error_code):
+    expect_should_check_shards = not (400 <= error_code < 500 and error_code != 416)
+
+    # Guarantee clean cache to avoid interference from previous tests
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    reset_context()
+
+    class MockSession:
+        proxies = None
+        get_count = 0
+
+        def __call__(self, *args):
+            return self
+
+        def get(self, url, *args, **kwargs):
+            self.get_count += 1
+            request = Request("GET", url).prepare()
+            response = Response()
+            response.request = request
+            response.url = url
+            # due to fetch_shards_index going through conda_http_errors, only
+            # 404 may be converted to the RepodataUnavailable exception we are
+            # looking for:
+            response.status_code = error_code
+            return response
+
+    mock_session = MockSession()
+    monkeypatch.setattr(shards, "get_session", mock_session)
+
+    channel = Channel("http://localhost/mock/noarch")
+    subdir_data = SubdirData(channel)
+
+    repo_cache = subdir_data.repo_cache
+    repo_cache.load_state()
+    assert repo_cache.state.should_check_format("shards")
+
+    fetch_shards_index(subdir_data, None)
+
+    # load json directly due to issues with repo_cache API, also
+    # fetch_shards_index gets a different repo_cache instance:
+    repo_cache.state.update(json.loads(repo_cache.cache_path_state.read_text()))
+    assert repo_cache.state.should_check_format("shards") == expect_should_check_shards
+    assert mock_session.get_count == 1
+
+    # assert that retry skips over shards without trying to GET
+    get_count = mock_session.get_count
+    second_try = fetch_shards_index(subdir_data, None)
+    assert second_try is None
+    assert mock_session.get_count == get_count + expect_should_check_shards
 
 
 def test_fetch_shards_error(http_server_shards, empty_shards_cache):
