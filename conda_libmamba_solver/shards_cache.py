@@ -66,7 +66,21 @@ class ShardCache:
         base: directory and filename prefix for cache.
         """
         self.base = base
-        self.connect()
+        self.connect(create=create)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exec_tb):
+        self.close()
+
+    def close(self):
+        """
+        Clean up connection. ShardCache can no longer be used after close().
+        """
+        if self.conn:
+            self.conn.close()
+            self.conn = None
 
     def copy(self):
         """
@@ -155,5 +169,5 @@ class ShardCache:
         """
         # This function appears to support `Path()` except on Windows
         # `os.rename(path, path + ".conda_trash")` fails:
-        self.conn.close()
+        self.close()
         unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))

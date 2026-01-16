@@ -57,7 +57,7 @@ import sys
 import threading
 from collections import deque
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import SimpleQueue
@@ -93,9 +93,7 @@ if TYPE_CHECKING:
     from conda_libmamba_solver.shards_cache import ShardCache
     from conda_libmamba_solver.shards_typing import ShardDict
 
-    from .shards import (
-        ShardBase,
-    )
+    from .shards import ShardBase
 
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
@@ -163,6 +161,22 @@ def filter_redundant_packages(repodata: ShardDict, use_only_tar_bz2=False) -> Sh
             if f"{k[:-_len_tar_bz2]}{_conda}" not in conda_packages
         },
     }
+
+
+@contextmanager
+def _install_shards_cache(shardlikes):
+    """
+    Add shards_cache to shardlikes for duration of traversal, then remove and
+    close.
+    """
+    with shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())) as cache:
+        for shardlike in shardlikes:
+            if isinstance(shardlike, Shards):
+                shardlike.shards_cache = cache
+        yield cache
+        for shardlike in shardlikes:
+            if isinstance(shardlike, Shards):
+                shardlike.shards_cache = None
 
 
 @dataclass
@@ -244,6 +258,13 @@ class RepodataSubset:
         Update associated `self.shardlikes` to contain enough data to build a
         repodata subset.
         """
+        with _install_shards_cache(self.shardlikes):
+            return self._reachable_bfs(root_packages)
+
+    def _reachable_bfs(self, root_packages):
+        """
+        Inner reachable_bfs() implementation.
+        """
         self.nodes = dict(_nodes_from_packages(root_packages, self.shardlikes))
 
         node_queue = deque(self.nodes.values())
@@ -285,7 +306,12 @@ class RepodataSubset:
         else:
             network_worker = network_fetch_thread
 
-        return self._reachable_pipelined(root_packages, network_worker=network_worker)
+        # Ignore cache on shards object, use our own. Necessary if there are no
+        # sharded channels.
+        with shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir())) as cache:
+            return self._reachable_pipelined(
+                root_packages, network_worker=network_worker, cache=cache
+            )
 
     def _reachable_pipelined(
         self,
@@ -293,21 +319,18 @@ class RepodataSubset:
         network_worker: Callable[
             [
                 Queue[Sequence[NodeId] | None],
-                Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+                Queue[list[tuple[NodeId, ShardDict] | Exception]],
                 ShardCache,
                 Sequence[ShardBase],
             ],
             None,
         ],
+        cache: shards_cache.ShardCache,
     ):
         """
         Set up queues and threads for shard traversal with a configurable
         network_worker. Called by reachable_pipelined()
         """
-
-        # Ignore cache on shards object, use our own. Necessary if there are no
-        # sharded channels.
-        cache = shards_cache.ShardCache(Path(conda.gateways.repodata.create_cache_dir()))
 
         cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
         shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]] | Exception] = SimpleQueue()
@@ -400,9 +423,6 @@ class RepodataSubset:
 
             try:
                 new_shards = shard_out_queue.get(timeout=1)
-                if new_shards is None:
-                    break
-
                 if isinstance(new_shards, Exception):  # error propagated from worker thread
                     raise new_shards
 
@@ -484,7 +504,6 @@ def build_repodata_subset(
         algorithm: desired traversal algorithm
     """
     channel_data = fetch_channels(channels)
-
     subset = RepodataSubset((*channel_data.values(),))
     subset.reachable(root_packages, strategy=algorithm)
     log.debug("%d (channel, package) nodes discovered", len(subset.nodes))
@@ -547,7 +566,7 @@ def exception_to_queue(func):
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
-    shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception] | None],
+    shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception]],
     network_out_queue: Queue[Sequence[NodeId] | None],
     cache: ShardCache,
 ):
@@ -564,34 +583,33 @@ def cache_fetch_thread(
             network_fetch_thread's in_queue.
         cache: used to retrieve shards.
     """
-    cache = cache.copy()
+    with cache.copy() as cache:
+        for node_ids in combine_batches_until_none(in_queue):
+            cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
-    for node_ids in combine_batches_until_none(in_queue):
-        cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
+            # should we add this into retrieve_multiple?
+            found: list[tuple[NodeId, ShardDict]] = []
+            not_found: list[NodeId] = []
+            for node_id in node_ids:
+                if shard := cached.get(node_id.shard_url):
+                    found.append((node_id, shard))
+                else:
+                    not_found.append(node_id)
 
-        # should we add this into retrieve_multiple?
-        found: list[tuple[NodeId, ShardDict]] = []
-        not_found: list[NodeId] = []
-        for node_id in node_ids:
-            if shard := cached.get(node_id.shard_url):
-                found.append((node_id, shard))
-            else:
-                not_found.append(node_id)
-
-        # Might wake up the network thread by calling it first:
-        if not_found:
-            network_out_queue.put(not_found)
-        if found:
-            shard_out_queue.put(found)
+            # Might wake up the network thread by calling it first:
+            if not_found:
+                network_out_queue.put(not_found)
+            if found:
+                shard_out_queue.put(found)
 
     network_out_queue.put(None)
-    shard_out_queue.put(None)
+    # no shard_out_queue.put(None); this is during mainloop shutdown.
 
 
 @exception_to_queue
 def network_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception]],
     cache: ShardCache,
     shardlikes: Sequence[ShardBase],
 ):
@@ -607,7 +625,6 @@ def network_fetch_thread(
         cache: once shards are decoded they are stored in cache.
         shardlikes: list of (network-only) shard index objects.
     """
-    cache = cache.copy()
     dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
@@ -649,7 +666,7 @@ def network_fetch_thread(
         # Future in here as well.
         in_queue.put([future])  # type: ignore
 
-    with ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
+    with ThreadPoolExecutor(max_workers=_shards_connections()) as executor, cache.copy() as cache:
         for node_ids_and_results in combine_batches_until_none(in_queue):
             for node_id_or_result in node_ids_and_results:
                 if isinstance(node_id_or_result, Future):
@@ -666,7 +683,7 @@ def network_fetch_thread(
 @exception_to_queue
 def offline_nofetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
-    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception]],
     cache: ShardCache,
     shardlikes: Sequence[ShardBase],
 ):

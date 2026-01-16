@@ -1,0 +1,4 @@
+### Bug fixes
+
+* Explicitly close sqlite3 connections after shard traversal to avoid a Python
+  3.13+ warning. (#843).
