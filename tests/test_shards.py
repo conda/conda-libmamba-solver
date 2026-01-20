@@ -402,7 +402,7 @@ def test_fetch_shards_index_mark_unavailable(monkeypatch, tmp_path, error_code):
     repo_cache.load_state()
     assert repo_cache.state.should_check_format("shards")
 
-    fetch_shards_index(subdir_data)
+    fetch_shards_index(subdir_data, None)
 
     # load json directly due to issues with repo_cache API, also
     # fetch_shards_index gets a different repo_cache instance:
@@ -412,7 +412,7 @@ def test_fetch_shards_index_mark_unavailable(monkeypatch, tmp_path, error_code):
 
     # assert that retry skips over shards without trying to GET
     get_count = mock_session.get_count
-    second_try = fetch_shards_index(subdir_data)
+    second_try = fetch_shards_index(subdir_data, None)
     assert second_try is None
     assert mock_session.get_count == get_count + expect_should_check_shards
 

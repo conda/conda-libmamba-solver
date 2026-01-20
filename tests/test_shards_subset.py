@@ -497,6 +497,15 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, monke
         )
 
 
+def test_build_repodata_subset_no_shards(http_server_shards):
+    """
+    If no channel has repodata_shards.msgpack.zst, build_repodata_subset()
+    returns None.
+    """
+    channels = expand_channels([Channel(http_server_shards + "/notfound")])
+    assert build_repodata_subset([], channels) is None
+
+
 def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
     """
     Build repodata subset, convert it into libmamba objects, and compute the

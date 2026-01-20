@@ -539,9 +539,7 @@ def _is_http_error_most_400_codes(status_code: str | int) -> bool:
     return isinstance(status_code, int) and 400 <= status_code < 500 and status_code != 416
 
 
-def fetch_shards_index(
-    sd: SubdirData, cache: shards_cache.ShardCache | None = None
-) -> Shards | None:
+def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) -> Shards | None:
     """
     Check a SubdirData's URL for shards.
 
@@ -677,7 +675,7 @@ def batch_retrieve_from_network(wanted: list[tuple[Shards, str, str]]):
         shard.fetch_shards(packages)
 
 
-def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
+def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] | None:
     """
     Args:
         url_to_channel: not modified, must already be expanded to subdirs.
@@ -686,13 +684,16 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
     traditional `repodata.json` file.
 
     Returns:
-        A dict mapping channel URLs to `Shard` or `ShardLike` objects. This dict
-        is return in the same order as the input `url_to_channel` dict.
+        A dict mapping channel URLs to `Shard` or `ShardLike` objects. None if
+        no channels have shards. This dict preserves the key order of the input
+        `url_to_channel`.
     """
     # copy incoming dict to retain order:
     channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
 
     # The parallel version may reorder channels, does this matter?
+
+    non_sharded_channels = []
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         futures = {
@@ -707,11 +708,19 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase]:
             if found:
                 channel_data[channel_url] = found
             else:
-                futures_non_sharded[
-                    executor.submit(
-                        SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed
-                    )
-                ] = channel_url
+                non_sharded_channels.append((channel_url, Channel(channel_url)))
+
+        # If all are None then don't do ShardLike.
+        if all(value is None for value in channel_data.values()):
+            return None  # caller should interpret this as falling back to the older code path
+
+        # Latency penalty launching these requests here instead of when we
+        # non_sharded_channels.append(), but we want to leave a fallback to the
+        # non-sharded path open.
+        for channel_url, channel in non_sharded_channels:
+            futures_non_sharded[
+                executor.submit(SubdirData(channel).repo_fetch.fetch_latest_parsed)
+            ] = channel_url
 
         for future in concurrent.futures.as_completed(futures_non_sharded):
             channel_url = futures_non_sharded[future]

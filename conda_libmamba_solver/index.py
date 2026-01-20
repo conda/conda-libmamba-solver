@@ -361,24 +361,30 @@ class LibMambaIndexHelper:
 
         urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
-        # Prefer sharded repodata loading if it's enabled
+        # Prefer sharded repodata loading if enabled
         if self.in_state and _is_sharded_repodata_enabled():
-            # This path promises to retain the order of urls_to_channels when returning channel_repos_info.
+            # _load_channel_repo_info_shards() must return ChannelRepoInfo
+            # matching the key order of urls_to_channel:
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
-            return channel_repos_info
+            if channel_repos_info is not None:
+                return channel_repos_info
+            log.debug("No sharded channels available. Fall back to non-sharded path.")
 
-        # Fallback to repodata.json loading
+        # Classic "monolithic repodata.json" path
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
     def _load_channel_repo_info_shards(
         self, urls_to_channel: dict[str, Channel]
-    ) -> list[_ChannelRepoInfo]:
+    ) -> list[_ChannelRepoInfo] | None:
         """
         Load repository information from sharded repodata cache.
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
         channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        if channel_data is None:
+            return  # caller should fall back to repodata.json
+
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
         return channel_repo_infos
