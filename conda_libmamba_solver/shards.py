@@ -688,7 +688,7 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
         no channels have shards. This dict preserves the key order of the input
         `url_to_channel`.
     """
-    # retain order from incoming dict:
+    # copy incoming dict to retain order:
     channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
 
     # The parallel version may reorder channels, does this matter?
