@@ -680,12 +680,13 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
     Args:
         url_to_channel: not modified, must already be expanded to subdirs.
 
-    Attempt to fetch the sharded index first and then fall back to retrieving
-    a traditional `repodata.json` file.
+    Attempt to fetch the sharded index first and then fall back to retrieving a
+    traditional `repodata.json` file.
 
     Returns:
-        A dict mapping channel URLs to `Shard` or `ShardLike` objects.
-        None if no channels have shards.
+        A dict mapping channel URLs to `Shard` or `ShardLike` objects. None if
+        no channels have shards. This dict preserves the key order of the input
+        `url_to_channel`.
     """
     # retain order from incoming dict:
     channel_data: dict[str, ShardBase | None] = {url: None for url in url_to_channel}
