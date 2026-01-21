@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import queue
 import random
 import threading
 import time
@@ -18,13 +19,14 @@ from unittest.mock import patch
 import conda.gateways.repodata
 import pytest
 import pytest_codspeed
-from conda.base.context import reset_context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset
+from conda_libmamba_solver.index import _package_info_from_package_dict
 from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
@@ -138,6 +140,21 @@ def clean_cache(conda_cli: CondaCLIFixture):
         assert not return_code, "conda clean returned {return_code} != 0"
 
 
+def repodata_subset_size(channel_data):
+    """
+    Measure the size of a repodata subset as serialized to JSON. Discard data.
+    """
+    repodata_size = 0
+    for _, shardlike in channel_data.items():
+        repodata = shardlike.build_repodata()
+        repodata_text = json.dumps(
+            repodata, indent=0, separators=(",", ":"), sort_keys=True, ensure_ascii=False
+        )
+        repodata_size += len(repodata_text.encode("utf-8"))
+
+    return repodata_size
+
+
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm"))
 @pytest.mark.parametrize("algorithm", ("bfs", "pipelined"))
@@ -179,6 +196,7 @@ def test_traversal_algorithm_benchmarks(
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
         channel_data = fetch_channels(expand_channels(channels))
 
+        assert channel_data is not None
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
         subset = RepodataSubset((*channel_data.values(),))
@@ -290,10 +308,15 @@ def test_shards_cache_thread(
 
     cache_thread.start()
 
-    while batch := shard_out_queue.get(timeout=1):
-        for node_id, shard in batch:
-            assert node_id in fake_nodes
-            assert shard == cache.retrieve(node_id.shard_url)
+    # combined into a single output batch
+    batch = shard_out_queue.get(timeout=1)
+    for node_id, shard in batch:
+        assert node_id in fake_nodes
+        assert shard == cache.retrieve(node_id.shard_url)
+
+    # no "done" sentinel in shard_out_queue
+    with pytest.raises(queue.Empty):
+        shard_out_queue.get_nowait()
 
     while notfound := network_out_queue.get(timeout=1):
         for node_id in notfound:
@@ -310,7 +333,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     cache, fake_shards = shard_cache_with_data
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, None)
     assert found
 
     invalid_shardlike = ShardLike(
@@ -474,6 +497,70 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, monke
         )
 
 
+def test_build_repodata_subset_no_shards(http_server_shards):
+    """
+    If no channel has repodata_shards.msgpack.zst, build_repodata_subset()
+    returns None.
+    """
+    channels = expand_channels([Channel(http_server_shards + "/notfound")])
+    assert build_repodata_subset([], channels) is None
+
+
+def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
+    """
+    Build repodata subset, convert it into libmamba objects, and compute the
+    size if the subset was serialized as repodata.json.
+    """
+
+    # installed, plus what we want to add (twine)
+    root_packages = ROOT_PACKAGES[:]
+
+    channels = list(context.default_channels)
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
+    channel_dict = expand_channels(channels)
+
+    with _timer("build_repodata_subset()"):
+        channel_data = build_repodata_subset(root_packages, channel_dict)
+
+    # convert to PackageInfo for libmamba, without temporary files
+    package_info = []
+    for channel, shardlike in channel_data.items():
+        repodata = shardlike.build_repodata()
+        # Don't like going back and forth between channel objects and URLs;
+        # build_repodata_subset() expands channels into per-subdir URLs as
+        # part of fetch:
+        channel_object = Channel(channel)
+        channel_id = str(channel_object)
+        for package_group in ("packages", "packages.conda"):
+            for filename, record in repodata.get(package_group, {}).items():
+                package_info.append(
+                    _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=shardlike.url,
+                        channel_id=channel_id,
+                    )
+                )
+
+    assert len(package_info), "no packages in subset"
+
+    print(f"{len(package_info)} packages in subset")
+
+    with _timer("write_repodata_subset()"):
+        repodata_size = repodata_subset_size(channel_data)
+    print(f"Repodata subset would be {repodata_size} bytes as json")
+
+    # e.g. this for noarch and osx-arm64
+    # % curl https://conda.anaconda.org/conda-forge-sharded/noarch/repodata.json.zst | zstd -d | wc
+    full_repodata_benchmark = 138186556 + 142680224
+
+    print(
+        f"Versus only noarch and osx-arm64 full repodata: {repodata_size / full_repodata_benchmark:.02f} times as large"
+    )
+
+    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
+
+
 @pytest.mark.parametrize("only_tar_bz2", (True, False))
 @pytest.mark.parametrize("strategy", ("pipelined", "bfs"))
 def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
@@ -597,7 +684,7 @@ def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
 
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    shardlikes = [fetch_shards_index(subdir_data)]
+    shardlikes = [fetch_shards_index(subdir_data, None)]
 
     queue = SimpleQueue()
 
