@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import sqlite3
 import tempfile
 import time
 from contextlib import contextmanager
@@ -569,7 +571,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
 
 
-def test_shard_cache(tmp_path: Path):
+def test_shards_cache(tmp_path: Path):
     cache = shards_cache.ShardCache(tmp_path)
 
     # test copy, context manager features
@@ -594,6 +596,18 @@ def test_shard_cache(tmp_path: Path):
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
     cache.close()
+
+
+def test_shards_cache_recovery(tmp_path: Path):
+    """
+    Test that we can recover from a bad shards database.
+    """
+    cache = shards_cache.ShardCache(tmp_path)
+    db_path = tmp_path / shards_cache.SHARD_CACHE_NAME
+    db_path.write_bytes(os.urandom(1024))
+
+    with pytest.raises(sqlite3.DatabaseError):
+        cache.retrieve("notfound")
 
 
 NUM_FAKE_SHARDS = 64
