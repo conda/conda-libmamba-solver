@@ -602,12 +602,16 @@ def test_shards_cache_recovery(tmp_path: Path):
     """
     Test that we can recover from a bad shards database.
     """
-    cache = shards_cache.ShardCache(tmp_path)
     db_path = tmp_path / shards_cache.SHARD_CACHE_NAME
     db_path.write_bytes(os.urandom(1024))
 
+    cache = shards_cache.ShardCache(tmp_path, create=False)
+    # sqlite3 won't complain until SQL is executed, but ShardCache() creates the
+    # schema if it doesn't exist:
     with pytest.raises(sqlite3.DatabaseError):
-        cache.retrieve("notfound")
+        cache.connect(retry=False)
+    cache.connect(retry=True)
+    assert cache.retrieve("notfound") is None
 
 
 NUM_FAKE_SHARDS = 64

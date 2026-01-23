@@ -88,22 +88,30 @@ class ShardCache:
         """
         return ShardCache(self.base, create=False)
 
-    def connect(self, create=True):
+    def connect(self, create=True, retry=True):
         """
         Args:
             create: if True, create table if not exists.
+            retry: remove cache, log warning, and retry on error.
         """
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
         if not create:
             return
-        # this schema will also get confused if we merge packages into a single
-        # shard, but the package name should be advisory.
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS shards ("
-            "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
-            "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-        )
+        try:
+            # this schema will also get confused if we merge packages into a single
+            # shard, but the package name should be advisory.
+            self.conn.execute(
+                "CREATE TABLE IF NOT EXISTS shards ("
+                "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
+                "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+            )
+        except sqlite3.DatabaseError as e:
+            if e.sqlite_errorcode == sqlite3.SQLITE_NOTADB and retry:
+                log.warning("%s is not a valid sqlite3 database; remove and retry.", dburi)
+                self.remove_cache()
+                return self.connect(create=create, retry=retry)
+            raise
 
     def insert(self, raw_shard: AnnotatedRawShard):
         """
