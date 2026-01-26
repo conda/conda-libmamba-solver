@@ -109,7 +109,7 @@ class ShardCache:
         except sqlite3.DatabaseError as e:
             has_errorcode = hasattr(e, "sqlite_errorcode")  # Added in Python 3.11
             if retry and ((not has_errorcode) or (e.sqlite_errorcode == sqlite3.SQLITE_NOTADB)):
-                log.warning("%s is not a valid sqlite3 database; remove and retry.", dburi)
+                log.warning("%s '%s'; remove and retry.", dburi, e)
                 self.remove_cache()
                 return self.connect(create=create, retry=retry)
             raise
