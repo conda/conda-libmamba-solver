@@ -39,7 +39,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
-  CONDA_REF: main # pin conda version to latest for more stable tests
+  CONDA_REF: test-trash-prefix-fix-windows-ci-CLS # pin conda version to latest for more stable tests
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -107,7 +107,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: agriyakhetarpal/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           ref: ${{ env.CONDA_REF }}
 
