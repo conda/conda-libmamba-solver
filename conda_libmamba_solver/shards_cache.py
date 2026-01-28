@@ -107,11 +107,16 @@ class ShardCache:
                 "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
             )
         except sqlite3.DatabaseError as e:
-            has_errorcode = hasattr(e, "sqlite_errorcode")  # Added in Python 3.11
+            # Python 3.11 adds sqlite_errorcode. This is meant to delete and
+            # retry on all DatabaseError for Python 3.10, but on Python 3.11+
+            # only retry on SQLITE_NOTADB. Other errors e.g. busy, locked, would
+            # propagate.
+            has_errorcode = hasattr(e, "sqlite_errorcode")
             if retry and ((not has_errorcode) or (e.sqlite_errorcode == sqlite3.SQLITE_NOTADB)):
                 log.warning("%s '%s'; remove and retry.", dburi, e)
                 self.remove_cache()
-                return self.connect(create=create, retry=retry)
+                # pass False so that we only retry once:
+                return self.connect(create=create, retry=False)
             raise
 
     def insert(self, raw_shard: AnnotatedRawShard):
