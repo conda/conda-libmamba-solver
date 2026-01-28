@@ -88,22 +88,36 @@ class ShardCache:
         """
         return ShardCache(self.base, create=False)
 
-    def connect(self, create=True):
+    def connect(self, create=True, retry=True):
         """
         Args:
             create: if True, create table if not exists.
+            retry: remove cache, log warning, and retry on error.
         """
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
         if not create:
             return
-        # this schema will also get confused if we merge packages into a single
-        # shard, but the package name should be advisory.
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS shards ("
-            "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
-            "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-        )
+        try:
+            # this schema will also get confused if we merge packages into a single
+            # shard, but the package name should be advisory.
+            self.conn.execute(
+                "CREATE TABLE IF NOT EXISTS shards ("
+                "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
+                "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+            )
+        except sqlite3.DatabaseError as e:
+            # Python 3.11 adds sqlite_errorcode. This is meant to delete and
+            # retry on all DatabaseError for Python 3.10, but on Python 3.11+
+            # only retry on SQLITE_NOTADB. Other errors e.g. busy, locked, would
+            # propagate.
+            has_errorcode = hasattr(e, "sqlite_errorcode")
+            if retry and ((not has_errorcode) or (e.sqlite_errorcode == sqlite3.SQLITE_NOTADB)):
+                log.warning("%s '%s'; remove and retry.", dburi, e)
+                self.remove_cache()
+                # pass False so that we only retry once:
+                return self.connect(create=create, retry=False)
+            raise
 
     def insert(self, raw_shard: AnnotatedRawShard):
         """
