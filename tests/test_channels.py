@@ -303,11 +303,15 @@ def test_http_server_auth_basic(
     )
 
 
+@pytest.mark.parametrize("shards", [True, False], ids=("shard", "noshard"))
 def test_http_server_auth_basic_email(
     http_server_auth_basic_email,  # noqa: F811
     conda_cli: CondaCLIFixture,
     path_factory: PathFactoryFixture,
+    shards: bool,
+    monkeypatch,
 ):
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", str(shards))
     conda_cli(
         "create",
         f"--prefix={path_factory()}",
