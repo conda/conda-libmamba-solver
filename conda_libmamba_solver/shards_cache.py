@@ -52,7 +52,8 @@ def connect(dburi="cache.db"):
     """
     conn = sqlite3.connect(dburi, uri=True)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    with conn as c:
+        c.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -101,11 +102,12 @@ class ShardCache:
         try:
             # this schema will also get confused if we merge packages into a single
             # shard, but the package name should be advisory.
-            self.conn.execute(
-                "CREATE TABLE IF NOT EXISTS shards ("
-                "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
-                "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-            )
+            with self.conn as c:
+                c.execute(
+                    "CREATE TABLE IF NOT EXISTS shards ("
+                    "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
+                    "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+                )
         except sqlite3.DatabaseError as e:
             # Python 3.11 adds sqlite_errorcode. This is meant to delete and
             # retry on all DatabaseError for Python 3.10, but on Python 3.11+
