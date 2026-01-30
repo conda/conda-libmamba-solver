@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -186,4 +187,8 @@ class ShardCache:
         # This function appears to support `Path()` except on Windows
         # `os.rename(path, path + ".conda_trash")` fails:
         self.close()
-        unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
+        try:
+            unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
+        except OSError:  # could this help on Windows?
+            time.sleep(5)
+            unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
