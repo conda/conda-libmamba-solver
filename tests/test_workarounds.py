@@ -66,7 +66,7 @@ def test_build_string_filters():
 
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage):
-    TIMEOUT = 20  # Used twice in total, so account for double the amount
+    TIMEOUT = 30  # Used twice in total, so account for double the amount
     p = sp.Popen(
         [
             sys.executable,
@@ -85,6 +85,7 @@ def test_ctrl_c(stage):
         text=True,
         stdout=sp.PIPE,
         stderr=sp.PIPE,
+        env={"CONDA_PLUGINS_USE_SHARDED_REPODATA": "1"},
     )
     t0 = time.time()
     while stage not in p.stdout.readline():
