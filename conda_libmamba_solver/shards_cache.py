@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import msgpack
 import zstandard
-from conda.gateways.disk.delete import unlink_or_rename_to_trash
 
 if TYPE_CHECKING:
     from pathlib import Path
