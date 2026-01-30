@@ -96,6 +96,8 @@ class ShardCache:
             create: if True, create table if not exists.
             retry: remove cache, log warning, and retry on error.
         """
+        global SHARD_CACHE_NAME
+
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
         if not create:
@@ -117,7 +119,12 @@ class ShardCache:
             has_errorcode = hasattr(e, "sqlite_errorcode")
             if retry and ((not has_errorcode) or (e.sqlite_errorcode == sqlite3.SQLITE_NOTADB)):
                 log.warning("%s '%s'; remove and retry.", dburi, e)
-                self.remove_cache()
+                try:
+                    self.remove_cache()
+                except OSError as e:
+                    # alternate filename if primary cannot be removed.
+                    log.warning("%s '%s'; use alternate filename.", dburi, e)
+                    SHARD_CACHE_NAME = "repodata_shards_1.db"
                 # pass False so that we only retry once:
                 return self.connect(create=create, retry=False)
             raise
@@ -184,11 +191,9 @@ class ShardCache:
         """
         Remove the sharded cache database.
         """
-        # This function appears to support `Path()` except on Windows
-        # `os.rename(path, path + ".conda_trash")` fails:
         self.close()
         try:
-            unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
-        except OSError:  # could this help on Windows?
-            time.sleep(5)
-            unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
+            (self.base / SHARD_CACHE_NAME).unlink()
+        except OSError:
+            # possibly workable on Windows
+            (self.base / SHARD_CACHE_NAME).rename(self.base / f"{SHARD_CACHE_NAME}.conda_trash")
