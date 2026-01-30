@@ -423,7 +423,7 @@ class RepodataSubset:
 
             try:
                 new_shards = shard_out_queue.get(timeout=1)
-                if isinstance(new_shards, Exception):  # error propagated from worker thread
+                if isinstance(new_shards, BaseException):  # error propagated from worker thread
                     raise new_shards
 
             except queue.Empty:
