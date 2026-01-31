@@ -193,8 +193,11 @@ class ShardBase(abc.ABC):
         """
         Return monolithic repodata including all visited shards.
         """
-        repodata = self.repodata_no_packages.copy()
-        repodata.update({"packages": {}, "packages.conda": {}})
+        repodata: RepodataDict = {
+            **self.repodata_no_packages,
+            "packages": {},
+            "packages.conda": {},
+        }
         for _, shard in self.visited.items():
             if shard is None:
                 continue  # recorded visited but not available shards
@@ -587,7 +590,8 @@ def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) ->
             cache_state.mod = ""
         elif not repo_cache.stale():
             # load from cache without network request
-            shards_data = repo_cache.cache_path_shards.read_bytes()
+            with repo_cache.lock("r+"):
+                shards_data = repo_cache.cache_path_shards.read_bytes()
 
         # If we don't have shards_data yet, try fetching (repodata_shards handles offline mode)
         if shards_data is None:

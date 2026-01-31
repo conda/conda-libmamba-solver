@@ -815,8 +815,11 @@ def test_pipelined_extreme_race_conditions(
 @pytest.mark.parametrize("num_threads", [1, 2, 5])
 def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_threads):
     """
-    Run pipelined algorithm from multiple threads concurrently.
-    This can expose race conditions in shared state or thread coordination.
+    Run pipelined algorithm from multiple threads concurrently. This can expose
+    race conditions in shared state or thread coordination.
+
+    (Actually the concurrency issues happen in fetch_channels() which deals with
+    reading, writing repodata_shards.msgpack.zst to disk.)
     """
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]

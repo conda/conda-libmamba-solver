@@ -423,7 +423,7 @@ class RepodataSubset:
 
             try:
                 new_shards = shard_out_queue.get(timeout=1)
-                if isinstance(new_shards, Exception):  # error propagated from worker thread
+                if isinstance(new_shards, BaseException):  # error propagated from worker thread
                     raise new_shards
 
             except queue.Empty:
@@ -561,9 +561,9 @@ def exception_to_queue(func):
     def wrapper(in_queue, out_queue, *args, **kwargs):
         try:
             return func(in_queue, out_queue, *args, **kwargs)
-        except Exception as e:
-            in_queue.put(None)  # signal termination
-            out_queue.put(e)
+        except BaseException as e:  # includes KeyboardInterrupt
+            in_queue.put(None)  # tell worker that we're done
+            out_queue.put(e)  # tell caller that we received an exception
 
     return wrapper
 
