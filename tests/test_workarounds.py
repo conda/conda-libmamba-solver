@@ -88,10 +88,14 @@ def test_ctrl_c(stage):
         env={"CONDA_PLUGINS_USE_SHARDED_REPODATA": "1"},
     )
     t0 = time.time()
-    while stage not in p.stdout.readline():
+    lines = []
+    while line := p.stdout.readline():
+        if "stage" in line:
+            continue
+        lines.append(line)
         time.sleep(0.1)
         if time.time() - t0 > TIMEOUT:
-            raise RuntimeError("Timeout")
+            raise RuntimeError(f"Timeout\n{'\n'.join(lines)}\n{p.stderr.read()}")
 
     # works around Windows' awkward CTRL-C signal handling
     # https://stackoverflow.com/a/64357453
