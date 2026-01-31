@@ -95,7 +95,7 @@ def test_ctrl_c(stage):
         lines.append(line)
         time.sleep(0.1)
         if time.time() - t0 > TIMEOUT:
-            raise RuntimeError(f"Timeout\n{'\n'.join(lines)}\n{p.stderr.read()}")
+            raise RuntimeError(f"Timeout\n{lines}\n{p.stderr.read()}")
 
     # works around Windows' awkward CTRL-C signal handling
     # https://stackoverflow.com/a/64357453
