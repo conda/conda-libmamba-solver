@@ -85,12 +85,12 @@ def test_ctrl_c(stage):
         text=True,
         stdout=sp.PIPE,
         stderr=sp.PIPE,
-        env={"CONDA_PLUGINS_USE_SHARDED_REPODATA": "1"},
+        env={"CONDA_PLUGINS_USE_SHARDED_REPODATA": "1", "PYTHONHASHSEED": str(0xAD792856)},
     )
     t0 = time.time()
     lines = []
     while line := p.stdout.readline():
-        if "stage" in line:
+        if stage in line:
             continue
         lines.append(line)
         time.sleep(0.1)
