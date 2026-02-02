@@ -64,9 +64,10 @@ def test_build_string_filters():
             assert "py38" in pkg["build_string"]
 
 
+@pytest.mark.parametrize("shards", (True, False), ids=["shards", "noshards"])
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
-def test_ctrl_c(stage):
-    TIMEOUT = 30  # Used twice in total, so account for double the amount
+def test_ctrl_c(stage, shards):
+    TIMEOUT = 20  # Used twice in total, so account for double the amount
     p = sp.Popen(
         [
             sys.executable,
@@ -85,17 +86,19 @@ def test_ctrl_c(stage):
         text=True,
         stdout=sp.PIPE,
         stderr=sp.PIPE,
-        env={"CONDA_PLUGINS_USE_SHARDED_REPODATA": "1", "PYTHONHASHSEED": str(0xAD792856)},
+        env={"CONDA_PLUGINS_USE_SHARDED_REPODATA": str(shards), "PYTHONHASHSEED": str(0xAD792856)},
     )
     t0 = time.time()
     lines = []
     while line := p.stdout.readline():
-        if stage in line:
-            continue
         lines.append(line)
-        time.sleep(0.1)
+        print(line.strip())
+        if stage in line:
+            break
+        time.sleep(0.01)
         if time.time() - t0 > TIMEOUT:
-            raise RuntimeError(f"Timeout\n{lines}\n{p.stderr.read()}")
+            lines = "\n".join(lines)
+            raise RuntimeError(f"Timeout\n{lines}\n\nstderr: {p.stderr.read()}")
 
     # works around Windows' awkward CTRL-C signal handling
     # https://stackoverflow.com/a/64357453
