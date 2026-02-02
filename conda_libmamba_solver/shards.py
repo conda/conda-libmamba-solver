@@ -697,8 +697,10 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=_shards_connections()) as executor:
         futures = {
-            executor.submit(fetch_shards_index, SubdirData(channel), None): channel_url
-            for (channel_url, channel) in url_to_channel.items()
+            executor.submit(
+                fetch_shards_index, SubdirData(Channel(channel_url)), None
+            ): channel_url
+            for (channel_url, _) in url_to_channel.items()
         }
         futures_non_sharded = {}
 
@@ -717,9 +719,9 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
         # Latency penalty launching these requests here instead of when we
         # non_sharded_channels.append(), but we want to leave a fallback to the
         # non-sharded path open.
-        for channel_url, channel in non_sharded_channels:
+        for channel_url, _ in non_sharded_channels:
             futures_non_sharded[
-                executor.submit(SubdirData(channel).repo_fetch.fetch_latest_parsed)
+                executor.submit(SubdirData(Channel(channel_url)).repo_fetch.fetch_latest_parsed)
             ] = channel_url
 
         for future in concurrent.futures.as_completed(futures_non_sharded):
@@ -733,4 +735,4 @@ def fetch_channels(url_to_channel: dict[str, Channel]) -> dict[str, ShardBase] |
             found = ShardLike(repodata_json, url)
             channel_data[channel_url] = found
 
-    return {url: channel for url, channel in channel_data.items() if channel is not None}
+    return {url: shard for url, shard in channel_data.items() if shard is not None}
