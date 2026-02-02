@@ -209,7 +209,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps --no-build-isolation
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv ${{  env.PYTEST_CLS_ADDOPTS } --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
+          python -m pytest -vv ${{ env.PYTEST_CLS_ADDOPTS }} --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -362,7 +362,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps --no-build-isolation
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv ${{  env.PYTEST_CLS_ADDOPTS } --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
+          python -m pytest -vv ${{ env.PYTEST_CLS_ADDOPTS }} --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -636,7 +636,7 @@ jobs:
           python -m pip install -e ../conda/ --no-deps --no-build-isolation
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv ${{  env.PYTEST_CLS_ADDOPTS } --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
+          python -m pytest -vv ${{ env.PYTEST_CLS_ADDOPTS }} --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
