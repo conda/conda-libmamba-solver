@@ -39,7 +39,7 @@ env:
   # upstream conda tests that we want to skip
   PYTEST_ADDOPTS: "-k \"not test_get_index_lazy and not test_strict_resolve_get_reduced_index\""
   # for conda-libmamba-solver
-  PYTEST_CLS_ADDOPTS: "-m trouble -s" # focus on worst test(s)
+  PYTEST_CLS_ADDOPTS: "-m \"not slow and not benchmark and not trouble\""
   # See https://github.com/conda/conda/pull/13694
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
