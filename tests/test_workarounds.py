@@ -64,6 +64,7 @@ def test_build_string_filters():
             assert "py38" in pkg["build_string"]
 
 
+@pytest.mark.trouble
 @pytest.mark.parametrize("shards", (True, False), ids=["shards", "noshards"])
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
 def test_ctrl_c(stage, shards):
