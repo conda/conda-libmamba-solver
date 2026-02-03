@@ -153,6 +153,7 @@ jobs:
           --file tests\requirements-s3.txt
           --file ..\conda-libmamba-solver\dev\requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ..\\conda-libmamba-solver\\tests\\requirements.txt' || '' }}
+          ${{ matrix.python-version < '3.14' && 'backports.zstd' || '' }}
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
@@ -317,6 +318,7 @@ jobs:
           --file tests/requirements-s3.txt
           --file ../conda-libmamba-solver/dev/requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
+          ${{ matrix.python-version < '3.14' && 'backports.zstd' || '' }}
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
@@ -593,6 +595,7 @@ jobs:
           --file tests/requirements-s3.txt
           --file ../conda-libmamba-solver/dev/requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
+          ${{ matrix.python-version < '3.14' && 'backports.zstd' || '' }}
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth

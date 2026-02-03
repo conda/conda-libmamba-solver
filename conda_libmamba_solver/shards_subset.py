@@ -65,14 +65,12 @@ from typing import TYPE_CHECKING
 
 import conda.gateways.repodata
 import msgpack
-import zstandard
 from conda.base.context import context
 
 from conda_libmamba_solver import shards_cache
 from conda_libmamba_solver.shards_cache import AnnotatedRawShard
 
 from .shards import (
-    ZSTD_MAX_SHARD_SIZE,
     Shards,
     _shards_connections,
     batch_retrieve_from_cache,
@@ -80,6 +78,7 @@ from .shards import (
     fetch_channels,
     shard_mentioned_packages,
 )
+from .zstd import decompress
 
 log = logging.getLogger(__name__)
 
@@ -630,7 +629,7 @@ def network_fetch_thread(
         cache: once shards are decoded they are stored in cache.
         shardlikes: list of (network-only) shard index objects.
     """
-    dctx = zstandard.ZstdDecompressor(max_window_size=ZSTD_MAX_SHARD_SIZE)
+    cache = cache.copy()
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
@@ -654,9 +653,7 @@ def network_fetch_thread(
         # Decompress and parse. If it decodes as
         # msgpack.zst, insert into cache. Then put "known
         # good" shard into out queue.
-        shard: ShardDict = msgpack.loads(
-            dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
-        )  # type: ignore[assign]
+        shard: ShardDict = msgpack.loads(decompress(data))  # type: ignore[assign]
         # We could send this back into the cache thread instead to
         # serialize access to sqlite3 if lock contention becomes an issue.
         cache.insert(AnnotatedRawShard(url, node_id.package, data))
@@ -693,11 +690,11 @@ def offline_nofetch_thread(
     shardlikes: Sequence[ShardBase],
 ):
     """
-    For offline mode, where network requests are not allowed.
-    Pretend that every network request is an empty shard.
-    Don't save those to the cache.
+    For offline mode, where network requests are not allowed. Pretend that every
+    network request is an empty shard. Don't save those to the cache.
 
-    Depending on how many shards are in sqlite3 and which packages were requested, the user may or may not get enough repodata for a solution.
+    Depending on how many shards are in sqlite3 and which packages were
+    requested, the user may or may not get enough repodata for a solution.
 
     Args:
         in_queue: NodeId (URLs) to fetch.

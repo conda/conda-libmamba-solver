@@ -20,7 +20,6 @@ from urllib.parse import urljoin
 import conda.exceptions
 import conda.gateways.repodata
 import msgpack
-import zstandard
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
@@ -32,6 +31,7 @@ from conda.models.channel import Channel
 from libmambapy.bindings import specs
 
 from . import shards_cache
+from .zstd import decompress
 
 log = logging.getLogger(__name__)
 
@@ -47,10 +47,6 @@ if TYPE_CHECKING:
     from .shards_typing import PackageRecordDict, ShardDict
 
 SHARDS_CONNECTIONS_DEFAULT = 10
-ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data has no size header
-# For reference, the largest shard "conda-forge/linux-64/vim" is 2608283 bytes
-# or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
-# decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
 
 
 def _shards_connections() -> int:
@@ -459,11 +455,9 @@ class Shards(ShardBase):
             fetch_result = future.result()
 
         # Decompress and save record
-        results[fetch_result.package] = msgpack.loads(
-            zstandard.decompress(
-                fetch_result.compressed_shard, max_output_size=ZSTD_MAX_SHARD_SIZE
-            )
-        )
+        results[fetch_result.package] = msgpack.loads(decompress(fetch_result.compressed_shard))
+
+        # Cache fetched shard
         self.shards_cache.insert(fetch_result)
 
 
@@ -620,9 +614,7 @@ def fetch_shards_index(sd: SubdirData, cache: shards_cache.ShardCache | None) ->
 
         if shards_data:
             # basic parse (move into caller?)
-            shards_index: ShardsIndexDict = msgpack.loads(
-                zstandard.decompress(shards_data, max_output_size=ZSTD_MAX_SHARD_SIZE)
-            )  # type: ignore
+            shards_index: ShardsIndexDict = msgpack.loads(decompress(shards_data))  # type: ignore
             shards = Shards(shards_index, shards_index_url, cache)
             return shards
 
