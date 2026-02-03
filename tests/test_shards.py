@@ -10,6 +10,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
+import sqlite3
 import tempfile
 import time
 from contextlib import contextmanager
@@ -569,7 +571,7 @@ def test_fetch_shards_channels(prepare_shards_test: None):
     assert any(isinstance(channel, Shards) for channel in channel_data.values())
 
 
-def test_shard_cache(tmp_path: Path):
+def test_shards_cache(tmp_path: Path):
     cache = shards_cache.ShardCache(tmp_path)
 
     # test copy, context manager features
@@ -594,6 +596,22 @@ def test_shard_cache(tmp_path: Path):
     assert (tmp_path / shards_cache.SHARD_CACHE_NAME).exists()
 
     cache.close()
+
+
+def test_shards_cache_recovery(tmp_path: Path):
+    """
+    Test that we can recover from a bad shards database.
+    """
+    db_path = tmp_path / shards_cache.SHARD_CACHE_NAME
+    db_path.write_bytes(os.urandom(1024))
+
+    cache = shards_cache.ShardCache(tmp_path, create=False)
+    # sqlite3 won't complain until SQL is executed, but ShardCache() creates the
+    # schema if it doesn't exist:
+    with pytest.raises(sqlite3.DatabaseError):
+        cache.connect(retry=False)
+    cache.connect(retry=True)
+    assert cache.retrieve("notfound") is None
 
 
 NUM_FAKE_SHARDS = 64
@@ -940,7 +958,7 @@ def test_filter_packages_simple():
 # the function under test is not particularly slow but downloads large repodata
 # unnecessarily. Useful if remove_legacy_packages needs to be debugged.
 @pytest.mark.skip(reason="slow")
-@pytest.mark.benchmark()
+@pytest.mark.benchmark
 @pytest.mark.parametrize(
     "channel", ("conda-forge/linux-64", "https://repo.anaconda.com/pkgs/main/linux-64")
 )

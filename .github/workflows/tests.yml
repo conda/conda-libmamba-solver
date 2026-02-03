@@ -32,9 +32,14 @@ concurrency:
 env:
   # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
   CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
-  PYTEST_RERUN_FAILURES: 3
+  # Reruns on upstream tests
+  PYTEST_RERUN_FAILURES: 1
+  # Reruns on our tests
+  PYTEST_RERUN_FAILURES_CLS: 0
   # upstream conda tests that we want to skip
   PYTEST_ADDOPTS: "-k \"not test_get_index_lazy and not test_strict_resolve_get_reduced_index\""
+  # for conda-libmamba-solver
+  PYTEST_CLS_ADDOPTS: "-m \"not slow and not benchmark and not trouble\""
   # See https://github.com/conda/conda/pull/13694
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
@@ -201,10 +206,10 @@ jobs:
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         shell: bash -el {0}
         run: |
-          python -m pip install -e ../conda/ --no-deps
+          python -m pip install -e ../conda/ --no-deps --no-build-isolation
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
+          python -m pytest -vv ${{ env.PYTEST_CLS_ADDOPTS }} --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -354,10 +359,10 @@ jobs:
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
-          python -m pip install -e ../conda/ --no-deps
+          python -m pip install -e ../conda/ --no-deps --no-build-isolation
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
+          python -m pytest -vv ${{ env.PYTEST_CLS_ADDOPTS }} --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
@@ -628,10 +633,10 @@ jobs:
         working-directory: conda-libmamba-solver
         if: ${{ matrix.test-type == 'conda-libmamba-solver' }}
         run: |
-          python -m pip install -e ../conda/ --no-deps
+          python -m pip install -e ../conda/ --no-deps --no-build-isolation
           python -m conda init --all
           . $CONDA_PREFIX/etc/profile.d/conda.sh
-          python -m pytest -vv -m "not slow" --reruns=${{ env.PYTEST_RERUN_FAILURES }} --durations=16
+          python -m pytest -vv ${{ env.PYTEST_CLS_ADDOPTS }} --reruns=${{ env.PYTEST_RERUN_FAILURES_CLS }} --durations=16
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage

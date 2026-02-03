@@ -83,6 +83,7 @@ filterwarnings = [
 markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",
+  "trouble: troublesome tests",
 ]
 
 [tool.ruff]
