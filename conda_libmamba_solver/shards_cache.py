@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 
 import msgpack
 
-from .zstd import ZstdDecompressor, decompress
+from .zstd import decompress
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -134,12 +134,16 @@ class ShardCache:
             package: package name
             raw_shard: msgpack.zst compressed shard data
         """
-        # decompress and return shard for convenience, also to validate? unless
-        # caller would rather retrieve the shard from another thread.
+        # caller must ensure that raw_shard.compressed_shard is valid or it will
+        # cause problems later.
         with self.conn as c:
             c.execute(
-                "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
-                (raw_shard.url, raw_shard.package, raw_shard.compressed_shard),
+                "INSERT OR REPLACE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
+                (
+                    raw_shard.url,
+                    raw_shard.package,
+                    raw_shard.compressed_shard,
+                ),
             )
 
     def retrieve(self, url) -> ShardDict | None:
@@ -155,16 +159,12 @@ class ShardCache:
         """
         if not urls:
             return {}  # this optimization does not save a noticeable amount of time.
-
-        # In one test reusing the context saves difference between .006s and .01s
-        # We could make this a threadlocal.
-        dctx = ZstdDecompressor()
-
         query = f"SELECT url, shard FROM shards WHERE url IN ({','.join(('?',) * len(urls))}) ORDER BY url"
         with self.conn as c:
             result: dict[str, ShardDict | None] = {
                 # note compression.zstd.decompress does not require or provide max_output_size
-                row["url"]: msgpack.loads(dctx.decompress(row["shard"])) if row else None
+                # row may always be truthy; remove 'if row' or change to if row["shard"]...
+                row["url"]: msgpack.loads(decompress(row["shard"])) if row else None
                 for row in c.execute(query, urls)  # type: ignore
             }
             return result

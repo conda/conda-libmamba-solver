@@ -26,7 +26,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from requests import Request, Response
 
-import conda_libmamba_solver.zstd as zstandard
+import conda_libmamba_solver.zstd as zstd
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
     LibMambaIndexHelper,
@@ -286,22 +286,22 @@ class ShardFactory:
         noarch = shards_repository / "noarch"
         noarch.mkdir()
 
-        foo_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
+        foo_shard = zstd.compress(msgpack.dumps(FAKE_SHARD))  # type: ignore
         foo_shard_digest = hashlib.sha256(foo_shard).digest()
         (noarch / f"{foo_shard_digest.hex()}.msgpack.zst").write_bytes(foo_shard)
 
-        bar_shard = zstandard.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
+        bar_shard = zstd.compress(msgpack.dumps(FAKE_SHARD_2))  # type: ignore
         bar_shard_digest = hashlib.sha256(bar_shard).digest()
         (noarch / f"{bar_shard_digest.hex()}.msgpack.zst").write_bytes(bar_shard)
 
         malformed = {"follows_schema": False}
-        bad_schema = zstandard.compress(msgpack.dumps(malformed))  # type: ignore
+        bad_schema = zstd.compress(msgpack.dumps(malformed))  # type: ignore
         malformed_digest = hashlib.sha256(bad_schema).digest()
 
         (noarch / f"{malformed_digest.hex()}.msgpack.zst").write_bytes(bad_schema)
         not_zstd = b"not zstd"
         (noarch / f"{hashlib.sha256(not_zstd).digest().hex()}.msgpack.zst").write_bytes(not_zstd)
-        not_msgpack = zstandard.compress(b"not msgpack")
+        not_msgpack = zstd.compress(b"not msgpack")
         (noarch / f"{hashlib.sha256(not_msgpack).digest().hex()}.msgpack.zst").write_bytes(
             not_msgpack
         )
@@ -319,7 +319,7 @@ class ShardFactory:
             },
         }
         (shards_repository / "noarch" / "repodata_shards.msgpack.zst").write_bytes(
-            zstandard.compress(msgpack.dumps(fake_shards))  # type: ignore
+            zstd.compress(msgpack.dumps(fake_shards))  # type: ignore
         )
 
         http = http_test_server.run_test_server(
@@ -450,7 +450,7 @@ def test_fetch_shards_error(http_server_shards, empty_shards_cache):
     malo = found.fetch_shard("malformed")
     assert malo == {"follows_schema": False}  # XXX should we return None or raise
 
-    with pytest.raises(zstandard.ZstdError):
+    with pytest.raises(zstd.ZstdError):
         found.fetch_shard("not_zstd")
 
     # unclear if all possible "bad msgpack" errors inherit from a common class
@@ -582,7 +582,7 @@ def test_shards_cache(tmp_path: Path):
     annotated_shard = shards_cache.AnnotatedRawShard(
         "https://foo",
         "foo",
-        zstandard.compress(msgpack.dumps(fake_shard)),  # type: ignore
+        zstd.compress(msgpack.dumps(fake_shard)),  # type: ignore
     )
     cache.insert(annotated_shard)
 
@@ -617,38 +617,43 @@ def test_shards_cache_recovery(tmp_path: Path):
 NUM_FAKE_SHARDS = 64
 
 
+@pytest.fixture()
+def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
+    """
+    Set up a mock shard cache that will be used by multiple benchmark tests.
+    """
+    with shards_cache.ShardCache(tmp_path) as cache:
+        NUM_FAKE_SHARDS = 64
+        fake_shards = []
+
+        for i in range(NUM_FAKE_SHARDS):
+            fake_shard = {f"foo{i}": "bar"}
+            annotated_shard = shards_cache.AnnotatedRawShard(
+                f"https://foo{i}",
+                f"foo{i}",
+                zstd.compress(msgpack.dumps(fake_shard)),  # type: ignore
+            )
+            cache.insert(annotated_shard)
+            fake_shards.append(annotated_shard)
+
+        yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
+
+
 @pytest.fixture
 def shard_cache_with_data(
-    tmp_path: Path,
+    mock_cache: MockCache,
 ) -> tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]]:
     """
-    ShardCache with some data already inserted.
+    (cache, shards); compatible with older fixture.
     """
-    cache = shards_cache.ShardCache(tmp_path)
-    fake_shards = []
-
-    compressor = zstandard.ZstdCompressor(level=1)
-    for i in range(NUM_FAKE_SHARDS):
-        fake_shard = {f"foo{i}": "bar"}
-        annotated_shard = shards_cache.AnnotatedRawShard(
-            f"https://foo{i}",
-            f"foo{i}",
-            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
-        )
-        cache.insert(annotated_shard)
-        fake_shards.append(annotated_shard)
-
-    return cache, fake_shards
+    return mock_cache.cache, mock_cache.shards
 
 
-def test_shard_cache_multiple(
-    tmp_path: Path,
-    shard_cache_with_data: tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]],
-):
+def test_shard_cache_multiple(tmp_path: Path, mock_cache: MockCache):
     """
     Test that retrieve_multiple() is equivalent to several retrieve() calls.
     """
-    cache, fake_shards = shard_cache_with_data
+    cache, fake_shards = mock_cache.cache, mock_cache.shards
 
     none_retrieved = cache.retrieve_multiple([])  # coverage
     assert none_retrieved == {}
@@ -882,29 +887,6 @@ class MockCache(NamedTuple):
     num_shards: int
     shards: list[shards_cache.AnnotatedRawShard]
     cache: shards_cache.ShardCache
-
-
-@pytest.fixture()
-def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
-    """
-    Set up a mock shard cache that will be used by multiple benchmark tests.
-    """
-    with shards_cache.ShardCache(tmp_path) as cache:
-        NUM_FAKE_SHARDS = 64
-        fake_shards = []
-
-        compressor = zstandard.ZstdCompressor(level=1)
-        for i in range(NUM_FAKE_SHARDS):
-            fake_shard = {f"foo{i}": "bar"}
-            annotated_shard = shards_cache.AnnotatedRawShard(
-                f"https://foo{i}",
-                f"foo{i}",
-                compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
-            )
-            cache.insert(annotated_shard)
-            fake_shards.append(annotated_shard)
-
-        yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
 
 
 @pytest.mark.benchmark

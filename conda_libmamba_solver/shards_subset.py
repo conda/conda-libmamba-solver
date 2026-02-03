@@ -78,7 +78,7 @@ from .shards import (
     fetch_channels,
     shard_mentioned_packages,
 )
-from .zstd import ZstdDecompressor
+from .zstd import decompress
 
 log = logging.getLogger(__name__)
 
@@ -630,7 +630,6 @@ def network_fetch_thread(
         shardlikes: list of (network-only) shard index objects.
     """
     cache = cache.copy()
-    dctx = ZstdDecompressor()
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
@@ -654,7 +653,7 @@ def network_fetch_thread(
         # Decompress and parse. If it decodes as
         # msgpack.zst, insert into cache. Then put "known
         # good" shard into out queue.
-        shard: ShardDict = msgpack.loads(dctx.decompress(data))  # type: ignore[assign]
+        shard: ShardDict = msgpack.loads(decompress(data))  # type: ignore[assign]
         # We could send this back into the cache thread instead to
         # serialize access to sqlite3 if lock contention becomes an issue.
         cache.insert(AnnotatedRawShard(url, node_id.package, data))
