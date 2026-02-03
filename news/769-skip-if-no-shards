@@ -1,0 +1,5 @@
+### Bug fixes
+
+* Fall back to `repodata.json` path if no channel has
+  `repodata_shards.msgpack.zst` instead of computing repodata subsets for
+  monolithic channels. (#716)
