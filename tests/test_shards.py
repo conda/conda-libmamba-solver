@@ -1151,8 +1151,16 @@ def test_repodata_shards_sends_etag(monkeypatch, tmp_path):
     "base_url,relative_url,expected",
     [
         # HTTP URLs - standard urljoin behavior works correctly
-        ("https://repo.anaconda.com/pkgs/main/linux-64", "", "https://repo.anaconda.com/pkgs/main/"),
-        ("https://repo.anaconda.com/pkgs/main/linux-64", "subdir", "https://repo.anaconda.com/pkgs/main/"),
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64",
+            "",
+            "https://repo.anaconda.com/pkgs/main/",
+        ),
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64",
+            "subdir",
+            "https://repo.anaconda.com/pkgs/main/",
+        ),
         # S3 URLs - the main bug fix (issue #866)
         ("s3://bucket-name/linux-64", "", "s3://bucket-name/linux-64/"),
         ("s3://bucket-name/linux-64/", "", "s3://bucket-name/linux-64/"),

@@ -93,6 +93,8 @@ def _safe_urljoin_with_slash(base_url: str, relative_url: str = "") -> str:
         result += "/"
 
     return result
+
+
 # For reference, the largest shard "conda-forge/linux-64/vim" is 2608283 bytes
 # or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
 # decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
