@@ -617,28 +617,47 @@ def test_shards_cache_recovery(tmp_path: Path):
 NUM_FAKE_SHARDS = 64
 
 
+class MockCache(NamedTuple):
+    """
+    Contain all the elements needed to be returned by the `mock_cache` fixture
+    """
+
+    num_shards: int
+    shards: list[shards_cache.AnnotatedRawShard]
+    cache: shards_cache.ShardCache
+
+
+@pytest.fixture()
+def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
+    """
+    Set up a mock shard cache that will be used by multiple benchmark tests.
+    """
+    with shards_cache.ShardCache(tmp_path) as cache:
+        NUM_FAKE_SHARDS = 64
+        fake_shards = []
+
+        compressor = zstandard.ZstdCompressor(level=1)
+        for i in range(NUM_FAKE_SHARDS):
+            fake_shard = {f"foo{i}": "bar"}
+            annotated_shard = shards_cache.AnnotatedRawShard(
+                f"https://foo{i}",
+                f"foo{i}",
+                compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
+            )
+            cache.insert(annotated_shard)
+            fake_shards.append(annotated_shard)
+
+        yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
+
+
 @pytest.fixture
 def shard_cache_with_data(
-    tmp_path: Path,
+    mock_cache: MockCache,
 ) -> tuple[shards_cache.ShardCache, list[shards_cache.AnnotatedRawShard]]:
     """
     ShardCache with some data already inserted.
     """
-    cache = shards_cache.ShardCache(tmp_path)
-    fake_shards = []
-
-    compressor = zstandard.ZstdCompressor(level=1)
-    for i in range(NUM_FAKE_SHARDS):
-        fake_shard = {f"foo{i}": "bar"}
-        annotated_shard = shards_cache.AnnotatedRawShard(
-            f"https://foo{i}",
-            f"foo{i}",
-            compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
-        )
-        cache.insert(annotated_shard)
-        fake_shards.append(annotated_shard)
-
-    return cache, fake_shards
+    return mock_cache.cache, mock_cache.shards
 
 
 def test_shard_cache_multiple(
@@ -872,39 +891,6 @@ def test_batch_retrieve_from_cache(
     # execute "no sharded channels" branch
     remaining = batch_retrieve_from_cache([], ["python"])
     assert remaining == []
-
-
-class MockCache(NamedTuple):
-    """
-    Contain all the elements needed to be returned by the `mock_cache` fixture
-    """
-
-    num_shards: int
-    shards: list[shards_cache.AnnotatedRawShard]
-    cache: shards_cache.ShardCache
-
-
-@pytest.fixture()
-def mock_cache(tmp_path: Path) -> Iterator[MockCache]:
-    """
-    Set up a mock shard cache that will be used by multiple benchmark tests.
-    """
-    with shards_cache.ShardCache(tmp_path) as cache:
-        NUM_FAKE_SHARDS = 64
-        fake_shards = []
-
-        compressor = zstandard.ZstdCompressor(level=1)
-        for i in range(NUM_FAKE_SHARDS):
-            fake_shard = {f"foo{i}": "bar"}
-            annotated_shard = shards_cache.AnnotatedRawShard(
-                f"https://foo{i}",
-                f"foo{i}",
-                compressor.compress(msgpack.dumps(fake_shard)),  # type: ignore
-            )
-            cache.insert(annotated_shard)
-            fake_shards.append(annotated_shard)
-
-        yield MockCache(num_shards=NUM_FAKE_SHARDS, shards=fake_shards, cache=cache)
 
 
 @pytest.mark.benchmark
