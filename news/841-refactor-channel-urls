@@ -1,0 +1,4 @@
+### Other
+
+* Refactor `LibMambaIndexHelper._channel_urls` to preserve arch/noarch in
+  Channel() objects; simplify sharded channel handling. (#841)
