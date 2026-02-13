@@ -36,6 +36,7 @@ from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
     _repodata_shards,
+    _safe_urljoin_with_slash,
     _shards_connections,
     batch_retrieve_from_cache,
     fetch_channels,
@@ -1130,3 +1131,41 @@ def test_repodata_shards_sends_etag(monkeypatch, tmp_path):
         _repodata_shards(channel.url(), repo_cache)
 
     assert mock_session.headers == {"If-None-Match": "etag"}
+
+
+@pytest.mark.parametrize(
+    "base_url,relative_url,expected",
+    [
+        # HTTP URLs - standard urljoin behavior works correctly
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64",
+            "",
+            "https://repo.anaconda.com/pkgs/main/",
+        ),
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64",
+            "subdir",
+            "https://repo.anaconda.com/pkgs/main/",
+        ),
+        # S3 URLs - the main bug fix (issue #866)
+        ("s3://bucket-name/linux-64", "", "s3://bucket-name/linux-64/"),
+        ("s3://bucket-name/linux-64/", "", "s3://bucket-name/linux-64/"),
+        ("s3://bucket-name/linux-64", ".", "s3://bucket-name/linux-64/"),
+        # File URLs
+        ("file:///path/to/channel/linux-64", "", "file:///path/to/channel/linux-64/"),
+        # FTP URLs
+        ("ftp://ftp.example.com/pub/linux-64", "", "ftp://ftp.example.com/pub/linux-64/"),
+    ],
+)
+def test_safe_urljoin_with_slash(base_url, relative_url, expected):
+    """
+    Test _safe_urljoin_with_slash handles various URL schemes correctly.
+
+    Python's urllib.parse.urljoin doesn't handle non-HTTP schemes (s3://, file://, etc.)
+    properly - it returns just "." when joining with ".". This function handles those
+    cases correctly.
+
+    See: https://github.com/conda/conda-libmamba-solver/issues/866
+    """
+    result = _safe_urljoin_with_slash(base_url, relative_url)
+    assert result == expected
