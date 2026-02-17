@@ -15,14 +15,6 @@ BASE_CONDA=${BASE_CONDA:-/opt/conda}
 SRC_CONDA=${SRC_CONDA:-/workspaces/conda}
 SRC_CONDA_LIBMAMBA_SOLVER=${SRC_CONDA_LIBMAMBA_SOLVER:-/workspaces/conda-libmamba-solver}
 
-if which apt-get > /dev/null; then
-    echo "Installing system dependencies"
-    apt-get update
-    DEBIAN_FRONTEND=noninteractive xargs -a "$HERE/apt-deps.txt" apt-get install -y
-fi
-
-# this would make sense in a separate docker layer:
-
 if [ ! -f "$SRC_CONDA/pyproject.toml" ]; then
     echo "https://github.com/conda/conda not found! Please clone or mount to $SRC_CONDA"
     exit 1
