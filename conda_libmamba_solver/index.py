@@ -188,6 +188,11 @@ def _package_info_from_package_dict(
 
     # filename, the key from repodata
 
+    track_features = record.get("track_features") or []
+    # track_features can be stored as a space- or comma-separated string
+    if track_features and isinstance(track_features, str):
+        track_features = track_features.replace(" ", ",").split(",")
+        track_features = list(f for f in (ff.strip() for ff in track_features) if f)
     return PackageInfo(
         name=record["name"],
         version=record["version"],
@@ -201,8 +206,8 @@ def _package_info_from_package_dict(
         md5=record.get("md5") or "",
         sha256=record.get("sha256") or "",
         signatures=record.get("signatures") or "",
+        track_features=track_features,
         # conda can have list or tuple, but libmamba only accepts lists
-        track_features=list(record.get("track_features") or []),
         depends=list(record.get("depends") or []),
         constrains=list(record.get("constrains") or []),
         defaulted_keys=list(record.get("defaulted_keys") or []),
@@ -235,7 +240,7 @@ class LibMambaIndexHelper:
         pkgs_dirs: PathsType = (),
         in_state: SolverInputState | None = None,
     ):
-        platform_less_channels = []
+        platform_less_channels: list[Channel] = []
         for channel in channels:
             if channel.platform:
                 # When .platform is defined, .urls() will ignore subdirs kw. Remove!
@@ -352,33 +357,34 @@ class LibMambaIndexHelper:
         try_solv: bool = True,
     ) -> list[_ChannelRepoInfo]:
         if urls_to_channel is None:
-            urls_to_channel = self._channel_urls()
+            urls_to_channel = self._channel_urls(self.subdirs, self.channels)
 
-        # conda.common.url.path_to_url does not %-encode spaces
-        encoded_urls_to_channel = {}
-        for url, channel in urls_to_channel.items():
-            if url.startswith("file://"):
-                url = url.replace(" ", "%20")
-            encoded_urls_to_channel[url] = channel
-        urls_to_channel = encoded_urls_to_channel
+        urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
-        # Prefer sharded repodata loading if it's enabled
+        # Prefer sharded repodata loading if enabled
         if self.in_state and _is_sharded_repodata_enabled():
-            # TODO: It may be better to directly pass channel objects without URL encoding
-            return self._load_channel_repo_info_shards(urls_to_channel)
+            # _load_channel_repo_info_shards() must return ChannelRepoInfo
+            # matching the key order of urls_to_channel:
+            channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
+            if channel_repos_info is not None:
+                return channel_repos_info
+            log.debug("No sharded channels available. Fall back to non-sharded path.")
 
-        # Fallback to repodata.json loading
+        # Classic "monolithic repodata.json" path
         return self._load_channel_repo_info_json(urls_to_channel, try_solv)
 
     def _load_channel_repo_info_shards(
         self, urls_to_channel: dict[str, Channel]
-    ) -> list[_ChannelRepoInfo]:
+    ) -> list[_ChannelRepoInfo] | None:
         """
         Load repository information from sharded repodata cache.
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
         channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        if channel_data is None:
+            return  # caller should fall back to repodata.json
+
         channel_repo_infos = self._load_repo_info_from_repodata_dict(channel_data)
 
         return channel_repo_infos
@@ -411,26 +417,26 @@ class LibMambaIndexHelper:
             )
         return channel_repo_infos
 
-    def _channel_urls(self) -> dict[str, Channel]:
-        "Maps authenticated URLs to channel objects"
+    @staticmethod
+    def _channel_urls(subdirs: Iterable[str], channels: list[Channel]) -> dict[str, Channel]:
+        "Map authenticated URLs to channel objects."
+        # class method for testing etc.
         urls = {}
         seen_noauth = set()
         channels_with_subdirs = []
-        for channel in self.channels:
-            for url in channel.urls(with_credentials=True, subdirs=self.subdirs):
+        for channel in channels:
+            for url in channel.urls(with_credentials=True, subdirs=subdirs):
                 channels_with_subdirs.append(Channel(url))
         for channel in channels_with_subdirs:
             noauth_urls = [
-                url
-                for url in channel.urls(with_credentials=False)
-                if url.endswith(tuple(self.subdirs))
+                url for url in channel.urls(with_credentials=False) if url.endswith(channel.subdir)
             ]
             if seen_noauth.issuperset(noauth_urls):
                 continue
             auth_urls = [
                 url.replace(" ", "%20")
                 for url in channel.urls(with_credentials=True)
-                if url.endswith(tuple(self.subdirs))
+                if url.endswith(tuple(subdirs))
             ]
             if noauth_urls != auth_urls:  # authed channel always takes precedence
                 urls.update({url: channel for url in auth_urls})
@@ -444,6 +450,21 @@ class LibMambaIndexHelper:
                     urls[url] = channel
                     seen_noauth.add(url)
         return urls
+
+    @staticmethod
+    def _encoded_urls_to_channels(urls_to_channel: dict[str, Channel]) -> dict[str, Channel]:
+        """
+        Return copy of urls_to_channel with %-encoded spaces.
+
+        Usage: _encoded_urls_to_channels(_channel_urls(subdirs, channels))
+        """
+        # conda.common.url.path_to_url does not %-encode spaces
+        encoded_urls_to_channel: dict[str, Channel] = {}
+        for url, channel in urls_to_channel.items():
+            if url.startswith("file://"):
+                url = url.replace(" ", "%20")
+            encoded_urls_to_channel[url] = channel
+        return encoded_urls_to_channel
 
     def _fetch_repodata_jsons(self, urls: Iterable[str]) -> dict[str, tuple[str, RepodataState]]:
         Executor = (

@@ -15,7 +15,6 @@ from typing import TYPE_CHECKING
 
 import msgpack
 import zstandard
-from conda.gateways.disk.delete import unlink_or_rename_to_trash
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -52,7 +51,8 @@ def connect(dburi="cache.db"):
     """
     conn = sqlite3.connect(dburi, uri=True)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
+    with conn as c:
+        c.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
@@ -66,7 +66,21 @@ class ShardCache:
         base: directory and filename prefix for cache.
         """
         self.base = base
-        self.connect()
+        self.connect(create=create)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exec_tb):
+        self.close()
+
+    def close(self):
+        """
+        Clean up connection. ShardCache can no longer be used after close().
+        """
+        if self.conn:
+            self.conn.close()
+            self.conn = None
 
     def copy(self):
         """
@@ -74,22 +88,44 @@ class ShardCache:
         """
         return ShardCache(self.base, create=False)
 
-    def connect(self, create=True):
+    def connect(self, create=True, retry=True):
         """
         Args:
             create: if True, create table if not exists.
+            retry: remove cache, log warning, and retry on error.
         """
+        global SHARD_CACHE_NAME
+
         dburi = (self.base / SHARD_CACHE_NAME).as_uri()
         self.conn = connect(dburi)
         if not create:
             return
-        # this schema will also get confused if we merge packages into a single
-        # shard, but the package name should be advisory.
-        self.conn.execute(
-            "CREATE TABLE IF NOT EXISTS shards ("
-            "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
-            "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
-        )
+        try:
+            # this schema will also get confused if we merge packages into a single
+            # shard, but the package name should be advisory.
+            with self.conn as c:
+                c.execute(
+                    "CREATE TABLE IF NOT EXISTS shards ("
+                    "url TEXT PRIMARY KEY, package TEXT, shard BLOB, "
+                    "timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
+                )
+        except sqlite3.DatabaseError as e:
+            # Python 3.11 adds sqlite_errorcode. This is meant to delete and
+            # retry on all DatabaseError for Python 3.10, but on Python 3.11+
+            # only retry on SQLITE_NOTADB. Other errors e.g. busy, locked, would
+            # propagate.
+            has_errorcode = hasattr(e, "sqlite_errorcode")
+            if retry and ((not has_errorcode) or (e.sqlite_errorcode == sqlite3.SQLITE_NOTADB)):
+                log.warning("%s '%s'; remove and retry.", dburi, e)
+                try:
+                    self.remove_cache()
+                except OSError as e:
+                    # alternate filename if primary cannot be removed.
+                    log.warning("%s '%s'; use alternate filename.", dburi, e)
+                    SHARD_CACHE_NAME = "repodata_shards_1.db"
+                # pass False so that we only retry once:
+                return self.connect(create=create, retry=False)
+            raise
 
     def insert(self, raw_shard: AnnotatedRawShard):
         """
@@ -153,7 +189,9 @@ class ShardCache:
         """
         Remove the sharded cache database.
         """
-        # This function appears to support `Path()` except on Windows
-        # `os.rename(path, path + ".conda_trash")` fails:
-        self.conn.close()
-        unlink_or_rename_to_trash(str(self.base / SHARD_CACHE_NAME))
+        self.close()
+        try:
+            (self.base / SHARD_CACHE_NAME).unlink()
+        except OSError:
+            # possibly workable on Windows
+            (self.base / SHARD_CACHE_NAME).rename(self.base / f"{SHARD_CACHE_NAME}.conda_trash")

@@ -8,6 +8,7 @@ import shutil
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 from conda.base.context import context, reset_context
@@ -18,6 +19,8 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.state import SolverInputState
+
+from .test_shards import CONDA_FORGE_WITH_SHARDS
 
 if TYPE_CHECKING:
     import os
@@ -142,11 +145,8 @@ def test_load_channel_repo_info_shards(
 ):
     """
     Benchmark shards/not-shards under different dependency tree sizes.
-
-    TODO: This test should eventually switch to just using conda-forge when that channel
-          supports shards and not the `conda-forge-sharded` channel.
     """
-    load_channel = "defaults" if load_type == "main" else "conda-forge-sharded"
+    load_channel = "defaults" if load_type == "main" else CONDA_FORGE_WITH_SHARDS
 
     monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
     assert _is_sharded_repodata_enabled() == (load_type == "shard")
@@ -156,10 +156,10 @@ def test_load_channel_repo_info_shards(
     def index():
         return LibMambaIndexHelper(
             # this is expanded to noarch, linux-64 for shards.
-            channels=[Channel(f"{load_channel}/linux-64")],
+            channels=[Channel(f"{load_channel}/{context.subdir}")],
             subdirs=(
                 "noarch",
-                "linux-64",
+                context.subdir,
             ),
             installed_records=(),  # do not load installed
             pkgs_dirs=(),  # do not load local cache as a channel
@@ -169,3 +169,40 @@ def test_load_channel_repo_info_shards(
     index_helper = benchmark.pedantic(index, rounds=1)
 
     assert len(index_helper.repos) > 0
+
+
+def test_load_channels_order(shard_factory):
+    # Setup two shard servers. server_one will have a small
+    # delay in the response to mimic a slower response.
+    server_one = shard_factory.http_server_shards(
+        "one", finish_request_action=lambda: time.sleep(0.2)
+    )
+    server_two = shard_factory.http_server_shards("two")
+
+    channel_one = Channel.from_url(f"{server_one}/noarch")
+    channel_two = Channel.from_url(f"{server_two}/noarch")
+    index_args = {
+        "channels": [
+            channel_one,
+            channel_two,
+        ],
+        "in_state": SolverInputState(prefix="idontexist"),
+    }
+
+    with patch(
+        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
+        return_value=True,
+    ):
+        shard_enabled_index = LibMambaIndexHelper(**index_args)
+
+    # The expected output is that all of channel_one subdirs (noarch and current
+    # platform) are ordered higher than channel_two subdirs.
+    expected_output_channels = [
+        channel_one.canonical_name,
+        channel_one.canonical_name,
+        channel_two.canonical_name,
+        channel_two.canonical_name,
+    ]
+    assert [
+        repo.channel.canonical_name for repo in shard_enabled_index.repos
+    ] == expected_output_channels
