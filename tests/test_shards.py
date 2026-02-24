@@ -29,7 +29,6 @@ from requests import Request, Response
 
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 from conda_libmamba_solver.index import (
-    LibMambaIndexHelper,
     _is_sharded_repodata_enabled,
 )
 from conda_libmamba_solver.shards import (
@@ -37,14 +36,15 @@ from conda_libmamba_solver.shards import (
     Shards,
     _repodata_shards,
     _shards_connections,
-    batch_retrieve_from_cache,
     fetch_channels,
     fetch_shards_index,
     shard_mentioned_packages,
 )
+from conda_libmamba_solver.shards_sync import batch_retrieve_from_cache
 from conda_libmamba_solver.shards_subset import (
     RepodataSubset,
 )
+from tests.shards_sync import CONDA_FORGE_WITH_SHARDS, ROOT_PACKAGES, expand_channels
 from tests import http_test_server
 
 if TYPE_CHECKING:
@@ -54,37 +54,6 @@ if TYPE_CHECKING:
 
 HERE = Path(__file__).parent
 
-# was conda-forge-sharded during testing
-CONDA_FORGE_WITH_SHARDS = "conda-forge"
-
-ROOT_PACKAGES = [
-    "__archspec",
-    "__conda",
-    "__osx",
-    "__unix",
-    "bzip2",
-    "ca-certificates",
-    "expat",
-    "icu",
-    "libexpat",
-    "libffi",
-    "liblzma",
-    "libmpdec",
-    "libsqlite",
-    "libzlib",
-    "ncurses",
-    "openssl",
-    "pip",
-    "python",
-    "python_abi",
-    "readline",
-    "tk",
-    "twine",
-    "tzdata",
-    "xz",
-    "zlib",
-]
-
 
 def package_names(shard: shards_cache.ShardDict):
     """
@@ -93,17 +62,6 @@ def package_names(shard: shards_cache.ShardDict):
     return set(package["name"] for package in shard["packages"].values()) | set(
         package["name"] for package in shard["packages.conda"].values()
     )
-
-
-def expand_channels(channels: list[Channel], subdirs: Iterable[str] | None = None):
-    """
-    Expand channels list into a dict of subdir-aware channels, matching
-    LibMambaIndexHelper behavior.
-    """
-    subdirs_ = list(context.subdirs) if subdirs is None else subdirs
-    channels_urls = LibMambaIndexHelper._channel_urls(subdirs_, channels)
-    channels_urls = LibMambaIndexHelper._encoded_urls_to_channels(channels_urls)
-    return channels_urls
 
 
 @contextmanager

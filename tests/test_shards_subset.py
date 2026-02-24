@@ -40,15 +40,12 @@ from conda_libmamba_solver.shards_subset import (
     combine_batches_until_none,
     exception_to_queue,
 )
+from tests.shards_sync import CONDA_FORGE_WITH_SHARDS, ROOT_PACKAGES, expand_channels
 from tests.test_shards import (
     FAKE_REPODATA,
-    ROOT_PACKAGES,
     _timer,
     ensure_hex_hash,
-    expand_channels,
 )
-
-from .test_shards import CONDA_FORGE_WITH_SHARDS
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

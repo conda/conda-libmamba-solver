@@ -75,10 +75,12 @@ from .shards import (
     ZSTD_MAX_SHARD_SIZE,
     Shards,
     _shards_connections,
-    batch_retrieve_from_cache,
-    batch_retrieve_from_network,
     fetch_channels,
     shard_mentioned_packages,
+)
+from .shards_sync import (
+    batch_retrieve_from_cache,
+    batch_retrieve_from_network,
 )
 
 log = logging.getLogger(__name__)
