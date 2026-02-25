@@ -31,12 +31,16 @@ fi
 echo "Clearing base history..."
 echo '' > "$BASE_CONDA/conda-meta/history"
 
+echo "Setting default channel..."
+"$BASE_CONDA/bin/conda" config --append channels $1
+
 echo "Installing dev & test dependencies..."
-"$BASE_CONDA/bin/conda" install -n base --yes --quiet \
+"$BASE_CONDA/bin/conda" install -n base --yes \
     --file="$SRC_CONDA/tests/requirements.txt" \
     --file="$SRC_CONDA/tests/requirements-ci.txt" \
     --file="$SRC_CONDA/tests/requirements-Linux.txt" \
     --file="$SRC_CONDA/tests/requirements-s3.txt" \
     --file="$SRC_CONDA_LIBMAMBA_SOLVER/dev/requirements.txt" \
     --file="$SRC_CONDA_LIBMAMBA_SOLVER/tests/requirements.txt"\
+    conda-pypi
     pre-commit

@@ -80,12 +80,13 @@ echo "Initializing conda in dev mode..."
 cd -
 
 echo "Installing conda-libmamba-solver in dev mode..."
-"$BASE_CONDA/bin/python" -m pip install -e "$SRC_CONDA_LIBMAMBA_SOLVER" --no-deps
+"$BASE_CONDA/bin/conda" pypi install -e "$SRC_CONDA_LIBMAMBA_SOLVER"
 
 set -x
 conda list -p "$BASE_CONDA"
 conda info
 conda config --show-sources
 set +x
-test -f "$SRC_MAMBA/mamba/setup.py" \
-  && echo "Mamba mounted at $SRC_MAMBA; source ~/.bashrc and run develop-mamba() for dev-install"
+test -f "$SRC_MAMBA/mamba/pyproject.toml" \
+  && echo "Mamba mounted at $SRC_MAMBA; source ~/.bashrc and run develop-mamba() for dev-install" \
+  || echo "Mamba not mounted at $SRC_MAMBA"
