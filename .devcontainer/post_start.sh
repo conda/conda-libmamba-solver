@@ -87,6 +87,4 @@ conda list -p "$BASE_CONDA"
 conda info
 conda config --show-sources
 set +x
-test -f "$SRC_MAMBA/mamba/pyproject.toml" \
-  && echo "Mamba mounted at $SRC_MAMBA; source ~/.bashrc and run develop-mamba() for dev-install" \
-  || echo "Mamba not mounted at $SRC_MAMBA"
+echo "Source ~/.bashrc and run develop-mamba() for dev-install; mamba at $SRC_MAMBA"

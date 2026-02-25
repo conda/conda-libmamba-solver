@@ -15,7 +15,7 @@
     // Use 'postCreateCommand' to run commands after the container is created.
     "postCreateCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh defaults",
     // Use 'postStartCommand' to run commands after the container is started.
-    "postStartCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh",
+    "postStartCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh defaults",
     // Configure tool-specific properties.
     "customizations": {
         "vscode": {
