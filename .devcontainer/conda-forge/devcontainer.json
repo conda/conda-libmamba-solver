@@ -2,13 +2,10 @@
 {
     "name": "Miniforge (default-channel=conda-forge)",
     "image": "condaforge/miniforge3:latest",
-
     // Uncomment to force x64 instead of native (slower!)
     // "runArgs": ["--platform=linux/amd64"],
-
     // Features to add to the dev container. More info: https://containers.dev/features.
     // "features": {},
-
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": [],
     "mounts": [
@@ -16,10 +13,9 @@
         "source=${localWorkspaceFolder}/../mamba,target=/workspaces/mamba,type=bind,consistency=cached"
     ],
     // Use 'postCreateCommand' to run commands after the container is created.
-    "postCreateCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh",
+    "postCreateCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_create.sh conda-forge",
     // Use 'postStartCommand' to run commands after the container is started.
     "postStartCommand": "bash /workspaces/conda-libmamba-solver/.devcontainer/post_start.sh",
-
     // Configure tool-specific properties.
     "customizations": {
         "vscode": {
@@ -39,8 +35,6 @@
             ]
         }
     }
-
     // Adjust to connect as non-root instead. More info: https://aka.ms/dev-containers-non-root.
     // "remoteUser": "root",
-
 }
