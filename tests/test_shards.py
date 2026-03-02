@@ -475,7 +475,7 @@ def test_shards_base_url():
                     "shards_base_url": shards_base_url,
                 },
                 "version": 1,
-                "shards": {"fake_package": b""},
+                "shards": {"fake_package": bytes.fromhex("abcd")},
             },
             url,
             None,  # type: ignore
@@ -488,14 +488,15 @@ def test_shards_base_url():
     )
 
     assert (
-        shards.shard_url("fake_package") == "https://shards.example.com/channel-name/.msgpack.zst"
+        shards.shard_url("fake_package")
+        == "https://shards.example.com/channel-name/abcd.msgpack.zst"
     )
 
     shards = with_urls(shards.url, "", "")
 
     assert (
         shards.shard_url("fake_package")
-        == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
+        == "https://conda.anaconda.org/channel-name/noarch/abcd.msgpack.zst"
     )
 
     # where packages are stored
@@ -521,7 +522,8 @@ def test_shards_base_url():
     # shards_base_url is url joined with shards_base_url, suitable for string concatenation
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/"
     assert (
-        shards.shard_url("fake_package") == "https://prefix.dev/conda-forge/osx-arm64/.msgpack.zst"
+        shards.shard_url("fake_package")
+        == "https://prefix.dev/conda-forge/osx-arm64/abcd.msgpack.zst"
     )
 
     # relative shards_base_url
@@ -540,6 +542,22 @@ def test_shards_base_url():
     )
     shards.shards_index["info"]["shards_base_url"] = "../shards"
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/shards/"
+
+    # s3 vs https
+    shards = with_urls(
+        "s3://index-bucket/linux-64",  # shards index stored on s3
+        "s3://package-bucket/linux-64",  # packages stored on different s3 bucket
+        "https://example.org/shards/",  # individual shards stored on https for some reason
+    )
+    assert shards.shard_url("fake_package") == "https://example.org/shards/abcd.msgpack.zst"
+
+    # s3 and relative base_url
+    shards = with_urls(
+        "s3://index-bucket/linux-64/repodata_shards.msgpack.zst",  # shards index stored on s3
+        "s3://package-bucket/linux-64",  # packages stored on different s3 bucket
+        "./shards/",  # individual shards stored on https for some reason
+    )
+    assert shards.shard_url("fake_package") == "s3://index-bucket/linux-64/shards/abcd.msgpack.zst"
 
 
 def test_shard_mentioned_packages_2():
