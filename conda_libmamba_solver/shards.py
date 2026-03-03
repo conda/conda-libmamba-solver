@@ -15,7 +15,7 @@ import json
 import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import conda.exceptions
 import conda.gateways.repodata
@@ -73,20 +73,16 @@ def _safe_urljoin_with_slash(base_url: str, relative_url: str = "") -> str:
         result = urljoin(urljoin(base_url, relative_url), ".")
         return result
 
-    # For non-standard schemes (s3://, ftp://, etc.), handle manually
-    # "." or empty means "current directory" - just use base_url
-    if not relative_url or relative_url == ".":
-        result = base_url
+    # For non-standard schemes (s3://, ftp://, etc.), urljoin drops the host.
+    # Work around that by temporarily swapping in https://, then restoring
+    # the original scheme on the result.
+    relative_parsed = urlparse(relative_url)
+    if not relative_parsed.scheme and parsed.scheme:
+        https_base_url = urlunparse(parsed._replace(scheme="https"))
+        joined_https = urljoin(urljoin(https_base_url, relative_url), ".")
+        result = urlunparse(urlparse(joined_https)._replace(scheme=parsed.scheme))
     else:
-        # Join base with relative URL - but urljoin loses the scheme for non-HTTP
-        # so we need to reconstruct manually
-        joined = urljoin(base_url, relative_url)
-        # Check if urljoin lost the scheme (common with non-HTTP schemes)
-        if "://" not in joined and parsed.scheme:
-            # Reconstruct: scheme://netloc/joined_path
-            result = f"{parsed.scheme}://{parsed.netloc}{joined}"
-        else:
-            result = joined
+        result = urljoin(urljoin(base_url, relative_url), ".")
 
     # Ensure trailing slash for proper concatenation
     if not result.endswith("/"):
