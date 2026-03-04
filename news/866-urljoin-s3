@@ -1,4 +1,0 @@
-### Bug fixes
-
-* Use relative join on `s3://`-hosted `repodata_shards.msgpack.zst` and shards
-  `base_url`, instead of truncating to just `base_url`. (#866)

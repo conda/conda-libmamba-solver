@@ -1,3 +1,0 @@
-### Bug fixes
-
-* Remove sqlite3 sharded repodata cache and create another on error. (#823)

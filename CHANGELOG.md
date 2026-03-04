@@ -13,6 +13,57 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.3.0 (2026-03-04)
+
+### Enhancements
+
+* Add offline mode support for sharded repodata. When offline mode is enabled, the solver will use cached shards even if they are expired, and gracefully fall back to non-sharded repodata if no cache exists. Missing shards in offline mode return empty shards rather than failing. (#710)
+
+### Bug fixes
+
+* Remove `.tar.bz2` with matching `.conda`-format packages during shard
+  traversal if `conda` is not in "use_only_tar_bz2" mode; needed as shards
+  directly adds individual packages to the solver. (#710)
+* Fall back to `repodata.json` path if no channel has
+  `repodata_shards.msgpack.zst` instead of computing repodata subsets for
+  monolithic channels. (#716)
+* Ensure `track_features` fields are recorded properly in `conda-meta/*.json`. (#804 via #805)
+* Remove sqlite3 sharded repodata cache and create another on error. (#823)
+* Ensure that channel order is preserved when fetching data from shards. (#824 via #828)
+* Explicitly close sqlite3 connections after shard traversal to avoid a Python
+  3.13+ warning. (#843).
+* Fall back to `repodata.json`, but don't mark shards as unavailable, unless we
+  receive a 4xx error code besides 416. (#844)
+* Use relative join on `s3://`-hosted `repodata_shards.msgpack.zst` and shards
+  `base_url`, instead of truncating to just `base_url`. (#866)
+
+### Docs
+
+* Updated documentation to reflect that the cudatoolkit/cpuonly issue has returned.
+
+### Other
+
+* Use lazy `PrefixData` getter to remove custom workaround for `conda` update checks. (#784 via #817)
+* Refactor `LibMambaIndexHelper._channel_urls` to preserve arch/noarch in
+  Channel() objects; simplify sharded channel handling. (#841)
+* The `cpuonly` mutex no longer correctly prevents CUDA packages from being
+  installed. For a time it appeared to work when non-cuda systems showed a
+  virtual package `__cuda=0=0`, but with no `__cuda` package the mutex appears
+  to no longer work. Reversing (#131 via #741)
+
+### Contributors
+
+* @dholth
+* @jaimergp
+* @jezdez
+* @ryanskeith
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
 ## 25.11.0 (2025-11-24)
 
 ### ✨ Special Announcement ✨
