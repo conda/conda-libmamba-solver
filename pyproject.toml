@@ -79,6 +79,7 @@ filterwarnings = [
   "ignore:conda.core.link.PrefixActions:DeprecationWarning:conda",
   "ignore:conda.core.link.PrefixActions:PendingDeprecationWarning:conda",
   "ignore:conda.base.constants.CONDA_PACKAGE_EXTENSIONS:PendingDeprecationWarning",
+  "ignore:conda.common.io.env_vars:PendingDeprecationWarning",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
