@@ -15,7 +15,7 @@ import json
 import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin, urlparse, urlunparse
+from urllib.parse import urljoin, urlparse, urlunparse, uses_relative
 
 import conda.exceptions
 import conda.gateways.repodata
@@ -49,17 +49,18 @@ if TYPE_CHECKING:
 SHARDS_CONNECTIONS_DEFAULT = 10
 ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data has no size header
 
-# URL schemes that urljoin handles correctly
-_URLJOIN_SAFE_SCHEMES = frozenset(("http", "https", ""))
+# Schemes that urljoin handles correctly (registered in urllib.parse.uses_relative)
+_URLJOIN_SAFE_SCHEMES = frozenset(uses_relative)
 
 
 def _safe_urljoin_with_slash(base_url: str, relative_url: str = "") -> str:
     """
     Join base_url with relative_url, ensuring proper handling of all URL schemes.
 
-    Python's urllib.parse.urljoin doesn't handle non-HTTP schemes (s3://, file://, etc.)
-    properly - it returns just "." when joining with ".". This function handles those
-    cases correctly.
+    Python's urllib.parse.urljoin only handles schemes registered in
+    ``urllib.parse.uses_relative``. For unregistered schemes like ``s3://``,
+    it returns just ``"."`` instead of the resolved URL. This function falls
+    back to a scheme-swap workaround for those cases.
 
     The result always ends with "/" to enable proper string concatenation with filenames.
 
@@ -73,7 +74,7 @@ def _safe_urljoin_with_slash(base_url: str, relative_url: str = "") -> str:
         result = urljoin(urljoin(base_url, relative_url), ".")
         return result
 
-    # For non-standard schemes (s3://, ftp://, etc.), urljoin drops the host.
+    # For unregistered schemes (e.g. s3://), urljoin drops the host.
     # Work around that by temporarily swapping in https://, then restoring
     # the original scheme on the result.
     relative_parsed = urlparse(relative_url)

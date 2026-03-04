@@ -1207,12 +1207,12 @@ def test_safe_urljoin_with_slash(base_url, relative_url, expected):
     """
     Test _safe_urljoin_with_slash handles various URL schemes correctly.
 
-    Python's urllib.parse.urljoin doesn't handle non-HTTP schemes (s3://, file://, etc.)
-    properly - it returns just "." when joining with ".". This function handles those
-    cases correctly.
+    urljoin only works for schemes in ``urllib.parse.uses_relative`` (http, https,
+    file, ftp, etc.). For unregistered schemes like s3://, it returns just ``"."``
+    instead of the resolved URL. This function handles those via scheme-swap.
 
-    All schemes should behave consistently with urljoin semantics: the last path
-    segment without a trailing slash is treated as a filename and stripped.
+    All schemes should behave consistently: the last path segment without a
+    trailing slash is treated as a filename and stripped.
 
     See: https://github.com/conda/conda-libmamba-solver/issues/866
     """
