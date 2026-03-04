@@ -15,7 +15,7 @@ import json
 import logging
 from collections import defaultdict
 from typing import TYPE_CHECKING
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, urlunparse, uses_relative
 
 import conda.exceptions
 import conda.gateways.repodata
@@ -48,6 +48,50 @@ if TYPE_CHECKING:
 
 SHARDS_CONNECTIONS_DEFAULT = 10
 ZSTD_MAX_SHARD_SIZE = 2**20 * 16  # maximum size necessary when compressed data has no size header
+
+# Schemes that urljoin handles correctly (registered in urllib.parse.uses_relative)
+_URLJOIN_SAFE_SCHEMES = frozenset(uses_relative)
+
+
+def _safe_urljoin_with_slash(base_url: str, relative_url: str = "") -> str:
+    """
+    Join base_url with relative_url, ensuring proper handling of all URL schemes.
+
+    Python's urllib.parse.urljoin only handles schemes registered in
+    ``urllib.parse.uses_relative``. For unregistered schemes like ``s3://``,
+    it returns just ``"."`` instead of the resolved URL. This function falls
+    back to a scheme-swap workaround for those cases.
+
+    The result always ends with "/" to enable proper string concatenation with filenames.
+
+    See: https://github.com/conda/conda-libmamba-solver/issues/866
+    """
+    parsed = urlparse(base_url)
+
+    # For schemes that urljoin handles correctly, use the standard behavior
+    if parsed.scheme in _URLJOIN_SAFE_SCHEMES:
+        # Standard urljoin behavior: join with relative_url, then "." for trailing slash
+        result = urljoin(urljoin(base_url, relative_url), ".")
+        return result
+
+    # For unregistered schemes (e.g. s3://), urljoin drops the host.
+    # Work around that by temporarily swapping in https://, then restoring
+    # the original scheme on the result.
+    relative_parsed = urlparse(relative_url)
+    if not relative_parsed.scheme and parsed.scheme:
+        https_base_url = urlunparse(parsed._replace(scheme="https"))
+        joined_https = urljoin(urljoin(https_base_url, relative_url), ".")
+        result = urlunparse(urlparse(joined_https)._replace(scheme=parsed.scheme))
+    else:
+        result = urljoin(urljoin(base_url, relative_url), ".")
+
+    # Ensure trailing slash for proper concatenation
+    if not result.endswith("/"):
+        result += "/"
+
+    return result
+
+
 # For reference, the largest shard "conda-forge/linux-64/vim" is 2608283 bytes
 # or < 2**19*5 decompressed (486155 bytes compressed); the index is 575219 bytes
 # decompressed (514039 bytes compressed) and is mostly uncompressible hash data.
@@ -136,11 +180,9 @@ class ShardBase(abc.ABC):
         base_url was present. Packages are found here.
 
         Note base_url can be a relative or an absolute url.
-        The double urljoin ensures proper URL normalization:
-        first join with _base_url, then with "." to add trailing slash
-        if needed.
+        Uses _safe_urljoin_with_slash to handle non-HTTP schemes (s3://, etc.).
         """
-        return urljoin(urljoin(self.url, self._base_url), ".")
+        return _safe_urljoin_with_slash(self.url, self._base_url)
 
     def __contains__(self, package: str) -> bool:
         """Check if a package is available in this shard collection."""
@@ -305,10 +347,11 @@ def _shards_base_url(url, shards_base_url) -> str:
     """
     Return shards_base_url joined with base_url and url.
     Note shards_base_url can be a relative or an absolute url.
+    Uses _safe_urljoin_with_slash to handle non-HTTP schemes (s3://, etc.).
     """
     if shards_base_url and not shards_base_url.endswith("/"):
         shards_base_url += "/"
-    return urljoin(urljoin(url, shards_base_url), ".")
+    return _safe_urljoin_with_slash(url, shards_base_url)
 
 
 class Shards(ShardBase):

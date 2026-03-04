@@ -36,6 +36,7 @@ from conda_libmamba_solver.shards import (
     ShardLike,
     Shards,
     _repodata_shards,
+    _safe_urljoin_with_slash,
     _shards_connections,
     batch_retrieve_from_cache,
     fetch_channels,
@@ -474,7 +475,7 @@ def test_shards_base_url():
                     "shards_base_url": shards_base_url,
                 },
                 "version": 1,
-                "shards": {"fake_package": b""},
+                "shards": {"fake_package": bytes.fromhex("abcd")},
             },
             url,
             None,  # type: ignore
@@ -487,14 +488,15 @@ def test_shards_base_url():
     )
 
     assert (
-        shards.shard_url("fake_package") == "https://shards.example.com/channel-name/.msgpack.zst"
+        shards.shard_url("fake_package")
+        == "https://shards.example.com/channel-name/abcd.msgpack.zst"
     )
 
     shards = with_urls(shards.url, "", "")
 
     assert (
         shards.shard_url("fake_package")
-        == "https://conda.anaconda.org/channel-name/noarch/.msgpack.zst"
+        == "https://conda.anaconda.org/channel-name/noarch/abcd.msgpack.zst"
     )
 
     # where packages are stored
@@ -520,7 +522,8 @@ def test_shards_base_url():
     # shards_base_url is url joined with shards_base_url, suitable for string concatenation
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/osx-arm64/"
     assert (
-        shards.shard_url("fake_package") == "https://prefix.dev/conda-forge/osx-arm64/.msgpack.zst"
+        shards.shard_url("fake_package")
+        == "https://prefix.dev/conda-forge/osx-arm64/abcd.msgpack.zst"
     )
 
     # relative shards_base_url
@@ -539,6 +542,22 @@ def test_shards_base_url():
     )
     shards.shards_index["info"]["shards_base_url"] = "../shards"
     assert shards.shards_base_url == "https://prefix.dev/conda-forge/shards/"
+
+    # s3 vs https
+    shards = with_urls(
+        "s3://index-bucket/linux-64",  # shards index stored on s3
+        "s3://package-bucket/linux-64",  # packages stored on different s3 bucket
+        "https://example.org/shards/",  # individual shards stored on https for some reason
+    )
+    assert shards.shard_url("fake_package") == "https://example.org/shards/abcd.msgpack.zst"
+
+    # s3 and relative base_url
+    shards = with_urls(
+        "s3://index-bucket/linux-64/repodata_shards.msgpack.zst",  # shards index stored on s3
+        "s3://package-bucket/linux-64",  # packages stored on different s3 bucket
+        "./shards/",  # individual shards stored on https for some reason
+    )
+    assert shards.shard_url("fake_package") == "s3://index-bucket/linux-64/shards/abcd.msgpack.zst"
 
 
 def test_shard_mentioned_packages_2():
@@ -1130,3 +1149,72 @@ def test_repodata_shards_sends_etag(monkeypatch, tmp_path):
         _repodata_shards(channel.url(), repo_cache)
 
     assert mock_session.headers == {"If-None-Match": "etag"}
+
+
+@pytest.mark.parametrize(
+    "base_url,relative_url,expected",
+    [
+        # HTTP URLs - standard urljoin behavior
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64",
+            "",
+            "https://repo.anaconda.com/pkgs/main/",
+        ),
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64",
+            "subdir",
+            "https://repo.anaconda.com/pkgs/main/",
+        ),
+        # Realistic file URLs: in practice, base_url is a repodata file URL,
+        # and urljoin(url, ".") strips the filename to get the directory.
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "https://repo.anaconda.com/pkgs/main/linux-64/",
+        ),
+        (
+            "s3://bucket-name/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "s3://bucket-name/linux-64/",
+        ),
+        (
+            "s3://bucket-name/linux-64/repodata_shards.msgpack.zst",
+            ".",
+            "s3://bucket-name/linux-64/",
+        ),
+        (
+            "file:///path/to/channel/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "file:///path/to/channel/linux-64/",
+        ),
+        (
+            "ftp://ftp.example.com/pub/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "ftp://ftp.example.com/pub/linux-64/",
+        ),
+        # Trailing-slash directory URLs are preserved as-is for all schemes
+        ("s3://bucket-name/linux-64/", "", "s3://bucket-name/linux-64/"),
+        ("file:///path/to/channel/linux-64/", "", "file:///path/to/channel/linux-64/"),
+        # Non-HTTP without trailing slash: urljoin treats the last segment as a
+        # filename (consistent with HTTP behavior above)
+        ("s3://bucket-name/linux-64", "", "s3://bucket-name/"),
+        ("s3://bucket-name/linux-64", ".", "s3://bucket-name/"),
+        ("file:///path/to/channel/linux-64", "", "file:///path/to/channel/"),
+        ("ftp://ftp.example.com/pub/linux-64", "", "ftp://ftp.example.com/pub/"),
+    ],
+)
+def test_safe_urljoin_with_slash(base_url, relative_url, expected):
+    """
+    Test _safe_urljoin_with_slash handles various URL schemes correctly.
+
+    urljoin only works for schemes in ``urllib.parse.uses_relative`` (http, https,
+    file, ftp, etc.). For unregistered schemes like s3://, it returns just ``"."``
+    instead of the resolved URL. This function handles those via scheme-swap.
+
+    All schemes should behave consistently: the last path segment without a
+    trailing slash is treated as a filename and stripped.
+
+    See: https://github.com/conda/conda-libmamba-solver/issues/866
+    """
+    result = _safe_urljoin_with_slash(base_url, relative_url)
+    assert result == expected
