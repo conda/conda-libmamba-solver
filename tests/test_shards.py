@@ -1154,7 +1154,7 @@ def test_repodata_shards_sends_etag(monkeypatch, tmp_path):
 @pytest.mark.parametrize(
     "base_url,relative_url,expected",
     [
-        # HTTP URLs - standard urljoin behavior works correctly
+        # HTTP URLs - standard urljoin behavior
         (
             "https://repo.anaconda.com/pkgs/main/linux-64",
             "",
@@ -1165,14 +1165,42 @@ def test_repodata_shards_sends_etag(monkeypatch, tmp_path):
             "subdir",
             "https://repo.anaconda.com/pkgs/main/",
         ),
-        # S3 URLs - the main bug fix (issue #866)
-        ("s3://bucket-name/linux-64", "", "s3://bucket-name/linux-64/"),
+        # Realistic file URLs: in practice, base_url is a repodata file URL,
+        # and urljoin(url, ".") strips the filename to get the directory.
+        (
+            "https://repo.anaconda.com/pkgs/main/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "https://repo.anaconda.com/pkgs/main/linux-64/",
+        ),
+        (
+            "s3://bucket-name/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "s3://bucket-name/linux-64/",
+        ),
+        (
+            "s3://bucket-name/linux-64/repodata_shards.msgpack.zst",
+            ".",
+            "s3://bucket-name/linux-64/",
+        ),
+        (
+            "file:///path/to/channel/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "file:///path/to/channel/linux-64/",
+        ),
+        (
+            "ftp://ftp.example.com/pub/linux-64/repodata_shards.msgpack.zst",
+            "",
+            "ftp://ftp.example.com/pub/linux-64/",
+        ),
+        # Trailing-slash directory URLs are preserved as-is for all schemes
         ("s3://bucket-name/linux-64/", "", "s3://bucket-name/linux-64/"),
-        ("s3://bucket-name/linux-64", ".", "s3://bucket-name/linux-64/"),
-        # File URLs
-        ("file:///path/to/channel/linux-64", "", "file:///path/to/channel/linux-64/"),
-        # FTP URLs
-        ("ftp://ftp.example.com/pub/linux-64", "", "ftp://ftp.example.com/pub/linux-64/"),
+        ("file:///path/to/channel/linux-64/", "", "file:///path/to/channel/linux-64/"),
+        # Non-HTTP without trailing slash: urljoin treats the last segment as a
+        # filename (consistent with HTTP behavior above)
+        ("s3://bucket-name/linux-64", "", "s3://bucket-name/"),
+        ("s3://bucket-name/linux-64", ".", "s3://bucket-name/"),
+        ("file:///path/to/channel/linux-64", "", "file:///path/to/channel/"),
+        ("ftp://ftp.example.com/pub/linux-64", "", "ftp://ftp.example.com/pub/"),
     ],
 )
 def test_safe_urljoin_with_slash(base_url, relative_url, expected):
@@ -1182,6 +1210,9 @@ def test_safe_urljoin_with_slash(base_url, relative_url, expected):
     Python's urllib.parse.urljoin doesn't handle non-HTTP schemes (s3://, file://, etc.)
     properly - it returns just "." when joining with ".". This function handles those
     cases correctly.
+
+    All schemes should behave consistently with urljoin semantics: the last path
+    segment without a trailing slash is treated as a filename and stripped.
 
     See: https://github.com/conda/conda-libmamba-solver/issues/866
     """
