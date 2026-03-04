@@ -14,6 +14,8 @@ Authors are sorted alphabetically.
 * Kevin Markham
 * Klaus Zimmermann
 * Matthew R. Becker
+* Ryan Keith
+* Sophia Castellarin
 * Stacy Noland
 * Thomas Lam
 * Travis Hathaway
