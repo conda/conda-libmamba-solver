@@ -1,0 +1,5 @@
+
+### Other
+
+* Refactor synchronous shard fetch code into own module in favor of default
+  pipelined shard fetch code. (#876)
