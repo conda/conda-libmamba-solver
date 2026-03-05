@@ -54,7 +54,7 @@ See below's 25.11.0 relase for more information on how to enable it.
 
 * Use lazy `PrefixData` getter to remove custom workaround for `conda` update checks. (#784 via #817)
 * Refactor `LibMambaIndexHelper._channel_urls` to preserve arch/noarch in
-  Channel() objects; simplify sharded channel handling. (#841)
+  `Channel()` objects; simplify sharded channel handling. (#841)
 * The `cpuonly` mutex no longer correctly prevents CUDA packages from being
   installed. For a time it appeared to work when non-cuda systems showed a
   virtual package `__cuda=0=0`, but with no `__cuda` package the mutex appears
