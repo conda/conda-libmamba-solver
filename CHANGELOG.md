@@ -48,7 +48,7 @@ See below's 25.11.0 relase for more information on how to enable it.
 
 ### Docs
 
-* Updated documentation to reflect that the cudatoolkit/cpuonly issue has returned.
+* Update documentation to reflect that the cudatoolkit/cpuonly issue has returned. (#815)
 
 ### Other
 
