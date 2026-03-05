@@ -19,7 +19,7 @@ Remember to update the hyperlinks at the bottom.
 
 Following the preliminary support for fetching [CEP 16](https://conda.org/learn/ceps/cep-0016) sharded repodata in conda-libmamba-solver 25.11.0, this release marks this feature as ready to be used by a wider audience.
 
-See below's 25.11.0 relase for more information on how to enable it.
+See below's 25.11.0 release for more information on how to enable it.
 
 ### Enhancements
 
