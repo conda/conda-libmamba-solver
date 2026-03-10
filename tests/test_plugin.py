@@ -20,7 +20,7 @@ def test_enabled_sharded_repodata():
     Ensure that the setting `plugins.enable_sharded_repodata` exists and is set
     to the correct default value.
     """
-    assert not context.plugins.use_sharded_repodata  # type: ignore
+    assert context.plugins.use_sharded_repodata  # type: ignore
 
 
 def test_enabled_sharded_repodata_environment_variable(monkeypatch):

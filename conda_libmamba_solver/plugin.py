@@ -42,5 +42,5 @@ def conda_settings():
     yield CondaSetting(
         name="use_sharded_repodata",
         description="Enable use of sharded repodata when available.",
-        parameter=PrimitiveParameter(False, element_type=bool),
+        parameter=PrimitiveParameter(True, element_type=bool),
     )
