@@ -35,7 +35,7 @@ from .utils import conda_subprocess, write_env_config
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
 
-    from .test_shards import ShardFactory
+    from .shard_fixtures import ShardFactory
 
 DATA = Path(__file__).parent / "data"
 

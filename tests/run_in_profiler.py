@@ -3,30 +3,37 @@
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 """
-To be run with python -m scalene <this file>
+Historical entry point for scalene profiling of sharded repodata traversal.
+
+Shard implementation and tests live in conda. Profile with:
+
+    cd /path/to/conda
+    python -m scalene -m pytest \\
+      tests/gateways/repodata/test_shards_subset.py::test_build_repodata_subset_pipelined
 """
+
+from __future__ import annotations
 
 import logging
 import os
-import pathlib
 
 from conda.base.context import reset_context
+from conda.gateways.repodata.shards import cache, core, subset
 
-import tests.test_shards_subset
-from conda_libmamba_solver import shards, shards_cache, shards_subset
-
-os.environ["CONDA_TOKEN"] = ""
-os.environ["CONDA_PLUGINS_USE_SHARDED_REPODATA"] = "1"
-os.environ["CONDA_REPODATA_THREADS"] = (
-    "10"  # shave a half second off our time by avoiding CondaSession() creation
+os.environ.setdefault("CONDA_TOKEN", "")
+os.environ.setdefault("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
+os.environ.setdefault(
+    "CONDA_REPODATA_THREADS",
+    "10",
 )
 reset_context()
-pathlib.Path("/tmp/shards").mkdir(exist_ok=True)
-
-tmp_path = pathlib.Path("/tmp/shards")
 
 logging.basicConfig(level=logging.INFO)
-for module in (shards, shards_cache, shards_subset):
+for module in (core, cache, subset):
     module.log.setLevel(logging.DEBUG)
 
-tests.test_shards_subset.test_build_repodata_subset_pipelined(None, tmp_path)
+if __name__ == "__main__":
+    print(  # noqa: T201
+        "Profiling target moved to conda: "
+        "tests/gateways/repodata/test_shards_subset.py::test_build_repodata_subset_pipelined"
+    )

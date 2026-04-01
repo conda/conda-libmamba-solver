@@ -87,6 +87,7 @@ from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
+from conda.gateways.repodata.shards import build_repodata_subset
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -107,8 +108,9 @@ from libmambapy.specs import (
     NoArchType,
     PackageInfo,
 )
-
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+from libmambapy.specs import (
+    MatchSpec as LibmambaMatchSpec,
+)
 
 from .mamba_utils import logger_callback
 
@@ -118,10 +120,9 @@ if TYPE_CHECKING:
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
+    from conda.gateways.repodata.shards import ShardBase
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
-
-    from conda_libmamba_solver.shards import ShardBase
 
     from .shards_typing import PackageRecordDict
     from .state import SolverInputState
@@ -154,6 +155,10 @@ def _is_sharded_repodata_enabled():
     Flag to see whether we should check for sharded repodata.
     """
     return context.plugins.use_sharded_repodata is True  # type: ignore
+
+
+def _libmamba_parse_dep_name(dep: str) -> str:
+    return LibmambaMatchSpec.parse(dep).name
 
 
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
@@ -381,7 +386,11 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        channel_data = build_repodata_subset(
+            root_packages,
+            urls_to_channel,
+            parse_dep_name=_libmamba_parse_dep_name,
+        )
         if channel_data is None:
             return  # caller should fall back to repodata.json
 

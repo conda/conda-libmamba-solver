@@ -20,7 +20,7 @@ from conda.models.channel import Channel
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
 from conda_libmamba_solver.state import SolverInputState
 
-from .test_shards import CONDA_FORGE_WITH_SHARDS
+from .shard_fixtures import CONDA_FORGE_WITH_SHARDS
 
 if TYPE_CHECKING:
     import os
