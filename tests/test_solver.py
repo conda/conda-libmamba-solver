@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from itertools import chain, permutations, repeat
 from pathlib import Path
@@ -297,7 +298,8 @@ def test_pinned_with_cli_build_string(tmp_env: TmpEnvFixture) -> None:
         )
         data = json.loads(p.stdout)
         assert not data.get("success")
-        assert data["exception_name"] == "PackagesNotFoundError"
+        # Conda 2026 1Q renames exception to PackagesNotFoundInChannelError
+        assert re.match("PackagesNotFound.*Error", data["exception_name"])
 
 
 def test_constraining_pin_and_requested():
