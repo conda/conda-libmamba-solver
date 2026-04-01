@@ -634,9 +634,9 @@ def network_fetch_thread(
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
-        response = s.get(url)
-        response.raise_for_status()
-        data = response.content
+        with s.get(url) as response:
+            response.raise_for_status()
+            data = response.content
         return url, node_id, data
 
     def submit(node_id: NodeId):
