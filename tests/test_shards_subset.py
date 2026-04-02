@@ -674,6 +674,8 @@ def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
     """
     # Guarantee clean cache to avoid interference from previous tests
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    monkeypatch.setenv("CONDA_REMOTE_READ_TIMEOUT_SECS", "1")
+    monkeypatch.setenv("CONDA_REMOTE_MAX_RETRIES", "0")
     reset_context()
 
     channel = Channel.from_url(f"{http_server_shards}/noarch/")

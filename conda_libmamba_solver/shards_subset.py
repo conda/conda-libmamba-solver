@@ -412,7 +412,13 @@ class RepodataSubset:
             log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
             log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
             log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-            if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+            if network_thread.is_alive() and in_flight:
+                max_timeouts = int(
+                    context.remote_read_timeout_secs * (context.remote_max_retries + 1)
+                )
+            else:
+                max_timeouts = REACHABLE_PIPELINED_MAX_TIMEOUTS
+            if timeouts > max_timeouts:
                 raise TimeoutError("Timeout while fetching repodata shards.")
 
         while True:
@@ -430,6 +436,7 @@ class RepodataSubset:
                 log_timeout()
                 continue
 
+            timeouts = 0
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
@@ -634,9 +641,13 @@ def network_fetch_thread(
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
-        response = s.get(url)
-        response.raise_for_status()
-        data = response.content
+        timeout = (
+            context.remote_connect_timeout_secs,
+            context.remote_read_timeout_secs,
+        )
+        with s.get(url, timeout=timeout) as response:
+            response.raise_for_status()
+            data = response.content
         return url, node_id, data
 
     def submit(node_id: NodeId):

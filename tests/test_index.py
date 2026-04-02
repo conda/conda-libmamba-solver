@@ -153,13 +153,15 @@ def test_load_channel_repo_info_shards(
 
     in_state = SolverInputState(str(tmp_path / "env"), requested=requested)
 
+    subdir = context.subdir  # override to hunt bugs
+
     def index():
         return LibMambaIndexHelper(
             # this is expanded to noarch, linux-64 for shards.
-            channels=[Channel(f"{load_channel}/{context.subdir}")],
+            channels=[Channel(f"{load_channel}/{subdir}")],
             subdirs=(
                 "noarch",
-                context.subdir,
+                subdir,
             ),
             installed_records=(),  # do not load installed
             pkgs_dirs=(),  # do not load local cache as a channel
