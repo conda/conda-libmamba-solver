@@ -97,7 +97,7 @@ if TYPE_CHECKING:
 
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
-REACHABLE_PIPELINED_MAX_TIMEOUTS = 30  # number of times we can timeout waiting for shards
+REACHABLE_PIPELINED_MAX_TIMEOUTS = 10  # number of times we can timeout waiting for shards
 
 
 @dataclass(order=True)
@@ -412,7 +412,14 @@ class RepodataSubset:
             log.debug("cache_thread.is_alive(): %s", cache_thread.is_alive())
             log.debug("network_thread.is_alive(): %s", network_thread.is_alive())
             log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
-            if timeouts > REACHABLE_PIPELINED_MAX_TIMEOUTS:
+            if network_thread.is_alive() and in_flight:
+                max_timeouts = int(
+                    context.remote_read_timeout_secs
+                    * (context.remote_max_retries + 1)
+                )
+            else:
+                max_timeouts = REACHABLE_PIPELINED_MAX_TIMEOUTS
+            if timeouts > max_timeouts:
                 raise TimeoutError("Timeout while fetching repodata shards.")
 
         while True:
