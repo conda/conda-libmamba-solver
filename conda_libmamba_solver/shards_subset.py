@@ -430,6 +430,7 @@ class RepodataSubset:
                 log_timeout()
                 continue
 
+            timeouts = 0
             for node_id, shard in new_shards:
                 in_flight.remove(node_id)
 
