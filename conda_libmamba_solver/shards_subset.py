@@ -414,8 +414,7 @@ class RepodataSubset:
             log.debug("shard_out_queue.qsize(): %s", shard_out_queue.qsize())
             if network_thread.is_alive() and in_flight:
                 max_timeouts = int(
-                    context.remote_read_timeout_secs
-                    * (context.remote_max_retries + 1)
+                    context.remote_read_timeout_secs * (context.remote_max_retries + 1)
                 )
             else:
                 max_timeouts = REACHABLE_PIPELINED_MAX_TIMEOUTS

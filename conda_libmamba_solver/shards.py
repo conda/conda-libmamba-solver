@@ -561,7 +561,13 @@ def _repodata_shards(url, cache: RepodataCache) -> bytes:
         # should we save cache-control to state here to put another n
         # seconds on the "make a remote request" clock and/or touch cache
         # mtime
-        return cache.cache_path_shards.read_bytes()
+        #
+        # Hold the cache lock while reading: RepodataCache.replace() does
+        # unlink()+rename() under this same lock, so without it a concurrent
+        # writer can briefly remove the file between those two operations,
+        # causing FileNotFoundError on Windows.
+        with cache.lock("r+"):
+            return cache.cache_path_shards.read_bytes()
 
     saved_fields = {conda.gateways.repodata.URL_KEY: url}
     for header, key in (
