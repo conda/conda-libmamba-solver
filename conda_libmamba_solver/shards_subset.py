@@ -97,7 +97,7 @@ if TYPE_CHECKING:
 
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
-REACHABLE_PIPELINED_MAX_TIMEOUTS = 10  # number of times we can timeout waiting for shards
+REACHABLE_PIPELINED_MAX_TIMEOUTS = 30  # number of times we can timeout waiting for shards
 
 
 @dataclass(order=True)
@@ -634,7 +634,11 @@ def network_fetch_thread(
     shardlikes_by_url = {s.url: s for s in shardlikes}
 
     def fetch(s, url: str, node_id: NodeId):
-        with s.get(url) as response:
+        timeout = (
+            context.remote_connect_timeout_secs,
+            context.remote_read_timeout_secs,
+        )
+        with s.get(url, timeout=timeout) as response:
             response.raise_for_status()
             data = response.content
         return url, node_id, data

@@ -459,7 +459,11 @@ class Shards(ShardBase):
         results = {}
 
         def fetch(s, url, package_to_fetch):
-            response = s.get(url)
+            timeout = (
+                context.remote_connect_timeout_secs,
+                context.remote_read_timeout_secs,
+            )
+            response = s.get(url, timeout=timeout)
             response.raise_for_status()
             data = response.content
 
