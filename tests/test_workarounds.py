@@ -1,12 +1,12 @@
 # Copyright (C) 2022 Anaconda, Inc
 # Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
+import asyncio
 import ctypes
 import json
 import signal
 import subprocess as sp
 import sys
-import time
 
 import pytest
 from conda.common.compat import on_win
@@ -64,11 +64,20 @@ def test_build_string_filters():
             assert "py38" in pkg["build_string"]
 
 
+@pytest.mark.trouble
+@pytest.mark.parametrize("shards", (True, False), ids=["shards", "noshards"])
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
-def test_ctrl_c(stage):
-    TIMEOUT = 20  # Used twice in total, so account for double the amount
-    p = sp.Popen(
-        [
+def test_ctrl_c(stage, shards):
+    TIMEOUT = 20
+
+    async def run() -> tuple[str, str, int]:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + TIMEOUT
+        env = {
+            "CONDA_PLUGINS_USE_SHARDED_REPODATA": str(shards),
+            "PYTHONHASHSEED": str(0xAD792856),
+        }
+        p = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
             "conda",
@@ -81,32 +90,58 @@ def test_ctrl_c(stage):
             "--channel=conda-forge",
             "--quiet",
             "vaex",
-        ],
-        text=True,
-        stdout=sp.PIPE,
-        stderr=sp.PIPE,
-    )
-    t0 = time.time()
-    while stage not in p.stdout.readline():
-        time.sleep(0.1)
-        if time.time() - t0 > TIMEOUT:
-            raise RuntimeError("Timeout")
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        lines: list[str] = []
+        while True:
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                break
+            try:
+                chunk = await asyncio.wait_for(p.stdout.readline(), timeout=remaining)
+            except asyncio.TimeoutError:
+                break
+            if not chunk:
+                break
+            line = chunk.decode()
+            lines.append(line)
+            print(line.strip())
+            if stage in line:
+                break
 
-    # works around Windows' awkward CTRL-C signal handling
-    # https://stackoverflow.com/a/64357453
-    if on_win:
-        try:
-            kernel = ctypes.windll.kernel32
-            kernel.FreeConsole()
-            kernel.AttachConsole(p.pid)
-            kernel.SetConsoleCtrlHandler(None, 1)
-            kernel.GenerateConsoleCtrlEvent(0, 0)
-            p.wait(timeout=TIMEOUT)
-        finally:
-            kernel.SetConsoleCtrlHandler(None, 0)
-    else:
-        p.send_signal(signal.SIGINT)
-        p.wait(timeout=TIMEOUT)
+        if loop.time() >= deadline:
+            stdout_text = "".join(lines)
+            raise RuntimeError(f"Timeout after {TIMEOUT} seconds\n{stdout_text}")
 
-    assert p.returncode != 0
-    assert "KeyboardInterrupt" in p.stdout.read() + p.stderr.read()
+        # works around Windows' awkward CTRL-C signal handling
+        # https://stackoverflow.com/a/64357453
+        if on_win:
+            try:
+                kernel = ctypes.windll.kernel32
+                kernel.FreeConsole()
+                kernel.AttachConsole(p.pid)
+                kernel.SetConsoleCtrlHandler(None, 1)
+                kernel.GenerateConsoleCtrlEvent(0, 0)
+                remaining = deadline - loop.time()
+                await asyncio.wait_for(p.wait(), timeout=remaining)
+            finally:
+                kernel.SetConsoleCtrlHandler(None, 0)
+        else:
+            p.send_signal(signal.SIGINT)
+            remaining = deadline - loop.time()
+            await asyncio.wait_for(p.wait(), timeout=remaining)
+
+        remaining = deadline - loop.time()
+        if remaining <= 0:
+            raise RuntimeError(f"Timeout after {TIMEOUT} seconds")
+        stdout_tail = await asyncio.wait_for(p.stdout.read(), timeout=remaining)
+        stderr_tail = await asyncio.wait_for(p.stderr.read(), timeout=remaining)
+        stdout_text = "".join(lines) + stdout_tail.decode()
+        stderr_text = stderr_tail.decode()
+        return stdout_text, stderr_text, p.returncode
+
+    stdout_text, stderr_text, returncode = asyncio.run(run())
+    assert returncode != 0
+    assert "KeyboardInterrupt" in stdout_text + stderr_text

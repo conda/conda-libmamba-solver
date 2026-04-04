@@ -23,7 +23,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-  "conda >=25.9",
+  "conda >=26.1",
   # "libmambapy >=2",
   "boltons >=23.0.0",
   "msgpack >=1.1.1",
@@ -78,10 +78,13 @@ filterwarnings = [
   "ignore:conda.trust:PendingDeprecationWarning:conda",
   "ignore:conda.core.link.PrefixActions:DeprecationWarning:conda",
   "ignore:conda.core.link.PrefixActions:PendingDeprecationWarning:conda",
+  "ignore:conda.base.constants.CONDA_PACKAGE_EXTENSIONS:PendingDeprecationWarning",
+  "ignore:conda.common.io.env_vars:PendingDeprecationWarning",
 ]
 markers = [
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",
+  "trouble: troublesome tests",
 ]
 
 [tool.ruff]

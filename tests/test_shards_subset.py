@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import json
+import queue
 import random
 import threading
 import time
@@ -21,14 +22,20 @@ import conda.gateways.repodata
 import pytest
 import pytest_codspeed
 import requests
-from conda.base.context import reset_context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from requests.exceptions import HTTPError
 
 from conda_libmamba_solver import shards_cache, shards_subset, shards_subset_http2
-from conda_libmamba_solver.shards import ShardLike, Shards, fetch_channels, fetch_shards_index
+from conda_libmamba_solver.index import _package_info_from_package_dict
+from conda_libmamba_solver.shards import (
+    ShardLike,
+    Shards,
+    fetch_channels,
+    fetch_shards_index,
+)
 from conda_libmamba_solver.shards_subset import (
     NodeId,
     RepodataSubset,
@@ -36,7 +43,13 @@ from conda_libmamba_solver.shards_subset import (
     combine_batches_until_none,
     exception_to_queue,
 )
-from tests.test_shards import FAKE_REPODATA, ROOT_PACKAGES, _timer, ensure_hex_hash
+from tests.test_shards import (
+    FAKE_REPODATA,
+    ROOT_PACKAGES,
+    _timer,
+    ensure_hex_hash,
+    expand_channels,
+)
 
 from .test_shards import CONDA_FORGE_WITH_SHARDS
 
@@ -130,6 +143,21 @@ def clean_cache(conda_cli: CondaCLIFixture):
         assert not return_code, "conda clean returned {return_code} != 0"
 
 
+def repodata_subset_size(channel_data):
+    """
+    Measure the size of a repodata subset as serialized to JSON. Discard data.
+    """
+    repodata_size = 0
+    for _, shardlike in channel_data.items():
+        repodata = shardlike.build_repodata()
+        repodata_text = json.dumps(
+            repodata, indent=0, separators=(",", ":"), sort_keys=True, ensure_ascii=False
+        )
+        repodata_size += len(repodata_text.encode("utf-8"))
+
+    return repodata_size
+
+
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm"))
 @pytest.mark.parametrize("algorithm", ("bfs", "pipelined", "httpx"))
@@ -169,8 +197,9 @@ def test_traversal_algorithm_benchmarks(
             cache.remove_cache()
 
         channels = [Channel(f"{scenario['channel']}/{scenario['platform']}")]
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
+        assert channel_data is not None
         assert len(channel_data) in (2, 4), "Expected 2 or 4 channels fetched"
 
         subset = RepodataSubset((*channel_data.values(),))
@@ -196,10 +225,11 @@ def test_traversal_algorithms_match(conda_cli, scenario: dict):
     Ensure that all traversal algorithms return the same repodata subset.
     """
     channel = Channel(f"{scenario['channel']}/{scenario['platform']}")
+    channels = expand_channels([channel])
 
     repodata_algorithm_map = {
-        "bfs": build_repodata_subset(scenario["packages"], [channel], algorithm="bfs"),
-        "pipelined": build_repodata_subset(scenario["packages"], [channel], algorithm="pipelined"),
+        "bfs": build_repodata_subset(scenario["packages"], channels, algorithm="bfs"),
+        "pipelined": build_repodata_subset(scenario["packages"], channels, algorithm="pipelined"),
     }
 
     for subdir in repodata_algorithm_map["bfs"].keys():
@@ -229,7 +259,7 @@ def test_build_repodata_subset_pipelined(
     channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
 
     with _timer("fetch_channels()"):
-        channel_data = fetch_channels(channels)
+        channel_data = fetch_channels(expand_channels(channels))
 
     def assert_quick(ns: int):
         # Check that the 1 second queue timeout doesn't happen on an empty
@@ -281,10 +311,15 @@ def test_shards_cache_thread(
 
     cache_thread.start()
 
-    while batch := shard_out_queue.get(timeout=1):
-        for node_id, shard in batch:
-            assert node_id in fake_nodes
-            assert shard == cache.retrieve(node_id.shard_url)
+    # combined into a single output batch
+    batch = shard_out_queue.get(timeout=1)
+    for node_id, shard in batch:
+        assert node_id in fake_nodes
+        assert shard == cache.retrieve(node_id.shard_url)
+
+    # no "done" sentinel in shard_out_queue
+    with pytest.raises(queue.Empty):
+        shard_out_queue.get_nowait()
 
     while notfound := network_out_queue.get(timeout=1):
         for node_id in notfound:
@@ -301,7 +336,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     cache, _ = shard_cache_with_data
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    found = fetch_shards_index(subdir_data)
+    found = fetch_shards_index(subdir_data, None)
     assert found
 
     invalid_shardlike = ShardLike(
@@ -417,7 +452,9 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
             mock_batch.side_effect = HTTPError("Simulated network error")
 
             with pytest.raises(HTTPError, match="Simulated network error"):
-                build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+                build_repodata_subset(
+                    root_packages, expand_channels([channel]), algorithm=algorithm
+                )
 
     # For pipelined algorithm, mock the session.get to raise an error
     elif algorithm == "pipelined":
@@ -439,7 +476,9 @@ def test_build_repodata_subset_error_propagation(http_server_shards, algorithm, 
         with patch("conda_libmamba_solver.shards_subset.ThreadPoolExecutor", mock_executor):
             # The pipelined algorithm should propagate this error
             with pytest.raises(HTTPError, match="Simulated network error during pipelined fetch"):
-                build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+                build_repodata_subset(
+                    root_packages, expand_channels([channel]), algorithm=algorithm
+                )
 
 
 @pytest.mark.parametrize("algorithm", ["bfs", "pipelined"])
@@ -458,7 +497,9 @@ def test_build_repodata_subset_package_not_found(http_server_shards, algorithm, 
     # Override cache dir location for tests; ensures it's empty
     mocker.patch("conda.gateways.repodata.create_cache_dir", return_value=str(tmp_path))
 
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm=algorithm)
+    channel_data = build_repodata_subset(
+        root_packages, expand_channels([channel]), algorithm=algorithm
+    )
 
     for shardlike in channel_data.values():
         assert not shardlike.build_repodata().get("packages")
@@ -497,6 +538,70 @@ def test_build_repodata_subset_local_server(http_server_shards, algorithm, monke
         )
 
 
+def test_build_repodata_subset_no_shards(http_server_shards):
+    """
+    If no channel has repodata_shards.msgpack.zst, build_repodata_subset()
+    returns None.
+    """
+    channels = expand_channels([Channel(http_server_shards + "/notfound")])
+    assert build_repodata_subset([], channels) is None
+
+
+def test_build_repodata_subset(prepare_shards_test: None, tmp_path):
+    """
+    Build repodata subset, convert it into libmamba objects, and compute the
+    size if the subset was serialized as repodata.json.
+    """
+
+    # installed, plus what we want to add (twine)
+    root_packages = ROOT_PACKAGES[:]
+
+    channels = list(context.default_channels)
+    channels.append(Channel(CONDA_FORGE_WITH_SHARDS))
+    channel_dict = expand_channels(channels)
+
+    with _timer("build_repodata_subset()"):
+        channel_data = build_repodata_subset(root_packages, channel_dict)
+
+    # convert to PackageInfo for libmamba, without temporary files
+    package_info = []
+    for channel, shardlike in channel_data.items():
+        repodata = shardlike.build_repodata()
+        # Don't like going back and forth between channel objects and URLs;
+        # build_repodata_subset() expands channels into per-subdir URLs as
+        # part of fetch:
+        channel_object = Channel(channel)
+        channel_id = str(channel_object)
+        for package_group in ("packages", "packages.conda"):
+            for filename, record in repodata.get(package_group, {}).items():
+                package_info.append(
+                    _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=shardlike.url,
+                        channel_id=channel_id,
+                    )
+                )
+
+    assert len(package_info), "no packages in subset"
+
+    print(f"{len(package_info)} packages in subset")
+
+    with _timer("write_repodata_subset()"):
+        repodata_size = repodata_subset_size(channel_data)
+    print(f"Repodata subset would be {repodata_size} bytes as json")
+
+    # e.g. this for noarch and osx-arm64
+    # % curl https://conda.anaconda.org/conda-forge-sharded/noarch/repodata.json.zst | zstd -d | wc
+    full_repodata_benchmark = 138186556 + 142680224
+
+    print(
+        f"Versus only noarch and osx-arm64 full repodata: {repodata_size / full_repodata_benchmark:.02f} times as large"
+    )
+
+    print("Channels:", ",".join(urllib.parse.urlparse(url).path[1:] for url in channel_data))
+
+
 @pytest.mark.parametrize("only_tar_bz2", (True, False))
 @pytest.mark.parametrize("strategy", ("pipelined", "bfs"))
 def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
@@ -509,7 +614,6 @@ def test_only_tar_bz2(http_server_shards, tmp_path, only_tar_bz2, strategy):
     root_packages = ["foo"]
 
     channel_data = fetch_channels({channel.url() or "": channel})
-
     subset = RepodataSubset((*channel_data.values(),))
     subset._use_only_tar_bz2 = only_tar_bz2
     subset.reachable(root_packages, strategy=strategy)
@@ -555,7 +659,9 @@ def test_pipelined_with_slow_queue_operations(http_server_shards, mocker, tmp_pa
     mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", slow_simple_queue_factory)
 
     # This should complete despite slow queue operations
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+    channel_data = build_repodata_subset(
+        root_packages, expand_channels([channel]), algorithm="pipelined"
+    )
 
     # Verify results
     found_packages = False
@@ -591,7 +697,9 @@ def test_pipelined_shutdown_race_condition(http_server_shards, mocker, tmp_path)
 
     # Run multiple times to increase chance of hitting race condition
     for _ in range(10):
-        channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+        channel_data = build_repodata_subset(
+            root_packages, expand_channels([channel]), algorithm="pipelined"
+        )
 
         # Verify we got valid results
         found_packages = False
@@ -617,7 +725,7 @@ def test_pipelined_timeout(http_server_shards, monkeypatch, tmp_path):
 
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     subdir_data = SubdirData(channel)
-    shardlikes = [fetch_shards_index(subdir_data)]
+    shardlikes = [fetch_shards_index(subdir_data, None)]
 
     queue = SimpleQueue()
 
@@ -728,7 +836,9 @@ def test_pipelined_extreme_race_conditions(
     failures = []
     for iteration in range(20):
         try:
-            channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+            channel_data = build_repodata_subset(
+                root_packages, expand_channels([channel]), algorithm="pipelined"
+            )
 
             # Verify we got results
             found = any(
@@ -746,8 +856,11 @@ def test_pipelined_extreme_race_conditions(
 @pytest.mark.parametrize("num_threads", [1, 2, 5])
 def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_threads):
     """
-    Run pipelined algorithm from multiple threads concurrently.
-    This can expose race conditions in shared state or thread coordination.
+    Run pipelined algorithm from multiple threads concurrently. This can expose
+    race conditions in shared state or thread coordination.
+
+    (Actually the concurrency issues happen in fetch_channels() which deals with
+    reading, writing repodata_shards.msgpack.zst to disk.)
     """
     channel = Channel.from_url(f"{http_server_shards}/noarch")
     root_packages = ["foo"]
@@ -758,7 +871,9 @@ def test_pipelined_concurrent_stress(http_server_shards, mocker, tmp_path, num_t
 
     def run_subset():
         try:
-            channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+            channel_data = build_repodata_subset(
+                root_packages, expand_channels([channel]), algorithm="pipelined"
+            )
             # Verify results
             for shardlike in channel_data.values():
                 if "/noarch/" in shardlike.url:
@@ -846,7 +961,9 @@ def test_shutdown_with_pending_work(http_server_shards, mocker, tmp_path):
     mocker.patch("conda_libmamba_solver.shards_subset.SimpleQueue", TrackShutdownQueue)
 
     # Run the algorithm
-    channel_data = build_repodata_subset(root_packages, [channel], algorithm="pipelined")
+    channel_data = build_repodata_subset(
+        root_packages, expand_channels([channel]), algorithm="pipelined"
+    )
 
     # Verify we got results
     found = any(
