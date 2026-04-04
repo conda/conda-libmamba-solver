@@ -15,6 +15,7 @@ from queue import Queue
 
 import httpx
 import msgpack
+import pycurltx
 import zstandard
 
 from .shards import ShardBase, Shards
@@ -30,6 +31,7 @@ async def _network_fetch_loop_httpx(
     shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
     cache: ShardCache,
     shardlikes: list[ShardBase],
+    transport=None,
 ):
     cache = cache.copy()
     dctx = zstandard.ZstdDecompressor()
@@ -52,6 +54,7 @@ async def _network_fetch_loop_httpx(
 
     async def get_work():
         with concurrent.futures.ThreadPoolExecutor() as thread_pool:
+            # this may be faster than asyncio.to_thread()
             while True:
                 batch = await asyncio.get_running_loop().run_in_executor(thread_pool, in_queue.get)
                 if batch is None:
@@ -72,7 +75,8 @@ async def _network_fetch_loop_httpx(
         cache.insert(AnnotatedRawShard(url, node_id.package, data))
         shard_out_queue.put([(node_id, shard)])
 
-    async with httpx.AsyncClient(http2=True) as client:
+    # if transport is not None, http2 comes from pycurl
+    async with httpx.AsyncClient(http2=(transport is None), transport=transport) as client:
         results: list[tuple[NodeId, ShardDict] | Exception] = []
 
         tasks = set()
@@ -108,3 +112,59 @@ def network_fetch_thread_httpx(
         if not shard.url.startswith("http"):
             raise ValueError(f"Unsupported shard in http/2 fetch thread: {shard.url}")
     asyncio.run(_network_fetch_loop_httpx(in_queue, shard_out_queue, cache, shardlikes))
+
+
+@exception_to_queue
+def network_fetch_thread_httpx_pycurl(
+    in_queue: Queue[list[NodeId] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    cache: ShardCache,
+    shardlikes: list[ShardBase],
+):
+    """
+    in_queue contains urls to fetch over the network.
+    While the in_queue has not received a sentinel None, empty everything from
+    the queue. Fetch all of them over the network. Fetched shards go to
+    shard_out_queue.
+    Unhandled exceptions also go to shard_out_queue, and exit this thread.
+    """
+    for shard in shardlikes:
+        if not shard.url.startswith("http"):
+            raise ValueError(f"Unsupported shard in http/2 fetch thread: {shard.url}")
+    asyncio.run(
+        _network_fetch_loop_httpx(
+            in_queue,
+            shard_out_queue,
+            cache,
+            shardlikes,
+            transport=pycurltx.PyCurlAsyncMultiSocketTransport(max_connections=100),
+        )
+    )
+
+
+@exception_to_queue
+def network_fetch_thread_httpx_pycurl2(
+    in_queue: Queue[list[NodeId] | None],
+    shard_out_queue: Queue[list[tuple[NodeId, ShardDict] | Exception] | None],
+    cache: ShardCache,
+    shardlikes: list[ShardBase],
+):
+    """
+    in_queue contains urls to fetch over the network.
+    While the in_queue has not received a sentinel None, empty everything from
+    the queue. Fetch all of them over the network. Fetched shards go to
+    shard_out_queue.
+    Unhandled exceptions also go to shard_out_queue, and exit this thread.
+    """
+    for shard in shardlikes:
+        if not shard.url.startswith("http"):
+            raise ValueError(f"Unsupported shard in http/2 fetch thread: {shard.url}")
+    asyncio.run(
+        _network_fetch_loop_httpx(
+            in_queue,
+            shard_out_queue,
+            cache,
+            shardlikes,
+            transport=pycurltx.PyCurlAsyncTransport(timeout=10.0),
+        )
+    )

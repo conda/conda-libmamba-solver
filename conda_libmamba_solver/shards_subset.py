@@ -294,6 +294,24 @@ class RepodataSubset:
 
         return self.reachable_pipelined(root_packages, network_fetch_thread_httpx)
 
+    def reachable_pycurl(self, root_packages):
+        """
+        httpx + pycurl transport for httpx (curl sockets in event loop async implementation)
+        """
+        from .shards_subset_http2 import network_fetch_thread_httpx_pycurl
+
+        return self.reachable_pipelined(root_packages, network_fetch_thread_httpx_pycurl)
+
+    def reachable_pycurl2(self, root_packages):
+        """
+        httpx + pycurl transport for httpx (delegate to thread async implementation)
+        """
+        from .shards_subset_http2 import network_fetch_thread_httpx_pycurl2
+
+        return self.reachable_pipelined(root_packages, network_fetch_thread_httpx_pycurl2)
+
+    # could try sync + threads http/2 also...
+
     def reachable_pipelined(self, root_packages, network_worker=None):
         """
         Fetch all packages reachable from `root_packages`' by following
@@ -308,7 +326,8 @@ class RepodataSubset:
         # empty shards.
         if context.offline:
             network_worker = offline_nofetch_thread
-        else:
+
+        if network_worker is None:
             network_worker = network_fetch_thread
 
         # Ignore cache on shards object, use our own. Necessary if there are no

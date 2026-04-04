@@ -112,7 +112,12 @@ if True:  # one fast, one slow-ish scenario for faster tests unless debugging.
     TESTING_SCENARIOS = [
         scenario
         for scenario in TESTING_SCENARIOS
-        if scenario["name"] in ("python", "devops_automation")
+        if scenario["name"]
+        in (
+            "python",
+            "devops_automation",
+            "vaex",
+        )
     ]
 
 
@@ -160,7 +165,7 @@ def repodata_subset_size(channel_data):
 
 @pytest.mark.skipif(not codspeed_supported(), reason="pytest-codspeed-version-4")
 @pytest.mark.parametrize("cache_state", ("cold", "warm"))
-@pytest.mark.parametrize("algorithm", ("bfs", "pipelined", "httpx"))
+@pytest.mark.parametrize("algorithm", ("pipelined", "httpx", "pycurl", "pycurl2"))
 @pytest.mark.parametrize(
     "scenario",
     TESTING_SCENARIOS,
