@@ -75,7 +75,6 @@ from __future__ import annotations
 
 import logging
 import os
-import time
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -83,7 +82,6 @@ from typing import TYPE_CHECKING
 
 from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
-from conda.cli.helpers import parse_duration_to_seconds
 from conda.common.compat import on_win
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
@@ -362,6 +360,10 @@ class LibMambaIndexHelper:
         value = context.exclude_newer
         if not value:
             return None
+        import time
+
+        from conda.cli.helpers import parse_duration_to_seconds
+
         return int(time.time() - parse_duration_to_seconds(value))
 
     def _load_channels(
