@@ -347,10 +347,11 @@ class LibMambaIndexHelper:
             home_dir=str(Path.home()),
             current_working_dir=os.getcwd(),
         )
-        db = Database(
-            params,
-            exclude_newer_timestamp=self._exclude_newer_timestamp(),
-        )
+        db_kwargs = {}
+        exclude_newer_ts = self._exclude_newer_timestamp()
+        if exclude_newer_ts is not None:
+            db_kwargs["exclude_newer_timestamp"] = exclude_newer_ts
+        db = Database(params, **db_kwargs)
         db.set_logger(logger_callback)
         return db
 
