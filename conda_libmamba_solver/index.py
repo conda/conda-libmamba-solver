@@ -75,6 +75,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
@@ -82,6 +83,7 @@ from typing import TYPE_CHECKING
 
 from conda.base.constants import KNOWN_SUBDIRS, REPODATA_FN, ChannelPriority
 from conda.base.context import context
+from conda.cli.helpers import parse_duration_to_seconds
 from conda.common.compat import on_win
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
@@ -347,9 +349,20 @@ class LibMambaIndexHelper:
             home_dir=str(Path.home()),
             current_working_dir=os.getcwd(),
         )
-        db = Database(params)
+        db = Database(
+            params,
+            exclude_newer_timestamp=self._exclude_newer_timestamp(),
+        )
         db.set_logger(logger_callback)
         return db
+
+    @staticmethod
+    def _exclude_newer_timestamp():
+        """Convert context.exclude_newer to a Unix timestamp for libmambapy."""
+        value = context.exclude_newer
+        if not value:
+            return None
+        return int(time.time() - parse_duration_to_seconds(value))
 
     def _load_channels(
         self,
