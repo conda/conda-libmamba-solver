@@ -209,7 +209,7 @@ class LibMambaSolver(Solver):
         return (
             f"Channels:\n"
             f" - {canonical_names_dashed}\n"
-            f"Platform: {context.subdir}\n"
+            f"Platform: {next(s for s in self.subdirs if s != 'noarch')}\n"
             f"Collecting package metadata ({self._repodata_fn})"
         )
 
