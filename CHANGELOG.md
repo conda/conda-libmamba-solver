@@ -23,6 +23,11 @@ Remember to update the hyperlinks at the bottom.
   plugins.use_sharded_repodata false` or the environment variable
   `CONDA_PLUGINS_USE_SHARDED_REPODATA=0`. (#836)
 
+### Bug fixes
+
+* Improve timeout behavior when fetching shards. (#890)
+* Fix race condition while reading shards index cache. (#890)
+
 ### Contributors
 
 * @dholth
