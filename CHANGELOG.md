@@ -13,6 +13,25 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.4.0 (2026-04-16)
+
+### Enhancements
+
+* Enable `use_sharded_repodata` by default. The solver will check for
+  `repodata_shards.msgpack.zst` and use sharded repodata if it is present in at
+  least one channel. Sharded repodata can be disabled with `conda config --set
+  plugins.use_sharded_repodata false` or the environment variable
+  `CONDA_PLUGINS_USE_SHARDED_REPODATA=0`. (#836)
+
+### Contributors
+
+* @dholth
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
 ## 26.3.0 (2026-03-04)
 
 ### ✨ Special Announcement ✨
