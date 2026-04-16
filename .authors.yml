@@ -12,7 +12,7 @@
   github: jezdez
 - name: pre-commit-ci[bot]
   email: 66853113+pre-commit-ci[bot]@users.noreply.github.com
-  num_commits: 103
+  num_commits: 110
   first_commit: 2022-11-22 08:39:31
   github: pre-commit-ci[bot]
 - name: Christopher Ostrouchov
@@ -22,7 +22,7 @@
   github: costrouc
 - name: Daniel Holth
   email: dholth@anaconda.com
-  num_commits: 26
+  num_commits: 28
   first_commit: 2022-10-19 21:11:39
   github: dholth
 - name: Matthew R. Becker
@@ -34,7 +34,7 @@
   email: 18747875+conda-bot@users.noreply.github.com
   aliases:
   - Conda Bot
-  num_commits: 95
+  num_commits: 101
   first_commit: 2022-11-15 16:45:31
   github: conda-bot
 - name: Ken Odegard
@@ -68,7 +68,7 @@
   github: tl-hbk
 - name: dependabot[bot]
   email: 49699333+dependabot[bot]@users.noreply.github.com
-  num_commits: 24
+  num_commits: 26
   first_commit: 2024-07-22 19:11:59
   github: dependabot[bot]
 - name: Jonathan J. Helmus
