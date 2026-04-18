@@ -675,9 +675,7 @@ def test_cross_platform_spinner_shows_target_platform(tmp_path: Path) -> None:
         specs_to_add=["tzdata"],
         command="create",
     )
-    message = solver._collect_all_metadata_spinner_message(
-        channels=[Channel("conda-forge")]
-    )
+    message = solver._collect_all_metadata_spinner_message(channels=[Channel("conda-forge")])
     assert f"Platform: {target}" in message
     assert "Platform: noarch" not in message
 
@@ -698,9 +696,7 @@ def test_cross_platform_spinner_falls_back_when_only_noarch(tmp_path: Path) -> N
         command="create",
     )
     solver.subdirs = ("noarch",)
-    message = solver._collect_all_metadata_spinner_message(
-        channels=[Channel("conda-forge")]
-    )
+    message = solver._collect_all_metadata_spinner_message(channels=[Channel("conda-forge")])
     assert f"Platform: {context.subdir}" in message
 
 
