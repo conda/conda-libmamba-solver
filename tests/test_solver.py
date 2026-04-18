@@ -657,6 +657,53 @@ def test_pytorch_gpu(specs):
         raise AssertionError("No pytorch found")
 
 
+def test_cross_platform_spinner_shows_target_platform(tmp_path: Path) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/pull/911
+
+    When ``subdirs`` is set to a non-host platform, the ``Platform:`` line of
+    the metadata-collection spinner message should show the target platform,
+    not the host platform, and must never show ``noarch``.
+    """
+    from conda.models.channel import Channel
+
+    target = "linux-64" if context.subdir != "linux-64" else "win-64"
+    solver = Solver(
+        prefix=tmp_path,
+        channels=["conda-forge"],
+        subdirs=(target, "noarch"),
+        specs_to_add=["tzdata"],
+        command="create",
+    )
+    message = solver._collect_all_metadata_spinner_message(
+        channels=[Channel("conda-forge")]
+    )
+    assert f"Platform: {target}" in message
+    assert "Platform: noarch" not in message
+
+
+def test_cross_platform_spinner_falls_back_when_only_noarch(tmp_path: Path) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/pull/911
+
+    If ``self.subdirs`` only contains ``noarch`` the spinner message must not
+    raise ``StopIteration``; it should fall back to ``context.subdir``.
+    """
+    from conda.models.channel import Channel
+
+    solver = Solver(
+        prefix=tmp_path,
+        channels=["conda-forge"],
+        specs_to_add=["tzdata"],
+        command="create",
+    )
+    solver.subdirs = ("noarch",)
+    message = solver._collect_all_metadata_spinner_message(
+        channels=[Channel("conda-forge")]
+    )
+    assert f"Platform: {context.subdir}" in message
+
+
 def test_channel_subdir_set_correctly(tmp_env: TmpEnvFixture) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/662
