@@ -347,9 +347,25 @@ class LibMambaIndexHelper:
             home_dir=str(Path.home()),
             current_working_dir=os.getcwd(),
         )
-        db = Database(params)
+        db_kwargs = {}
+        exclude_newer_ts = self._exclude_newer_timestamp()
+        if exclude_newer_ts is not None:
+            db_kwargs["exclude_newer_timestamp"] = exclude_newer_ts
+        db = Database(params, **db_kwargs)
         db.set_logger(logger_callback)
         return db
+
+    @staticmethod
+    def _exclude_newer_timestamp():
+        """Convert context.exclude_newer to a Unix timestamp for libmambapy."""
+        value = context.exclude_newer
+        if not value:
+            return None
+        import time
+
+        from conda.cli.helpers import parse_duration_to_seconds
+
+        return int(time.time() - parse_duration_to_seconds(value))
 
     def _load_channels(
         self,

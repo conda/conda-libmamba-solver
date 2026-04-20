@@ -208,3 +208,23 @@ def test_load_channels_order(shard_factory):
     assert [
         repo.channel.canonical_name for repo in shard_enabled_index.repos
     ] == expected_output_channels
+
+
+def test_exclude_newer_timestamp_unset(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(context, "exclude_newer", "")
+    assert LibMambaIndexHelper._exclude_newer_timestamp() is None
+
+
+def test_exclude_newer_timestamp_duration(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(context, "exclude_newer", "7d")
+    result = LibMambaIndexHelper._exclude_newer_timestamp()
+    assert result is not None
+    expected = int(time.time() - 7 * 86400)
+    assert abs(result - expected) < 2
+
+
+def test_exclude_newer_timestamp_zero_duration(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(context, "exclude_newer", "0d")
+    result = LibMambaIndexHelper._exclude_newer_timestamp()
+    assert result is not None
+    assert abs(result - int(time.time())) < 2

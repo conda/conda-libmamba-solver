@@ -1,0 +1,21 @@
+### Enhancements
+
+* Pass `context.exclude_newer` to libmambapy's `Database` as
+  `exclude_newer_timestamp`, enabling native `--exclude-newer` support
+  when the upstream mamba PR lands. (#15759)
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
