@@ -1,7 +1,6 @@
 # build-time
 pip
 # run-time
-boltons>=23.0.0
 conda>=26.1
 conda-forge::libmamba>=2.0.0
 conda-forge::libmambapy>=2.0.0
