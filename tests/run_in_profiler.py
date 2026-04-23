@@ -10,8 +10,10 @@ import logging
 import os
 import pathlib
 
+import pytest
 from conda.base.context import reset_context
 
+import tests.test_index
 import tests.test_shards_subset
 from conda_libmamba_solver import shards, shards_cache, shards_subset
 
@@ -29,4 +31,19 @@ logging.basicConfig(level=logging.INFO)
 for module in (shards, shards_cache, shards_subset):
     module.log.setLevel(logging.DEBUG)
 
-tests.test_shards_subset.test_build_repodata_subset_pipelined(None, tmp_path)
+# tests.test_shards_subset.test_build_repodata_subset_pipelined(None, tmp_path)
+
+
+class Benchmark:
+    def pedantic(self, fn, rounds: int = 1):
+        return fn()
+        # for _ in range(1):
+        #     rc = fn()
+        # return rc
+
+
+monkeypatch = pytest.MonkeyPatch()
+for i in range(16):
+    tests.test_index.test_load_channel_repo_info_shards(
+        "shard", ("django", "celery"), tmp_path, None, monkeypatch, Benchmark()
+    )
