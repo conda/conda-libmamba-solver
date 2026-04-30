@@ -184,14 +184,12 @@ def test_load_channel_repo_info_shards(
 def test_add_pip_as_python_dependency_sharded(
     monkeypatch: pytest.MonkeyPatch,
     mocker: MockerFixture,
-    tmp_path: Path,
     add_pip: bool,
 ):
     """
     Regression test for https://github.com/conda/conda-libmamba-solver/issues/918.
     When sharded repodata is used, add_pip_as_python_dependency must be honored.
     """
-    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
     monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "true" if add_pip else "false")
     reset_context()
 
@@ -213,7 +211,7 @@ def test_add_pip_as_python_dependency_sharded(
     )
     shardlike.fetch_shard("python")
 
-    in_state = SolverInputState(str(tmp_path / "env"), requested=("python",))
+    in_state = SolverInputState(prefix="idontexist", requested=("python",))
 
     mocker.patch(
         "conda_libmamba_solver.index._is_sharded_repodata_enabled",
@@ -232,17 +230,14 @@ def test_add_pip_as_python_dependency_sharded(
     )
 
     python_records = index_helper.search("python")
-    # python package must be found in the sharded index
     assert python_records
 
     pip_in_depends = any(
         dep == "pip" or dep.startswith("pip ") for dep in (python_records[0].depends or [])
     )
     if add_pip:
-        # pip must be injected as a python dependency when add_pip_as_python_dependency=True
         assert pip_in_depends
     else:
-        # pip must NOT be a dependency of python when add_pip_as_python_dependency=False
         assert not pip_in_depends
 
 
