@@ -344,7 +344,7 @@ class RepodataSubset:
 
         network_thread = threading.Thread(
             target=network_worker,
-            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+            args=(cache_miss_queue, shard_out_queue, QueueCache(cache_in_queue), self.shardlikes),
             daemon=True,
         )
 
@@ -575,6 +575,14 @@ def exception_to_queue(func):
     return wrapper
 
 
+class QueueCache:
+    def __init__(self, queue):
+        self.queue: Queue = queue
+
+    def insert(self, shard: AnnotatedRawShard):
+        self.queue.put([shard])
+
+
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
@@ -597,6 +605,10 @@ def cache_fetch_thread(
     """
     with cache.copy() as cache:
         for node_ids in combine_batches_until_none(in_queue):
+            to_insert = [value for value in node_ids if isinstance(value, AnnotatedRawShard)]
+            for value in to_insert:
+                cache.insert(value)
+            node_ids = [value for value in node_ids if not isinstance(value, AnnotatedRawShard)]
             cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
             # should we add this into retrieve_multiple?
