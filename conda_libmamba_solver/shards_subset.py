@@ -98,6 +98,7 @@ if TYPE_CHECKING:
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
 REACHABLE_PIPELINED_MAX_TIMEOUTS = 10  # number of times we can timeout waiting for shards
+QUEUE_TIMEOUT = 1
 
 
 @dataclass(order=True)
@@ -428,7 +429,7 @@ class RepodataSubset:
                 break
 
             try:
-                new_shards = shard_out_queue.get(timeout=1)
+                new_shards = shard_out_queue.get(timeout=QUEUE_TIMEOUT)
                 if isinstance(new_shards, BaseException):  # error propagated from worker thread
                     raise new_shards
 
@@ -539,7 +540,7 @@ def combine_batches_until_none(
     while running:
         try:
             # Add timeout to prevent indefinite blocking if producer thread fails
-            batch = in_queue.get(timeout=5)
+            batch = in_queue.get(timeout=QUEUE_TIMEOUT)
             if batch is None:
                 break
         except queue.Empty:
@@ -582,13 +583,22 @@ class QueueCache:
     def insert(self, shard: AnnotatedRawShard):
         self.queue.put([shard])
 
+    def copy(self):
+        return self  # used for threadsafety in ShardCache; not needed here
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return
+
 
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception]],
     network_out_queue: Queue[Sequence[NodeId] | None],
-    cache: ShardCache,
+    cache: ShardCache | QueueCache,
 ):
     """
     Fetch batches of shards from cache until in_queue sees None. Enqueue found
@@ -604,11 +614,14 @@ def cache_fetch_thread(
         cache: used to retrieve shards.
     """
     with cache.copy() as cache:
-        for node_ids in combine_batches_until_none(in_queue):
-            to_insert = [value for value in node_ids if isinstance(value, AnnotatedRawShard)]
-            for value in to_insert:
-                cache.insert(value)
-            node_ids = [value for value in node_ids if not isinstance(value, AnnotatedRawShard)]
+        for node_or_shard in combine_batches_until_none(in_queue):
+            node_ids = []
+            for node_or_shard in node_ids:
+                if isinstance(node_or_shard, AnnotatedRawShard):
+                    # opens transaction; could do insertmany here or transaction scoped to loop
+                    cache.insert(node_or_shard)
+                else:
+                    node_ids.append(node_or_shard)
             cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
             # should we add this into retrieve_multiple?

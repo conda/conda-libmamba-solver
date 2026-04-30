@@ -34,6 +34,7 @@ from conda_libmamba_solver.shards import (
     fetch_shards_index,
 )
 from conda_libmamba_solver.shards_subset import (
+    QUEUE_TIMEOUT,
     NodeId,
     RepodataSubset,
     build_repodata_subset,
@@ -309,7 +310,7 @@ def test_shards_cache_thread(
     cache_thread.start()
 
     # combined into a single output batch
-    batch = shard_out_queue.get(timeout=1)
+    batch = shard_out_queue.get(timeout=QUEUE_TIMEOUT)
     for node_id, shard in batch:
         assert node_id in fake_nodes
         assert shard == cache.retrieve(node_id.shard_url)
@@ -318,7 +319,7 @@ def test_shards_cache_thread(
     with pytest.raises(queue.Empty):
         shard_out_queue.get_nowait()
 
-    while notfound := network_out_queue.get(timeout=1):
+    while notfound := network_out_queue.get(timeout=QUEUE_TIMEOUT):
         for node_id in notfound:
             assert node_id.shard_url.startswith("https://example.com/notfound")
 
@@ -362,7 +363,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     network_thread.start()
 
     with suppress(Empty):
-        while batch := shard_out_queue.get(timeout=1):
+        while batch := shard_out_queue.get(timeout=QUEUE_TIMEOUT):
             for url, shard in batch:
                 assert isinstance(shard, dict)
 
@@ -375,7 +376,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     # shardlikes has its url. (If no shardlike has NodeId's url, it produces
     # KeyError).
     network_in_queue.put([NodeId("nope", invalid_shardlike.url)])
-    assert isinstance(shard_out_queue.get(timeout=1), TypeError)
+    assert isinstance(shard_out_queue.get(timeout=QUEUE_TIMEOUT), TypeError)
 
     # Terminate with sentinel
     network_in_queue.put(None)
@@ -881,16 +882,16 @@ def test_worker_thread_exception_propagation():
     worker.start()
 
     # Should get the successful result first
-    result = out_queue.get(timeout=1)
+    result = out_queue.get(timeout=QUEUE_TIMEOUT)
     assert result == "processed: test_item"
 
     # Should get the exception propagated
-    exception = out_queue.get(timeout=1)
+    exception = out_queue.get(timeout=QUEUE_TIMEOUT)
     assert isinstance(exception, ValueError)
     assert "Simulated worker failure" in str(exception)
 
     # Worker should also send None to in_queue to signal termination
-    sentinel = in_queue.get(timeout=1)
+    sentinel = in_queue.get(timeout=QUEUE_TIMEOUT)
     assert sentinel is None
 
 
