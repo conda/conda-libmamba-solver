@@ -598,7 +598,7 @@ def cache_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
     shard_out_queue: Queue[Sequence[tuple[NodeId, ShardDict] | Exception]],
     network_out_queue: Queue[Sequence[NodeId] | None],
-    cache: ShardCache | QueueCache,
+    cache: ShardCache,
 ):
     """
     Fetch batches of shards from cache until in_queue sees None. Enqueue found
