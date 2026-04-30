@@ -614,14 +614,14 @@ def cache_fetch_thread(
         cache: used to retrieve shards.
     """
     with cache.copy() as cache:
-        for node_or_shard in combine_batches_until_none(in_queue):
+        for batch in combine_batches_until_none(in_queue):
             node_ids = []
-            for node_or_shard in node_ids:
-                if isinstance(node_or_shard, AnnotatedRawShard):
+            for item in batch:
+                if isinstance(item, AnnotatedRawShard):
                     # opens transaction; could do insertmany here or transaction scoped to loop
-                    cache.insert(node_or_shard)
+                    cache.insert(item)
                 else:
-                    node_ids.append(node_or_shard)
+                    node_ids.append(item)
             cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
             # should we add this into retrieve_multiple?
