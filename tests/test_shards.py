@@ -13,6 +13,7 @@ import logging
 import os
 import sqlite3
 import tempfile
+import threading
 import time
 from contextlib import contextmanager
 from pathlib import Path
@@ -631,6 +632,58 @@ def test_shards_cache_recovery(tmp_path: Path):
         cache.connect(retry=False)
     cache.connect(retry=True)
     assert cache.retrieve("notfound") is None
+
+
+def test_shards_cache_uses_wal(tmp_path: Path):
+    """WAL journal mode is enabled on a fresh cache."""
+    with shards_cache.ShardCache(tmp_path) as cache:
+        mode = cache.conn.execute("PRAGMA journal_mode").fetchone()[0]
+    assert mode == "wal"
+
+
+def test_shards_cache_concurrent_read_write(tmp_path: Path):
+    """Concurrent readers and writers must not raise OperationalError (#924)."""
+    compressor = zstandard.ZstdCompressor(level=1)
+    errors: list[Exception] = []
+    stop = threading.Event()
+
+    def writer(base):
+        try:
+            with shards_cache.ShardCache(base, create=False) as cache_copy:
+                for i in range(200):
+                    if stop.is_set():
+                        break
+                    shard = shards_cache.AnnotatedRawShard(
+                        f"https://shard{i}",
+                        f"pkg{i}",
+                        compressor.compress(msgpack.dumps({f"pkg{i}": "data"})),
+                    )
+                    cache_copy.insert(shard)
+        except Exception as exc:
+            errors.append(exc)
+
+    def reader(base):
+        try:
+            with shards_cache.ShardCache(base, create=False) as cache_copy:
+                for i in range(200):
+                    if stop.is_set():
+                        break
+                    urls = [f"https://shard{j}" for j in range(i + 1)]
+                    cache_copy.retrieve_multiple(urls)
+        except Exception as exc:
+            errors.append(exc)
+
+    with shards_cache.ShardCache(tmp_path) as cache:
+        w = threading.Thread(target=writer, args=(cache.base,))
+        r = threading.Thread(target=reader, args=(cache.base,))
+        w.start()
+        r.start()
+        w.join(timeout=10)
+        r.join(timeout=10)
+        stop.set()
+
+    # No sqlite3.OperationalError from either thread
+    assert errors == []
 
 
 NUM_FAKE_SHARDS = 64

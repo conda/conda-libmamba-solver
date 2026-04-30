@@ -49,9 +49,15 @@ def connect(dburi="cache.db"):
 
     dburi: uri-style sqlite database filename; accepts certain ?= parameters.
     """
-    conn = sqlite3.connect(dburi, uri=True)
+    conn = sqlite3.connect(dburi, uri=True, timeout=30.0)
     conn.row_factory = sqlite3.Row
     with conn as c:
+        try:
+            mode = c.execute("PRAGMA journal_mode = WAL").fetchone()[0]
+        except sqlite3.DatabaseError:
+            mode = None
+        if mode and mode.lower().startswith("wal"):
+            c.execute("PRAGMA synchronous = NORMAL")
         c.execute("PRAGMA foreign_keys = ON")
     return conn
 
