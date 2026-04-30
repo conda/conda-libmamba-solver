@@ -8,7 +8,6 @@ import shutil
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 from conda.base.context import context, reset_context
@@ -18,6 +17,7 @@ from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
+from conda_libmamba_solver.shards import ShardLike
 from conda_libmamba_solver.state import SolverInputState
 
 from .test_shards import CONDA_FORGE_WITH_SHARDS
@@ -27,6 +27,7 @@ if TYPE_CHECKING:
 
     from conda.testing.fixtures import CondaCLIFixture
     from pytest_benchmark.plugin import BenchmarkFixture
+    from pytest_mock import MockerFixture
 
 
 initialize_logging()
@@ -173,7 +174,79 @@ def test_load_channel_repo_info_shards(
     assert len(index_helper.repos) > 0
 
 
-def test_load_channels_order(shard_factory):
+@pytest.mark.parametrize(
+    "add_pip",
+    (
+        pytest.param(True, id="add_pip=True"),
+        pytest.param(False, id="add_pip=False"),
+    ),
+)
+def test_add_pip_as_python_dependency_sharded(
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
+    tmp_path: Path,
+    add_pip: bool,
+):
+    """
+    Regression test for https://github.com/conda/conda-libmamba-solver/issues/918.
+    When sharded repodata is used, add_pip_as_python_dependency must be honored.
+    """
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path))
+    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "true" if add_pip else "false")
+    reset_context()
+
+    shardlike = ShardLike(
+        {
+            "info": {"subdir": "noarch"},
+            "packages": {
+                "python-3.10.0-h1234567_0.tar.bz2": {
+                    "name": "python",
+                    "version": "3.10.0",
+                    "build": "h1234567_0",
+                    "build_number": 0,
+                    "depends": [],
+                }
+            },
+            "packages.conda": {},
+        },
+        url="https://shards.example.com/noarch/",
+    )
+    shardlike.fetch_shard("python")
+
+    in_state = SolverInputState(str(tmp_path / "env"), requested=("python",))
+
+    mocker.patch(
+        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
+        return_value=True,
+    )
+    mocker.patch(
+        "conda_libmamba_solver.index.build_repodata_subset",
+        return_value={"https://shards.example.com/noarch/": shardlike},
+    )
+    index_helper = LibMambaIndexHelper(
+        channels=[Channel("https://shards.example.com")],
+        subdirs=("noarch",),
+        installed_records=(),
+        pkgs_dirs=(),
+        in_state=in_state,
+    )
+
+    python_records = index_helper.search("python")
+    # python package must be found in the sharded index
+    assert python_records
+
+    pip_in_depends = any(
+        dep == "pip" or dep.startswith("pip ") for dep in (python_records[0].depends or [])
+    )
+    if add_pip:
+        # pip must be injected as a python dependency when add_pip_as_python_dependency=True
+        assert pip_in_depends
+    else:
+        # pip must NOT be a dependency of python when add_pip_as_python_dependency=False
+        assert not pip_in_depends
+
+
+def test_load_channels_order(shard_factory, mocker: MockerFixture):
     # Setup two shard servers. server_one will have a small
     # delay in the response to mimic a slower response.
     server_one = shard_factory.http_server_shards(
@@ -191,11 +264,11 @@ def test_load_channels_order(shard_factory):
         "in_state": SolverInputState(prefix="idontexist"),
     }
 
-    with patch(
+    mocker.patch(
         "conda_libmamba_solver.index._is_sharded_repodata_enabled",
         return_value=True,
-    ):
-        shard_enabled_index = LibMambaIndexHelper(**index_args)
+    )
+    shard_enabled_index = LibMambaIndexHelper(**index_args)
 
     # The expected output is that all of channel_one subdirs (noarch and current
     # platform) are ordered higher than channel_two subdirs.

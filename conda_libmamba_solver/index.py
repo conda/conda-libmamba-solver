@@ -644,7 +644,13 @@ class LibMambaIndexHelper:
                     )
                     packages.append(package)
 
-            repo = self.db.add_repo_from_packages(packages=packages, name=channel_url)
+            repo = self.db.add_repo_from_packages(
+                packages=packages,
+                name=channel_url,
+                add_pip_as_python_dependency=PipAsPythonDependency(
+                    context.add_pip_as_python_dependency
+                ),
+            )
             repos.append(
                 _ChannelRepoInfo(
                     channel=channel_object,
