@@ -17,7 +17,7 @@ from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled
-from conda_libmamba_solver.shards import ShardLike
+from conda_libmamba_solver.shards import ShardLike, spec_to_package_name
 from conda_libmamba_solver.state import SolverInputState
 
 from .test_shards import CONDA_FORGE_WITH_SHARDS
@@ -233,7 +233,7 @@ def test_add_pip_as_python_dependency_sharded(
     assert python_records
 
     pip_in_depends = any(
-        dep == "pip" or dep.startswith("pip ") for dep in (python_records[0].depends or [])
+        spec_to_package_name(dep) == "pip" for dep in (python_records[0].depends or [])
     )
     if add_pip:
         assert pip_in_depends
