@@ -6,10 +6,10 @@
 
 * Serialize all repodata cache access in a single thread. Open the sharded
   repodata cache (`repodata_shards.db`) in WAL mode with a longer SQLite busy
-  timeout. The pipelined cache reader thread no longer races with the network
-  writer thread and raises `sqlite3.OperationalError: database is locked`. Fall
-  back to the default journal mode on filesystems where WAL is not supported.
-  (#924)
+  timeout. This avoids an issue where the pipelined cache reader thread could
+  race with the network writer thread and raise `sqlite3.OperationalError: database is locked`.
+  Fall back to the default journal mode on filesystems where WAL is not
+  supported. (#924)
 
 ### Deprecations
 
