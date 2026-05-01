@@ -141,6 +141,10 @@ jobs:
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
 
+      - name: Upgrade conda-libmamba-solver (without sharded repodata)
+        shell: bash
+        run: "CONDA_PLUGINS_USE_SHARDED_REPODATA=0 conda install --yes -n base conda-canary/label/dev::conda-libmamba-solver"
+
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
@@ -305,6 +309,9 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
+
+      - name: Upgrade conda-libmamba-solver (without sharded repodata)
+        run: CONDA_PLUGINS_USE_SHARDED_REPODATA=0 conda install --yes -n base conda-canary/label/dev::conda-libmamba-solver
 
       - name: Conda Install
         working-directory: conda
@@ -581,6 +588,9 @@ jobs:
           miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
           miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
+
+      - name: Upgrade conda-libmamba-solver (without sharded repodata)
+        run: CONDA_PLUGINS_USE_SHARDED_REPODATA=0 conda install --yes -n base conda-canary/label/dev::conda-libmamba-solver
 
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
