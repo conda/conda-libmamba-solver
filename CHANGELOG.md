@@ -13,6 +13,27 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.4.1 (2026-05-01)
+
+### Bug fixes
+
+* Show the target platform instead of the host platform in the progress
+  message during cross-platform lockfile export. (#911)
+* Open the sharded repodata cache (`repodata_shards.db`) in WAL mode with a
+  longer SQLite busy timeout, so the pipelined cache reader thread no longer
+  races with the network writer thread and raises
+  `sqlite3.OperationalError: database is locked`. Fall back to the default
+  journal mode on filesystems where WAL is not supported. (#924)
+
+### Contributors
+
+* @jezdez
+* @costajohnt
+* @conda-bot
+* @pre-commit-ci[bot]
+
+
+
 ## 26.4.0 (2026-04-16)
 
 ### Enhancements
