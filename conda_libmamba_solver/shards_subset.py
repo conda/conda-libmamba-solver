@@ -189,6 +189,7 @@ class RepodataSubset:
         self.nodes = {}
         self.shardlikes = list(shardlikes)
         self._use_only_tar_bz2 = context.use_only_tar_bz2
+        self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
 
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
@@ -450,6 +451,9 @@ class RepodataSubset:
                 shardlike.visit_shard(node_id.package, shard)
 
                 pending.update(self.visit_node(parent_node, shard_mentioned_packages(shard)))
+                # ensure solver has "pip" record if add_pip_as_python_dependency:
+                if self._add_pip_as_python_dependency and parent_node.package == "python":
+                    pending.update(self.visit_node(parent_node, ("pip",)))
 
     def visit_node(self, parent_node: Node, mentioned_packages: Iterable[str]) -> Iterable[NodeId]:
         """Broadcast mentioned packages across channels. yield pending NodeId's."""

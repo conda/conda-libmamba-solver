@@ -205,18 +205,18 @@ def test_add_pip_as_python_dependency_sharded(
     subdir = context.subdir
     shardlike = ShardLike(
         {
-            "info": {"subdir": subdir},
+            "info": {"subdir": subdir, "base_url": "", "shards_base_url": ""},
             "packages": {
                 "python-3.10.0-h1234567_0.tar.bz2": {
                     "name": "python",
                     "version": "3.10.0",
                     "build": "h1234567_0",
                     "build_number": 0,
-                    "subdir": subdir,
                     "depends": [],
                 }
             },
             "packages.conda": {},
+            "repodata_version": 2,
         },
         url=f"https://shards.example.com/{subdir}/",
     )
@@ -246,8 +246,7 @@ def test_add_pip_as_python_dependency_sharded(
     # Verify the package was loaded correctly
     python_rec = python_records[0]
     assert python_rec.name == "python", f"Expected python, got {python_rec.name}"
-    assert python_rec.subdir == subdir, f"Expected subdir={subdir}, got {python_rec.subdir}"
-
+    # subdir will attach to channel, not record
     pip_in_depends = any(
         spec_to_package_name(dep) == "pip" for dep in (python_records[0].depends or [])
     )
