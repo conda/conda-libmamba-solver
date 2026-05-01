@@ -193,6 +193,12 @@ def test_add_pip_as_python_dependency_sharded(
     monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "true" if add_pip else "false")
     reset_context()
 
+    # Verify the context was set correctly
+    assert context.add_pip_as_python_dependency == add_pip, (
+        f"Context add_pip_as_python_dependency={context.add_pip_as_python_dependency}, "
+        f"expected {add_pip}"
+    )
+
     # Python interpreter packages are always platform-specific (never noarch).
     # libmamba only injects pip when the package's platform is a real platform
     # present in the db — so the test must use the current subdir, not "noarch".
