@@ -160,7 +160,11 @@ _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path
 
 
 def _package_info_from_package_dict(
-    record: PackageRecordDict, filename: str, url: str, channel_id: str
+    record: PackageRecordDict,
+    filename: str,
+    url: str,
+    channel_id: str,
+    add_pip_as_python_dependency=False,
 ) -> PackageInfo:
     """
     Build libmamba PackageInfo from an unprocessed repodata "packages", "packages.conda" entry.
@@ -193,6 +197,16 @@ def _package_info_from_package_dict(
     if track_features and isinstance(track_features, str):
         track_features = track_features.replace(" ", ",").split(",")
         track_features = list(f for f in (ff.strip() for ff in track_features) if f)
+
+    # Build depends list and append pip if conditions are met
+    depends = list(record.get("depends") or [])
+    if (
+        add_pip_as_python_dependency
+        and record["name"] == "python"
+        and record["version"].startswith(("2.", "3."))
+    ):
+        depends.append("pip")
+
     return PackageInfo(
         name=record["name"],
         version=record["version"],
@@ -208,7 +222,7 @@ def _package_info_from_package_dict(
         signatures=record.get("signatures") or "",
         track_features=track_features,
         # conda can have list or tuple, but libmamba only accepts lists
-        depends=list(record.get("depends") or []),
+        depends=depends,
         constrains=list(record.get("constrains") or []),
         defaulted_keys=list(record.get("defaulted_keys") or []),
         noarch=noarch,
@@ -257,6 +271,7 @@ class LibMambaIndexHelper:
         self.subdirs = subdirs or context.subdirs
         self.repodata_fn = repodata_fn
         self.in_state = in_state
+        self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -641,6 +656,7 @@ class LibMambaIndexHelper:
                         filename,
                         url=f"{base_url}{filename}",
                         channel_id=channel_id,
+                        add_pip_as_python_dependency=self._add_pip_as_python_dependency,
                     )
                     packages.append(package)
 
