@@ -189,6 +189,7 @@ class RepodataSubset:
         self.nodes = {}
         self.shardlikes = list(shardlikes)
         self._use_only_tar_bz2 = context.use_only_tar_bz2
+        self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
 
     @classmethod
     def has_strategy(cls, strategy: str) -> bool:
@@ -217,7 +218,11 @@ class RepodataSubset:
             shard = filter_redundant_packages(shard, self._use_only_tar_bz2)
             shardlike.visit_shard(node.package, shard)
 
-            for package in shard_mentioned_packages(shard):
+            # ensure solver has "pip" record if add_pip_as_python_dependency:
+            extra = (
+                ("pip",) if self._add_pip_as_python_dependency and node.package == "python" else ()
+            )
+            for package in shard_mentioned_packages(shard, extra=extra):
                 node_id = NodeId(package, shardlike.url)
 
                 if node_id not in self.nodes:
@@ -449,7 +454,15 @@ class RepodataSubset:
                 shardlike = shardlikes_by_url[node_id.channel]
                 shardlike.visit_shard(node_id.package, shard)
 
-                pending.update(self.visit_node(parent_node, shard_mentioned_packages(shard)))
+                # ensure solver has "pip" record if add_pip_as_python_dependency:
+                extra = (
+                    ("pip",)
+                    if self._add_pip_as_python_dependency and parent_node.package == "python"
+                    else ()
+                )
+                pending.update(
+                    self.visit_node(parent_node, shard_mentioned_packages(shard, extra=extra))
+                )
 
     def visit_node(self, parent_node: Node, mentioned_packages: Iterable[str]) -> Iterable[NodeId]:
         """Broadcast mentioned packages across channels. yield pending NodeId's."""
