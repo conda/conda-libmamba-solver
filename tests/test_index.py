@@ -193,21 +193,26 @@ def test_add_pip_as_python_dependency_sharded(
     monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "true" if add_pip else "false")
     reset_context()
 
+    # Python interpreter packages are always platform-specific (never noarch).
+    # libmamba only injects pip when the package's platform is a real platform
+    # present in the db — so the test must use the current subdir, not "noarch".
+    subdir = context.subdir
     shardlike = ShardLike(
         {
-            "info": {"subdir": "noarch"},
+            "info": {"subdir": subdir},
             "packages": {
                 "python-3.10.0-h1234567_0.tar.bz2": {
                     "name": "python",
                     "version": "3.10.0",
                     "build": "h1234567_0",
                     "build_number": 0,
+                    "subdir": subdir,
                     "depends": [],
                 }
             },
             "packages.conda": {},
         },
-        url="https://shards.example.com/noarch/",
+        url=f"https://shards.example.com/{subdir}/",
     )
     shardlike.fetch_shard("python")
 
@@ -219,11 +224,11 @@ def test_add_pip_as_python_dependency_sharded(
     )
     mocker.patch(
         "conda_libmamba_solver.index.build_repodata_subset",
-        return_value={"https://shards.example.com/noarch/": shardlike},
+        return_value={f"https://shards.example.com/{subdir}/": shardlike},
     )
     index_helper = LibMambaIndexHelper(
         channels=[Channel("https://shards.example.com")],
-        subdirs=("noarch",),
+        subdirs=(subdir,),
         installed_records=(),
         pkgs_dirs=(),
         in_state=in_state,
