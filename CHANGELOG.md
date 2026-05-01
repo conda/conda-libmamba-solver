@@ -17,6 +17,15 @@ Remember to update the hyperlinks at the bottom.
 
 ### Bug fixes
 
+* Fix `add_pip_as_python_dependency` not being honored when sharded repodata
+  is enabled. (#918 via #929)
+
+
+
+## 26.4.1 (2026-05-01)
+
+### Bug fixes
+
 * Show the target platform instead of the host platform in the progress
   message during cross-platform lockfile export. (#911)
 * Open the sharded repodata cache (`repodata_shards.db`) in WAL mode with a
