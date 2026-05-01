@@ -4,6 +4,7 @@ Authors are sorted alphabetically.
 * Agriya Khetarpal
 * Albert DeFusco
 * Christopher Ostrouchov
+* Dan Yeaw
 * Daniel Holth
 * Jaime Rodríguez-Guerra
 * Jannis Leidel

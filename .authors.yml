@@ -22,7 +22,7 @@
   github: costrouc
 - name: Daniel Holth
   email: dholth@anaconda.com
-  num_commits: 30
+  num_commits: 32
   first_commit: 2022-10-19 21:11:39
   github: dholth
 - name: Matthew R. Becker
@@ -111,3 +111,7 @@
   github: costajohnt
   num_commits: 1
   first_commit: 2026-04-27 03:34:42
+- name: Dan Yeaw
+  email: dan@yeaw.me
+  num_commits: 1
+  first_commit: 2026-05-01 18:41:55
