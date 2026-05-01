@@ -219,7 +219,9 @@ class RepodataSubset:
             shardlike.visit_shard(node.package, shard)
 
             # ensure solver has "pip" record if add_pip_as_python_dependency:
-            extra = ("pip",) if self._add_pip_as_python_dependency and node.package == "python" else ()
+            extra = (
+                ("pip",) if self._add_pip_as_python_dependency and node.package == "python" else ()
+            )
             for package in shard_mentioned_packages(shard, extra=extra):
                 node_id = NodeId(package, shardlike.url)
 
@@ -453,8 +455,14 @@ class RepodataSubset:
                 shardlike.visit_shard(node_id.package, shard)
 
                 # ensure solver has "pip" record if add_pip_as_python_dependency:
-                extra = ("pip",) if self._add_pip_as_python_dependency and parent_node.package == "python" else ()
-                pending.update(self.visit_node(parent_node, shard_mentioned_packages(shard, extra=extra)))
+                extra = (
+                    ("pip",)
+                    if self._add_pip_as_python_dependency and parent_node.package == "python"
+                    else ()
+                )
+                pending.update(
+                    self.visit_node(parent_node, shard_mentioned_packages(shard, extra=extra))
+                )
 
     def visit_node(self, parent_node: Node, mentioned_packages: Iterable[str]) -> Iterable[NodeId]:
         """Broadcast mentioned packages across channels. yield pending NodeId's."""
