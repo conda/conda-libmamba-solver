@@ -7,6 +7,7 @@ Authors are sorted alphabetically.
 * Daniel Holth
 * Jaime Rodríguez-Guerra
 * Jannis Leidel
+* John Costa
 * John Kirkham
 * Jonathan J. Helmus
 * Julien Jerphanion
