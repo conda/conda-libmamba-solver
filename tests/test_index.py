@@ -16,7 +16,11 @@ from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
-from conda_libmamba_solver.index import LibMambaIndexHelper, _is_sharded_repodata_enabled, _package_info_from_package_dict
+from conda_libmamba_solver.index import (
+    LibMambaIndexHelper,
+    _is_sharded_repodata_enabled,
+    _package_info_from_package_dict,
+)
 from conda_libmamba_solver.shards import ShardLike, spec_to_package_name
 from conda_libmamba_solver.state import SolverInputState
 
@@ -307,7 +311,7 @@ def test_package_info_from_package_dict_add_pip_as_python_dependency():
         "depends": ["libffi >=3.4,<4.0"],
         "subdir": "osx-64",
     }
-    
+
     package_info = _package_info_from_package_dict(
         python_record,
         "python-3.11.0-h96f0305_0.tar.bz2",
@@ -315,7 +319,7 @@ def test_package_info_from_package_dict_add_pip_as_python_dependency():
         channel_id="pkgs/main",
         add_pip_as_python_dependency=True,
     )
-    
+
     # pip should be appended to dependencies
     assert "pip" in package_info.dependencies
     assert "libffi >=3.4,<4.0" in package_info.dependencies
@@ -337,7 +341,7 @@ def test_package_info_from_package_dict_add_pip_as_python_dependency_false():
         "depends": ["libffi >=3.4,<4.0"],
         "subdir": "osx-64",
     }
-    
+
     package_info = _package_info_from_package_dict(
         python_record,
         "python-3.11.0-h96f0305_0.tar.bz2",
@@ -345,7 +349,7 @@ def test_package_info_from_package_dict_add_pip_as_python_dependency_false():
         channel_id="pkgs/main",
         add_pip_as_python_dependency=False,
     )
-    
+
     # pip should NOT be appended
     assert "pip" not in package_info.dependencies
     assert len(package_info.dependencies) == 1
@@ -364,7 +368,7 @@ def test_package_info_from_package_dict_add_pip_python2():
         "depends": [],
         "subdir": "osx-64",
     }
-    
+
     package_info = _package_info_from_package_dict(
         python_record,
         "python-2.7.18-h9ed2024_0.tar.bz2",
@@ -372,7 +376,7 @@ def test_package_info_from_package_dict_add_pip_python2():
         channel_id="pkgs/main",
         add_pip_as_python_dependency=True,
     )
-    
+
     # pip should be appended for Python 2.x as well
     assert "pip" in package_info.dependencies
     assert len(package_info.dependencies) == 1
@@ -390,7 +394,7 @@ def test_package_info_from_package_dict_add_pip_non_python_package():
         "depends": ["python >=3.11"],
         "subdir": "osx-64",
     }
-    
+
     package_info = _package_info_from_package_dict(
         record,
         "numpy-1.24.0-py311h5a7a992_0.tar.bz2",
@@ -398,7 +402,7 @@ def test_package_info_from_package_dict_add_pip_non_python_package():
         channel_id="pkgs/main",
         add_pip_as_python_dependency=True,
     )
-    
+
     # pip should NOT be appended for non-Python packages
     assert "pip" not in package_info.dependencies
     assert len(package_info.dependencies) == 1
@@ -418,7 +422,7 @@ def test_package_info_from_package_dict_add_pip_invalid_version():
         "depends": [],
         "subdir": "osx-64",
     }
-    
+
     package_info = _package_info_from_package_dict(
         record,
         "python-1.0.0-h0000_0.tar.bz2",
@@ -426,7 +430,7 @@ def test_package_info_from_package_dict_add_pip_invalid_version():
         channel_id="pkgs/main",
         add_pip_as_python_dependency=True,
     )
-    
+
     # pip should NOT be appended for invalid Python versions
     assert "pip" not in package_info.dependencies
     assert len(package_info.dependencies) == 0
