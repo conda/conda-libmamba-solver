@@ -190,7 +190,8 @@ def test_add_pip_as_python_dependency_sharded(
     Regression test for https://github.com/conda/conda-libmamba-solver/issues/918.
     When sharded repodata is used, add_pip_as_python_dependency must be honored.
     """
-    monkeypatch.setattr(context, "add_pip_as_python_dependency", add_pip)
+    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "true" if add_pip else "false")
+    reset_context()
 
     shardlike = ShardLike(
         {
