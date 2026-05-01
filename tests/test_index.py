@@ -243,6 +243,11 @@ def test_add_pip_as_python_dependency_sharded(
     python_records = index_helper.search("python")
     assert python_records
 
+    # Verify the package was loaded correctly
+    python_rec = python_records[0]
+    assert python_rec.name == "python", f"Expected python, got {python_rec.name}"
+    assert python_rec.subdir == subdir, f"Expected subdir={subdir}, got {python_rec.subdir}"
+
     pip_in_depends = any(
         spec_to_package_name(dep) == "pip" for dep in (python_records[0].depends or [])
     )
