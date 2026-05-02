@@ -142,8 +142,8 @@ jobs:
           run-post: false  # skip post cleanup
 
       - name: Upgrade conda-libmamba-solver (without sharded repodata)
-        shell: bash -el {0}
-        run: CONDA_PLUGINS_USE_SHARDED_REPODATA=0 conda install --yes -n base conda-canary/label/dev::conda-libmamba-solver
+        shell: bash
+        run: "CONDA_PLUGINS_USE_SHARDED_REPODATA=0 conda install --yes -n base conda-canary/label/dev::conda-libmamba-solver"
 
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
