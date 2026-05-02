@@ -13,12 +13,6 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
-## 26.4.1 (2026-05-01)
-
-### Bug fixes
-
-* Fix `add_pip_as_python_dependency` not being honored when sharded repodata
-  is enabled. (#918 via #929)
 
 
 
@@ -33,11 +27,15 @@ Remember to update the hyperlinks at the bottom.
   races with the network writer thread and raises
   `sqlite3.OperationalError: database is locked`. Fall back to the default
   journal mode on filesystems where WAL is not supported. (#924)
+* Fix `add_pip_as_python_dependency` not being honored when sharded repodata
+  is enabled. (#918 via #929)
 
 ### Contributors
 
+* @costajohnt made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/911
+* @danyeaw made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/929
+* @dholth
 * @jezdez
-* @costajohnt
 * @conda-bot
 * @pre-commit-ci[bot]
 
