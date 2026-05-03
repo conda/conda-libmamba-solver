@@ -138,10 +138,10 @@ def spec_to_package_name(spec: str) -> str:
     return name
 
 
-def shard_mentioned_packages(shard: ShardDict) -> Iterable[str]:
+def shard_mentioned_packages(shard: ShardDict, extra: Iterable[str] = ()) -> Iterable[str]:
     """
     Return all dependency names mentioned in a shard, not including the shard's
-    own package name.
+    own package name. Additional names can be injected via ``extra``.
     """
     unique_specs = set()
     for package in (*shard["packages"].values(), *shard["packages.conda"].values()):
@@ -152,6 +152,7 @@ def shard_mentioned_packages(shard: ShardDict) -> Iterable[str]:
             unique_specs.add(spec)
             name = spec_to_package_name(spec)
             yield name  # not much improvement from only yielding unique names
+    yield from extra
 
 
 class ShardBase(abc.ABC):

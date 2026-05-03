@@ -4,9 +4,11 @@ Authors are sorted alphabetically.
 * Agriya Khetarpal
 * Albert DeFusco
 * Christopher Ostrouchov
+* Dan Yeaw
 * Daniel Holth
 * Jaime Rodríguez-Guerra
 * Jannis Leidel
+* John Costa
 * John Kirkham
 * Jonathan J. Helmus
 * Julien Jerphanion

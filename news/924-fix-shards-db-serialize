@@ -4,8 +4,7 @@
 
 ### Bug fixes
 
-* Show the target platform instead of the host platform in the progress
-  message during cross-platform lockfile export. (#911)
+* Serialize repodata cache access in a single thread. (#924)
 
 ### Deprecations
 
