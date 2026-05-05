@@ -98,6 +98,7 @@ if TYPE_CHECKING:
 # Waiting for worker threads to shutdown cleanly, or raise error.
 THREAD_WAIT_TIMEOUT = 5  # seconds
 REACHABLE_PIPELINED_MAX_TIMEOUTS = 10  # number of times we can timeout waiting for shards
+QUEUE_TIMEOUT = 1
 
 
 @dataclass(order=True)
@@ -349,7 +350,7 @@ class RepodataSubset:
 
         network_thread = threading.Thread(
             target=network_worker,
-            args=(cache_miss_queue, shard_out_queue, cache, self.shardlikes),
+            args=(cache_miss_queue, shard_out_queue, QueueCache(cache_in_queue), self.shardlikes),
             daemon=True,
         )
 
@@ -433,7 +434,7 @@ class RepodataSubset:
                 break
 
             try:
-                new_shards = shard_out_queue.get(timeout=1)
+                new_shards = shard_out_queue.get(timeout=QUEUE_TIMEOUT)
                 if isinstance(new_shards, BaseException):  # error propagated from worker thread
                     raise new_shards
 
@@ -552,7 +553,7 @@ def combine_batches_until_none(
     while running:
         try:
             # Add timeout to prevent indefinite blocking if producer thread fails
-            batch = in_queue.get(timeout=5)
+            batch = in_queue.get(timeout=QUEUE_TIMEOUT)
             if batch is None:
                 break
         except queue.Empty:
@@ -588,6 +589,23 @@ def exception_to_queue(func):
     return wrapper
 
 
+class QueueCache:
+    def __init__(self, queue):
+        self.queue: Queue = queue
+
+    def insert(self, shard: AnnotatedRawShard):
+        self.queue.put([shard])
+
+    def copy(self):
+        return self  # used for threadsafety in ShardCache; not needed here
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return
+
+
 @exception_to_queue
 def cache_fetch_thread(
     in_queue: Queue[Sequence[NodeId] | None],
@@ -609,7 +627,14 @@ def cache_fetch_thread(
         cache: used to retrieve shards.
     """
     with cache.copy() as cache:
-        for node_ids in combine_batches_until_none(in_queue):
+        for batch in combine_batches_until_none(in_queue):
+            node_ids = []
+            for item in batch:
+                if isinstance(item, AnnotatedRawShard):
+                    # opens transaction; could do insertmany here or transaction scoped to loop
+                    cache.insert(item)
+                else:
+                    node_ids.append(item)
             cached = cache.retrieve_multiple([node_id.shard_url for node_id in node_ids])
 
             # should we add this into retrieve_multiple?
