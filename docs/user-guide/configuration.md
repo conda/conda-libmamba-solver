@@ -20,7 +20,7 @@ Sharded repodata is a feature that enables faster repodata fetching and is enabl
 conda config --set plugins.use_sharded_repodata false
 ```
 
-Alternatively, you can also disable it via an environment variable:
+Alternatively, you can disable it via an environment variable:
 
 ```shell
 export CONDA_PLUGINS_USE_SHARDED_REPODATA=false
