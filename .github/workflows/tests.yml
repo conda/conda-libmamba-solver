@@ -44,7 +44,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
-  CONDA_REF: main # pin conda version to latest for more stable tests
+  CONDA_REF: 15906-repodata-subset # branch with shards implementation
 
 jobs:
   # detect whether any code changes are included in this PR
