@@ -120,6 +120,7 @@ if TYPE_CHECKING:
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
+    from conda.gateways.shards import BuildRepodataSubset
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
@@ -256,7 +257,7 @@ class LibMambaIndexHelper:
         pkgs_dirs: PathsType = (),
         in_state: SolverInputState | None = None,
         *,
-        build_repodata_subset: Callable | None = None,
+        build_repodata_subset: BuildRepodataSubset | None = None,
     ):
         platform_less_channels: list[Channel] = []
         for channel in channels:

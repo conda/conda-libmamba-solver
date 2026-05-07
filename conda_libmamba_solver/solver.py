@@ -62,7 +62,6 @@ from .state import SolverInputState, SolverOutputState
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
-    from typing import Callable
 
     from boltons.setutils import IndexedSet
     from conda.auxlib import _Null
@@ -71,6 +70,7 @@ if TYPE_CHECKING:
         UpdateModifier,
     )
     from conda.common.path import PathType
+    from conda.gateways.shards import BuildRepodataSubset
     from libmambapy.solver.libsolv import Database, UnSolvable
     from libmambapy.specs import PackageInfo
 
@@ -99,7 +99,7 @@ class LibMambaSolver(Solver):
         repodata_fn: str = REPODATA_FN,
         command: str | _Null = NULL,
         *,
-        build_repodata_subset: Callable | None = None,
+        build_repodata_subset: BuildRepodataSubset | None = None,
     ):
         if specs_to_add and specs_to_remove:
             raise ValueError(
