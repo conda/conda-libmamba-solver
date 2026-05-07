@@ -62,6 +62,7 @@ from .state import SolverInputState, SolverOutputState
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
+    from typing import Callable
 
     from boltons.setutils import IndexedSet
     from conda.auxlib import _Null
@@ -97,6 +98,8 @@ class LibMambaSolver(Solver):
         specs_to_remove: Iterable[MatchSpec | str] = (),
         repodata_fn: str = REPODATA_FN,
         command: str | _Null = NULL,
+        *,
+        build_repodata_subset: Callable | None = None,
     ):
         if specs_to_add and specs_to_remove:
             raise ValueError(
@@ -125,6 +128,7 @@ class LibMambaSolver(Solver):
             self.subdirs = (*self.subdirs, "noarch")
 
         self._repodata_fn = self._maybe_ignore_current_repodata()
+        self._build_repodata_subset = build_repodata_subset
         self._libmamba_context = init_libmamba_context(
             channels=tuple(c.canonical_name for c in self.channels),
             platform=next(s for s in self.subdirs if s != "noarch"),
@@ -273,6 +277,7 @@ class LibMambaSolver(Solver):
             ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
             in_state=in_state,
+            build_repodata_subset=self._build_repodata_subset,
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)
