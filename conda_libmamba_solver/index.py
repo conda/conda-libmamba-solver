@@ -108,7 +108,9 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset as _default_build_repodata_subset
+from conda_libmamba_solver.shards_subset import (
+    build_repodata_subset as _default_build_repodata_subset,
+)
 
 from .mamba_utils import logger_callback
 
