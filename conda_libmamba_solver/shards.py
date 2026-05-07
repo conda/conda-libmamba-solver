@@ -37,8 +37,7 @@ log = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, KeysView
-    from typing import Iterator
+    from collections.abc import Iterable, Iterator, KeysView
 
     from conda.gateways.repodata import RepodataCache
     from requests import Response
@@ -257,8 +256,7 @@ class ShardBase(abc.ABC):
         """
         repodata = self.build_repodata()
         for package_group in ("packages", "packages.conda"):
-            for filename, record in repodata.get(package_group, {}).items():
-                yield filename, record
+            yield from repodata.get(package_group, {}).items()
 
 
 class ShardLike(ShardBase):
