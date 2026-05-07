@@ -233,7 +233,7 @@ def test_add_pip_as_python_dependency_sharded(
         return_value=True,
     )
     mocker.patch(
-        "conda_libmamba_solver.index.build_repodata_subset",
+        "conda_libmamba_solver.index._default_build_repodata_subset",
         return_value={f"https://shards.example.com/{subdir}/": shardlike},
     )
     index_helper = LibMambaIndexHelper(
