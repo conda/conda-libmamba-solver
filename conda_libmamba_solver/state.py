@@ -67,7 +67,6 @@ import logging
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
-from boltons.setutils import IndexedSet
 from conda.auxlib import NULL
 from conda.base.constants import DepsModifier, UpdateModifier
 from conda.base.context import context
@@ -82,7 +81,7 @@ from conda.models.match_spec import MatchSpec
 from conda.models.prefix_graph import PrefixGraph
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Sequence
     from os import PathLike
     from typing import Any
 
@@ -472,12 +471,12 @@ class SolverOutputState:
         self.pins: dict[str, MatchSpec] = pins or {}
 
     @property
-    def current_solution(self) -> IndexedSet[PackageRecord]:
+    def current_solution(self) -> Sequence[PackageRecord]:
         """
         Massage currently stored records so they can be returned as the type expected by the
         solver API. This is what you should return in ``Solver.solve_final_state()``.
         """
-        return IndexedSet(PrefixGraph(self.records.values()).graph)
+        return tuple(PrefixGraph(self.records.values()).graph)
 
     @property
     def specs(self) -> dict[str, MatchSpec]:
@@ -519,7 +518,7 @@ class SolverOutputState:
         """
         return {name: spec for name, spec in self.specs.items() if name.startswith("__")}
 
-    def early_exit(self) -> IndexedSet[PackageRecord] | None:
+    def early_exit(self) -> Sequence[PackageRecord] | None:
         """
         Operations that do not need a solver and might result in returning
         early are collected here.
