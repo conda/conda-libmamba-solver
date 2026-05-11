@@ -653,7 +653,7 @@ class LibMambaIndexHelper:
             base_url = shardlike.base_url
 
             packages = []
-            for filename, record in shardlike.package_records():
+            for filename, record in shardlike.iter_records():
                 package = _package_info_from_package_dict(
                     record,
                     filename,
