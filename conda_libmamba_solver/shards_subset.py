@@ -338,7 +338,7 @@ class RepodataSubset:
         network_worker. Called by reachable_pipelined()
         """
 
-        cache_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
+        cache_in_queue: SimpleQueue[list[NodeId] | list[AnnotatedRawShard] | None] = SimpleQueue()
         shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]] | Exception] = SimpleQueue()
         cache_miss_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
 
@@ -708,7 +708,8 @@ def network_fetch_thread(
         )  # type: ignore[assign]
         # We could send this back into the cache thread instead to
         # serialize access to sqlite3 if lock contention becomes an issue.
-        cache.insert(AnnotatedRawShard(url, node_id.package, data))
+)  # type: ignore[assign]
+cache.insert(AnnotatedRawShard(url, node_id.package, data))
         shard_out_queue.put([(node_id, shard)])
 
     def result_to_in_queue(future: Future):
