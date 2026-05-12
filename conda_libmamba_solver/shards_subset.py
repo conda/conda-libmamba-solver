@@ -706,10 +706,9 @@ def network_fetch_thread(
         shard: ShardDict = msgpack.loads(
             dctx.decompress(data, max_output_size=ZSTD_MAX_SHARD_SIZE)
         )  # type: ignore[assign]
-        # We could send this back into the cache thread instead to
-        # serialize access to sqlite3 if lock contention becomes an issue.
-)  # type: ignore[assign]
-cache.insert(AnnotatedRawShard(url, node_id.package, data))
+        # A special cache: QueueCache lets cache.insert() send the shard back
+        # into the cache thread, avoiding lock contention:
+        cache.insert(AnnotatedRawShard(url, node_id.package, data))
         shard_out_queue.put([(node_id, shard)])
 
     def result_to_in_queue(future: Future):
