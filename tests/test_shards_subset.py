@@ -36,6 +36,7 @@ from conda_libmamba_solver.shards import (
 from conda_libmamba_solver.shards_subset import (
     QUEUE_TIMEOUT,
     NodeId,
+    QueueCache,
     RepodataSubset,
     build_repodata_subset,
     combine_batches_until_none,
@@ -344,12 +345,18 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
 
     network_in_queue: SimpleQueue[list[NodeId] | None] = SimpleQueue()
     shard_out_queue: SimpleQueue[list[tuple[NodeId, ShardDict]]] = SimpleQueue()
+    cache_in_queue: SimpleQueue = SimpleQueue()
 
     # this kind of thread can crash, and we don't hear back without our own
     # handling.
     network_thread = threading.Thread(
         target=shards_subset.network_fetch_thread,
-        args=(network_in_queue, shard_out_queue, cache, [found, invalid_shardlike]),
+        args=(
+            network_in_queue,
+            shard_out_queue,
+            QueueCache(cache_in_queue),
+            [found, invalid_shardlike],
+        ),
         daemon=False,
     )
 
@@ -381,7 +388,16 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
     # Terminate with sentinel
     network_in_queue.put(None)
 
-    network_thread.join(5)
+    network_thread.join(1)
+    assert not network_thread.is_alive()
+
+    # Check that network put expected shards in cache
+    to_cache = []
+    with suppress(Empty):
+        while True:
+            to_cache.append(cache_in_queue.get(block=False))
+
+    assert [raw_shard.package for (raw_shard,) in to_cache] == ["bar", "foo"]
 
 
 # endregion
