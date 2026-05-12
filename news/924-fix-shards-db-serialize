@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Serialize repodata cache access in a single thread. (#924)
+* Serialize sharded repodata cache access in a single thread. (#924)
 
 ### Deprecations
 
