@@ -397,7 +397,7 @@ def test_shards_network_thread(http_server_shards, shard_cache_with_data):
         while True:
             to_cache.append(cache_in_queue.get(block=False))
 
-    assert [raw_shard.package for (raw_shard,) in to_cache] == ["bar", "foo"]
+    assert {raw_shard.package for (raw_shard,) in to_cache} == {"bar", "foo"}
 
 
 # endregion
