@@ -13,6 +13,21 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.4.2 (2026-05-13)
+
+### Bug fixes
+
+* Serialize sharded repodata cache access in a single thread. (#924)
+
+### Contributors
+
+* @danyeaw
+* @dholth
+* @travishathaway
+* @conda-bot
+
+
+
 
 
 
