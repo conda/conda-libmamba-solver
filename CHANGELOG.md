@@ -28,9 +28,6 @@ Remember to update the hyperlinks at the bottom.
 
 
 
-
-
-
 ## 26.4.1 (2026-05-01)
 
 ### Bug fixes
