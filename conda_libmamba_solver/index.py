@@ -108,7 +108,9 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset
+from conda_libmamba_solver.shards_subset import (
+    build_repodata_subset as _default_build_repodata_subset,
+)
 
 from .mamba_utils import logger_callback
 
@@ -118,6 +120,7 @@ if TYPE_CHECKING:
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
+    from conda.gateways.shards import BuildRepodataSubset
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
 
@@ -253,6 +256,8 @@ class LibMambaIndexHelper:
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
         in_state: SolverInputState | None = None,
+        *,
+        build_repodata_subset: BuildRepodataSubset | None = None,
     ):
         platform_less_channels: list[Channel] = []
         for channel in channels:
@@ -272,6 +277,7 @@ class LibMambaIndexHelper:
         self.repodata_fn = repodata_fn
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
+        self.build_repodata_subset = build_repodata_subset or _default_build_repodata_subset
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -396,7 +402,7 @@ class LibMambaIndexHelper:
         """
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        channel_data = self.build_repodata_subset(root_packages, urls_to_channel)
         if channel_data is None:
             return  # caller should fall back to repodata.json
 
@@ -639,26 +645,23 @@ class LibMambaIndexHelper:
         """
         repos = []
         for channel_url, shardlike in repodata_subset.items():
-            repodata = shardlike.build_repodata()
-            # Don't like going back and forth between channel objects and URLs;
-            # build_repodata_subset() expands channels into per-subdir URLs as
-            # part of fetch:
+            # Channels are already expanded to per-subdir URLs by the caller.
+            # Reconstruct Channel object to get channel_id for the solver.
             channel_object = Channel(channel_url)
             channel_id = self._channel_to_id(channel_object)
             # must be appropriate for string concatenation:
             base_url = shardlike.base_url
 
             packages = []
-            for package_group in ("packages", "packages.conda"):
-                for filename, record in repodata.get(package_group, {}).items():
-                    package = _package_info_from_package_dict(
-                        record,
-                        filename,
-                        url=f"{base_url}{filename}",
-                        channel_id=channel_id,
-                        add_pip_as_python_dependency=self._add_pip_as_python_dependency,
-                    )
-                    packages.append(package)
+            for filename, record in shardlike.iter_records():
+                package = _package_info_from_package_dict(
+                    record,
+                    filename,
+                    url=f"{base_url}{filename}",
+                    channel_id=channel_id,
+                    add_pip_as_python_dependency=self._add_pip_as_python_dependency,
+                )
+                packages.append(package)
 
             repo = self.db.add_repo_from_packages(
                 packages=packages,

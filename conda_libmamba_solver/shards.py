@@ -37,7 +37,7 @@ log = logging.getLogger(__name__)
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, KeysView
+    from collections.abc import Iterable, Iterator, KeysView
 
     from conda.gateways.repodata import RepodataCache
     from requests import Response
@@ -138,7 +138,7 @@ def spec_to_package_name(spec: str) -> str:
     return name
 
 
-def shard_mentioned_packages(shard: ShardDict, extra: Iterable[str] = ()) -> Iterable[str]:
+def shard_mentioned_packages(shard: ShardDict, extra: Iterable[str] = ()) -> Iterator[str]:
     """
     Return all dependency names mentioned in a shard, not including the shard's
     own package name. Additional names can be injected via ``extra``.
@@ -235,6 +235,8 @@ class ShardBase(abc.ABC):
     def build_repodata(self) -> RepodataDict:
         """
         Return monolithic repodata including all visited shards.
+
+        Prefer iter_records() over this method.
         """
         repodata: RepodataDict = {
             **self.repodata_no_packages,
@@ -247,6 +249,14 @@ class ShardBase(abc.ABC):
             for package_group in ("packages", "packages.conda"):
                 repodata[package_group].update(shard[package_group])
         return repodata
+
+    def iter_records(self) -> Iterator[tuple[str, dict]]:
+        """
+        Yield (filename, record) tuples for all packages in visited shards.
+        """
+        repodata = self.build_repodata()
+        for package_group in ("packages", "packages.conda"):
+            yield from repodata.get(package_group, {}).items()
 
 
 class ShardLike(ShardBase):

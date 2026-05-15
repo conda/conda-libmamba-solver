@@ -1,0 +1,21 @@
+### Enhancements
+
+* Add a new `build_repodata_subset: Callable | None` parameter to
+`LibMambaSolver`, allowing `conda` to provide sharded repodata
+instead of hosting the implementation in this project. (#908)
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
