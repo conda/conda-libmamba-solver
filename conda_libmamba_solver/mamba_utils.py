@@ -68,7 +68,12 @@ def init_libmamba_context(
     if libmamba_context.output_params.json:
         libmambapy.cancel_json_output(libmamba_context)
     libmamba_context.output_params.quiet = context.quiet
-    libmamba_context.output_params.verbosity = context.verbosity
+    verbosity = context.verbosity
+    # libmambapy only respects 4 log levels. If conda provides
+    # a higher verbosity, set the highest logging verbosity level.
+    if verbosity > 4:
+        verbosity = 4
+    libmamba_context.output_params.verbosity = verbosity
     libmamba_context.set_log_level(
         {
             4: libmambapy.LogLevel.TRACE,
@@ -76,7 +81,7 @@ def init_libmamba_context(
             2: libmambapy.LogLevel.INFO,
             1: libmambapy.LogLevel.WARNING,
             0: libmambapy.LogLevel.ERROR,
-        }[context.verbosity]
+        }[verbosity]
     )
 
     # Prefix params
