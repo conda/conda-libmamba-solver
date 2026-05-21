@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 
+from conda.common.compat import on_win
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
@@ -58,6 +59,14 @@ def test_query_search_includes_python_site_packages_path():
     assert prec.name == "python"
     assert prec.version == "3.13.2"
     if python_site_packages_path_support:
-        assert prec.python_site_packages_path == "lib/python3.13t/site-packages"
+        # python_site_packages_path is computed by mamba for every python package.
+        # ref: https://github.com/mamba-org/mamba/blob/2.6.2/libmamba/src/core/query.cpp#L237-L245
+        # Windows vs unix and free-threaded vs not free-threaded will have different results.
+        # ref: https://github.com/mamba-org/mamba/pull/4268/changes
+        # issue ref: https://github.com/mamba-org/mamba/issues/4286
+        if on_win:
+            assert prec.python_site_packages_path == "Lib/site-packages"
+        else:
+            assert prec.python_site_packages_path == "lib/python3.13t/site-packages"
     else:
         assert prec.python_site_packages_path is None
