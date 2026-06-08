@@ -35,6 +35,11 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
 
+def test_solver_declares_global_exclude_newer_support_only() -> None:
+    assert Solver.supports_exclude_newer_global is True
+    assert Solver.supports_exclude_newer_package is False
+
+
 def test_python_downgrade_reinstalls_noarch_packages(
     tmp_env: TmpEnvFixture,
     conda_cli: CondaCLIFixture,

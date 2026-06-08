@@ -44,7 +44,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
-  CONDA_REF: main # pin conda version to latest for more stable tests
+  CONDA_REF: feature/repodata-filter-cooldown # temporarily test against exclude-newer branch
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -112,7 +112,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jezdez/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           ref: ${{ env.CONDA_REF }}
 
@@ -278,7 +278,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jezdez/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           ref: ${{ env.CONDA_REF }}
 
@@ -550,7 +550,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
-          repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
+          repository: jezdez/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           ref: ${{ env.CONDA_REF }}
 

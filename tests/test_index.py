@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context, reset_context
 from conda.common.compat import on_win
+from conda.core.exclude_newer import ExcludeNewerPolicy
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
@@ -434,3 +435,17 @@ def test_package_info_from_package_dict_add_pip_invalid_version():
     # pip should NOT be appended for invalid Python versions
     assert "pip" not in package_info.dependencies
     assert len(package_info.dependencies) == 0
+
+
+def test_exclude_newer_timestamp_unset():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy.disabled()
+
+    assert index._exclude_newer_timestamp() is None
+
+
+def test_exclude_newer_timestamp_uses_resolved_global_cutoff():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
+
+    assert index._exclude_newer_timestamp() == 1234
