@@ -35,9 +35,10 @@ if TYPE_CHECKING:
     from pytest import MonkeyPatch
 
 
-def test_solver_declares_global_exclude_newer_support_only() -> None:
+def test_solver_declares_exclude_newer_support() -> None:
     assert Solver.supports_exclude_newer_global is True
-    assert Solver.supports_exclude_newer_package is False
+    assert Solver.supports_exclude_newer_channel is True
+    assert Solver.supports_exclude_newer_package is True
 
 
 def test_python_downgrade_reinstalls_noarch_packages(

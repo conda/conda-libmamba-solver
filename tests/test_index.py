@@ -37,6 +37,8 @@ if TYPE_CHECKING:
 
 initialize_logging()
 DATA = Path(__file__).parent / "data"
+NOW = 1_700_000_000.0
+DAY = 86400
 
 
 def test_given_channels(monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike):
@@ -449,3 +451,41 @@ def test_exclude_newer_timestamp_uses_resolved_global_cutoff():
     index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
 
     assert index._exclude_newer_timestamp() == 1234
+
+
+def test_exclude_newer_timestamp_is_disabled_for_policy_overrides():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy.from_values(
+        "1d",
+        {"openssl": False},
+        channel_settings=({"channel": "https://example.test/conda", "exclude_newer": "3d"},),
+        now=NOW,
+    )
+
+    assert index._exclude_newer_timestamp() is None
+    assert index._uses_python_exclude_newer_filter()
+
+
+def test_exclude_newer_record_filter_honors_package_and_channel_overrides():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy.from_values(
+        "1d",
+        {"openssl": "false", "numpy": "1d"},
+        channel_settings=({"channel": "https://example.test/conda", "exclude_newer": "3d"},),
+        now=NOW,
+    )
+
+    def allowed(name: str, channel_url: str, timestamp: float) -> bool:
+        filename = f"{name}-1.0-0.tar.bz2"
+        package_url = f"{channel_url}/{filename}"
+        return index._record_allowed(
+            {"name": name, "timestamp": timestamp},
+            filename,
+            channel_url,
+            package_url,
+        )
+
+    assert allowed("openssl", "https://example.test/conda/linux-64", NOW - 60)
+    assert allowed("numpy", "https://example.test/conda/linux-64", NOW - 2 * DAY)
+    assert not allowed("scipy", "https://example.test/conda/linux-64", NOW - 2 * DAY)
+    assert allowed("scipy", "https://other.example.test/conda/linux-64", NOW - 2 * DAY)
