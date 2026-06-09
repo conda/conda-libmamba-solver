@@ -514,6 +514,65 @@ def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None
     conda_cli("create", "--dry-run", "--offline", spec, raises=raises)
 
 
+@pytest.mark.parametrize(
+    "cuda_version,expect_error",
+    [
+        pytest.param("12.0", True, id="unsatisfied"),
+        pytest.param("13.0", False, id="satisfied"),
+    ],
+)
+def test_constrains_virtual_package(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    cuda_version: str,
+    expect_error: bool,
+) -> None:
+    """
+    conda/conda#10803 regression: a package whose constrains reference a virtual
+    package (e.g. __cuda>=13) must cause an unsatisfiable error when the host
+    virtual package version is too low (__cuda==12), not silently succeed.
+    """
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA", cuda_version)
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
+    reset_context()
+
+    noarch = tmp_path / "noarch"
+    noarch.mkdir()
+    (noarch / "repodata.json").write_text(
+        json.dumps({
+            "info": {"subdir": "noarch"},
+            "packages": {
+                "needs-cuda13-1.0-0.tar.bz2": {
+                    "name": "needs-cuda13",
+                    "version": "1.0",
+                    "build": "0",
+                    "build_number": 0,
+                    "noarch": "generic",
+                    "constrains": ["__cuda>=13"],
+                    "depends": [],
+                    "md5": "00000000000000000000000000000000",
+                    "sha256": "0" * 64,
+                }
+            },
+            "packages.conda": {},
+        })
+    )
+
+    solver = Solver(
+        prefix=tmp_path / "env",
+        channels=[str(tmp_path)],
+        specs_to_add=["needs-cuda13"],
+        command="create",
+    )
+    if expect_error:
+        with pytest.raises(LibMambaUnsatisfiableError):
+            solver.solve_final_state()
+    else:
+        records = solver.solve_final_state()
+        assert any(r.name == "needs-cuda13" for r in records)
+
+
 def test_urls_are_percent_decoded(tmp_path: Path) -> None:
     solver = Solver(
         prefix=tmp_path, channels=["conda-forge"], specs_to_add=["x264"], command="create"
