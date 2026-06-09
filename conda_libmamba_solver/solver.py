@@ -435,7 +435,7 @@ class LibMambaSolver(Solver):
         excluded: it manages virtual packages separately and already skips
         ``__``-prefixed specs.
         """
-        tasks[Request.Install].extend(in_state.virtual)
+        tasks[Request.Install].extend(in_state.virtual.keys())
 
     def _specs_to_request_jobs_add(
         self,
