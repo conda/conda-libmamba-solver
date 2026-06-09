@@ -540,23 +540,25 @@ def test_constrains_virtual_package(
     noarch = tmp_path / "noarch"
     noarch.mkdir()
     (noarch / "repodata.json").write_text(
-        json.dumps({
-            "info": {"subdir": "noarch"},
-            "packages": {
-                "needs-cuda13-1.0-0.tar.bz2": {
-                    "name": "needs-cuda13",
-                    "version": "1.0",
-                    "build": "0",
-                    "build_number": 0,
-                    "noarch": "generic",
-                    "constrains": ["__cuda>=13"],
-                    "depends": [],
-                    "md5": "00000000000000000000000000000000",
-                    "sha256": "0" * 64,
-                }
-            },
-            "packages.conda": {},
-        })
+        json.dumps(
+            {
+                "info": {"subdir": "noarch"},
+                "packages": {
+                    "needs-cuda13-1.0-0.tar.bz2": {
+                        "name": "needs-cuda13",
+                        "version": "1.0",
+                        "build": "0",
+                        "build_number": 0,
+                        "noarch": "generic",
+                        "constrains": ["__cuda>=13"],
+                        "depends": [],
+                        "md5": "00000000000000000000000000000000",
+                        "sha256": "0" * 64,
+                    }
+                },
+                "packages.conda": {},
+            }
+        )
     )
 
     solver = Solver(
