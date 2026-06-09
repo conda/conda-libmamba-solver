@@ -429,9 +429,7 @@ class LibMambaSolver(Solver):
         dodge a ``constrains``/``depends`` rule that references it -- silently
         ignoring e.g. ``__cuda>=13`` on a host providing ``__cuda==12``.
         Requesting them as (name-only) installs keeps them present so such
-        constraints are enforced, mirroring conda's classic solver, which
-        injects every virtual package as a hard spec for both add and remove
-        solves (conda/conda#10803). The conda-build path is intentionally
+        constraints are enforced. The conda-build path is intentionally
         excluded.
         """
         tasks[Request.Install].extend(in_state.virtual.keys())
