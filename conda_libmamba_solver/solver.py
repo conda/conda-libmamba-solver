@@ -432,8 +432,7 @@ class LibMambaSolver(Solver):
         constraints are enforced, mirroring conda's classic solver, which
         injects every virtual package as a hard spec for both add and remove
         solves (conda/conda#10803). The conda-build path is intentionally
-        excluded: it manages virtual packages separately and already skips
-        ``__``-prefixed specs.
+        excluded.
         """
         tasks[Request.Install].extend(in_state.virtual.keys())
 
