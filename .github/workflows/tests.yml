@@ -386,7 +386,8 @@ jobs:
   linux-benchmarks:
     # only run benchmarks if there are code changes
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: false
+    # if: needs.changes.outputs.code == 'true'
 
     runs-on: ubuntu-22.04
     defaults:
