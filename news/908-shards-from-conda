@@ -10,7 +10,7 @@ instead of hosting the implementation in this project. (#908)
 
 ### Deprecations
 
-* <news item>
+* Require `conda >=26.5` (#908)
 
 ### Docs
 
