@@ -1,8 +1,9 @@
 ### Enhancements
 
 * Add a new `build_repodata_subset: Callable | None` parameter to
-`LibMambaSolver`, allowing `conda` to provide sharded repodata
-instead of hosting the implementation in this project. (#908)
+`LibMambaSolver`, allowing `conda` to provide sharded repodata instead of
+hosting the implementation in this project. The implementation in
+`conda-libmamba-solver` has been removed. (#908)
 
 ### Bug fixes
 
@@ -11,6 +12,9 @@ instead of hosting the implementation in this project. (#908)
 ### Deprecations
 
 * Require `conda >=26.5` (#908)
+* Remove `CONDA_PLUGINS_USE_SHARDED_REPODATA`/`plugins.use_sharded_repodata`
+  setting. `conda` provides a `repodata_use_shards` (default True) setting
+  instead. (#908)
 
 ### Docs
 

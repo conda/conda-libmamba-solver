@@ -108,10 +108,6 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import (
-    build_repodata_subset as _default_build_repodata_subset,
-)
-
 from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
@@ -121,10 +117,9 @@ if TYPE_CHECKING:
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
     from conda.gateways.shards import BuildRepodataSubset
+    from conda.gateways.shards.typing import Shards as ShardBase
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
-
-    from conda_libmamba_solver.shards import ShardBase
 
     from .shards_typing import PackageRecordDict
     from .state import SolverInputState
@@ -150,13 +145,6 @@ class _ChannelRepoInfo:
         if url_parts[-1] in KNOWN_SUBDIRS:
             return url_parts[-2]
         return url_parts[-1]
-
-
-def _is_sharded_repodata_enabled():
-    """
-    Flag to see whether we should check for sharded repodata.
-    """
-    return context.plugins.use_sharded_repodata is True  # type: ignore
 
 
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
@@ -277,7 +265,7 @@ class LibMambaIndexHelper:
         self.repodata_fn = repodata_fn
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
-        self.build_repodata_subset = build_repodata_subset or _default_build_repodata_subset
+        self.build_repodata_subset = build_repodata_subset
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -383,7 +371,7 @@ class LibMambaIndexHelper:
         urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
         # Prefer sharded repodata loading if enabled
-        if self.in_state and _is_sharded_repodata_enabled():
+        if self.in_state and self.build_repodata_subset:
             # _load_channel_repo_info_shards() must return ChannelRepoInfo
             # matching the key order of urls_to_channel:
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
@@ -400,6 +388,8 @@ class LibMambaIndexHelper:
         """
         Load repository information from sharded repodata cache.
         """
+        if self.build_repodata_subset is None:  # typing
+            return None
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
         channel_data = self.build_repodata_subset(root_packages, urls_to_channel)

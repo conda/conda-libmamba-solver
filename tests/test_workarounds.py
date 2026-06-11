@@ -65,16 +65,14 @@ def test_build_string_filters():
 
 
 @pytest.mark.trouble
-@pytest.mark.parametrize("shards", (True, False), ids=["shards", "noshards"])
 @pytest.mark.parametrize("stage", ["Collecting package metadata", "Solving environment"])
-def test_ctrl_c(stage, shards):
+def test_ctrl_c(stage):
     TIMEOUT = 20
 
     async def run() -> tuple[str, str, int]:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + TIMEOUT
         env = {
-            "CONDA_PLUGINS_USE_SHARDED_REPODATA": str(shards),
             "PYTHONHASHSEED": str(0xAD792856),
         }
         p = await asyncio.create_subprocess_exec(
