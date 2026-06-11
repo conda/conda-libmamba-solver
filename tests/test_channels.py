@@ -425,9 +425,9 @@ def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaC
         # '<unknown>' channel and reproduce the issue
         temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
         shutil.copy(test_pkg, temp_pkg)
-        conda_cli("install", f"--prefix={prefix}", temp_pkg)
+        conda_cli("install", f"--prefix={prefix}", "--yes", temp_pkg)
         assert package_is_installed(prefix, "test-package")
-        conda_cli("install", f"--prefix={prefix}", "zlib")
+        conda_cli("install", f"--prefix={prefix}", "--yes", "zlib")
         assert package_is_installed(prefix, "zlib")
 
 
