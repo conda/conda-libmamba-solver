@@ -748,7 +748,7 @@ def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
 @pytest.mark.skipif(on_win, reason="Missing free-threaded Python build?")
 @pytest.mark.parametrize("shards", (True, False))
 def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
-    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1" if shards else "0")
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", "1" if shards else "0")
     reset_context()
     with tmp_env("python=3.14=*_cp314t", "--override-channels", "-c", "conda-forge") as prefix:
         python = PrefixData(prefix).get("python")
