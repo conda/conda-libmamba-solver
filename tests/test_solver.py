@@ -183,6 +183,8 @@ def test_update_from_latest_not_downgrade(
             "python",
         )
         update_python = PrefixData(prefix).get("python")
+        print(f"Check that {original_python} matches {update_python}")
+        print(update_python.__dict__)
         assert original_python.version == update_python.version
 
 
@@ -501,13 +503,11 @@ def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None
 
     TODO: Remove once https://github.com/conda/conda/pull/13784 is merged
     """
-    if any(
-        [
-            on_linux and spec in ("__glibc", "__unix", "__linux"),
-            on_mac and spec in ("__unix", "__osx"),
-            on_win and spec == "__win",
-        ]
-    ):
+    if any([
+        on_linux and spec in ("__glibc", "__unix", "__linux"),
+        on_mac and spec in ("__unix", "__osx"),
+        on_win and spec == "__win",
+    ]):
         raises = DryRunExit  # success
     else:
         raises = (UnsatisfiableError, PackagesNotFoundError)
