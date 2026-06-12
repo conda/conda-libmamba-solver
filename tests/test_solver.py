@@ -151,9 +151,12 @@ def test_determinism(tmpdir):
     assert len(set(installed_bokeh_versions)) == 1
 
 
+@pytest.mark.parametrize("use_shards", (True, False), ids=("use-shards", "no-use-shards"))
 def test_update_from_latest_not_downgrade(
     tmp_env: TmpEnvFixture,
     conda_cli: CondaCLIFixture,
+    use_shards: bool,
+    monkeypatch,
 ) -> None:
     """Based on two issues where an upgrade caused a downgrade in a given package
 
@@ -167,6 +170,8 @@ def test_update_from_latest_not_downgrade(
      - https://github.com/conda/conda-libmamba-solver/issues/71
      - https://github.com/conda/conda-libmamba-solver/issues/156
     """
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", str(use_shards))
+    reset_context()
     with tmp_env(
         "--override-channels",
         "--channel=conda-forge",
@@ -503,11 +508,13 @@ def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None
 
     TODO: Remove once https://github.com/conda/conda/pull/13784 is merged
     """
-    if any([
-        on_linux and spec in ("__glibc", "__unix", "__linux"),
-        on_mac and spec in ("__unix", "__osx"),
-        on_win and spec == "__win",
-    ]):
+    if any(
+        [
+            on_linux and spec in ("__glibc", "__unix", "__linux"),
+            on_mac and spec in ("__unix", "__osx"),
+            on_win and spec == "__win",
+        ]
+    ):
         raises = DryRunExit  # success
     else:
         raises = (UnsatisfiableError, PackagesNotFoundError)
