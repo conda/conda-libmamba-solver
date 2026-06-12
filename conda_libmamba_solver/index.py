@@ -147,6 +147,14 @@ class _ChannelRepoInfo:
         return url_parts[-1]
 
 
+def _is_sharded_repodata_enabled():
+    """
+    Flag to see whether we should check for sharded repodata.
+    """
+    # TODO this is referenced in the conda tests. Keeping here for compat.
+    return True
+
+
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
 
 
