@@ -159,7 +159,7 @@ jobs:
 
       - name: Conda Remove anaconda-auth
         if: matrix.default-channel == 'defaults'
-        run: conda list -n base anaconda && conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+        run: conda list -n base anaconda && conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos || echo "Nothing to remove"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
@@ -324,7 +324,7 @@ jobs:
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
-        run: conda list -n base anaconda && conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+        run: conda list -n base anaconda && conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos || echo "Nothing to remove"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
@@ -634,7 +634,7 @@ jobs:
           python=${{ matrix.python-version }}
 
       - name: Conda Remove anaconda-auth
-        run: conda list -n base anaconda && conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos
+        run: conda list -n base anaconda && conda remove --yes -n base anaconda-auth anaconda-anon-usage conda-anaconda-telemetry conda-anaconda-tos || echo "Nothing to remove"
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
