@@ -174,16 +174,26 @@ def test_update_from_latest_not_downgrade(
         "python",
     ) as prefix:
         original_python = PrefixData(prefix).get("python")
-        conda_cli(
+        out, err, _ = conda_cli(
             "update",
             f"--prefix={prefix}",
             "--solver=libmamba",
             "--override-channels",
             "--channel=conda-forge",
             "python",
+            "-vvv",
+            "--dry-run",
+            "--json",
+            raises=DryRunExit,
         )
-        update_python = PrefixData(prefix).get("python")
-        assert original_python.version == update_python.version
+        print(out)
+        print(err, file=sys.stderr)
+        result = json.loads(out)
+        assert result["success"]
+        # Python MUST NOT be uninstalled, or if uninstalled, reinstalled with same version
+        unlinked_python = next((r for r in result["actions"]["UNLINK"] if r["name"] == "python"), None)
+        linked_python = next((r for r in result["actions"]["LINK"] if r["name"] == "python"), None)
+        assert unlinked_python is None or linked_python["version"] == original_python.version
 
 
 @pytest.mark.skipif(not on_linux, reason="Linux only")
