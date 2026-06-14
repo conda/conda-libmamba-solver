@@ -375,7 +375,7 @@ class LibMambaSolver(Solver):
 
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
         flags = {
-            "allow_downgrade": True,
+            "allow_downgrade": not in_state.is_updating,
             # About flags.allow_uninstall = True:
             # We used to set this to False on a global basis and then add jobs
             # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
