@@ -140,7 +140,7 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda\
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
-          miniconda-version: ${{ matrix.default-channel == 'defaults' && '25.11.1-1' || null }}
+          miniconda-version: ${{ matrix.default-channel == 'defaults' && 'py313_25.11.1-1' || null }}
           miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
 
       - name: Conda Install
@@ -307,7 +307,7 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
-          miniconda-version: ${{ matrix.default-channel == 'defaults' && '25.11.1-1' || null }}
+          miniconda-version: ${{ matrix.default-channel == 'defaults' && 'py313_25.11.1-1' || null }}
           miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
 
       - name: Conda Install
@@ -616,7 +616,7 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
-          miniconda-version: ${{ matrix.default-channel == 'defaults' && '25.11.1-1' || null }}
+          miniconda-version: ${{ matrix.default-channel == 'defaults' && 'py313_25.11.1-1' || null }}
           miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
           architecture: ${{ runner.arch }}
 
