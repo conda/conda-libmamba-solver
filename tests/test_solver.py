@@ -191,7 +191,9 @@ def test_update_from_latest_not_downgrade(
         result = json.loads(out)
         assert result["success"]
         # Python MUST NOT be uninstalled, or if uninstalled, reinstalled with same version
-        unlinked_python = next((r for r in result["actions"]["UNLINK"] if r["name"] == "python"), None)
+        unlinked_python = next(
+            (r for r in result["actions"]["UNLINK"] if r["name"] == "python"), None
+        )
         linked_python = next((r for r in result["actions"]["LINK"] if r["name"] == "python"), None)
         assert unlinked_python is None or linked_python["version"] == original_python.version
 
