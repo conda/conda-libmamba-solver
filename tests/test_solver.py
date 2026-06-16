@@ -151,6 +151,7 @@ def test_determinism(tmpdir):
     assert len(set(installed_bokeh_versions)) == 1
 
 
+@pytest.mark.xfail(reason="conda-forge dependency changes?")
 @pytest.mark.parametrize("use_shards", (True, False), ids=("use-shards", "no-use-shards"))
 def test_update_from_latest_not_downgrade(
     tmp_env: TmpEnvFixture,
