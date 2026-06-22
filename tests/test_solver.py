@@ -189,8 +189,6 @@ def test_update_from_latest_not_downgrade(
             "python",
         )
         update_python = PrefixData(prefix).get("python")
-        print(f"Check that {original_python} matches {update_python}")
-        print(update_python.__dict__)
         assert original_python.version == update_python.version
 
 
