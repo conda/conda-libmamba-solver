@@ -73,6 +73,7 @@ and `libmamba.Repo` objects.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -85,6 +86,7 @@ from conda.base.context import context
 from conda.common.compat import on_win
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
+from conda.core.exclude_newer import ExcludeNewerPolicy
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
@@ -253,6 +255,7 @@ class LibMambaIndexHelper:
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
         in_state: SolverInputState | None = None,
+        exclude_newer_policy: ExcludeNewerPolicy | None = None,
     ):
         platform_less_channels: list[Channel] = []
         for channel in channels:
@@ -272,6 +275,7 @@ class LibMambaIndexHelper:
         self.repodata_fn = repodata_fn
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
+        self.exclude_newer_policy = exclude_newer_policy or ExcludeNewerPolicy.disabled()
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -362,9 +366,25 @@ class LibMambaIndexHelper:
             home_dir=str(Path.home()),
             current_working_dir=os.getcwd(),
         )
-        db = Database(params)
+        db_kwargs = {}
+        if (exclude_newer_timestamp := self._exclude_newer_timestamp()) is not None:
+            db_kwargs["exclude_newer_timestamp"] = exclude_newer_timestamp
+        db = Database(params, **db_kwargs)
         db.set_logger(logger_callback)
         return db
+
+    def _exclude_newer_timestamp(self) -> int | None:
+        """Return the resolved global cutoff as a Unix timestamp for libmambapy."""
+        if (
+            self.exclude_newer_policy.global_cutoff is None
+            or self.exclude_newer_policy.has_channel_overrides
+            or self.exclude_newer_policy.has_package_overrides
+        ):
+            return None
+        return int(self.exclude_newer_policy.global_cutoff)
+
+    def _uses_python_exclude_newer_filter(self) -> bool:
+        return self.exclude_newer_policy.active and self._exclude_newer_timestamp() is None
 
     def _load_channels(
         self,
@@ -535,6 +555,13 @@ class LibMambaIndexHelper:
             repodata_origin = None
         channel = Channel(channel_url)
         channel_id = self._channel_to_id(channel)
+        if self._uses_python_exclude_newer_filter():
+            return self._load_repo_info_from_filtered_json_path(
+                json_path,
+                channel_url,
+                channel_id,
+            )
+
         if try_solv and repodata_origin:
             try:
                 log.debug(
@@ -587,6 +614,64 @@ class LibMambaIndexHelper:
             except MambaNativeException as exc:
                 log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
+
+    def _load_repo_info_from_filtered_json_path(
+        self,
+        json_path: Path,
+        channel_url: str,
+        channel_id: str,
+    ) -> RepoInfo | None:
+        try:
+            repodata = json.loads(json_path.read_text())
+        except FileNotFoundError:
+            if context.offline:
+                log.warning("Could not load repodata for %s.", channel_id)
+                return None
+            raise
+
+        base_url = f"{channel_url.rstrip('/')}/"
+        packages = []
+        for package_group in ("packages", "packages.conda"):
+            for filename, record in repodata.get(package_group, {}).items():
+                package_url = record.get("url") or f"{base_url}{filename}"
+                if not self._record_allowed(record, filename, channel_url, package_url):
+                    continue
+                packages.append(
+                    _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=package_url,
+                        channel_id=channel_id,
+                        add_pip_as_python_dependency=self._add_pip_as_python_dependency,
+                    )
+                )
+
+        return self.db.add_repo_from_packages(
+            packages=packages,
+            name=channel_url,
+            add_pip_as_python_dependency=PipAsPythonDependency(
+                context.add_pip_as_python_dependency
+            ),
+        )
+
+    def _record_allowed(
+        self,
+        record: PackageRecordDict,
+        filename: str,
+        channel_url: str,
+        package_url: str,
+    ) -> bool:
+        if not self._uses_python_exclude_newer_filter():
+            return True
+
+        return self.exclude_newer_policy.should_include(
+            {
+                **record,
+                "channel": channel_url,
+                "fn": record.get("fn") or filename,
+                "url": package_url,
+            }
+        )
 
     def _channel_to_id(self, channel: Channel):
         channel_id = channel.canonical_name
@@ -651,10 +736,18 @@ class LibMambaIndexHelper:
             packages = []
             for package_group in ("packages", "packages.conda"):
                 for filename, record in repodata.get(package_group, {}).items():
+                    package_url = f"{base_url}{filename}"
+                    if not self._record_allowed(
+                        record,
+                        filename,
+                        channel_url,
+                        package_url,
+                    ):
+                        continue
                     package = _package_info_from_package_dict(
                         record,
                         filename,
-                        url=f"{base_url}{filename}",
+                        url=package_url,
                         channel_id=channel_id,
                         add_pip_as_python_dependency=self._add_pip_as_python_dependency,
                     )

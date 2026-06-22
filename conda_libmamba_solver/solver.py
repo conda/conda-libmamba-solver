@@ -79,6 +79,9 @@ log = logging.getLogger(f"conda.{__name__}")
 class LibMambaSolver(Solver):
     MAX_SOLVER_ATTEMPTS_CAP = 10
     _uses_ssc = False
+    supports_exclude_newer_global = True
+    supports_exclude_newer_channel = True
+    supports_exclude_newer_package = True
 
     @staticmethod
     @cache
@@ -273,6 +276,7 @@ class LibMambaSolver(Solver):
             ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
             in_state=in_state,
+            exclude_newer_policy=self.exclude_newer_policy,
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)
