@@ -1,0 +1,20 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* Since we now receive our shards implementation from conda, replace sharded
+  repodata documentation with link to conda developer guide.
+
+### Other
+
+* <news item>
