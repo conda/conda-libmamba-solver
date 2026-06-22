@@ -63,7 +63,6 @@ from .state import SolverInputState, SolverOutputState
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
 
-    from boltons.setutils import IndexedSet
     from conda.auxlib import _Null
     from conda.base.constants import (
         DepsModifier,
@@ -139,7 +138,7 @@ class LibMambaSolver(Solver):
         ignore_pinned: bool | _Null = NULL,
         force_remove: bool | _Null = NULL,
         should_retry_solve: bool = False,
-    ) -> IndexedSet[PackageRecord]:
+    ) -> Sequence[PackageRecord]:
         self._log_info()
         in_state = SolverInputState(
             prefix=self.prefix,
@@ -301,14 +300,14 @@ class LibMambaSolver(Solver):
         in_state: SolverInputState,
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
-    ) -> IndexedSet[PackageRecord]:
+    ) -> SolverOutputState:
+        solved = False
         for attempt in range(1, self._max_attempts(in_state) + 1):
             try:
                 solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt)
                 if solved:
                     break
             except (UnsatisfiableError, PackagesNotFoundError):
-                solved = False
                 break  # try with last attempt
             else:  # didn't solve yet, but can retry
                 out_state = SolverOutputState(
