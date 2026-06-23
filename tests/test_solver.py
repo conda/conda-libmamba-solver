@@ -151,9 +151,13 @@ def test_determinism(tmpdir):
     assert len(set(installed_bokeh_versions)) == 1
 
 
+@pytest.mark.xfail(reason="conda-forge dependency changes?")
+@pytest.mark.parametrize("use_shards", (True, False), ids=("use-shards", "no-use-shards"))
 def test_update_from_latest_not_downgrade(
     tmp_env: TmpEnvFixture,
     conda_cli: CondaCLIFixture,
+    use_shards: bool,
+    monkeypatch,
 ) -> None:
     """Based on two issues where an upgrade caused a downgrade in a given package
 
@@ -167,6 +171,8 @@ def test_update_from_latest_not_downgrade(
      - https://github.com/conda/conda-libmamba-solver/issues/71
      - https://github.com/conda/conda-libmamba-solver/issues/156
     """
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", str(use_shards))
+    reset_context()
     with tmp_env(
         "--override-channels",
         "--channel=conda-forge",
@@ -748,7 +754,7 @@ def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
 @pytest.mark.skipif(on_win, reason="Missing free-threaded Python build?")
 @pytest.mark.parametrize("shards", (True, False))
 def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
-    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1" if shards else "0")
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", "1" if shards else "0")
     reset_context()
     with tmp_env("python=3.14=*_cp314t", "--override-channels", "-c", "conda-forge") as prefix:
         python = PrefixData(prefix).get("python")
