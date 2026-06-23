@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
-import pytest
 from conda._private.shards.shards import ShardLike
 from conda.base.context import reset_context
 from conda.gateways.logging import initialize_logging
@@ -27,13 +26,15 @@ from conda_libmamba_solver.state import SolverInputState
 if TYPE_CHECKING:
     import os
 
+    from pytest import MonkeyPatch
+
 
 initialize_logging()
 DATA = Path(__file__).parent / "data"
 
 
 def test_libmamba_index_helper_uses_build_repodata_subset(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: MonkeyPatch, tmp_path: Path
 ):
     """
     Test that LibMambaIndexHelper calls build_repodata_subset when both
@@ -89,7 +90,7 @@ def test_libmamba_index_helper_uses_build_repodata_subset(
 
 
 def test_libmamba_index_helper_skips_build_repodata_subset_when_no_state(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike
+    monkeypatch: MonkeyPatch, tmp_path: os.PathLike
 ):
     """
     Test that LibMambaIndexHelper does not call build_repodata_subset
@@ -119,7 +120,7 @@ def test_libmamba_index_helper_skips_build_repodata_subset_when_no_state(
 
 
 def test_libmamba_index_helper_falls_back_when_build_repodata_subset_returns_none(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike
+    monkeypatch: MonkeyPatch, tmp_path: os.PathLike
 ):
     """
     Test that LibMambaIndexHelper falls back to standard repodata.json loading
