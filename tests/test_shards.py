@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 from conda._private.shards.shards import ShardLike
