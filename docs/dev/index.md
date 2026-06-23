@@ -19,7 +19,6 @@ setup
 workflows
 implementation
 performance-testing
-sharded
 future-work
 code-of-conduct
 changelog
