@@ -1,0 +1,20 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* Remove `requests`, `zstandard` dependencies; network access, shards are
+  delegated to conda. (#812)
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>
