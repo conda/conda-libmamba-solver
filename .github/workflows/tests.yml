@@ -143,6 +143,9 @@ jobs:
           miniconda-version: ${{ matrix.default-channel == 'defaults' && 'py313_25.11.1-1' || null }}
           miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
 
+      - name: Update conda-libmamba-solver in base
+        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
+
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
@@ -309,6 +312,9 @@ jobs:
           run-post: false  # skip post cleanup
           miniconda-version: ${{ matrix.default-channel == 'defaults' && 'py313_25.11.1-1' || null }}
           miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
+
+      - name: Update conda-libmamba-solver in base
+        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda
@@ -619,6 +625,9 @@ jobs:
           miniconda-version: ${{ matrix.default-channel == 'defaults' && 'py313_25.11.1-1' || null }}
           miniforge-version: ${{ matrix.default-channel == 'conda-forge' && 'latest' || null }}
           architecture: ${{ runner.arch }}
+
+      - name: Update conda-libmamba-solver in base
+        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE

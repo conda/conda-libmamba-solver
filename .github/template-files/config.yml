@@ -43,13 +43,28 @@ conda/infrastructure:
   - src: templates/pull_requests/base.md
     dst: .github/PULL_REQUEST_TEMPLATE.md
 
+  # [optional] dependabot — pick ONE variant
+  # - src: templates/dependabot/github-actions.yml
+  #   dst: .github/dependabot.yml
+  - src: templates/dependabot/github-actions-with-pre-commit.yml
+    dst: .github/dependabot.yml
+  # - src: templates/dependabot/github-actions-with-docs-pip.yml
+  #   dst: .github/dependabot.yml
+  # - src: templates/dependabot/github-actions-full.yml
+  #   dst: .github/dependabot.yml
+
   # [optional] rever release files
-  - src: templates/releases/RELEASE.md
+  # Select one of the following:
+  # conda and conda-build release file or
+  # Cadence release file
+  # - src: templates/releases/RELEASE.md
+  # On demand release file
+  - src: templates/releases/RELEASE_ON_DEMAND.md
     dst: RELEASE.md
     with:
-      canary_channel: https://anaconda.org/conda-canary
+      # canary_channel: https://anaconda.org/conda-canary
       placeholder: YY.MM.MICRO
-      placeholder_x: YY.MM.x
+      # placeholder_x: YY.MM.x
   - src: templates/releases/rever.xsh
     dst: rever.xsh
   - src: templates/releases/TEMPLATE
