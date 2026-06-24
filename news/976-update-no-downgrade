@@ -4,7 +4,7 @@
 
 ### Bug fixes
 
-* Do not allow package downgrades when running `conda update` (#71, #156)
+* Do not allow package downgrades when running `conda update` (#976)
 
 ### Deprecations
 
