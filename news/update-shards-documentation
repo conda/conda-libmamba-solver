@@ -13,7 +13,7 @@
 ### Docs
 
 * Since we now receive our shards implementation from conda, replace sharded
-  repodata documentation with link to conda developer guide.
+  repodata documentation with link to conda developer guide. (#974)
 
 ### Other
 

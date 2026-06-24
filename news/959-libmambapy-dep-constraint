@@ -16,4 +16,4 @@
 
 ### Other
 
-* Adds dependency constraint libmambapy != 2.6.2/ (#959)
+* Adds dependency constraint libmambapy != 2.6.2. (#959)
