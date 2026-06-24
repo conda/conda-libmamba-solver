@@ -106,6 +106,8 @@
   num_commits: 1
   first_commit: 2026-01-07 03:17:00
   github: soapy1
+  alternate_emails:
+  - scastellarin@quansight.com
 - name: John Costa
   email: costajohnt@gmail.com
   github: costajohnt
