@@ -81,13 +81,13 @@ jobs:
       matrix:
         include:
           - runs-on: ubuntu-latest
-            subdir: linux-64
+            subdir: noarch
           - runs-on: ubuntu-24.04-arm
-            subdir: linux-aarch64
+            subdir: noarch
           - runs-on: macos-latest
-            subdir: osx-arm64
+            subdir: noarch
           - runs-on: windows-latest
-            subdir: win-64
+            subdir: noarch
     runs-on: ${{ matrix.runs-on }}
     steps:
       # Clean checkout of specific git ref needed for package metadata version
