@@ -7,7 +7,7 @@ the following pages:
 - [Typical development workflows](workflows)
 - [Implementation details](implementation)
 - [Performance testing](performance-testing)
-- [Sharded repodata implementation](sharded)
+- [Sharded repodata](sharded)
 - [Future work](future-work)
 - [Code of conduct](code-of-conduct)
 - [CHANGELOG](changelog)

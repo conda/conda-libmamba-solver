@@ -141,6 +141,9 @@ jobs:
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
 
+      - name: Update conda-libmamba-solver in base
+        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
+
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
@@ -305,6 +308,9 @@ jobs:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
           run-post: false  # skip post cleanup
+
+      - name: Update conda-libmamba-solver in base
+        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda
@@ -581,6 +587,9 @@ jobs:
           miniconda-version: ${{ (matrix.default-channel == 'defaults' && matrix.arch == 'osx-arm64') && 'latest' || null }}
           miniforge-version: ${{ (matrix.default-channel == 'conda-forge' && matrix.arch == 'osx-64') && 'latest' || null }}
           architecture: ${{ runner.arch }}
+
+      - name: Update conda-libmamba-solver in base
+        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE

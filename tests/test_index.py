@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
-from conda.base.context import context, reset_context
+from conda.base.context import reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
@@ -18,20 +18,11 @@ from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import (
     LibMambaIndexHelper,
-    _is_sharded_repodata_enabled,
     _package_info_from_package_dict,
 )
-from conda_libmamba_solver.shards import ShardLike, spec_to_package_name
-from conda_libmamba_solver.state import SolverInputState
-
-from .test_shards import CONDA_FORGE_WITH_SHARDS
 
 if TYPE_CHECKING:
     import os
-
-    from conda.testing.fixtures import CondaCLIFixture
-    from pytest_benchmark.plugin import BenchmarkFixture
-    from pytest_mock import MockerFixture
 
 
 initialize_logging()
@@ -127,174 +118,6 @@ def test_reload_channels(tmp_path: Path):
     time.sleep(1)
     index.reload_channel(Channel(str(tmp_path)))
     assert index.n_packages() == initial_count + 1
-
-
-@pytest.mark.parametrize(
-    "load_type,requested",
-    [
-        ("shard", ("python",)),
-        ("shard", ("django", "celery")),
-        ("shard", ("vaex",)),
-        ("repodata", ("vaex",)),
-        ("main", ()),
-    ],
-    ids=["shard-small", "shard-medium", "shard-large", "noshard", "main"],
-)
-def test_load_channel_repo_info_shards(
-    load_type: str,
-    requested: tuple[str, ...],
-    tmp_path: Path,
-    conda_cli: CondaCLIFixture,
-    monkeypatch: pytest.MonkeyPatch,
-    benchmark: BenchmarkFixture,
-):
-    """
-    Benchmark shards/not-shards under different dependency tree sizes.
-    """
-    load_channel = "defaults" if load_type == "main" else CONDA_FORGE_WITH_SHARDS
-
-    monkeypatch.setattr(context.plugins, "use_sharded_repodata", load_type == "shard")
-    assert _is_sharded_repodata_enabled() == (load_type == "shard")
-
-    in_state = SolverInputState(str(tmp_path / "env"), requested=requested)
-
-    subdir = context.subdir  # override to hunt bugs
-
-    def index():
-        return LibMambaIndexHelper(
-            # this is expanded to noarch, linux-64 for shards.
-            channels=[Channel(f"{load_channel}/{subdir}")],
-            subdirs=(
-                "noarch",
-                subdir,
-            ),
-            installed_records=(),  # do not load installed
-            pkgs_dirs=(),  # do not load local cache as a channel
-            in_state=in_state,
-        )
-
-    index_helper = benchmark.pedantic(index, rounds=1)
-
-    assert len(index_helper.repos) > 0
-
-
-@pytest.mark.parametrize(
-    "add_pip",
-    (
-        pytest.param(True, id="add_pip=True"),
-        pytest.param(False, id="add_pip=False"),
-    ),
-)
-def test_add_pip_as_python_dependency_sharded(
-    monkeypatch: pytest.MonkeyPatch,
-    mocker: MockerFixture,
-    add_pip: bool,
-):
-    """
-    Regression test for https://github.com/conda/conda-libmamba-solver/issues/918.
-    When sharded repodata is used, add_pip_as_python_dependency must be honored.
-    """
-    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "true" if add_pip else "false")
-    reset_context()
-
-    # Verify the context was set correctly
-    assert context.add_pip_as_python_dependency == add_pip, (
-        f"Context add_pip_as_python_dependency={context.add_pip_as_python_dependency}, "
-        f"expected {add_pip}"
-    )
-
-    # Python interpreter packages are always platform-specific (never noarch).
-    # libmamba only injects pip when the package's platform is a real platform
-    # present in the db — so the test must use the current subdir, not "noarch".
-    subdir = context.subdir
-    shardlike = ShardLike(
-        {
-            "info": {"subdir": subdir, "base_url": "", "shards_base_url": ""},
-            "packages": {
-                "python-3.10.0-h1234567_0.tar.bz2": {
-                    "name": "python",
-                    "version": "3.10.0",
-                    "build": "h1234567_0",
-                    "build_number": 0,
-                    "depends": [],
-                }
-            },
-            "packages.conda": {},
-            "repodata_version": 2,
-        },
-        url=f"https://shards.example.com/{subdir}/",
-    )
-    shardlike.fetch_shard("python")
-
-    in_state = SolverInputState(prefix="idontexist", requested=("python",))
-
-    mocker.patch(
-        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
-        return_value=True,
-    )
-    mocker.patch(
-        "conda_libmamba_solver.index.build_repodata_subset",
-        return_value={f"https://shards.example.com/{subdir}/": shardlike},
-    )
-    index_helper = LibMambaIndexHelper(
-        channels=[Channel("https://shards.example.com")],
-        subdirs=(subdir,),
-        installed_records=(),
-        pkgs_dirs=(),
-        in_state=in_state,
-    )
-
-    python_records = index_helper.search("python")
-    assert python_records
-
-    # Verify the package was loaded correctly
-    python_rec = python_records[0]
-    assert python_rec.name == "python", f"Expected python, got {python_rec.name}"
-    # subdir will attach to channel, not record
-    pip_in_depends = any(
-        spec_to_package_name(dep) == "pip" for dep in (python_records[0].depends or [])
-    )
-    if add_pip:
-        assert pip_in_depends
-    else:
-        assert not pip_in_depends
-
-
-def test_load_channels_order(shard_factory, mocker: MockerFixture):
-    # Setup two shard servers. server_one will have a small
-    # delay in the response to mimic a slower response.
-    server_one = shard_factory.http_server_shards(
-        "one", finish_request_action=lambda: time.sleep(0.2)
-    )
-    server_two = shard_factory.http_server_shards("two")
-
-    channel_one = Channel.from_url(f"{server_one}/noarch")
-    channel_two = Channel.from_url(f"{server_two}/noarch")
-    index_args = {
-        "channels": [
-            channel_one,
-            channel_two,
-        ],
-        "in_state": SolverInputState(prefix="idontexist"),
-    }
-
-    mocker.patch(
-        "conda_libmamba_solver.index._is_sharded_repodata_enabled",
-        return_value=True,
-    )
-    shard_enabled_index = LibMambaIndexHelper(**index_args)
-
-    # The expected output is that all of channel_one subdirs (noarch and current
-    # platform) are ordered higher than channel_two subdirs.
-    expected_output_channels = [
-        channel_one.canonical_name,
-        channel_one.canonical_name,
-        channel_two.canonical_name,
-        channel_two.canonical_name,
-    ]
-    assert [
-        repo.channel.canonical_name for repo in shard_enabled_index.repos
-    ] == expected_output_channels
 
 
 def test_package_info_from_package_dict_add_pip_as_python_dependency():
