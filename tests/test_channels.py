@@ -304,14 +304,18 @@ def test_http_server_auth_token_in_defaults(
     path_factory: PathFactoryFixture,
     tmp_path: Path,
 ) -> None:
-    # Run in a subprocess with an isolated HOME so the localhost token URL only
+    # Run in a subprocess with an isolated condarc so the localhost token URL only
     # ever lives in `default_channels` for this process. conda caches the
     # resolved `defaults` multichannel process-wide (via MatchSpec ->
     # Channel.from_value), and that object survives reset_context/fresh_context,
     # so an in-process run would leak the dead server URL into later tests.
     channel = f"{mamba_repo_server.url}/t/{TOKEN}"
+    condarc = tmp_path / ".condarc"
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
+    env["CONDARC"] = str(condarc)
+    if on_win:
+        env["USERPROFILE"] = str(tmp_path)
     write_env_config(
         tmp_path,
         force=True,
