@@ -10,6 +10,8 @@ import pytest
 from conda.testing import http_test_server as http_server_module
 from conda.testing.fixtures import HttpTestServerFixture
 
+from .http_channel_helpers import MAMBA_REPO, TOKEN
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -25,7 +27,6 @@ pytest_plugins = (
 @pytest.fixture(scope="module")
 def mamba_repo_server(tmp_path_factory) -> Iterator[HttpTestServerFixture]:
     """Module-scoped server pre-populated with mamba_repo + token subpath."""
-    from .http_channel_helpers import MAMBA_REPO, TOKEN
 
     server_dir = tmp_path_factory.mktemp("mamba_repo_server")
     shutil.copytree(MAMBA_REPO, server_dir, dirs_exist_ok=True)
