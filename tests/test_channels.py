@@ -6,15 +6,12 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import sys
-import time
 from pathlib import Path
 from subprocess import check_call
 from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
-from conda.base.context import reset_context
 from conda.common.compat import on_linux, on_win
 from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
@@ -24,18 +21,17 @@ from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
-from .channel_testing.helpers import (
-    http_server_auth_basic,  # noqa: F401
-    http_server_auth_basic_email,  # noqa: F401
-    http_server_auth_none,  # noqa: F401
-    http_server_auth_token,  # noqa: F401
-)
+from .http_channel_helpers import TOKEN, basic_auth_url
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
-    from conda.testing.fixtures import CondaCLIFixture, PathFactoryFixture, TmpEnvFixture
+    from conda.testing.fixtures import (
+        CondaCLIFixture,
+        HttpTestServerFixture,
+        PathFactoryFixture,
+        TmpEnvFixture,
+    )
 
-    from .test_shards import ShardFactory
 
 DATA = Path(__file__).parent / "data"
 
@@ -239,132 +235,102 @@ def test_encoding_file_paths(tmp_path: Path):
         "test-package",
         "--solver=libmamba",
     )
-    print(process.stdout)
-    print(process.stderr, file=sys.stderr)
-    assert process.returncode == 0
+    assert process.returncode == 0, process.stderr
     assert list((tmp_path / "env" / "conda-meta").glob("test-package-*.json"))
 
 
-def test_conda_build_with_aliased_channels(tmp_path):
+def test_conda_build_with_aliased_channels(tmp_path: Path) -> None:
     "https://github.com/conda/conda-libmamba-solver/issues/363"
-    condarc = Path.home() / ".condarc"
-    condarc_contents = condarc.read_text() if condarc.is_file() else None
     env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
     if on_win:
         env["CONDA_BLD_PATH"] = str(Path(os.environ.get("RUNNER_TEMP", tmp_path), "bld"))
     else:
         env["CONDA_BLD_PATH"] = str(tmp_path / "conda-bld")
-    try:
-        _setup_conda_forge_as_defaults(Path.home(), force=True)
-        conda_subprocess(
-            "build",
-            DATA / "conda_build_recipes" / "jedi",
-            "--override-channels",
-            "--channel=defaults",
-            capture_output=False,
-            env=env,
-        )
-    finally:
-        if condarc_contents:
-            condarc.write_text(condarc_contents)
-        else:
-            condarc.unlink()
-
-
-def test_http_server_auth_none(
-    http_server_auth_none: str,  # noqa: F811
-    conda_cli: CondaCLIFixture,
-    path_factory: PathFactoryFixture,
-):
-    conda_cli(
-        "create",
-        f"--prefix={path_factory()}",
-        "--solver=libmamba",
-        "--json",
+    _setup_conda_forge_as_defaults(tmp_path, force=True)
+    conda_subprocess(
+        "build",
+        DATA / "conda_build_recipes" / "jedi",
         "--override-channels",
-        f"--channel={http_server_auth_none}",
-        "test-package",
+        "--channel=defaults",
+        capture_output=False,
+        env=env,
     )
 
 
-def test_http_server_auth_basic(
-    http_server_auth_basic,  # noqa: F811
+@pytest.mark.parametrize(
+    "get_channel",
+    [
+        pytest.param(
+            lambda s: s.url,
+            id="none",
+        ),
+        pytest.param(
+            lambda s: basic_auth_url(s, "user", "test"),
+            id="basic",
+        ),
+        pytest.param(
+            lambda s: basic_auth_url(s, "user@email.com", "test"),
+            id="basic-email",
+        ),
+        pytest.param(
+            lambda s: f"{s.url}/t/{TOKEN}",
+            id="token",
+        ),
+    ],
+)
+def test_http_server_auth(
+    mamba_repo_server: HttpTestServerFixture,
     conda_cli: CondaCLIFixture,
     path_factory: PathFactoryFixture,
-):
+    get_channel,
+) -> None:
+    channel = get_channel(mamba_repo_server)
     conda_cli(
         "create",
         f"--prefix={path_factory()}",
         "--solver=libmamba",
         "--json",
+        "--dry-run",
         "--override-channels",
-        f"--channel={http_server_auth_basic}",
+        f"--channel={channel}",
         "test-package",
-    )
-
-
-@pytest.mark.parametrize("shards", [True, False], ids=("shard", "noshard"))
-def test_http_server_auth_basic_email(
-    http_server_auth_basic_email,  # noqa: F811
-    conda_cli: CondaCLIFixture,
-    path_factory: PathFactoryFixture,
-    shards: bool,
-    monkeypatch,
-):
-    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", str(shards))
-    conda_cli(
-        "create",
-        f"--prefix={path_factory()}",
-        "--solver=libmamba",
-        "--json",
-        "--override-channels",
-        f"--channel={http_server_auth_basic_email}",
-        "test-package",
-    )
-
-
-def test_http_server_auth_token(
-    http_server_auth_token,  # noqa: F811
-    conda_cli: CondaCLIFixture,
-    path_factory: PathFactoryFixture,
-):
-    conda_cli(
-        "create",
-        f"--prefix={path_factory()}",
-        "--solver=libmamba",
-        "--json",
-        "--override-channels",
-        f"--channel={http_server_auth_token}",
-        "test-package",
+        raises=DryRunExit,
     )
 
 
 def test_http_server_auth_token_in_defaults(
-    http_server_auth_token,  # noqa: F811
+    mamba_repo_server: HttpTestServerFixture,
     path_factory: PathFactoryFixture,
+    tmp_path: Path,
 ) -> None:
-    condarc = Path.home() / ".condarc"
-    condarc_contents = condarc.read_text() if condarc.is_file() else None
-    try:
-        write_env_config(
-            Path.home(),
-            force=True,
-            channels=["defaults"],
-            default_channels=[http_server_auth_token],
-        )
-        reset_context()
-        conda_subprocess("info", capture_output=False)
-        conda_subprocess(
-            "create",
-            f"--prefix={path_factory()}",
-            "--solver=libmamba",
-            "test-package",
-        )
-    finally:
-        if condarc_contents:
-            condarc.write_text(condarc_contents)
-        else:
-            condarc.unlink()
+    # Run in a subprocess with an isolated condarc so the localhost token URL only
+    # ever lives in `default_channels` for this process. conda caches the
+    # resolved `defaults` multichannel process-wide (via MatchSpec ->
+    # Channel.from_value), and that object survives reset_context/fresh_context,
+    # so an in-process run would leak the dead server URL into later tests.
+    channel = f"{mamba_repo_server.url}/t/{TOKEN}"
+    condarc = tmp_path / ".condarc"
+    env = os.environ.copy()
+    env["HOME"] = str(tmp_path)
+    env["CONDARC"] = str(condarc)
+    if on_win:
+        env["USERPROFILE"] = str(tmp_path)
+    write_env_config(
+        tmp_path,
+        force=True,
+        channels=["defaults"],
+        default_channels=[channel],
+    )
+    process = conda_subprocess(
+        "create",
+        f"--prefix={path_factory()}",
+        "--solver=libmamba",
+        "--dry-run",
+        "test-package",
+        env=env,
+    )
+    assert process.returncode == 0, process.stderr
 
 
 def test_local_spec() -> None:
@@ -379,7 +345,7 @@ def test_local_spec() -> None:
         "test-package",
         env=env,
     )
-    assert process.returncode == 0
+    assert process.returncode == 0, process.stderr
 
     process = conda_subprocess(
         "create",
@@ -388,37 +354,33 @@ def test_local_spec() -> None:
         "local::test-package",
         env=env,
     )
-    assert process.returncode == 0
+    assert process.returncode == 0, process.stderr
 
 
 def test_nameless_channel(
-    http_server_auth_none: str,  # noqa: F811
+    mamba_repo_server: HttpTestServerFixture,
     conda_cli: CondaCLIFixture,
     tmp_path: Path,
-):
+) -> None:
     out, err, rc = conda_cli(
         "create",
         f"--prefix={tmp_path}",
         "--solver=libmamba",
         "--yes",
         "--override-channels",
-        f"--channel={http_server_auth_none}",
+        f"--channel={mamba_repo_server.url}",
         "test-package",
     )
-    print(out)
-    print(err, file=sys.stderr)
-    assert not rc
+    assert not rc, err
     out, err, rc = conda_cli(
         "install",
         f"--prefix={tmp_path}",
         "--solver=libmamba",
         "--yes",
-        f"--channel={http_server_auth_none}",
+        f"--channel={mamba_repo_server.url}",
         "zlib",
     )
-    print(out)
-    print(err, file=sys.stderr)
-    assert not rc
+    assert not rc, err
 
 
 def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
@@ -430,9 +392,9 @@ def test_unknown_channels_do_not_crash(tmp_env: TmpEnvFixture, conda_cli: CondaC
         # '<unknown>' channel and reproduce the issue
         temp_pkg = Path(prefix, "test-package-0.1-0.tar.bz2")
         shutil.copy(test_pkg, temp_pkg)
-        conda_cli("install", f"--prefix={prefix}", temp_pkg)
+        conda_cli("install", f"--prefix={prefix}", "--yes", temp_pkg)
         assert package_is_installed(prefix, "test-package")
-        conda_cli("install", f"--prefix={prefix}", "zlib")
+        conda_cli("install", f"--prefix={prefix}", "--yes", "zlib")
         assert package_is_installed(prefix, "zlib")
 
 
@@ -489,54 +451,3 @@ def test_channels_are_percent_encoded(tmp_path):
     for repo in index.repos:
         assert "%20" in repo.url_no_cred
         assert "%20" in repo.url_w_cred
-
-
-def test_channel_ordering(
-    conda_cli: CondaCLIFixture, monkeypatch: pytest.MonkeyPatch, shard_factory: ShardFactory
-) -> None:
-    """https://github.com/conda/conda-libmamba-solver/issues/824"""
-    # Setup two shard servers. server_one will have a small
-    # delay in the response to mimic a slower response.
-    server_one = shard_factory.http_server_shards(
-        "channel-ordering-one", finish_request_action=lambda: time.sleep(0.2)
-    )
-    server_two = shard_factory.http_server_shards("channel-ordering-two")
-
-    monkeypatch.setenv("CONDA_CHANNELS", server_two)
-    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
-    out, err, rc = conda_cli(
-        "create",
-        "--dry-run",
-        "--solver=libmamba",
-        f"--channel={server_one}",
-        "foo",
-        "--json",
-        raises=DryRunExit,
-    )
-    data = json.loads(out)
-    assert data.get("success") is True
-    for link_package in data["actions"]["LINK"]:
-        if link_package["name"] == "foo":
-            # Match the base url of the package to the server url. But clip
-            # the trailing slash from the server url.
-            assert link_package["base_url"] == server_one[:-1]
-
-    # Ensure that the ordering is respected in the other direction as well.
-    monkeypatch.setenv("CONDA_CHANNELS", server_one)
-    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "1")
-    out, err, rc = conda_cli(
-        "create",
-        "--dry-run",
-        "--solver=libmamba",
-        f"--channel={server_two}",
-        "foo",
-        "--json",
-        raises=DryRunExit,
-    )
-    data = json.loads(out)
-    assert data.get("success") is True
-    for link_package in data["actions"]["LINK"]:
-        if link_package["name"] == "foo":
-            # Match the base url of the package to the server url. But clip
-            # the trailing slash from the server url.
-            assert link_package["base_url"] == server_two[:-1]

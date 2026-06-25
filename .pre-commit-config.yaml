@@ -32,7 +32,7 @@ repos:
       - id: blacken-docs
         additional_dependencies: [black]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.15
+    rev: v0.15.18
     hooks:
       # lint & attempt to correct failures (e.g. pyupgrade)
       - id: ruff-check
@@ -56,4 +56,4 @@ repos:
       - id: insert-license
         files: \.py$
         args: [--license-filepath, .github/disclaimer.txt, --no-extra-eol]
-        exclude: ^(tests/repodata_time_machine.py|mamba_utils\.py|tests/channel_testing/helpers\.py|tests/channel_testing/reposerver\.py)  # extend global exclude
+        exclude: ^(tests/repodata_time_machine.py|mamba_utils\.py)  # extend global exclude

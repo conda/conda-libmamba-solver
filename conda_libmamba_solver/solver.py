@@ -70,6 +70,7 @@ if TYPE_CHECKING:
         UpdateModifier,
     )
     from conda.common.path import PathType
+    from conda.gateways.shards import BuildRepodataSubset
     from libmambapy.solver.libsolv import Database, UnSolvable
     from libmambapy.specs import PackageInfo
 
@@ -97,6 +98,8 @@ class LibMambaSolver(Solver):
         specs_to_remove: Iterable[MatchSpec | str] = (),
         repodata_fn: str = REPODATA_FN,
         command: str | _Null = NULL,
+        *,
+        build_repodata_subset: BuildRepodataSubset | None = None,
     ):
         if specs_to_add and specs_to_remove:
             raise ValueError(
@@ -125,6 +128,7 @@ class LibMambaSolver(Solver):
             self.subdirs = (*self.subdirs, "noarch")
 
         self._repodata_fn = self._maybe_ignore_current_repodata()
+        self._build_repodata_subset = build_repodata_subset
         self._libmamba_context = init_libmamba_context(
             channels=tuple(c.canonical_name for c in self.channels),
             platform=next(s for s in self.subdirs if s != "noarch"),
@@ -273,6 +277,7 @@ class LibMambaSolver(Solver):
             ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
             in_state=in_state,
+            build_repodata_subset=self._build_repodata_subset,
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)
@@ -375,7 +380,7 @@ class LibMambaSolver(Solver):
 
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
         flags = {
-            "allow_downgrade": True,
+            "allow_downgrade": not in_state.is_updating,
             # About flags.allow_uninstall = True:
             # We used to set this to False on a global basis and then add jobs
             # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
