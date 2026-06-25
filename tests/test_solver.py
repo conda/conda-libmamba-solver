@@ -151,7 +151,6 @@ def test_determinism(tmpdir):
     assert len(set(installed_bokeh_versions)) == 1
 
 
-@pytest.mark.xfail(reason="conda-forge dependency changes?")
 @pytest.mark.parametrize("use_shards", (True, False), ids=("use-shards", "no-use-shards"))
 def test_update_from_latest_not_downgrade(
     tmp_env: TmpEnvFixture,
@@ -187,17 +186,14 @@ def test_update_from_latest_not_downgrade(
             "--override-channels",
             "--channel=conda-forge",
             "python",
-            "-vvv",
             "--json",
         )
         assert rc == 0
-        print(out)
-        print(err, file=sys.stderr)
         result = json.loads(out)
         assert result["success"]
         if result.get("actions"):
             # If there were actions, Python MUST NOT be uninstalled, or if uninstalled,
-            # it must be reinstalled with same version
+            # it must be reinstalled with the same version.
             unlinked_python = next(
                 (r for r in result["actions"]["UNLINK"] if r["name"] == "python"), None
             )
