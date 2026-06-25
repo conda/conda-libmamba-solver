@@ -30,7 +30,7 @@ test:
   imports:
     - conda_libmamba_solver
   commands:
-    - conda create -n test --dry-run scipy --solver=libmamba
+    - conda create -n cls-dry-run-test --dry-run scipy --solver=libmamba
     - >-
       python -c
       "import conda_libmamba_solver as cls;
