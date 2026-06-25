@@ -16,4 +16,4 @@
 
 ### Other
 
-* Fix HTTP channel test isolation by replacing the xprocess test server with conda's http_test_server fixture. (#978)
+* Replace the vendored `xprocess`-based HTTP test server with conda's `http_test_server` fixture and isolate the token-in-`default_channels` test in a subprocess so its localhost channel URL no longer leaks into later tests' `default_channels`. (#978)

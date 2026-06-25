@@ -21,7 +21,7 @@ from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
-from .http_channel_helpers import basic_auth_url, setup_mamba_repo, setup_token_channel
+from .http_channel_helpers import TOKEN, basic_auth_url
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
@@ -262,47 +262,54 @@ def test_conda_build_with_aliased_channels(tmp_path: Path) -> None:
     "get_channel",
     [
         pytest.param(
-            lambda s: (setup_mamba_repo(s), s.url)[1],
+            lambda s: s.url,
             id="none",
         ),
         pytest.param(
-            lambda s: (setup_mamba_repo(s), basic_auth_url(s, "user", "test"))[1],
+            lambda s: basic_auth_url(s, "user", "test"),
             id="basic",
         ),
         pytest.param(
-            lambda s: (setup_mamba_repo(s), basic_auth_url(s, "user@email.com", "test"))[1],
+            lambda s: basic_auth_url(s, "user@email.com", "test"),
             id="basic-email",
         ),
         pytest.param(
-            lambda s: setup_token_channel(s),
+            lambda s: f"{s.url}/t/{TOKEN}",
             id="token",
         ),
     ],
 )
 def test_http_server_auth(
-    http_test_server: HttpTestServerFixture,
+    mamba_repo_server: HttpTestServerFixture,
     conda_cli: CondaCLIFixture,
     path_factory: PathFactoryFixture,
     get_channel,
 ) -> None:
-    channel = get_channel(http_test_server)
+    channel = get_channel(mamba_repo_server)
     conda_cli(
         "create",
         f"--prefix={path_factory()}",
         "--solver=libmamba",
         "--json",
+        "--dry-run",
         "--override-channels",
         f"--channel={channel}",
         "test-package",
+        raises=DryRunExit,
     )
 
 
 def test_http_server_auth_token_in_defaults(
-    http_test_server: HttpTestServerFixture,
+    mamba_repo_server: HttpTestServerFixture,
     path_factory: PathFactoryFixture,
     tmp_path: Path,
 ) -> None:
-    channel = setup_token_channel(http_test_server)
+    # Run in a subprocess with an isolated HOME so the localhost token URL only
+    # ever lives in `default_channels` for this process. conda caches the
+    # resolved `defaults` multichannel process-wide (via MatchSpec ->
+    # Channel.from_value), and that object survives reset_context/fresh_context,
+    # so an in-process run would leak the dead server URL into later tests.
+    channel = f"{mamba_repo_server.url}/t/{TOKEN}"
     env = os.environ.copy()
     env["HOME"] = str(tmp_path)
     write_env_config(
@@ -311,13 +318,15 @@ def test_http_server_auth_token_in_defaults(
         channels=["defaults"],
         default_channels=[channel],
     )
-    conda_subprocess(
+    process = conda_subprocess(
         "create",
         f"--prefix={path_factory()}",
         "--solver=libmamba",
+        "--dry-run",
         "test-package",
         env=env,
     )
+    assert process.returncode == 0, process.stderr
 
 
 def test_local_spec() -> None:
@@ -345,18 +354,17 @@ def test_local_spec() -> None:
 
 
 def test_nameless_channel(
-    http_test_server: HttpTestServerFixture,
+    mamba_repo_server: HttpTestServerFixture,
     conda_cli: CondaCLIFixture,
     tmp_path: Path,
 ) -> None:
-    setup_mamba_repo(http_test_server)
     out, err, rc = conda_cli(
         "create",
         f"--prefix={tmp_path}",
         "--solver=libmamba",
         "--yes",
         "--override-channels",
-        f"--channel={http_test_server.url}",
+        f"--channel={mamba_repo_server.url}",
         "test-package",
     )
     assert not rc, err
@@ -365,7 +373,7 @@ def test_nameless_channel(
         f"--prefix={tmp_path}",
         "--solver=libmamba",
         "--yes",
-        f"--channel={http_test_server.url}",
+        f"--channel={mamba_repo_server.url}",
         "zlib",
     )
     assert not rc, err
