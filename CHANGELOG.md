@@ -38,8 +38,7 @@ hosting the implementation in this project. The implementation in
 
 ### Docs
 
-* Since we now receive our shards implementation from conda, replace sharded
-  repodata documentation with link to conda developer guide. (#974)
+* Replace sharded repodata documentation with link to conda developer guide. (#974)
 
 ### Other
 
