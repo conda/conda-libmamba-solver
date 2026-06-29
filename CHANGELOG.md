@@ -13,7 +13,7 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
-## 26.6.0 (2026-06-25)
+## 26.6.0 (2026-06-29)
 
 ### Enhancements
 
@@ -24,7 +24,7 @@ hosting the implementation in this project. The implementation in
 
 ### Bug fixes
 
-* Fix error when the verbosity level from conda is set higher than 4. (#948 via #949)
+* Fix an error when the verbosity level from conda is set higher than 4. (#948 via #949)
 * Do not allow package downgrades when running `conda update` (#976)
 
 ### Deprecations
