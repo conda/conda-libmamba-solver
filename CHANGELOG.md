@@ -13,7 +13,7 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
-## 26.6.0 (2026-06-29)
+## 26.6.0 (2026-06-30)
 
 ### Enhancements
 
