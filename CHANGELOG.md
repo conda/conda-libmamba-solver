@@ -45,7 +45,7 @@ hosting the implementation in this project. The implementation in
 * Add `libmambapy != 2.6.2` to `run_constrained` dependencies. (#959)
 * Enable infrastructure-managed Dependabot configuration via conda/infrastructure templates. (#969)
 * Remove temporary CI workarounds that deselected upstream tests and stripped Anaconda auth/telemetry plugins from base. (#977)
-* Replace the vendored `xprocess`-based HTTP test server with conda's `http_test_server` fixture and isolate the token-in-`default_channels` test in a subprocess so its localhost channel URL no longer leaks into later tests' `default_channels`. (#978)
+* Replace the vendored `xprocess`-based HTTP test server with conda's `http_test_server` fixture. Isolate the token-in-`default_channels` test in a subprocess so its localhost channel URL no longer leaks into later tests' `default_channels`. (#978)
 
 ### Contributors
 
