@@ -433,11 +433,12 @@ class LibMambaSolver(Solver):
         to be present, libsolv may drop a virtual package from the installed repo to
         dodge a ``constrains`` rule that references it (silently ignoring
         ``__cuda>=13`` on a host providing ``__cuda==12`` for example).
-        Requesting them as (name-only) installs keeps them present so such
+        Freezing them at their current version keeps them present so such
         constraints are enforced. The conda-build path is intentionally
         excluded.
         """
-        tasks[Request.Install].extend(in_state.virtual.keys())
+        for record in in_state.virtual.values():
+            tasks[Request.Freeze].append(record.to_match_spec().conda_build_form())
 
     def _specs_to_request_jobs_add(
         self,
