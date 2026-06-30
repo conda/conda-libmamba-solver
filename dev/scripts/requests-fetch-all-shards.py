@@ -28,6 +28,7 @@ def connect(dburi="cache.db"):
     conn.execute("PRAGMA journal_mode = WAL")
     conn.execute("PRAGMA synchronous = 1")  # less fsync, good for WAL mode
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("CREATE TABLE IF NOT EXISTS shards (url TEXT PRIMARY KEY, package TEXT, shard BLOB)")
     return conn
 
 
@@ -42,7 +43,6 @@ s = requests.Session()
 index = msgpack.loads(zstandard.decompress(s.get(base_url).content))
 
 conn = connect("conda-forge-shards.db")
-conn.execute("CREATE TABLE IF NOT EXISTS shards (url TEXT PRIMARY KEY, package TEXT, shard BLOB)")
 
 
 def shard_urls():
@@ -73,7 +73,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
         url, package = futures[future]
         with conn as c:
             c.execute(
-                "INSERT OR IGNORE INTO SHARDS (url, package, shard) VALUES (?, ?, ?)",
+                "INSERT OR IGNORE INTO shards (url, package, shard) VALUES (?, ?, ?)",
                 (url, package, data),
             )
 
