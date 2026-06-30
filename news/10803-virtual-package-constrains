@@ -1,0 +1,24 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* Enforce `run_constrained`/`constrains` entries that reference virtual packages
+  (e.g. a `constrains` on `__cuda`). Virtual packages are now requested as
+  (name-only) installs so the solver -- which runs with `allow_uninstall=True` --
+  cannot drop them to dodge such a constraint. Previously a constraint like
+  `__cuda>=13` against a host providing `__cuda==12` was silently ignored.
+  (conda/conda#10803 via #962)
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* <news item>
+
+### Other
+
+* <news item>

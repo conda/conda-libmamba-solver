@@ -425,6 +425,21 @@ class LibMambaSolver(Solver):
             log.info("The solver will handle these requests:\n%s", json_str)
         return request_jobs
 
+    def _lock_virtual_packages(self, tasks: dict, in_state: SolverInputState) -> None:
+        """Pin the host's virtual packages present for a prefix solve.
+
+        Virtual packages (e.g. ``__cuda``) model immutable host state. The
+        solver runs with ``allow_uninstall=True``, so unless they are forced
+        to be present, libsolv may drop a virtual package from the installed repo to
+        dodge a ``constrains`` rule that references it (silently ignoring
+        ``__cuda>=13`` on a host providing ``__cuda==12`` for example).
+        Freezing them at their current version keeps them present so such
+        constraints are enforced. The conda-build path is intentionally
+        excluded.
+        """
+        for record in in_state.virtual.values():
+            tasks[Request.Freeze].append(record.to_match_spec().conda_build_form())
+
     def _specs_to_request_jobs_add(
         self,
         in_state: SolverInputState,
@@ -545,6 +560,8 @@ class LibMambaSolver(Solver):
                     # else:
                     #     tasks[Request.Keep].append(name)
 
+        self._lock_virtual_packages(tasks, in_state)
+
         # Sort tasks by priority
         # This ensures that more important tasks are added to the solver first
         returned_tasks = {}
@@ -582,6 +599,8 @@ class LibMambaSolver(Solver):
         for name, spec in in_state.requested.items():
             spec = self._check_spec_compat(spec)
             tasks[Request.Remove].append(str(spec))
+
+        self._lock_virtual_packages(tasks, in_state)
 
         return dict(tasks)
 
