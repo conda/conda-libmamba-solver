@@ -13,6 +13,52 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.6.0 (2026-06-30)
+
+### Enhancements
+
+* Add a new `build_repodata_subset: Callable | None` parameter to
+`LibMambaSolver`, allowing `conda` to provide sharded repodata instead of
+hosting the implementation in this project. The implementation in
+`conda-libmamba-solver` has been removed. (#908)
+
+### Bug fixes
+
+* Fix an error when the verbosity level from conda is set higher than 4. (#948 via #949)
+* Do not allow package downgrades when running `conda update` (#976)
+
+### Deprecations
+
+* Remove `requests`, `zstandard` dependencies; network access, shards are
+  delegated to conda. (#812)
+* Require `conda >=26.5` (#908)
+* Remove `CONDA_PLUGINS_USE_SHARDED_REPODATA`/`plugins.use_sharded_repodata`
+  setting. `conda` provides a `repodata_use_shards` (default True) setting
+  instead. (#908)
+
+### Docs
+
+* Replace sharded repodata documentation with link to conda developer guide. (#974)
+
+### Other
+
+* Add `libmambapy != 2.6.2` to `run_constrained` dependencies. (#959)
+* Enable infrastructure-managed Dependabot configuration via conda/infrastructure templates. (#969)
+* Remove temporary CI workarounds that deselected upstream tests and stripped Anaconda auth/telemetry plugins from base. (#977)
+* Replace the vendored `xprocess`-based HTTP test server with conda's `http_test_server` fixture. Isolate the token-in-`default_channels` test in a subprocess so its localhost channel URL no longer leaks into later tests' `default_channels`. (#978)
+
+### Contributors
+
+* @danyeaw
+* @dholth
+* @jaimergp
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
 ## 26.4.2 (2026-05-13)
 
 ### Bug fixes
