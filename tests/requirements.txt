@@ -4,5 +4,6 @@ conda-lock
 conda-forge::pre-commit
 pytest-codspeed >=4
 conda-forge::pytest-mock
+conda-forge::pytest-benchmark>=5.1.0
 # needed for many conda tests
 flask
