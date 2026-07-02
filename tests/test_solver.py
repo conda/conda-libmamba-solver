@@ -553,26 +553,24 @@ def test_constrains_virtual_package(
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
     reset_context()
-
+    record = {
+        "name": "needs-cuda13",
+        "version": "1.0",
+        "build": "0",
+        "build_number": 0,
+        "noarch": "generic",
+        "constrains": ["__cuda>=13"],
+        "depends": [],
+        "md5": "0" * 32,
+        "sha256": "0" * 64,
+    }
     noarch = tmp_path / "noarch"
     noarch.mkdir()
     (noarch / "repodata.json").write_text(
         json.dumps(
             {
                 "info": {"subdir": "noarch"},
-                "packages": {
-                    "needs-cuda13-1.0-0.tar.bz2": {
-                        "name": "needs-cuda13",
-                        "version": "1.0",
-                        "build": "0",
-                        "build_number": 0,
-                        "noarch": "generic",
-                        "constrains": ["__cuda>=13"],
-                        "depends": [],
-                        "md5": "00000000000000000000000000000000",
-                        "sha256": "0" * 64,
-                    }
-                },
+                "packages": {"needs-cuda13-1.0-0.tar.bz2": record},
                 "packages.conda": {},
             }
         )
@@ -590,6 +588,28 @@ def test_constrains_virtual_package(
     else:
         records = solver.solve_final_state()
         assert any(r.name == "needs-cuda13" for r in records)
+
+    conda_meta = tmp_path / "env" / "conda-meta"
+    conda_meta.mkdir(parents=True, exist_ok=True)
+    (conda_meta / "needs-cuda13-1.0-0.json").write_text(
+        json.dumps(
+            {
+                **record,
+                "files": [],
+                "paths_data": {"paths_version": 1, "paths": []},
+                "requested_spec": "needs-cuda13",
+                "requested_specs": ["needs-cuda13"],
+            }
+        )
+    )
+    assert PrefixData(tmp_path / "env").get("needs-cuda13")
+    records = Solver(
+        prefix=tmp_path / "env",
+        channels=[str(tmp_path)],
+        specs_to_remove=["needs-cuda13"],
+        command="remove",
+    ).solve_final_state()
+    assert not any(r.name == "needs-cuda13" for r in records)
 
 
 def test_urls_are_percent_decoded(tmp_path: Path) -> None:
