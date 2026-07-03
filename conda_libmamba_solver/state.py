@@ -231,12 +231,12 @@ class SolverInputState:
         # 5 000-record prefix this was ~2.4 ms per access × ~10 000 accesses
         # = 24 s just in this property.
         #
-        # Cache the sorted view on the ``SolverInputState`` instance (the
-        # prefix is frozen for the life of one solve). Invalidate the cache
-        # if the underlying records mapping is swapped or mutated so the
-        # behaviour is identical to unconditional resorting. See #921.
+        # Cache the sorted view on the ``SolverInputState`` instance. The
+        # prefix is expected to be value-stable for the life of one solve, but
+        # the key also tracks mapping replacement and installed-name changes.
+        # See #921.
         records = self.prefix_data._prefix_records
-        cache_key = id(records), len(records)
+        cache_key = id(records), tuple(records)
         cached_key = getattr(self, "_installed_cache_key", None)
         if cached_key == cache_key:
             return self._installed_cache
