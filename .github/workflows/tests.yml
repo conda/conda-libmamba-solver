@@ -103,7 +103,7 @@ jobs:
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       ErrorActionPreference: Stop  # powershell exit immediately on error
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
     steps:
       - name: Checkout conda/conda # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -267,7 +267,7 @@ jobs:
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
 
     steps:
@@ -381,8 +381,9 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
+    # only run benchmarks if there are code changes
     needs: changes
-    if: false # needs.changes.outputs.code == 'true'  # disable for now.
+    if: false # needs.changes.outputs.code == 'true' # disable for now.
 
     runs-on: ubuntu-latest
     defaults:
@@ -392,7 +393,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12']
+        python-version: ['3.14']
 
     steps:
       - name: Checkout Source
@@ -401,22 +402,32 @@ jobs:
           fetch-depth: 0
 
       - name: Hash + Timestamp
-        run: echo "HASH=${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-benchmark-$(date -u "+%Y%m")" >> $GITHUB_ENV
+        run: |
+          STEM="${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-$(date -u "+%Y%m")"
+          echo "CACHE_KEY=${STEM}-defaults-aux" >> $GITHUB_ENV
+          echo "HASH=${STEM}-benchmark" >> $GITHUB_ENV
 
       - name: Cache Conda
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
-          path: ~/conda_pkgs_dir
-          key: cache-${{ env.HASH }}
+          path: |
+            ~/conda_pkgs_dir/*.tar.bz2
+            ~/conda_pkgs_dir/*.conda
+          key: cache-${{ env.CACHE_KEY }}
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
 
       - name: Conda Install
-        run: conda install
+        run: >
+          conda install
           --yes
           --file tests/requirements.txt
+          --file tests/requirements-${{ runner.os }}.txt
+          --file tests/requirements-ci.txt
+          --file tests/requirements-s3.txt
           python=${{ matrix.python-version }}
+          "pytest-benchmark>=5.1.0"
 
       - name: Conda Info
         run: python -m conda info --verbose
@@ -428,11 +439,25 @@ jobs:
         run: conda list --show-channel-urls
 
       - name: Run Benchmarks
-        uses: CodSpeedHQ/action@63f3e98b61959fe67f146a3ff022e4136fe9bb9c # v4.17.6
+        run: >
+          $CONDA/envs/test/bin/python -m pytest
+          -m benchmark
+          --benchmark-json benchmark_results.json
+
+      - name: Upload Benchmark Results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          token: ${{ secrets.CODSPEED_TOKEN }}
-          run: $CONDA/envs/test/bin/pytest --codspeed
-          mode: instrumentation
+          name: benchmark-results
+          path: benchmark_results.json
+          retention-days: 7
+
+      - name: Upload GitHub Pull Request Event
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: benchmark-event
+          path: ${{ github.event_path }}
+          retention-days: 7
 
   # linux-qemu test suite
   linux-qemu:
@@ -539,7 +564,7 @@ jobs:
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
     env:
-      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration' || 'integration' }}
+      PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
 
     steps:
