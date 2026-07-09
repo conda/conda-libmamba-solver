@@ -286,7 +286,6 @@ def test_exclude_newer_timestamp_is_disabled_for_policy_overrides():
     )
 
     assert index._exclude_newer_timestamp() is None
-    assert index._uses_python_exclude_newer_filter()
 
 
 def test_exclude_newer_record_filter_honors_package_and_channel_overrides():

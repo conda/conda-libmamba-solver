@@ -73,7 +73,6 @@ and `libmamba.Repo` objects.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -86,7 +85,6 @@ from conda.base.context import context
 from conda.common.compat import on_win
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
-from conda.core.exclude_newer import ExcludeNewerPolicy
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
@@ -117,6 +115,7 @@ if TYPE_CHECKING:
     from typing import Any, Literal
 
     from conda.common.path import PathsType
+    from conda.core.exclude_newer import ExcludeNewerPolicy
     from conda.gateways.repodata import RepodataState
     from conda.gateways.shards import BuildRepodataSubset
     from conda.gateways.shards.typing import Shards as ShardBase
@@ -277,7 +276,14 @@ class LibMambaIndexHelper:
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
         self.build_repodata_subset = build_repodata_subset
-        self.exclude_newer_policy = exclude_newer_policy or ExcludeNewerPolicy.disabled()
+        if exclude_newer_policy is None:
+            from conda.core.exclude_newer import ExcludeNewerPolicy
+
+            exclude_newer_policy = ExcludeNewerPolicy.disabled()
+        self.exclude_newer_policy = exclude_newer_policy
+        self._use_python_exclude_newer_filter = (
+            self.exclude_newer_policy.active and self._exclude_newer_timestamp() is None
+        )
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -384,9 +390,6 @@ class LibMambaIndexHelper:
         ):
             return None
         return int(self.exclude_newer_policy.global_cutoff)
-
-    def _uses_python_exclude_newer_filter(self) -> bool:
-        return self.exclude_newer_policy.active and self._exclude_newer_timestamp() is None
 
     def _load_channels(
         self,
@@ -559,7 +562,7 @@ class LibMambaIndexHelper:
             repodata_origin = None
         channel = Channel(channel_url)
         channel_id = self._channel_to_id(channel)
-        if self._uses_python_exclude_newer_filter():
+        if self._use_python_exclude_newer_filter:
             return self._load_repo_info_from_filtered_json_path(
                 json_path,
                 channel_url,
@@ -625,6 +628,8 @@ class LibMambaIndexHelper:
         channel_url: str,
         channel_id: str,
     ) -> RepoInfo | None:
+        import json
+
         try:
             repodata = json.loads(json_path.read_text())
         except FileNotFoundError:
@@ -665,9 +670,6 @@ class LibMambaIndexHelper:
         channel_url: str,
         package_url: str,
     ) -> bool:
-        if not self._uses_python_exclude_newer_filter():
-            return True
-
         return self.exclude_newer_policy.should_include(
             {
                 **record,
@@ -738,7 +740,9 @@ class LibMambaIndexHelper:
             packages = []
             for filename, record in shardlike.iter_records():
                 package_url = f"{base_url}{filename}"
-                if not self._record_allowed(record, filename, channel_url, package_url):
+                if self._use_python_exclude_newer_filter and not self._record_allowed(
+                    record, filename, channel_url, package_url
+                ):
                     continue
                 package = _package_info_from_package_dict(
                     record,
