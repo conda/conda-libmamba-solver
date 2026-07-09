@@ -615,6 +615,7 @@ class LibMambaSolver(Solver):
             spec = self._fix_version_field_for_conda_build(spec)
             tasks[Request.Install].append(spec.conda_build_form())
 
+        self._lock_virtual_packages(tasks, in_state)
         return dict(tasks)
 
     # endregion
