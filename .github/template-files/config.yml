@@ -53,15 +53,13 @@ conda/infrastructure:
   - src: templates/pull_requests/base.md
     dst: .github/PULL_REQUEST_TEMPLATE.md
 
-  # [optional] dependabot — pick ONE variant
-  # - src: templates/dependabot/github-actions.yml
-  #   dst: .github/dependabot.yml
-  - src: templates/dependabot/github-actions-with-pre-commit.yml
+  # [optional] dependabot
+  - src: templates/dependabot.yml
     dst: .github/dependabot.yml
-  # - src: templates/dependabot/github-actions-with-docs-pip.yml
-  #   dst: .github/dependabot.yml
-  # - src: templates/dependabot/github-actions-full.yml
-  #   dst: .github/dependabot.yml
+    with:
+      github_actions: true
+      pre_commit: true
+      docs: false
 
   # [optional] rever release files
   # Select one of the following:
