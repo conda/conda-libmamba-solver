@@ -24,6 +24,7 @@ from conda.exceptions import (
     UnsatisfiableError,
 )
 from conda.testing.integration import package_is_installed
+from conda_build.exceptions import DependencyNeedsBuildingError
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.solver import LibMambaSolver as Solver
@@ -532,16 +533,18 @@ def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None
 
 
 @pytest.mark.parametrize(
-    "cuda_version,expect_error",
+    "cuda_version,called_from_conda_build,expect_error",
     [
-        pytest.param("12.0", True, id="unsatisfied"),
-        pytest.param("13.0", False, id="satisfied"),
+        pytest.param("12.0", False, True, id="unsatisfied"),
+        pytest.param("13.0", False, False, id="satisfied"),
+        pytest.param("12.0", True, True, id="conda-build-unsatisfied"),
     ],
 )
 def test_constrains_virtual_package(
     monkeypatch: MonkeyPatch,
     tmp_path: Path,
     cuda_version: str,
+    called_from_conda_build: bool,
     expect_error: bool,
 ) -> None:
     """
@@ -552,6 +555,8 @@ def test_constrains_virtual_package(
     monkeypatch.setenv("CONDA_OVERRIDE_CUDA", cuda_version)
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
+    if called_from_conda_build:
+        monkeypatch.setattr(Solver, "_called_from_conda_build", lambda self: True)
     reset_context()
     record = {
         "name": "needs-cuda13",
@@ -583,7 +588,10 @@ def test_constrains_virtual_package(
         command="create",
     )
     if expect_error:
-        with pytest.raises(LibMambaUnsatisfiableError):
+        error_type = (
+            DependencyNeedsBuildingError if called_from_conda_build else LibMambaUnsatisfiableError
+        )
+        with pytest.raises(error_type):
             solver.solve_final_state()
     else:
         records = solver.solve_final_state()
