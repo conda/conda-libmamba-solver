@@ -1065,11 +1065,11 @@ class LibMambaSolver(Solver):
         # print instructions to stderr if we found a newer conda
         if conda_newer_records:
             newest = max(conda_newer_records, key=lambda x: VersionOrder(x.version))
-            conda_update_message = f"conda update -n base -c {channel_name} conda"
-            if prefix_data.is_frozen():
-                if prefix_data.get("conda-self", None):
-                    conda_update_message = "conda self update"
-                else:
+            if prefix_data.get("conda-self", None):
+                conda_update_message = "conda self update"
+            else:
+                conda_update_message = f"conda update -n base -c {channel_name} conda"
+                if prefix_data.is_frozen():
                     conda_update_message += " --override-frozen"
 
             print(
