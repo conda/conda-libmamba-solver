@@ -8,28 +8,32 @@ from conda.models.records import PrefixRecord
 from conda_libmamba_solver.state import SolverInputState
 
 
-def prefix_record(name: str) -> PrefixRecord:
-    return PrefixRecord(
-        name=name,
+def test_installed_cache_tracks_installed_names(tmp_path):
+    state = SolverInputState(tmp_path)
+    records = state.prefix_data._prefix_records
+    records["alpha"] = PrefixRecord(
+        name="alpha",
         version="1.0",
         build="0",
         build_number=0,
         channel="conda-forge",
         subdir="noarch",
-        fn=f"{name}-1.0-0.conda",
+        fn="alpha-1.0-0.conda",
     )
-
-
-def test_installed_cache_tracks_installed_names(tmp_path):
-    state = SolverInputState(tmp_path)
-    records = state.prefix_data._prefix_records
-    records["alpha"] = prefix_record("alpha")
 
     installed = state.installed
     assert tuple(installed) == ("alpha",)
     assert state.installed is installed
 
     del records["alpha"]
-    records["beta"] = prefix_record("beta")
+    records["beta"] = PrefixRecord(
+        name="beta",
+        version="1.0",
+        build="0",
+        build_number=0,
+        channel="conda-forge",
+        subdir="noarch",
+        fn="beta-1.0-0.conda",
+    )
 
     assert tuple(state.installed) == ("beta",)
