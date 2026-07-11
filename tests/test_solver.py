@@ -24,6 +24,7 @@ from conda.exceptions import (
     UnsatisfiableError,
 )
 from conda.testing.integration import package_is_installed
+from conda_build.exceptions import DependencyNeedsBuildingError
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.solver import LibMambaSolver as Solver
@@ -529,6 +530,94 @@ def test_install_virtual_packages(conda_cli: CondaCLIFixture, spec: str) -> None
     else:
         raises = (UnsatisfiableError, PackagesNotFoundError)
     conda_cli("create", "--dry-run", "--offline", spec, raises=raises)
+
+
+@pytest.mark.parametrize(
+    "cuda_version,called_from_conda_build,expect_error",
+    [
+        pytest.param("12.0", False, True, id="unsatisfied"),
+        pytest.param("13.0", False, False, id="satisfied"),
+        pytest.param("12.0", True, True, id="conda-build-unsatisfied"),
+    ],
+)
+def test_constrains_virtual_package(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    cuda_version: str,
+    called_from_conda_build: bool,
+    expect_error: bool,
+) -> None:
+    """
+    conda/conda#10803 regression: a package whose constrains reference a virtual
+    package (e.g. __cuda>=13) must cause an unsatisfiable error when the host
+    virtual package version is too low (__cuda==12), not silently succeed.
+    """
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA", cuda_version)
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
+    if called_from_conda_build:
+        monkeypatch.setattr(Solver, "_called_from_conda_build", lambda self: True)
+    reset_context()
+    record = {
+        "name": "needs-cuda13",
+        "version": "1.0",
+        "build": "0",
+        "build_number": 0,
+        "noarch": "generic",
+        "constrains": ["__cuda>=13"],
+        "depends": [],
+        "md5": "0" * 32,
+        "sha256": "0" * 64,
+    }
+    noarch = tmp_path / "noarch"
+    noarch.mkdir()
+    (noarch / "repodata.json").write_text(
+        json.dumps(
+            {
+                "info": {"subdir": "noarch"},
+                "packages": {"needs-cuda13-1.0-0.tar.bz2": record},
+                "packages.conda": {},
+            }
+        )
+    )
+
+    solver = Solver(
+        prefix=tmp_path / "env",
+        channels=[str(tmp_path)],
+        specs_to_add=["needs-cuda13"],
+        command="create",
+    )
+    if expect_error:
+        error_type = (
+            DependencyNeedsBuildingError if called_from_conda_build else LibMambaUnsatisfiableError
+        )
+        with pytest.raises(error_type):
+            solver.solve_final_state()
+    else:
+        records = solver.solve_final_state()
+        assert any(r.name == "needs-cuda13" for r in records)
+
+    conda_meta = tmp_path / "env" / "conda-meta"
+    conda_meta.mkdir(parents=True, exist_ok=True)
+    (conda_meta / "needs-cuda13-1.0-0.json").write_text(
+        json.dumps(
+            {
+                **record,
+                "files": [],
+                "paths_data": {"paths_version": 1, "paths": []},
+                "requested_spec": "needs-cuda13",
+                "requested_specs": ["needs-cuda13"],
+            }
+        )
+    )
+    assert PrefixData(tmp_path / "env").get("needs-cuda13")
+    records = Solver(
+        prefix=tmp_path / "env",
+        channels=[str(tmp_path)],
+        specs_to_remove=["needs-cuda13"],
+        command="remove",
+    ).solve_final_state()
+    assert not any(r.name == "needs-cuda13" for r in records)
 
 
 def test_urls_are_percent_decoded(tmp_path: Path) -> None:
