@@ -29,6 +29,17 @@ Remember to update the hyperlinks at the bottom.
   `__cuda>=13` against a host providing `__cuda==12` was silently ignored.
   (conda/conda#10803 via #962)
 
+### Contributors
+
+* @carterbox made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/962
+* @jaimergp
+* @jezdez
+* @kenodegard
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
 
 
 ## 26.6.0 (2026-06-30)
