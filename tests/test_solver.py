@@ -11,6 +11,7 @@ from itertools import chain, permutations, repeat
 from pathlib import Path
 from subprocess import check_call, run
 from textwrap import dedent
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
@@ -866,3 +867,72 @@ def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
         )
         tf = python.track_features
         assert tf == ("py_freethreading",)
+
+
+@pytest.mark.parametrize(
+    "conda_self_installed,frozen,expected_message",
+    (
+        pytest.param(True, False, "conda self update", id="conda-self installed, not frozen"),
+        pytest.param(True, True, "conda self update", id="conda-self installed, frozen"),
+        pytest.param(
+            False,
+            True,
+            "conda update -n base -c test-channel conda --override-frozen",
+            id="conda-self absent, frozen",
+        ),
+        pytest.param(
+            False,
+            False,
+            "conda update -n base -c test-channel conda",
+            id="conda-self absent, not frozen",
+        ),
+    ),
+)
+def test_notify_conda_outdated(
+    monkeypatch: MonkeyPatch,
+    capsys: pytest.CaptureFixture,
+    tmp_path: Path,
+    conda_self_installed: bool,
+    frozen: bool,
+    expected_message: str,
+) -> None:
+    """
+    Tests the notify conda outdated message.
+    - 'conda self update' whenever the 'conda-self' plugin is installed
+    - 'conda update ... --override-frozen' when 'conda-self' is absent and the prefix
+      is frozen (a plain update is blocked in that case).
+    - a plain 'conda update ...' when 'conda-self' is absent and the prefix isn't frozen.
+    """
+    channel_name = "test-channel"
+
+    class FakePrefixData:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def get(self, name, default=None):
+            if name == "conda":
+                return SimpleNamespace(channel=SimpleNamespace(canonical_name=channel_name))
+            if name == "conda-self":
+                return SimpleNamespace() if conda_self_installed else None
+            return default
+
+        def is_frozen(self) -> bool:
+            return frozen
+
+    monkeypatch.setattr("conda_libmamba_solver.solver.PrefixData", FakePrefixData)
+    monkeypatch.setenv("CONDA_NOTIFY_OUTDATED_CONDA", "true")
+    monkeypatch.setenv("CONDA_QUIET", "false")
+    reset_context()
+
+    solver = Solver(prefix=str(tmp_path), channels=[channel_name])
+    # Setup fake index with a newer version of conda available.
+    fake_index = SimpleNamespace(
+        channels=[SimpleNamespace(canonical_name=channel_name)],
+        search=lambda spec: [SimpleNamespace(version="99999.1.0")],
+    )
+
+    solver._notify_conda_outdated(None, index=fake_index, final_state=[])
+
+    stderr = capsys.readouterr().err
+    assert "A newer version of conda exists" in stderr
+    assert f"$ {expected_message}" in stderr
