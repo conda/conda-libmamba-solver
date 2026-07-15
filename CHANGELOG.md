@@ -13,6 +13,35 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.7.0 (2026-07-14)
+
+### Enhancements
+
+* Cache `SolverInputState.installed` for the lifetime of a single solve. `conda install`, `conda update`, and `conda remove` against large environments (thousands of packages) are now dramatically faster: a 50,000-record prefix that previously timed out after 5+ minutes completes in ~10 s. (#921)
+* Suggest updating conda with `conda self` if conda self plugin is installed. (#993)
+
+### Bug fixes
+
+* Enforce `run_constrained`/`constrains` entries that reference virtual packages
+  (e.g. a `constrains` on `__cuda`). Virtual packages are now kept present
+  at their detected version/build in solver requests, so the solver -- which runs
+  with `allow_uninstall=True` -- cannot drop them to dodge such a constraint.
+  `__cuda>=13` against a host providing `__cuda==12` was silently ignored.
+  (conda/conda#10803 via #962)
+
+### Contributors
+
+* @carterbox made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/962
+* @jaimergp
+* @jezdez
+* @kenodegard
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
 ## 26.6.0 (2026-06-30)
 
 ### Enhancements
