@@ -494,6 +494,12 @@ class LibMambaSolver(Solver):
                 # constrain updates too but those can be overridden in case of conflicts.
                 # name-only pins are treated as locks when installed, see below
                 tasks[Request.Pin].append(pinned)
+            elif name == "python" and installed and not pinned and not requested:
+                # Classic major.minor business rule: do not float python beyond X.Y.*
+                # unless the user requested python explicitly. Pin is compatible with
+                # Update (below), so --update-all can still take patch releases.
+                pyver = ".".join(installed.version.split(".")[:2])
+                tasks[Request.Pin].append(f"python {pyver}.*")
             # in libmamba, pins and installs are compatible tasks (pin only constrains,
             # does not 'request' a package). In classic, pins were actually targeted installs
             # so they were exclusive
@@ -517,9 +523,6 @@ class LibMambaSolver(Solver):
             # as long as they don't cause trouble
             elif in_state.prune:
                 continue
-            elif name == "python" and installed and not pinned:
-                pyver = ".".join(installed.version.split(".")[:2])
-                tasks[Request.Pin].append(f"python {pyver}.*")
             elif history:
                 if conflicting and history.strictness == 3:
                     # relax name-version-build (strictness=3) history specs that cause conflicts

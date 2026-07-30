@@ -299,7 +299,10 @@ class SolverInputState:
             pkgs.setdefault("conda", MatchSpec("conda"))
         if self.update_modifier.UPDATE_ALL:
             for pkg in installed:
-                if pkg != "python" and pkg not in pinned:
+                # Include python so patch updates within the current major.minor
+                # are requested; the solver applies the X.Y.* pin separately
+                # (classic parity). See conda.core.solve.Solver._add_specs.
+                if pkg not in pinned:
                     pkgs.setdefault(pkg, MatchSpec(pkg))
         return MappingProxyType(pkgs)
 
