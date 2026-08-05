@@ -120,6 +120,12 @@ jobs:
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
+
+      # Temporary: packaging 26.3 raises InvalidVersion for None; drop once fixed in conda.
+      - name: Patch conda DeprecationHandler for packaging 26.3
+        working-directory: conda
+        shell: bash
+        run: patch -p1 < ../conda-libmamba-solver/dev/patches/0001-fix-DeprecationHandler-for-packaging-26.3.patch
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Hash + Timestamp
@@ -285,6 +291,12 @@ jobs:
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
+
+      # Temporary: packaging 26.3 raises InvalidVersion for None; drop once fixed in conda.
+      - name: Patch conda DeprecationHandler for packaging 26.3
+        working-directory: conda
+        shell: bash
+        run: patch -p1 < ../conda-libmamba-solver/dev/patches/0001-fix-DeprecationHandler-for-packaging-26.3.patch
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Hash + Timestamp
@@ -582,6 +594,12 @@ jobs:
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
+
+      # Temporary: packaging 26.3 raises InvalidVersion for None; drop once fixed in conda.
+      - name: Patch conda DeprecationHandler for packaging 26.3
+        working-directory: conda
+        shell: bash
+        run: patch -p1 < ../conda-libmamba-solver/dev/patches/0001-fix-DeprecationHandler-for-packaging-26.3.patch
       # /CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Hash + Timestamp
