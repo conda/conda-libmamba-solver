@@ -42,7 +42,7 @@ env:
   # we can't break classic from here; no need to test it
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
-  CONDA_REF: feature/repodata-filter-cooldown # temporarily test against exclude-newer branch
+  CONDA_REF: a5094a3ae2df8d21843d40780278fc2f9eff3e27 # conda/conda#15761
 
 jobs:
   # detect whether any code changes are included in this PR
