@@ -271,20 +271,24 @@ def test_exclude_newer_timestamp_unset():
     assert index._exclude_newer_timestamp() is None
 
 
-@pytest.mark.parametrize(
-    ("libmamba_version", "expected"),
-    (("2.8.1", None), ("2.9.0", 1234), ("2.10.0", 1234)),
-)
-def test_exclude_newer_timestamp_requires_libmambapy_2_9(
+def test_exclude_newer_timestamp_uses_libmambapy_2_9():
+    index = object.__new__(LibMambaIndexHelper)
+    index.channels = []
+    index.subdirs = ("noarch",)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
+
+    assert index._exclude_newer_timestamp() == 1234
+    index._init_db()
+
+
+def test_exclude_newer_timestamp_falls_back_before_libmambapy_2_9(
     mocker: MockerFixture,
-    libmamba_version: str,
-    expected: int | None,
 ):
     index = object.__new__(LibMambaIndexHelper)
     index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
-    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value=libmamba_version)
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.8.1")
 
-    assert index._exclude_newer_timestamp() == expected
+    assert index._exclude_newer_timestamp() is None
 
 
 def test_exclude_newer_timestamp_is_disabled_for_policy_overrides():
