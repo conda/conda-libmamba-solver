@@ -334,6 +334,31 @@ def test_native_exclude_newer_keeps_installed_records(mocker: MockerFixture):
     assert package.timestamp == 0
 
 
+def test_native_exclude_newer_uses_indexed_timestamp_for_shards(mocker: MockerFixture):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234)
+    index.subdirs = ("noarch",)
+    index._add_pip_as_python_dependency = False
+    index.db = mocker.Mock()
+    package = mocker.Mock(timestamp=5678)
+    mocker.patch(
+        "conda_libmamba_solver.index._package_info_from_package_dict",
+        return_value=package,
+    )
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.9.0")
+    shard = mocker.Mock(base_url="https://example.test/conda/noarch/")
+    shard.iter_records.return_value = (
+        (
+            "package-1.0-0.conda",
+            {"name": "package", "indexed_timestamp": 1000, "timestamp": 5678},
+        ),
+    )
+
+    index._load_repo_info_from_repodata_dict({"https://example.test/conda/noarch": shard})
+
+    assert package.timestamp == 0
+
+
 def test_exclude_newer_record_filter_honors_package_and_channel_overrides():
     index = object.__new__(LibMambaIndexHelper)
     index.exclude_newer_policy = ExcludeNewerPolicy.from_values(

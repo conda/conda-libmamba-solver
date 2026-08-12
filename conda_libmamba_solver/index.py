@@ -761,6 +761,8 @@ class LibMambaIndexHelper:
                     channel_id=channel_id,
                     add_pip_as_python_dependency=self._add_pip_as_python_dependency,
                 )
+                if self._exclude_newer_timestamp() is not None:
+                    package.timestamp = 0
                 packages.append(package)
 
             repo = self.db.add_repo_from_packages(
