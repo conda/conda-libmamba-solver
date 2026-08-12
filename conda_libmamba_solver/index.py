@@ -90,6 +90,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
+from conda.models.version import VersionOrder
 from libmambapy import MambaNativeException, Query
 from libmambapy.solver.libsolv import (
     Database,
@@ -108,7 +109,7 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from .mamba_utils import logger_callback
+from .mamba_utils import logger_callback, mamba_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -387,6 +388,7 @@ class LibMambaIndexHelper:
             self.exclude_newer_policy.global_cutoff is None
             or self.exclude_newer_policy.has_channel_overrides
             or self.exclude_newer_policy.has_package_overrides
+            or VersionOrder(mamba_version()) < VersionOrder("2.9.0")
         ):
             return None
         return int(self.exclude_newer_policy.global_cutoff)
@@ -554,6 +556,9 @@ class LibMambaIndexHelper:
             # https://github.com/mamba-org/mamba/pull/2753#issuecomment-1739122830
             log.debug("Overriding truthy 'try_solv' as False on Windows for performance reasons.")
             try_solv = False
+        # libmamba does not apply the cutoff when loading a serialized repository.
+        if self._exclude_newer_timestamp() is not None:
+            try_solv = False
         json_path = Path(json_path)
         solv_path = json_path.with_suffix(".solv")
         if state:
@@ -691,6 +696,10 @@ class LibMambaIndexHelper:
 
     def _load_installed(self, records: Iterable[PackageRecord]) -> _ChannelRepoInfo:
         packages = [self._package_info_from_package_record(record) for record in records]
+        # The native cutoff applies to every repository, including the installed one.
+        if self._exclude_newer_timestamp() is not None:
+            for package in packages:
+                package.timestamp = 0
         repo = self.db.add_repo_from_packages(
             packages=packages,
             name="installed",
@@ -740,7 +749,8 @@ class LibMambaIndexHelper:
             packages = []
             for filename, record in shardlike.iter_records():
                 package_url = f"{base_url}{filename}"
-                if self._use_python_exclude_newer_filter and not self._record_allowed(
+                # PackageInfo does not carry the preferred indexed timestamp.
+                if self.exclude_newer_policy.active and not self._record_allowed(
                     record, filename, channel_url, package_url
                 ):
                     continue

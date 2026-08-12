@@ -1,6 +1,5 @@
 ### Enhancements
 
-* Pass conda's resolved `exclude_newer` global cutoff to libmambapy's
-  `Database` as `exclude_newer_timestamp`, enabling native
-  `--exclude-newer` support when the upstream mamba PR lands. (#905,
-  conda/conda#15759)
+* Use libmambapy 2.9.0's native `exclude_newer_timestamp` support for global
+  `exclude_newer` policies, with Python filtering for older libmambapy versions
+  and scoped policies. (#905, conda/conda#15759)

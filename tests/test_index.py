@@ -25,6 +25,8 @@ from conda_libmamba_solver.index import (
 if TYPE_CHECKING:
     import os
 
+    from pytest_mock import MockerFixture
+
 
 initialize_logging()
 DATA = Path(__file__).parent / "data"
@@ -269,11 +271,20 @@ def test_exclude_newer_timestamp_unset():
     assert index._exclude_newer_timestamp() is None
 
 
-def test_exclude_newer_timestamp_uses_resolved_global_cutoff():
+@pytest.mark.parametrize(
+    ("libmamba_version", "expected"),
+    (("2.8.1", None), ("2.9.0", 1234), ("2.10.0", 1234)),
+)
+def test_exclude_newer_timestamp_requires_libmambapy_2_9(
+    mocker: MockerFixture,
+    libmamba_version: str,
+    expected: int | None,
+):
     index = object.__new__(LibMambaIndexHelper)
     index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value=libmamba_version)
 
-    assert index._exclude_newer_timestamp() == 1234
+    assert index._exclude_newer_timestamp() == expected
 
 
 def test_exclude_newer_timestamp_is_disabled_for_policy_overrides():
@@ -286,6 +297,41 @@ def test_exclude_newer_timestamp_is_disabled_for_policy_overrides():
     )
 
     assert index._exclude_newer_timestamp() is None
+
+
+def test_native_exclude_newer_skips_solv_cache(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234)
+    index._use_python_exclude_newer_filter = False
+    index.db = mocker.Mock()
+    index.db.add_repo_from_repodata_json.return_value = mocker.sentinel.repo
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.9.0")
+
+    repo = index._load_repo_info_from_json_path(
+        tmp_path / "repodata.json",
+        "https://example.test/conda/noarch",
+        mocker.Mock(etag="etag", mod="mod"),
+    )
+
+    assert repo is mocker.sentinel.repo
+    index.db.add_repo_from_native_serialization.assert_not_called()
+    index.db.native_serialize_repo.assert_not_called()
+
+
+def test_native_exclude_newer_keeps_installed_records(mocker: MockerFixture):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234)
+    index.db = mocker.Mock()
+    package = mocker.Mock(timestamp=5678)
+    mocker.patch.object(index, "_package_info_from_package_record", return_value=package)
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.9.0")
+
+    index._load_installed((mocker.sentinel.record,))
+
+    assert package.timestamp == 0
 
 
 def test_exclude_newer_record_filter_honors_package_and_channel_overrides():
