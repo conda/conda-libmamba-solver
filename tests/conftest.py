@@ -23,6 +23,38 @@ pytest_plugins = (
 
 # Shard-related fixtures have been removed (shards module being deprecated)
 
+_EMPTY_NOARCH_REPODATA = (
+    '{"info":{"subdir":"noarch"},"packages":{},'
+    '"packages.conda":{},"removed":[],"repodata_version":1}'
+)
+
+
+@pytest.fixture(scope="module")
+def mirror_channel_server(tmp_path_factory) -> Iterator[HttpTestServerFixture]:
+    """HTTP server shaped like an Anaconda Cloud + defaults pkgs mirror."""
+    server_dir = tmp_path_factory.mktemp("mirror_channel_server")
+    conda_forge = server_dir / "cloud" / "conda-forge"
+    conda_forge.parent.mkdir()
+    try:
+        conda_forge.symlink_to(MAMBA_REPO, target_is_directory=True)
+    except OSError:
+        shutil.copytree(MAMBA_REPO, conda_forge)
+    for pkgs_channel in ("main", "r", "msys2"):
+        noarch = server_dir / "pkgs" / pkgs_channel / "noarch"
+        noarch.mkdir(parents=True)
+        (noarch / "repodata.json").write_text(_EMPTY_NOARCH_REPODATA)
+    server = http_server_module.run_test_server(str(server_dir))
+    host, port = server.socket.getsockname()[:2]
+    url_host = f"[{host}]" if ":" in host else host
+    yield HttpTestServerFixture(
+        server=server,
+        host=host,
+        port=port,
+        url=f"http://{url_host}:{port}",
+        directory=server_dir,
+    )
+    server.shutdown()
+
 
 @pytest.fixture(scope="module")
 def mamba_repo_server(tmp_path_factory) -> Iterator[HttpTestServerFixture]:

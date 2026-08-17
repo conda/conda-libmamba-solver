@@ -109,30 +109,40 @@ def _setup_conda_forge_as_defaults(prefix, force=False):
     )
 
 
-def _setup_channels_alias(prefix, force=False):
+def _setup_channels_alias(prefix, base_url, force=False):
     write_env_config(
         prefix,
         force=force,
         channels=["conda-forge", "defaults"],
-        channel_alias="https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
+        channel_alias=f"{base_url}/cloud",
         migrated_channel_aliases=["https://conda.anaconda.org"],
         default_channels=[
-            "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main",
-            "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r",
-            "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2",
+            f"{base_url}/pkgs/main",
+            f"{base_url}/pkgs/r",
+            f"{base_url}/pkgs/msys2",
         ],
     )
 
 
-def _setup_channels_custom(prefix, force=False):
+def _setup_channels_custom(prefix, base_url, force=False):
     write_env_config(
         prefix,
         force=force,
         channels=["conda-forge"],
         custom_channels={
-            "conda-forge": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
+            "conda-forge": f"{base_url}/cloud",
         },
     )
+
+
+def _assert_mirrored_conda_forge(result, stderr, expected_base_url):
+    if stderr:
+        assert "conda.anaconda.org" not in stderr
+    linked = result["actions"]["LINK"]
+    assert linked
+    for pkg in linked:
+        assert pkg["channel"] == "conda-forge", pkg
+        assert pkg["base_url"] == expected_base_url, pkg
 
 
 @pytest.mark.parametrize(
@@ -142,7 +152,7 @@ def _setup_channels_custom(prefix, force=False):
         _setup_channels_custom,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env):
+def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env, mirror_channel_server):
     """
     https://github.com/conda/conda-libmamba-solver/issues/108
 
@@ -153,46 +163,25 @@ def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env):
     the non-mirrored (original) channels being loaded. In airgapped contexts, this
     is undesirable.
     """
+    expected_base_url = f"{mirror_channel_server.url}/cloud/conda-forge"
 
     with env_vars({"CONDA_PKGS_DIRS": tmp_path}), tmp_env() as prefix:
         assert (Path(prefix) / "conda-meta" / "history").exists()
 
         # Setup conda configuration
-        config_env(prefix)
+        config_env(prefix, mirror_channel_server.url)
         common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
 
         env = os.environ.copy()
         env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
 
         # Create an environment using mirrored channels only
-        p = conda_subprocess("install", *common, "ca-certificates", env=env)
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
+        p = conda_subprocess("install", *common, "test-package", env=env)
+        _assert_mirrored_conda_forge(json.loads(p.stdout), p.stderr, expected_base_url)
 
-        for pkg in result["actions"]["LINK"]:
-            assert pkg["channel"] == "conda-forge", pkg
-            assert (
-                pkg["base_url"]
-                == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
-            ), pkg
-
-        # Make a change to that channel
-        p = conda_subprocess("install", *common, "zlib", env=env)
-
-        # Ensure that the loaded channels are ONLY the mirrored ones
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
-
-        for pkg in result["actions"]["LINK"]:
-            assert pkg["channel"] == "conda-forge", pkg
-            assert (
-                pkg["base_url"]
-                == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
-            ), pkg
-
-        # Ensure that other end points were never loaded
+        # Re-solve against prefix data so a leak of conda.anaconda.org would show up
+        p = conda_subprocess("install", *common, "--force-reinstall", "test-package", env=env)
+        _assert_mirrored_conda_forge(json.loads(p.stdout), p.stderr, expected_base_url)
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")
