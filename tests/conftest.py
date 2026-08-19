@@ -31,7 +31,7 @@ _EMPTY_NOARCH_REPODATA = (
 
 @pytest.fixture(scope="module")
 def mirror_channel_server(tmp_path_factory) -> Iterator[HttpTestServerFixture]:
-    """HTTP server shaped like an Anaconda Cloud + defaults pkgs mirror."""
+    """Local HTTP server with mirror-style /cloud and /pkgs paths."""
     server_dir = tmp_path_factory.mktemp("mirror_channel_server")
     conda_forge = server_dir / "cloud" / "conda-forge"
     conda_forge.parent.mkdir()

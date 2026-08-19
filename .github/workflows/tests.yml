@@ -30,8 +30,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # https://conda.github.io/conda-libmamba-solver/user-guide/configuration/#advanced-options
-  CONDA_LIBMAMBA_SOLVER_NO_CHANNELS_FROM_INSTALLED: true
   # Reruns on upstream tests
   PYTEST_RERUN_FAILURES: 1
   # Reruns on our tests

@@ -109,7 +109,7 @@ def _setup_conda_forge_as_defaults(prefix, force=False):
     )
 
 
-def _setup_channels_alias(prefix, base_url, force=False):
+def _setup_mirror_channel_alias(prefix, base_url, force=False):
     write_env_config(
         prefix,
         force=force,
@@ -124,7 +124,7 @@ def _setup_channels_alias(prefix, base_url, force=False):
     )
 
 
-def _setup_channels_custom(prefix, base_url, force=False):
+def _setup_mirror_custom_channels(prefix, base_url, force=False):
     write_env_config(
         prefix,
         force=force,
@@ -135,7 +135,7 @@ def _setup_channels_custom(prefix, base_url, force=False):
     )
 
 
-def _assert_mirrored_conda_forge(result, stderr, expected_base_url):
+def _assert_mirror_channel_link(result, stderr, expected_base_url):
     if stderr:
         assert "conda.anaconda.org" not in stderr
     linked = result["actions"]["LINK"]
@@ -148,20 +148,20 @@ def _assert_mirrored_conda_forge(result, stderr, expected_base_url):
 @pytest.mark.parametrize(
     "config_env",
     (
-        _setup_channels_alias,
-        _setup_channels_custom,
+        _setup_mirror_channel_alias,
+        _setup_mirror_custom_channels,
     ),
 )
-def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env, mirror_channel_server):
-    """
-    https://github.com/conda/conda-libmamba-solver/issues/108
+def test_mirror_channel_config(config_env, tmp_path, tmp_env, mirror_channel_server):
+    """Smoke test for mirror-style channel configuration.
 
-    On existing environments, we load channels from the prefix data information
-    to silence some warnings in libmamba (see `test_channels_prefixdata`).
+    Installs ``test-package`` through a local HTTP server configured via either
+    ``channel_alias`` + ``migrated_channel_aliases`` + mirrored ``default_channels``,
+    or ``custom_channels``. Asserts LINK actions report the expected mirror
+    ``base_url`` for ``conda-forge``.
 
-    In some configurations that use proxies or Anaconda mirrors, this can lead to
-    the non-mirrored (original) channels being loaded. In airgapped contexts, this
-    is undesirable.
+    See https://github.com/conda/conda-libmamba-solver/issues/108 for the original
+    mirror/airgap motivation. Prefix-driven channel reinjection was removed in #457.
     """
     expected_base_url = f"{mirror_channel_server.url}/cloud/conda-forge"
 
@@ -175,13 +175,8 @@ def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env, mirror_chan
         env = os.environ.copy()
         env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
 
-        # Create an environment using mirrored channels only
         p = conda_subprocess("install", *common, "test-package", env=env)
-        _assert_mirrored_conda_forge(json.loads(p.stdout), p.stderr, expected_base_url)
-
-        # Re-solve against prefix data so a leak of conda.anaconda.org would show up
-        p = conda_subprocess("install", *common, "--force-reinstall", "test-package", env=env)
-        _assert_mirrored_conda_forge(json.loads(p.stdout), p.stderr, expected_base_url)
+        _assert_mirror_channel_link(json.loads(p.stdout), p.stderr, expected_base_url)
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")

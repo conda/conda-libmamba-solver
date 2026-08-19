@@ -51,8 +51,6 @@ Their origins can be:
 - Specified by the user on the command-line (-c arguments)
 - Specified by the configuration files (.condarc) or environment vars (context object)
 - Added from channel-specific MatchSpec (e.g. `conda-forge::python`)
-- Added from installed packages in target environment (e.g. a package that was installed
-  from a non-default channel remembers where it comes from)
 
 Also note that a channel URL might have authentication in the form:
 
