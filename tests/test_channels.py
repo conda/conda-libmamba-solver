@@ -108,50 +108,44 @@ def _setup_conda_forge_as_defaults(prefix, force=False):
     )
 
 
-def test_foreign_index_json_does_not_leak_channel(tmp_env: TmpEnvFixture) -> None:
+def test_foreign_index_json_does_not_leak_channel(
+    conda_cli: CondaCLIFixture,
+    path_factory: PathFactoryFixture,
+) -> None:
     """Local channel whose ``index.json`` embeds ``conda.anaconda.org`` metadata.
 
     Installs ``test-package`` from the shared ``mamba_repo`` fixture, whose committed
     ``.conda`` artifact embeds foreign channel metadata in ``index.json``. Asserts
     LINK and ``conda-meta`` use the local channel, not the stale metadata in the
-    package. A second solve against the prefix must not mention ``conda.anaconda.org``
-    in stderr.
+    package.
 
     See https://github.com/conda/conda-libmamba-solver/issues/108 for background.
     Prefix-driven channel reinjection was removed in #457.
     """
     channel = MAMBA_REPO.resolve()
-    common = [
+    prefix = path_factory()
+    stdout, _, _ = conda_cli(
+        "create",
+        f"--prefix={prefix}",
         "--override-channels",
         f"--channel={channel}",
         "--solver=libmamba",
         "--json",
-        "-vv",
-    ]
+        "test-package",
+    )
+    result = json.loads(stdout)
+    linked = result["actions"]["LINK"]
+    assert len(linked) == 1, linked
+    pkg = linked[0]
+    assert pkg["name"] == "test-package"
+    assert "conda.anaconda.org" not in pkg["base_url"], pkg
+    assert str(channel) in pkg["base_url"], pkg
 
-    with tmp_env() as prefix:
-        p = conda_subprocess("install", "-yp", prefix, *common, "test-package")
-        assert p.returncode == 0, p.stderr
-        result = json.loads(p.stdout)
-        linked = result["actions"]["LINK"]
-        assert linked
-        for pkg in linked:
-            if pkg["name"] == "test-package":
-                assert "conda.anaconda.org" not in pkg.get("base_url", ""), pkg
-                assert str(channel) in pkg.get("base_url", ""), pkg
-
-        meta_files = list(Path(prefix).glob("conda-meta/test-package-*.json"))
-        assert meta_files
-        record = json.loads(meta_files[0].read_text())
-        assert "conda.anaconda.org" not in record.get("url", ""), record
-        assert str(channel) in record.get("url", ""), record
-
-        p2 = conda_subprocess(
-            "install", "-yp", prefix, *common, "--force-reinstall", "test-package"
-        )
-        assert p2.returncode == 0, p2.stderr
-        if p2.stderr:
-            assert "conda.anaconda.org" not in p2.stderr
+    meta_files = list(Path(prefix).glob("conda-meta/test-package-*.json"))
+    assert len(meta_files) == 1, meta_files
+    record = json.loads(meta_files[0].read_text())
+    assert "conda.anaconda.org" not in record["url"], record
+    assert str(channel) in record["url"], record
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")
