@@ -16,4 +16,4 @@
 
 ### Other
 
-* Replace Tsinghua Anaconda mirror in `test_mirrors_do_not_leak_channels` with a local HTTP mirror. (#1027)
+* Replace Tsinghua Anaconda mirror channel test with `test_foreign_index_json_does_not_leak_channel`, using a poisoned `.conda` package in the shared `mamba_repo` fixture whose `index.json` embeds foreign channel metadata. (#1027)

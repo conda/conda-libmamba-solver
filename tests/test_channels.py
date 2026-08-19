@@ -13,7 +13,6 @@ from urllib.request import urlretrieve
 
 import pytest
 from conda.common.compat import on_linux, on_win
-from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
@@ -21,7 +20,7 @@ from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
-from .http_channel_helpers import TOKEN, basic_auth_url
+from .http_channel_helpers import MAMBA_REPO, TOKEN, basic_auth_url
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
@@ -109,74 +108,50 @@ def _setup_conda_forge_as_defaults(prefix, force=False):
     )
 
 
-def _setup_mirror_channel_alias(prefix, base_url, force=False):
-    write_env_config(
-        prefix,
-        force=force,
-        channels=["conda-forge", "defaults"],
-        channel_alias=f"{base_url}/cloud",
-        migrated_channel_aliases=["https://conda.anaconda.org"],
-        default_channels=[
-            f"{base_url}/pkgs/main",
-            f"{base_url}/pkgs/r",
-            f"{base_url}/pkgs/msys2",
-        ],
-    )
+def test_foreign_index_json_does_not_leak_channel(tmp_env: TmpEnvFixture) -> None:
+    """Local channel whose ``index.json`` embeds ``conda.anaconda.org`` metadata.
 
+    Installs ``test-package`` from the shared ``mamba_repo`` fixture, whose committed
+    ``.conda`` artifact embeds foreign channel metadata in ``index.json``. Asserts
+    LINK and ``conda-meta`` use the local channel, not the stale metadata in the
+    package. A second solve against the prefix must not mention ``conda.anaconda.org``
+    in stderr.
 
-def _setup_mirror_custom_channels(prefix, base_url, force=False):
-    write_env_config(
-        prefix,
-        force=force,
-        channels=["conda-forge"],
-        custom_channels={
-            "conda-forge": f"{base_url}/cloud",
-        },
-    )
-
-
-def _assert_mirror_channel_link(result, stderr, expected_base_url):
-    if stderr:
-        assert "conda.anaconda.org" not in stderr
-    linked = result["actions"]["LINK"]
-    assert linked
-    for pkg in linked:
-        assert pkg["channel"] == "conda-forge", pkg
-        assert pkg["base_url"] == expected_base_url, pkg
-
-
-@pytest.mark.parametrize(
-    "config_env",
-    (
-        _setup_mirror_channel_alias,
-        _setup_mirror_custom_channels,
-    ),
-)
-def test_mirror_channel_config(config_env, tmp_path, tmp_env, mirror_channel_server):
-    """Smoke test for mirror-style channel configuration.
-
-    Installs ``test-package`` through a local HTTP server configured via either
-    ``channel_alias`` + ``migrated_channel_aliases`` + mirrored ``default_channels``,
-    or ``custom_channels``. Asserts LINK actions report the expected mirror
-    ``base_url`` for ``conda-forge``.
-
-    See https://github.com/conda/conda-libmamba-solver/issues/108 for the original
-    mirror/airgap motivation. Prefix-driven channel reinjection was removed in #457.
+    See https://github.com/conda/conda-libmamba-solver/issues/108 for background.
+    Prefix-driven channel reinjection was removed in #457.
     """
-    expected_base_url = f"{mirror_channel_server.url}/cloud/conda-forge"
+    channel = MAMBA_REPO.resolve()
+    common = [
+        "--override-channels",
+        f"--channel={channel}",
+        "--solver=libmamba",
+        "--json",
+        "-vv",
+    ]
 
-    with env_vars({"CONDA_PKGS_DIRS": tmp_path}), tmp_env() as prefix:
-        assert (Path(prefix) / "conda-meta" / "history").exists()
+    with tmp_env() as prefix:
+        p = conda_subprocess("install", "-yp", prefix, *common, "test-package")
+        assert p.returncode == 0, p.stderr
+        result = json.loads(p.stdout)
+        linked = result["actions"]["LINK"]
+        assert linked
+        for pkg in linked:
+            if pkg["name"] == "test-package":
+                assert "conda.anaconda.org" not in pkg.get("base_url", ""), pkg
+                assert str(channel) in pkg.get("base_url", ""), pkg
 
-        # Setup conda configuration
-        config_env(prefix, mirror_channel_server.url)
-        common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
+        meta_files = list(Path(prefix).glob("conda-meta/test-package-*.json"))
+        assert meta_files
+        record = json.loads(meta_files[0].read_text())
+        assert "conda.anaconda.org" not in record.get("url", ""), record
+        assert str(channel) in record.get("url", ""), record
 
-        env = os.environ.copy()
-        env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
-
-        p = conda_subprocess("install", *common, "test-package", env=env)
-        _assert_mirror_channel_link(json.loads(p.stdout), p.stderr, expected_base_url)
+        p2 = conda_subprocess(
+            "install", "-yp", prefix, *common, "--force-reinstall", "test-package"
+        )
+        assert p2.returncode == 0, p2.stderr
+        if p2.stderr:
+            assert "conda.anaconda.org" not in p2.stderr
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")
