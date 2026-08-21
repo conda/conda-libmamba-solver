@@ -280,7 +280,7 @@ class LibMambaIndexHelper:
         if exclude_newer_policy is None:
             from conda.core.exclude_newer import ExcludeNewerPolicy
 
-            exclude_newer_policy = ExcludeNewerPolicy.disabled()
+            exclude_newer_policy = ExcludeNewerPolicy()
         self.exclude_newer_policy = exclude_newer_policy
         self._use_python_exclude_newer_filter = (
             self.exclude_newer_policy.active and self._exclude_newer_timestamp() is None

@@ -266,7 +266,7 @@ def test_package_info_from_package_dict_add_pip_invalid_version():
 
 def test_exclude_newer_timestamp_unset():
     index = object.__new__(LibMambaIndexHelper)
-    index.exclude_newer_policy = ExcludeNewerPolicy.disabled()
+    index.exclude_newer_policy = ExcludeNewerPolicy()
 
     assert index._exclude_newer_timestamp() is None
 
