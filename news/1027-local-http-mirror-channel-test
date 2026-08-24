@@ -16,4 +16,4 @@
 
 ### Other
 
-* Replace Tsinghua Anaconda mirror channel test with `test_foreign_index_json_does_not_leak_channel`, using a poisoned `.conda` package in the shared `mamba_repo` fixture whose `index.json` embeds foreign channel metadata. (#1027)
+* Replace the remote mirror regression test with a local test that verifies installed-prefix metadata cannot cause the solver to fetch an unconfigured channel. (#1027)

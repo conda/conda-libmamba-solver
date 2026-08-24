@@ -19,23 +19,7 @@
       "version": "0.1"
     }
   },
-  "packages.conda": {
-    "test-package-0.1-0.conda": {
-      "build": "0",
-      "build_number": 0,
-      "depends": [],
-      "license": "BSD",
-      "license_family": "BSD",
-      "md5": "b447a0ec0dd4a3de460ad4c60cf62402",
-      "name": "test-package",
-      "noarch": "generic",
-      "sha256": "6b8ea43b20d9e7bfade5368923ba79bd9394cda1c0ae845ddc4aa0f5516d4576",
-      "size": 6579,
-      "subdir": "noarch",
-      "timestamp": 1613117294885,
-      "version": "0.1"
-    }
-  },
+  "packages.conda": {},
   "removed": [],
   "repodata_version": 1
 }
