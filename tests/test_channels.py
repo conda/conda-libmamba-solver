@@ -13,7 +13,6 @@ from urllib.request import urlretrieve
 
 import pytest
 from conda.common.compat import on_linux, on_win
-from conda.common.io import env_vars
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import DryRunExit
 from conda.models.channel import Channel
@@ -21,7 +20,7 @@ from conda.testing.integration import package_is_installed
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
 
-from .http_channel_helpers import TOKEN, basic_auth_url
+from .http_channel_helpers import MAMBA_REPO, TOKEN, basic_auth_url
 from .utils import conda_subprocess, write_env_config
 
 if TYPE_CHECKING:
@@ -31,6 +30,7 @@ if TYPE_CHECKING:
         PathFactoryFixture,
         TmpEnvFixture,
     )
+    from pytest_mock import MockerFixture
 
 
 DATA = Path(__file__).parent / "data"
@@ -109,90 +109,61 @@ def _setup_conda_forge_as_defaults(prefix, force=False):
     )
 
 
-def _setup_channels_alias(prefix, force=False):
-    write_env_config(
-        prefix,
-        force=force,
-        channels=["conda-forge", "defaults"],
-        channel_alias="https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
-        migrated_channel_aliases=["https://conda.anaconda.org"],
-        default_channels=[
-            "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main",
-            "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/r",
-            "https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/msys2",
-        ],
-    )
+@pytest.mark.parametrize("http_test_server", [MAMBA_REPO], indirect=True)
+def test_installed_channel_is_not_fetched(
+    http_test_server: HttpTestServerFixture,
+    mocker: MockerFixture,
+    path_factory: PathFactoryFixture,
+) -> None:
+    """Do not fetch channels found only in installed-prefix metadata.
 
-
-def _setup_channels_custom(prefix, force=False):
-    write_env_config(
-        prefix,
-        force=force,
-        channels=["conda-forge"],
-        custom_channels={
-            "conda-forge": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud",
-        },
-    )
-
-
-@pytest.mark.parametrize(
-    "config_env",
-    (
-        _setup_channels_alias,
-        _setup_channels_custom,
-    ),
-)
-def test_mirrors_do_not_leak_channels(config_env, tmp_path, tmp_env):
+    See https://github.com/conda/conda-libmamba-solver/issues/108.
     """
-    https://github.com/conda/conda-libmamba-solver/issues/108
+    channel = MAMBA_REPO.resolve().as_uri()
+    prefix = path_factory()
+    env = os.environ.copy()
+    env["CONDA_PKGS_DIRS"] = str(path_factory())
 
-    On existing environments, we load channels from the prefix data information
-    to silence some warnings in libmamba (see `test_channels_prefixdata`).
+    conda_subprocess(
+        "create",
+        f"--prefix={prefix}",
+        "--override-channels",
+        f"--channel={channel}",
+        "--solver=libmamba",
+        "--yes",
+        "test-package",
+        env=env,
+    )
+    meta_files = list(Path(prefix).glob("conda-meta/test-package-*.json"))
+    assert len(meta_files) == 1, meta_files
+    record = json.loads(meta_files[0].read_text())
+    foreign_subdir = http_test_server.get_url("noarch")
+    record["channel"] = foreign_subdir
+    record["base_url"] = http_test_server.url
+    record["url"] = http_test_server.get_url(f"noarch/{record['fn']}")
+    meta_files[0].write_text(json.dumps(record))
 
-    In some configurations that use proxies or Anaconda mirrors, this can lead to
-    the non-mirrored (original) channels being loaded. In airgapped contexts, this
-    is undesirable.
-    """
+    write_env_config(prefix, channels=[channel])
+    env["CONDA_PREFIX"] = str(prefix)
+    env["CONDARC"] = str(prefix / ".condarc")
+    # The foreign channel is available, but a later solve must never contact it.
+    requests = mocker.spy(http_test_server.server, "finish_request")
 
-    with env_vars({"CONDA_PKGS_DIRS": tmp_path}), tmp_env() as prefix:
-        assert (Path(prefix) / "conda-meta" / "history").exists()
-
-        # Setup conda configuration
-        config_env(prefix)
-        common = ["-yp", prefix, "--solver=libmamba", "--json", "-vv"]
-
-        env = os.environ.copy()
-        env["CONDA_PREFIX"] = str(prefix)  # fake activation so config is loaded
-
-        # Create an environment using mirrored channels only
-        p = conda_subprocess("install", *common, "ca-certificates", env=env)
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
-
-        for pkg in result["actions"]["LINK"]:
-            assert pkg["channel"] == "conda-forge", pkg
-            assert (
-                pkg["base_url"]
-                == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
-            ), pkg
-
-        # Make a change to that channel
-        p = conda_subprocess("install", *common, "zlib", env=env)
-
-        # Ensure that the loaded channels are ONLY the mirrored ones
-        result = json.loads(p.stdout)
-        if p.stderr:
-            assert "conda.anaconda.org" not in p.stderr
-
-        for pkg in result["actions"]["LINK"]:
-            assert pkg["channel"] == "conda-forge", pkg
-            assert (
-                pkg["base_url"]
-                == "https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge"
-            ), pkg
-
-        # Ensure that other end points were never loaded
+    # The historical implementation skipped channel injection with --override-channels.
+    process = conda_subprocess(
+        "install",
+        f"--prefix={prefix}",
+        "--solver=libmamba",
+        "--dry-run",
+        "--force-reinstall",
+        "--json",
+        "test-package",
+        env=env,
+    )
+    result = json.loads(process.stdout)
+    assert result["success"] is True, result
+    assert [package["name"] for package in result["actions"]["LINK"]] == ["test-package"]
+    assert requests.call_count == 0, requests.call_args_list
 
 
 @pytest.mark.skipif(not on_linux, reason="Only run on Linux")
