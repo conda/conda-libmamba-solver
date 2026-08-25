@@ -79,12 +79,27 @@ jobs:
           --file conda-libmamba-solver/dev/requirements.txt
           python=${{ matrix.python-version }}
 
-      - name: Editable install conda-libmamba-solver and pytest-conda-solvers
+      - name: Install pytest-conda-solvers dependencies
+        # `conda pypi install -e` does not resolve dependencies, so install
+        # pytest-conda-solvers' runtime dependencies explicitly.
         run: >
-          conda pypi install
+          conda install
           --yes
-          -e conda-libmamba-solver
-          -e pytest-conda-solvers
+          pytest
+          fastapi
+          fastapi-cache2
+          httpx
+          msgspec
+          typer
+          uvicorn
+
+      - name: Editable install conda-libmamba-solver and pytest-conda-solvers
+        # Run as separate commands: a single `conda pypi install -e A -e B`
+        # trips a conda-pypi bug where the second editable install reuses a
+        # stale (already deleted) ephemeral package cache directory.
+        run: |
+          conda pypi install --yes -e conda-libmamba-solver
+          conda pypi install --yes -e pytest-conda-solvers
 
       - name: Conda Info
         run: python -m conda info --verbose
@@ -94,4 +109,5 @@ jobs:
 
       - name: Run solver tests
         working-directory: pytest-conda-solvers
-        run: python -m pytest --conda-solver=${{ env.CONDA_SOLVER }} -vv
+        # same invocation as pytest-conda-solvers' own CI
+        run: python -m pytest --conda-solver=${{ env.CONDA_SOLVER }} tests/test_provenance.py -vv
