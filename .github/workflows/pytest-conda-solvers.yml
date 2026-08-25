@@ -1,0 +1,97 @@
+name: Pytest Conda Solvers
+
+on:
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#push
+  push:
+    branches:
+      - main
+      - feature/**
+      - '[0-9].*.x'  # e.g., 4.14.x
+      - '[0-9][0-9].*.x'  # e.g., 23.3.x
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
+  pull_request:
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_dispatch
+  workflow_dispatch:
+
+  schedule:
+    - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
+
+concurrency:
+  # Concurrency group that uses the workflow name and PR number if available
+  # or commit SHA as a fallback. If a new build is triggered under that
+  # concurrency group while a previous build is running it will be canceled.
+  # Repeated pushes to a PR will cancel all previous builds, while multiple
+  # merges to main will not cancel.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  # run the shared solver YAML suite against the libmamba backend
+  CONDA_SOLVER: libmamba
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}  # bash exit immediately on error + login shell
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.10', '3.13']
+
+    steps:
+      - name: Checkout conda-libmamba-solver
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          path: conda-libmamba-solver
+
+      - name: Checkout pytest-conda-solvers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: dholth/pytest-conda-solvers
+          ref: patch-1
+          fetch-depth: 0
+          path: pytest-conda-solvers
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        with:
+          channels: conda-forge
+          run-post: false  # skip post cleanup
+
+      - name: Update conda in base
+        # conda-pypi (and therefore `conda pypi install -e`) is available in conda >= 26.5
+        run: conda install -n base --yes "conda>=26.5"
+
+      - name: Install conda dependencies
+        # libmamba/libmambapy are not declared in conda-libmamba-solver's
+        # pyproject.toml, so install them (plus the build backend needed for
+        # the editable install) explicitly.
+        run: >
+          conda install
+          --yes
+          --file conda-libmamba-solver/dev/requirements.txt
+          python=${{ matrix.python-version }}
+
+      - name: Editable install conda-libmamba-solver and pytest-conda-solvers
+        run: >
+          conda pypi install
+          --yes
+          -e conda-libmamba-solver
+          -e pytest-conda-solvers
+
+      - name: Conda Info
+        run: python -m conda info --verbose
+
+      - name: Conda List
+        run: conda list --show-channel-urls
+
+      - name: Run solver tests
+        working-directory: pytest-conda-solvers
+        run: python -m pytest --conda-solver=${{ env.CONDA_SOLVER }} -vv
