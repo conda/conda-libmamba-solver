@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
+# SPDX-License-Identifier: BSD-3-Clause
 """Parse a GitHub Actions workflow and emit a shell script of its ``run:`` steps
 to ease local testing of simple github actions workflows.
 
