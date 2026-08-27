@@ -66,8 +66,7 @@ jobs:
           run-post: false  # skip post cleanup
 
       - name: Update conda in base
-        # conda-pypi (and therefore `conda pypi install -e`) is available in conda >= 26.5
-        run: conda install -n base --yes "conda>=26.5"
+        run: conda install -n base --yes --override-channels -c conda-forge "conda>=26.5" conda-pypi
 
       - name: Install conda dependencies
         # libmamba/libmambapy are not declared in conda-libmamba-solver's
@@ -76,22 +75,30 @@ jobs:
         run: >
           conda install
           --yes
+          --override-channels -c conda-forge
           --file conda-libmamba-solver/dev/requirements.txt
           python=${{ matrix.python-version }}
 
       - name: Install pytest-conda-solvers dependencies
         # `conda pypi install -e` does not resolve dependencies, so install
-        # pytest-conda-solvers' runtime dependencies explicitly.
+        # pytest-conda-solvers' runtime dependencies and the test requirements
+        # from pytest-conda-solvers/tests/requirements.txt explicitly.
         run: >
           conda install
           --yes
+          --override-channels -c conda-forge
           pytest
+          coverage
           fastapi
           fastapi-cache2
           httpx
           msgspec
+          pytest-cov
+          pytest-split
+          pytest-xprocess
           typer
           uvicorn
+          xdoctest
 
       - name: Editable install conda-libmamba-solver and pytest-conda-solvers
         # Run as separate commands: a single `conda pypi install -e A -e B`
