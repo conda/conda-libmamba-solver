@@ -110,4 +110,4 @@ jobs:
       - name: Run solver tests
         working-directory: pytest-conda-solvers
         # same invocation as pytest-conda-solvers' own CI
-        run: python -m pytest --conda-solver=${{ env.CONDA_SOLVER }} tests/test_provenance.py -vv
+        run: python -m pytest --conda-solver=${{ env.CONDA_SOLVER }} -vv
