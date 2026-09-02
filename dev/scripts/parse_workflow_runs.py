@@ -76,9 +76,7 @@ def main(argv: list[str]) -> int:
 
             chunks.append(f"# {step.get('name', '(unnamed)')}")
             if "if" in step:
-                raise ValueError(
-                    f"step conditions are not supported: {step['if']}"
-                )
+                raise ValueError(f"step conditions are not supported: {step['if']}")
             if step.get("working-directory"):
                 chunks.append(f"cd {step['working-directory']}")
             chunks.append(substitute(run, env, matrix_vars))
