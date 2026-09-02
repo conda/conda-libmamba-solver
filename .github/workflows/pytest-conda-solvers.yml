@@ -27,6 +27,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   # run the shared solver YAML suite against the libmamba backend
   CONDA_SOLVER: libmamba
@@ -50,14 +53,16 @@ jobs:
         with:
           fetch-depth: 0
           path: conda-libmamba-solver
+          persist-credentials: false
 
       - name: Checkout pytest-conda-solvers
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: dholth/pytest-conda-solvers
-          ref: patch-1
+          repository: conda-incubator/pytest-conda-solvers
+          ref: d757bfdb37c5235089c76ac4921f001713117b48
           fetch-depth: 0
           path: pytest-conda-solvers
+          persist-credentials: false
 
       - name: Setup Miniconda
         uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1

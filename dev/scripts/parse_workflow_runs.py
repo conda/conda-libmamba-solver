@@ -45,7 +45,7 @@ def substitute(text: str, env: dict, matrix_vars: set) -> str:
     def repl(match: re.Match) -> str:
         kind, name = match.group(1), match.group(2)
         if kind == "env":
-            return env.get(name, f"${{{shell_var(name)}}}")
+            return str(env.get(name, f"${{{shell_var(name)}}}"))
         if kind == "matrix":
             matrix_vars.add(name)
             return f"${{{shell_var(name)}}}"
@@ -75,8 +75,10 @@ def main(argv: list[str]) -> int:
             run = str(run).rstrip("\n")
 
             chunks.append(f"# {step.get('name', '(unnamed)')}")
-            if step.get("if"):
-                chunks.append(f"# if: {step['if']}")
+            if "if" in step:
+                raise ValueError(
+                    f"step conditions are not supported: {step['if']}"
+                )
             if step.get("working-directory"):
                 chunks.append(f"cd {step['working-directory']}")
             chunks.append(substitute(run, env, matrix_vars))
