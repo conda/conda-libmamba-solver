@@ -247,12 +247,27 @@ class LibMambaSolver(Solver):
             # We need to recover the local dirs (conda-build's local, output_folder, etc)
             # from the index. This is a bit of a hack, but it works.
             conda_build_channels = {}
-            for record in self._index or {}:
-                if record.channel.scheme == "file":
+            index = self._index
+            expanded_channels = getattr(index, "expanded_channels", None)
+            if expanded_channels is not None:
+                # Lazy conda Index (conda >= 24.7): the Channel objects are
+                # available without realizing the index. Iterating the index
+                # itself (``for record in index``) would call ``Index.data``
+                # and eagerly construct a PackageRecord for every package of
+                # every channel, only to find the handful of ``file://``
+                # channels conda-build registered. That cost is measured in
+                # minutes for conda-forge-sized channels. See
+                # conda/conda-build#4961.
+                channels = expanded_channels
+            else:
+                # Plain dict of records (older conda-build or custom index).
+                channels = (record.channel for record in index or {})
+            for channel in channels:
+                if channel.scheme == "file":
                     # Remove 'Channel.platform' to avoid missing subdirs. Channel.urls()
                     # will ignore our explicitly passed subdirs if .platform is defined!
                     channel = Channel(
-                        **{k: v for k, v in record.channel.dump().items() if k != "platform"}
+                        **{k: v for k, v in channel.dump().items() if k != "platform"}
                     )
                     if channel not in seen:
                         conda_build_channels.setdefault(channel)
