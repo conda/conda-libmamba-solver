@@ -926,7 +926,10 @@ class LibMambaSolver(Solver):
         return (
             # conda_build.environ.get_install_actions will always pass a custom 'index'
             # which conda.plan.install_actions uses to override our null Solver._index
-            getattr(self, "_index", None)
+            # NB: `is not None`, NOT truthiness. A lazy conda Index is a UserDict:
+            #     truthiness calls len(index.data) and realizes every PackageRecord
+            #     in the index. See conda/conda-build#4961.
+            getattr(self, "_index", None) is not None
             # Is conda build in use? In that case, it should have been imported
             and "conda_build" in sys.modules
             # Confirm conda_build.environ's 'get_install_actions' and conda.plan's
