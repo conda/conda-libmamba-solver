@@ -5,12 +5,15 @@
 """Parse a GitHub Actions workflow and emit a shell script of its ``run:`` steps
 to ease local testing of simple github actions workflows.
 
+Not general purpose. Intended to be enough to test pytest-conda-solvers.yml
+workflow only.
+
 Usage:
     python dev/scripts/parse_workflow_runs.py [WORKFLOW] [OUTPUT]
 
 Defaults:
-    WORKFLOW = .github/workflows/pytest-conda-solvers.yml
-    OUTPUT   = pytest-conda-solvers-steps.sh
+    WORKFLOW = .github/workflows/pytest-conda-solvers.yml OUTPUT   =
+    pytest-conda-solvers-steps.sh
 """
 
 from __future__ import annotations
