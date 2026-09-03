@@ -88,6 +88,7 @@ from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
+from conda.models.version import VersionOrder
 from libmambapy import MambaNativeException, Query
 from libmambapy.solver.libsolv import (
     Database,
@@ -106,13 +107,14 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from .mamba_utils import logger_callback
+from .mamba_utils import logger_callback, mamba_version
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from typing import Any, Literal
 
     from conda.common.path import PathsType
+    from conda.core.exclude_newer import ExcludeNewerPolicy
     from conda.gateways.repodata import RepodataState
     from conda.gateways.shards import BuildRepodataSubset
     from conda.gateways.shards.typing import Shards as ShardBase
@@ -252,6 +254,7 @@ class LibMambaIndexHelper:
         in_state: SolverInputState | None = None,
         *,
         build_repodata_subset: BuildRepodataSubset | None = None,
+        exclude_newer_policy: ExcludeNewerPolicy | None = None,
     ):
         platform_less_channels: list[Channel] = []
         for channel in channels:
@@ -272,6 +275,14 @@ class LibMambaIndexHelper:
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
         self.build_repodata_subset = build_repodata_subset
+        if exclude_newer_policy is None:
+            from conda.core.exclude_newer import ExcludeNewerPolicy
+
+            exclude_newer_policy = ExcludeNewerPolicy()
+        self.exclude_newer_policy = exclude_newer_policy
+        self._use_python_exclude_newer_filter = (
+            self.exclude_newer_policy.active and self._exclude_newer_timestamp() is None
+        )
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -362,9 +373,23 @@ class LibMambaIndexHelper:
             home_dir=str(Path.home()),
             current_working_dir=os.getcwd(),
         )
-        db = Database(params)
+        db_kwargs = {}
+        if (exclude_newer_timestamp := self._exclude_newer_timestamp()) is not None:
+            db_kwargs["exclude_newer_timestamp"] = exclude_newer_timestamp
+        db = Database(params, **db_kwargs)
         db.set_logger(logger_callback)
         return db
+
+    def _exclude_newer_timestamp(self) -> int | None:
+        """Return the resolved global cutoff as a Unix timestamp for libmambapy."""
+        if (
+            self.exclude_newer_policy.global_cutoff is None
+            or self.exclude_newer_policy.has_channel_overrides
+            or self.exclude_newer_policy.has_package_overrides
+            or VersionOrder(mamba_version()) < VersionOrder("2.9.0")
+        ):
+            return None
+        return int(self.exclude_newer_policy.global_cutoff)
 
     def _load_channels(
         self,
@@ -529,6 +554,9 @@ class LibMambaIndexHelper:
             # https://github.com/mamba-org/mamba/pull/2753#issuecomment-1739122830
             log.debug("Overriding truthy 'try_solv' as False on Windows for performance reasons.")
             try_solv = False
+        # libmamba does not apply the cutoff when loading a serialized repository.
+        if self._exclude_newer_timestamp() is not None:
+            try_solv = False
         json_path = Path(json_path)
         solv_path = json_path.with_suffix(".solv")
         if state:
@@ -537,6 +565,13 @@ class LibMambaIndexHelper:
             repodata_origin = None
         channel = Channel(channel_url)
         channel_id = self._channel_to_id(channel)
+        if self._use_python_exclude_newer_filter:
+            return self._load_repo_info_from_filtered_json_path(
+                json_path,
+                channel_url,
+                channel_id,
+            )
+
         if try_solv and repodata_origin:
             try:
                 log.debug(
@@ -590,6 +625,63 @@ class LibMambaIndexHelper:
                 log.debug("Ignored SOLV writing error for %s", channel_id, exc_info=exc)
         return repo
 
+    def _load_repo_info_from_filtered_json_path(
+        self,
+        json_path: Path,
+        channel_url: str,
+        channel_id: str,
+    ) -> RepoInfo | None:
+        import json
+
+        try:
+            repodata = json.loads(json_path.read_text())
+        except FileNotFoundError:
+            if context.offline:
+                log.warning("Could not load repodata for %s.", channel_id)
+                return None
+            raise
+
+        base_url = f"{channel_url.rstrip('/')}/"
+        packages = []
+        for package_group in ("packages", "packages.conda"):
+            for filename, record in repodata.get(package_group, {}).items():
+                package_url = record.get("url") or f"{base_url}{filename}"
+                if not self._record_allowed(record, filename, channel_url, package_url):
+                    continue
+                packages.append(
+                    _package_info_from_package_dict(
+                        record,
+                        filename,
+                        url=package_url,
+                        channel_id=channel_id,
+                        add_pip_as_python_dependency=self._add_pip_as_python_dependency,
+                    )
+                )
+
+        return self.db.add_repo_from_packages(
+            packages=packages,
+            name=channel_url,
+            add_pip_as_python_dependency=PipAsPythonDependency(
+                context.add_pip_as_python_dependency
+            ),
+        )
+
+    def _record_allowed(
+        self,
+        record: PackageRecordDict,
+        filename: str,
+        channel_url: str,
+        package_url: str,
+    ) -> bool:
+        return self.exclude_newer_policy.should_include(
+            {
+                **record,
+                "channel": channel_url,
+                "fn": record.get("fn") or filename,
+                "url": package_url,
+            }
+        )
+
     def _channel_to_id(self, channel: Channel):
         channel_id = channel.canonical_name
         if channel_id in context.custom_multichannels:
@@ -602,6 +694,10 @@ class LibMambaIndexHelper:
 
     def _load_installed(self, records: Iterable[PackageRecord]) -> _ChannelRepoInfo:
         packages = [self._package_info_from_package_record(record) for record in records]
+        # The native cutoff applies to every repository, including the installed one.
+        if self._exclude_newer_timestamp() is not None:
+            for package in packages:
+                package.timestamp = 0
         repo = self.db.add_repo_from_packages(
             packages=packages,
             name="installed",
@@ -650,13 +746,21 @@ class LibMambaIndexHelper:
 
             packages = []
             for filename, record in shardlike.iter_records():
+                package_url = f"{base_url}{filename}"
+                # PackageInfo does not carry the preferred indexed timestamp.
+                if self.exclude_newer_policy.active and not self._record_allowed(
+                    record, filename, channel_url, package_url
+                ):
+                    continue
                 package = _package_info_from_package_dict(
                     record,
                     filename,
-                    url=f"{base_url}{filename}",
+                    url=package_url,
                     channel_id=channel_id,
                     add_pip_as_python_dependency=self._add_pip_as_python_dependency,
                 )
+                if self._exclude_newer_timestamp() is not None:
+                    package.timestamp = 0
                 packages.append(package)
 
             repo = self.db.add_repo_from_packages(

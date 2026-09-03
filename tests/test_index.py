@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import reset_context
 from conda.common.compat import on_win
+from conda.core.exclude_newer import ExcludeNewerPolicy
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
@@ -24,9 +25,13 @@ from conda_libmamba_solver.index import (
 if TYPE_CHECKING:
     import os
 
+    from pytest_mock import MockerFixture
+
 
 initialize_logging()
 DATA = Path(__file__).parent / "data"
+NOW = 1_700_000_000.0
+DAY = 86400
 
 
 def test_given_channels(monkeypatch: pytest.MonkeyPatch, tmp_path: os.PathLike):
@@ -257,3 +262,127 @@ def test_package_info_from_package_dict_add_pip_invalid_version():
     # pip should NOT be appended for invalid Python versions
     assert "pip" not in package_info.dependencies
     assert len(package_info.dependencies) == 0
+
+
+def test_exclude_newer_timestamp_unset():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy()
+
+    assert index._exclude_newer_timestamp() is None
+
+
+def test_exclude_newer_timestamp_uses_libmambapy_2_9():
+    index = object.__new__(LibMambaIndexHelper)
+    index.channels = []
+    index.subdirs = ("noarch",)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
+
+    assert index._exclude_newer_timestamp() == 1234
+    index._init_db()
+
+
+def test_exclude_newer_timestamp_falls_back_before_libmambapy_2_9(
+    mocker: MockerFixture,
+):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234.56)
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.8.1")
+
+    assert index._exclude_newer_timestamp() is None
+
+
+def test_exclude_newer_timestamp_is_disabled_for_policy_overrides():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy.from_values(
+        "1d",
+        {"openssl": False},
+        channel_settings=({"channel": "https://example.test/conda", "exclude_newer": "3d"},),
+        now=NOW,
+    )
+
+    assert index._exclude_newer_timestamp() is None
+
+
+def test_native_exclude_newer_skips_solv_cache(
+    mocker: MockerFixture,
+    tmp_path: Path,
+):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234)
+    index._use_python_exclude_newer_filter = False
+    index.db = mocker.Mock()
+    index.db.add_repo_from_repodata_json.return_value = mocker.sentinel.repo
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.9.0")
+
+    repo = index._load_repo_info_from_json_path(
+        tmp_path / "repodata.json",
+        "https://example.test/conda/noarch",
+        mocker.Mock(etag="etag", mod="mod"),
+    )
+
+    assert repo is mocker.sentinel.repo
+    index.db.add_repo_from_native_serialization.assert_not_called()
+    index.db.native_serialize_repo.assert_not_called()
+
+
+def test_native_exclude_newer_keeps_installed_records(mocker: MockerFixture):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234)
+    index.db = mocker.Mock()
+    package = mocker.Mock(timestamp=5678)
+    mocker.patch.object(index, "_package_info_from_package_record", return_value=package)
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.9.0")
+
+    index._load_installed((mocker.sentinel.record,))
+
+    assert package.timestamp == 0
+
+
+def test_native_exclude_newer_uses_indexed_timestamp_for_shards(mocker: MockerFixture):
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy(global_cutoff=1234)
+    index.subdirs = ("noarch",)
+    index._add_pip_as_python_dependency = False
+    index.db = mocker.Mock()
+    package = mocker.Mock(timestamp=5678)
+    mocker.patch(
+        "conda_libmamba_solver.index._package_info_from_package_dict",
+        return_value=package,
+    )
+    mocker.patch("conda_libmamba_solver.index.mamba_version", return_value="2.9.0")
+    shard = mocker.Mock(base_url="https://example.test/conda/noarch/")
+    shard.iter_records.return_value = (
+        (
+            "package-1.0-0.conda",
+            {"name": "package", "indexed_timestamp": 1000, "timestamp": 5678},
+        ),
+    )
+
+    index._load_repo_info_from_repodata_dict({"https://example.test/conda/noarch": shard})
+
+    assert package.timestamp == 0
+
+
+def test_exclude_newer_record_filter_honors_package_and_channel_overrides():
+    index = object.__new__(LibMambaIndexHelper)
+    index.exclude_newer_policy = ExcludeNewerPolicy.from_values(
+        "1d",
+        {"openssl": "false", "numpy": "1d"},
+        channel_settings=({"channel": "https://example.test/conda", "exclude_newer": "3d"},),
+        now=NOW,
+    )
+
+    def allowed(name: str, channel_url: str, timestamp: float) -> bool:
+        filename = f"{name}-1.0-0.tar.bz2"
+        package_url = f"{channel_url}/{filename}"
+        return index._record_allowed(
+            {"name": name, "timestamp": timestamp},
+            filename,
+            channel_url,
+            package_url,
+        )
+
+    assert allowed("openssl", "https://example.test/conda/linux-64", NOW - 60)
+    assert allowed("numpy", "https://example.test/conda/linux-64", NOW - 2 * DAY)
+    assert not allowed("scipy", "https://example.test/conda/linux-64", NOW - 2 * DAY)
+    assert allowed("scipy", "https://other.example.test/conda/linux-64", NOW - 2 * DAY)

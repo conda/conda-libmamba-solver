@@ -1,0 +1,5 @@
+### Enhancements
+
+* Use libmambapy 2.9.0's native `exclude_newer_timestamp` support for global
+  `exclude_newer` policies, with Python filtering for older libmambapy versions
+  and scoped policies. Require conda 26.9.0 or newer. (#905, conda/conda#15759)
