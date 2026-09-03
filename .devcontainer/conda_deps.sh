@@ -15,14 +15,6 @@ BASE_CONDA=${BASE_CONDA:-/opt/conda}
 SRC_CONDA=${SRC_CONDA:-/workspaces/conda}
 SRC_CONDA_LIBMAMBA_SOLVER=${SRC_CONDA_LIBMAMBA_SOLVER:-/workspaces/conda-libmamba-solver}
 
-if which apt-get > /dev/null; then
-    echo "Installing system dependencies"
-    apt-get update
-    DEBIAN_FRONTEND=noninteractive xargs -a "$HERE/apt-deps.txt" apt-get install -y
-fi
-
-# this would make sense in a separate docker layer:
-
 if [ ! -f "$SRC_CONDA/pyproject.toml" ]; then
     echo "https://github.com/conda/conda not found! Please clone or mount to $SRC_CONDA"
     exit 1
@@ -32,17 +24,12 @@ fi
 echo "Clearing base history..."
 echo '' > "$BASE_CONDA/conda-meta/history"
 
-echo "Setting default channel..."
-"$BASE_CONDA/bin/conda" config --append channels $1
-
 echo "Installing dev & test dependencies..."
-"$BASE_CONDA/bin/conda" install -n base -c $1 --yes \
+"$BASE_CONDA/bin/conda" install -n base --yes --quiet \
     --file="$SRC_CONDA/tests/requirements.txt" \
     --file="$SRC_CONDA/tests/requirements-ci.txt" \
     --file="$SRC_CONDA/tests/requirements-Linux.txt" \
     --file="$SRC_CONDA/tests/requirements-s3.txt" \
     --file="$SRC_CONDA_LIBMAMBA_SOLVER/dev/requirements.txt" \
-    --file="$SRC_CONDA_LIBMAMBA_SOLVER/tests/requirements.txt" \
-    conda-forge::editables \
-    conda-pypi \
+    --file="$SRC_CONDA_LIBMAMBA_SOLVER/tests/requirements.txt"\
     pre-commit
