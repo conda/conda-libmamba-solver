@@ -138,7 +138,7 @@ jobs:
           run-post: false  # skip post cleanup
 
       - name: Update conda-libmamba-solver in base
-        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
+        run: conda install -n base --yes --solver=classic "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -302,7 +302,7 @@ jobs:
           run-post: false  # skip post cleanup
 
       - name: Update conda-libmamba-solver in base
-        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
+        run: conda install -n base --yes --solver=classic "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda
@@ -603,7 +603,7 @@ jobs:
           architecture: ${{ runner.arch }}
 
       - name: Update conda-libmamba-solver in base
-        run: conda install -n base --yes "conda-libmamba-solver>=26.4.2"
+        run: conda install -n base --yes --solver=classic "conda-libmamba-solver>=26.4.2"
 
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
