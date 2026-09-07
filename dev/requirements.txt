@@ -3,8 +3,8 @@ pip
 # run-time
 boltons>=23.0.0
 conda>=26.1
-conda-forge::libmamba>=2.0.0
-conda-forge::libmambapy>=2.0.0,!=2.6.2
+conda-forge::libmamba>=2.9.0
+conda-forge::libmambapy>=2.9.0
 # needed for 'pip install -e conda-libmamba-solver'
 hatchling
 hatch-vcs
