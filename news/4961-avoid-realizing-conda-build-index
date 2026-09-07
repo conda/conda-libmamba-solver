@@ -1,19 +1,3 @@
 ### Enhancements
 
-* Avoid realizing the full package index during `conda-build` solves. Local `file://` channels are now discovered from `expanded_channels` without materializing every `PackageRecord`, so solves against large channels (e.g. `conda-forge` plus `bioconda`) no longer stall for minutes. (conda/conda-build#4961)
-
-### Bug fixes
-
-* <news item>
-
-### Deprecations
-
-* <news item>
-
-### Docs
-
-* <news item>
-
-### Other
-
-* <news item>
+* Avoid loading every package record solely to detect conda-build solves or discover their local channels, when conda-build supplies a lazy index. (#1045)

@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_mac, on_win
+from conda.core.index import Index
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
     DryRunExit,
@@ -24,6 +25,8 @@ from conda.exceptions import (
     SpecsConfigurationConflictError,
     UnsatisfiableError,
 )
+from conda.models.channel import Channel
+from conda.models.records import PackageRecord
 from conda.testing.integration import package_is_installed
 from conda_build.exceptions import DependencyNeedsBuildingError
 
@@ -35,6 +38,72 @@ from .utils import conda_subprocess, python_site_packages_path_support
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
     from pytest import MonkeyPatch
+
+
+def test_conda_build_detection_preserves_lazy_index(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    solver = Solver(prefix=tmp_path / "env", channels=[])
+    solver._index = Index(prepend=False, use_cache=False)
+    monkeypatch.setattr(
+        Index, "data", property(lambda self: pytest.fail("Index.data was accessed"))
+    )
+
+    def install_actions():
+        return solver._called_from_conda_build()
+
+    def get_install_actions():
+        return install_actions()
+
+    assert get_install_actions() is True
+    assert solver._called_from_conda_build() is False
+
+    solver._index = {}
+    assert get_install_actions() is True
+
+    solver._index = None
+    assert get_install_actions() is False
+
+
+@pytest.mark.parametrize("lazy", [True, False], ids=["lazy-index", "dict-index"])
+def test_conda_build_channel_discovery_preserves_lazy_index(
+    monkeypatch: MonkeyPatch, tmp_path: Path, lazy: bool
+) -> None:
+    first = (tmp_path / "first").as_uri()
+    second = (tmp_path / "second").as_uri()
+    index = Index(
+        channels=[first, "https://example.invalid/channel", second],
+        prepend=False,
+        subdirs=("linux-64", "noarch"),
+        use_cache=False,
+    )
+    if not lazy:
+        records = [
+            PackageRecord(
+                name=f"package-{i}",
+                version="1",
+                build="0",
+                build_number=0,
+                channel=channel,
+                subdir=channel.subdir,
+            )
+            for i, channel in enumerate(index.expanded_channels)
+        ]
+        index = {record: record for record in records}
+
+    solver = Solver(prefix=tmp_path / "env", channels=[])
+    solver._index = index
+    monkeypatch.setattr(solver, "_called_from_conda_build", lambda: True)
+    monkeypatch.setattr(
+        Index, "data", property(lambda self: pytest.fail("Index.data was accessed"))
+    )
+
+    channels = solver._collect_channels_subdirs_from_conda_build()
+    assert [channel.base_url for channel in channels] == [first, second]
+    assert all(channel.platform is None for channel in channels)
+
+    channels = solver._collect_channels_subdirs_from_conda_build(seen={Channel(first)})
+    assert [channel.base_url for channel in channels] == [second]
 
 
 def test_python_downgrade_reinstalls_noarch_packages(

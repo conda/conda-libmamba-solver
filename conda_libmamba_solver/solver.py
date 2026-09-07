@@ -250,7 +250,7 @@ class LibMambaSolver(Solver):
             index = self._index
             expanded_channels = getattr(index, "expanded_channels", None)
             if expanded_channels is not None:
-                # Lazy conda Index (conda >= 24.7): the Channel objects are
+                # Lazy conda Index (conda >= 24.9): the Channel objects are
                 # available without realizing the index. Iterating the index
                 # itself (``for record in index``) would call ``Index.data``
                 # and eagerly construct a PackageRecord for every package of
