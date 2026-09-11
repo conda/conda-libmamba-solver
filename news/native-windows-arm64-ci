@@ -1,0 +1,11 @@
+### Enhancements
+
+### Bug fixes
+
+### Deprecations
+
+### Docs
+
+### Other
+
+* Run the solver test suites natively on Windows ARM64 with Python 3.14 (conda/conda#16540).

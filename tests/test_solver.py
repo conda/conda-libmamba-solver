@@ -106,6 +106,7 @@ def test_conda_build_channel_discovery_preserves_lazy_index(
     assert [channel.base_url for channel in channels] == [second]
 
 
+@pytest.mark.usefixtures("historical_python_subdir")
 def test_python_downgrade_reinstalls_noarch_packages(
     tmp_env: TmpEnvFixture,
     conda_cli: CondaCLIFixture,
@@ -167,7 +168,7 @@ def test_defaults_specs_work(conda_cli: CondaCLIFixture) -> None:
         "--solver=libmamba",
         "--override-channels",
         "--channel=conda-forge",
-        "python=3.10",
+        "python=3.14" if context.subdir == "win-arm64" else "python=3.10",
         "defaults::libarchive",
         raises=DryRunExit,
     )
@@ -181,6 +182,7 @@ def test_defaults_specs_work(conda_cli: CondaCLIFixture) -> None:
         raise AssertionError("libarchive not found in LINK actions")
 
 
+@pytest.mark.usefixtures("historical_python_subdir")
 def test_determinism(tmpdir):
     "Based on https://github.com/conda/conda-libmamba-solver/issues/75"
     env = os.environ.copy()
@@ -390,6 +392,7 @@ def test_pinned_with_cli_build_string(tmp_env: TmpEnvFixture) -> None:
         assert re.match("PackagesNotFound.*Error", data["exception_name"])
 
 
+@pytest.mark.usefixtures("historical_python_subdir")
 def test_constraining_pin_and_requested():
     env = os.environ.copy()
     env["CONDA_PINNED_PACKAGES"] = "python=3.10"
@@ -507,6 +510,7 @@ def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture
 @pytest.mark.skipif(
     context.subdir == "osx-arm64", reason="python=2.7 not available in this platform"
 )
+@pytest.mark.usefixtures("historical_python_subdir")
 def test_python_update_should_not_uninstall_history(
     tmp_env: TmpEnvFixture,
     conda_cli: CondaCLIFixture,
@@ -543,6 +547,7 @@ def test_python_update_should_not_uninstall_history(
             )
 
 
+@pytest.mark.usefixtures("historical_python_subdir")
 def test_python_downgrade_with_pins_removes_truststore(tmp_env: TmpEnvFixture) -> None:
     """
     https://github.com/conda/conda-libmamba-solver/issues/354
@@ -692,7 +697,11 @@ def test_constrains_virtual_package(
 
 def test_urls_are_percent_decoded(tmp_path: Path) -> None:
     solver = Solver(
-        prefix=tmp_path, channels=["conda-forge"], specs_to_add=["x264"], command="create"
+        prefix=tmp_path,
+        channels=["conda-forge"],
+        subdirs=("win-64", "noarch") if context.subdir == "win-arm64" else None,
+        specs_to_add=["x264"],
+        command="create",
     )
     records = solver.solve_final_state()
     for record in records:
@@ -745,18 +754,21 @@ def test_prune_existing_env_dependencies_are_solved(
     """
     https://github.com/conda/conda-libmamba-solver/issues/595
     """
+    python_version, numpy_version = (
+        ("3.14", "2.5.3") if context.subdir == "win-arm64" else ("3.13", "2.2.2")
+    )
     (tmp_path / "env.yml").write_text(
         dedent(
-            """
+            f"""
             channels:
             - conda-forge
             dependencies:
-            - python=3.13
-            - numpy=2.2.2
+            - python={python_version}
+            - numpy={numpy_version}
             """
         )
     )
-    with tmp_env("python=3.13") as prefix:
+    with tmp_env(f"python={python_version}") as prefix:
         out, err, rc = conda_cli(
             "env",
             "update",
@@ -769,7 +781,7 @@ def test_prune_existing_env_dependencies_are_solved(
         print(err, file=sys.stderr)
         assert rc == 0
         PrefixData._cache_.clear()
-        assert PrefixData(prefix).get("python").version.startswith("3.13")
+        assert PrefixData(prefix).get("python").version.startswith(python_version)
         assert PrefixData(prefix).get("numpy")
         out, err, rc = conda_cli("run", f"--prefix={prefix}", "python", "-c", "import numpy")
         print(out)
@@ -902,21 +914,24 @@ def test_channel_subdir_set_correctly(tmp_env: TmpEnvFixture) -> None:
 
 
 def test_python_site_packages_path(tmp_env: TmpEnvFixture) -> None:
+    python_version = "3.14" if context.subdir == "win-arm64" else "3.13"
     with tmp_env(
         "--override-channels",
         "--channel=conda-forge",
         "--solver=libmamba",
-        "python-freethreading=3.13",
+        f"python-freethreading={python_version}",
     ) as prefix:
         PrefixData._cache_.clear()
         prec = PrefixData(prefix).get("python")
         assert prec.name == "python"
-        assert prec.version.startswith("3.13")
+        assert prec.version.startswith(python_version)
         if python_site_packages_path_support:
             if context.subdir.startswith("win"):
                 assert prec.python_site_packages_path == "Lib/site-packages"
             else:
-                assert prec.python_site_packages_path == "lib/python3.13t/site-packages"
+                assert (
+                    prec.python_site_packages_path == f"lib/python{python_version}t/site-packages"
+                )
         else:
             assert prec.python_site_packages_path is None
 
