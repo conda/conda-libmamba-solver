@@ -794,7 +794,6 @@ class LibMambaSolver(Solver):
                     if "does not exist" in explained_line and "which" not in explained_line:
                         end = explained_words.index("does")
                         not_found.append(cls._matchspec_from_error_str(explained_words[:end]))
-                        break
             else:
                 log.debug("! Problem line not recognized: %s", line)
 

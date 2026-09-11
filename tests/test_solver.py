@@ -1005,3 +1005,29 @@ def test_notify_conda_outdated(
     stderr = capsys.readouterr().err
     assert "A newer version of conda exists" in stderr
     assert f"$ {expected_message}" in stderr
+
+
+def test_parse_problems_reports_all_missing_packages() -> None:
+    """
+    Ensure that all not found packages are included in the "not_found"
+    packages report.
+    """
+
+    class FakeUnsolvable:
+        def problems(self, db) -> list[str]:
+            # libmamba v2 emits one "unsupported request" line per missing spec
+            return ["unsupported request", "unsupported request", "unsupported request"]
+
+        def explain_problems(self, db, format) -> str:
+            return dedent(
+                """
+                Cannot install because no candidates were found for:
+                ├─ package-one does not exist
+                ├─ package-two does not exist
+                └─ package-three does not exist
+                """
+            )
+
+    parsed = Solver._parse_problems(FakeUnsolvable(), db=None)
+
+    assert set(parsed["not_found"]) == {"package-one", "package-two", "package-three"}
