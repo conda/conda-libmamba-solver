@@ -473,17 +473,17 @@ def test_locking_pins(
 
 
 def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture) -> None:
-    ca_certificates_pin = "ca-certificates=2023"
+    ca_certificates_pin = "ca-certificates=2025"
     with tmp_env() as prefix:
         Path(prefix, "conda-meta").mkdir(exist_ok=True)
         Path(prefix, "conda-meta", "pinned").write_text(f"{ca_certificates_pin}\n")
 
         for cli_spec in (
             "ca-certificates",
-            "ca-certificates=2023",
+            "ca-certificates=2025",
             "ca-certificates>0",
-            "ca-certificates<2024",
-            "ca-certificates!=2022",
+            "ca-certificates<2026",
+            "ca-certificates!=2024",
         ):
             out, err, retcode = conda_cli(
                 "install",
@@ -501,7 +501,7 @@ def test_ca_certificates_pins(tmp_env: TmpEnvFixture, conda_cli: CondaCLIFixture
 
             for pkg in data["actions"]["LINK"]:
                 if pkg["name"] == "ca-certificates":
-                    assert pkg["version"].startswith("2023."), cli_spec
+                    assert pkg["version"].startswith("2025."), cli_spec
                     break
             else:
                 raise AssertionError("ca-certificates not found in LINK actions")
