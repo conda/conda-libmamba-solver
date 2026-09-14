@@ -34,25 +34,25 @@ def test_query_search():
     index = LibMambaIndexHelper(channels=[Channel("conda-forge")])
     for query in (
         "ca-certificates",
-        "ca-certificates =2022.9.24",
-        "ca-certificates >=2022.9.24",
-        "ca-certificates >2022.9.24",
-        "ca-certificates<2022.9.24,>2020",
-        "ca-certificates<=2022.9.24,>2020",
-        "ca-certificates !=2022.9.24,>2020",
+        "ca-certificates =2025.7.9",
+        "ca-certificates >=2025.7.9",
+        "ca-certificates >2025.7.9",
+        "ca-certificates<2025.7.9,>2020",
+        "ca-certificates<=2025.7.9,>2020",
+        "ca-certificates !=2025.7.9,>2020",
         "ca-certificates=*=*_0",
         # TODO: channel specs are accepted but they seem to be ignored by libmambapy.Query!
         # "defaults::ca-certificates",
-        # "defaults::ca-certificates=2022.9.24",
-        # "defaults::ca-certificates[version='>=2022.9.24']",
+        # "defaults::ca-certificates=2025.7.9",
+        # "defaults::ca-certificates[version='>=2025.7.9']",
         # "defaults::ca-certificates[build='*_0']",
     ):
         results = index.search(query)
         assert len(results) > 0, query
 
     assert index.search("ca-certificates=*=*_0") == index.search("ca-certificates[build='*_0']")
-    assert index.search("ca-certificates >=2022.9.24") == index.search(
-        "ca-certificates[version='>=2022.9.24']"
+    assert index.search("ca-certificates >=2025.7.9") == index.search(
+        "ca-certificates[version='>=2025.7.9']"
     )
 
 

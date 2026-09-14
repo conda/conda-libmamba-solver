@@ -36,6 +36,7 @@ def test_matchspec_star_version():
     )
 
 
+@pytest.mark.usefixtures("historical_python_subdir")
 def test_build_string_filters():
     process = sp.run(
         [

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from urllib.request import urlretrieve
 
 import pytest
+from conda.base.context import context
 from conda.common.compat import on_linux, on_win
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import DryRunExit
@@ -45,7 +46,7 @@ def test_channel_matchspec(conda_cli: CondaCLIFixture, path_factory: PathFactory
         "--override-channels",
         "--channel=defaults",
         "conda-forge::libblas=*=*openblas",
-        "python=3.9",
+        "python=3.14" if context.subdir == "win-arm64" else "python=3.9",
     )
     result = json.loads(stdout)
     assert result["success"] is True
@@ -63,7 +64,8 @@ def test_channels_prefixdata(tmp_env: TmpEnvFixture) -> None:
 
     See https://github.com/conda/conda/issues/11790
     """
-    with tmp_env("conda-forge::xz", "python=3.13", "--solver=libmamba") as prefix:
+    python = "python=3.14" if context.subdir == "win-arm64" else "python=3.13"
+    with tmp_env("conda-forge::xz", python, "--solver=libmamba") as prefix:
         p = conda_subprocess(
             "install",
             "-yp",
