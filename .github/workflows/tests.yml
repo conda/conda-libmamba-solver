@@ -416,9 +416,12 @@ jobs:
   linux-benchmarks:
     needs: changes
     if: needs.changes.outputs.code == 'true' && !github.event.repository.fork
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      PYTHONHASHSEED: '0'
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
       run:
         shell: bash -el {0}
@@ -447,23 +450,75 @@ jobs:
           --file tests/requirements.txt
           "conda>=26.5"
 
-      - name: Install conda-libmamba-solver
-        run: python -m pip install -e . --no-deps --no-build-isolation
+      - name: Record runner and benchmark harness
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
+
+          metadata = {
+              "runner": "ubuntu-24.04",
+              "image_os": os.environ.get("ImageOS"),
+              "image_version": os.environ.get("ImageVersion"),
+              "harness_sha": os.environ["HEAD_SHA"],
+          }
+          Path(os.environ["RUNNER_TEMP"], "runner_metadata.json").write_text(json.dumps(metadata))
 
       - name: Record benchmark dependencies
-        run: conda list --show-channel-urls
+        run: conda list --show-channel-urls | tee "$RUNNER_TEMP/benchmark_dependencies.txt"
+
+      - name: Install Bencher diagnostics
+        id: bencher
+        continue-on-error: true
+        uses: bencherdev/bencher@8d75325c3bc59403a2186a056b472c4f49d42838 # v0.6.12
+        with:
+          version: '0.6.12'
+
+      - name: Record runner noise
+        if: steps.bencher.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bencher noise --duration 30 --quiet | tee "$RUNNER_TEMP/noise.txt"
+
+      - name: Run base benchmarks on the same runner
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A failed baseline must not leave partial data for the reporter.
+          trap 'rm -f "$RUNNER_TEMP/baseline_results.json"' ERR
+          git checkout --detach "$BASE_SHA"
+          # Keep the measured production code at BASE_SHA but use the PR's
+          # benchmark cases, fixtures, and data for both measurements.
+          git restore --source "$HEAD_SHA" --worktree -- tests
+          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pytest tests/test_benchmarks.py \
+            -o 'markers=benchmark: performance benchmarks' \
+            -m benchmark --benchmark-only \
+            --benchmark-json "$RUNNER_TEMP/baseline_results.json"
 
       - name: Run benchmarks
-        run: >-
-          python -m pytest tests/test_benchmarks.py
-          -m benchmark --benchmark-only
-          --benchmark-json benchmark_results.json
+        run: |
+          # Discard only the test overlay in this disposable CI checkout.
+          git checkout --detach --force "$HEAD_SHA"
+          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pytest tests/test_benchmarks.py \
+            -m benchmark --benchmark-only \
+            --benchmark-json "$RUNNER_TEMP/benchmark_results.json"
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: benchmark-results
-          path: benchmark_results.json
+          path: |
+            ${{ runner.temp }}/benchmark_results.json
+            ${{ runner.temp }}/baseline_results.json
+            ${{ runner.temp }}/benchmark_dependencies.txt
+            ${{ runner.temp }}/noise.txt
+            ${{ runner.temp }}/runner_metadata.json
           if-no-files-found: error
           retention-days: 7
 

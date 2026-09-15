@@ -25,7 +25,7 @@ jobs:
           )
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       checks: write
@@ -34,6 +34,7 @@ jobs:
       BRANCH: ${{ github.event.workflow_run.head_branch }}
       COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
       BENCHMARK_RESULTS: benchmark-results/benchmark_results.json
+      BASELINE_RESULTS: benchmark-results/baseline_results.json
 
     steps:
       - name: Locate benchmark artifacts
@@ -70,6 +71,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Export PR event data
+        id: pr
         if: steps.artifacts.outputs.found == 'true' && github.event.workflow_run.event == 'pull_request'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
@@ -78,28 +80,55 @@ jobs:
           script: |
             const fs = require("fs")
             const prEvent = JSON.parse(fs.readFileSync(process.env.PR_EVENT, { encoding: "utf8" }))
-            core.exportVariable("BRANCH", `pr-${prEvent.number}`)
-            core.exportVariable("COMMIT_SHA", prEvent.pull_request.head.sha)
-            core.exportVariable("PR_BASE", prEvent.pull_request.base.ref)
+            const run = context.payload.workflow_run
+            if (!Number.isSafeInteger(prEvent.number) || prEvent.number < 1) {
+              throw new Error("Invalid pull request number in benchmark artifact")
+            }
+            const { data: pr } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: prEvent.number,
+            })
+            if (pr.head.sha !== run.head_sha || pr.head.repo?.full_name !== run.head_repository?.full_name) {
+              core.notice("Skipping benchmarks for an outdated pull request head")
+              return
+            }
+            if (prEvent.pull_request.head.sha !== pr.head.sha
+                || !/^[a-f0-9]{40}$/.test(prEvent.pull_request.base.sha)
+                || prEvent.pull_request.base.ref !== pr.base.ref) {
+              throw new Error("Benchmark artifact does not match the pull request")
+            }
+            core.setOutput("current", true)
+            core.exportVariable("BRANCH", `pr-${pr.number}`)
+            core.exportVariable("COMMIT_SHA", pr.head.sha)
             core.exportVariable("PR_BASE_SHA", prEvent.pull_request.base.sha)
-            core.exportVariable("PR_NUMBER", prEvent.number)
+            core.exportVariable("PR_NUMBER", pr.number)
+            core.exportVariable("BASELINE_BRANCH", `pr-${pr.number}-base-${run.id}-${run.run_attempt}`)
 
-      - name: Select testbed from benchmark results
-        if: steps.artifacts.outputs.found == 'true'
+      - name: Select testbed and matching benchmarks
+        id: results
+        if: steps.artifacts.outputs.found == 'true' && (github.event.workflow_run.event != 'pull_request' || steps.pr.outputs.current == 'true')
         shell: python
         run: |
           import hashlib
           import json
           import os
           import re
+          from pathlib import Path
 
-          with open(os.environ["BENCHMARK_RESULTS"], encoding="utf-8") as results:
-              machine = json.load(results)["machine_info"]
+          results = json.loads(Path(os.environ["BENCHMARK_RESULTS"]).read_text())
+          if results["commit_info"]["id"] != os.environ["COMMIT_SHA"]:
+              raise ValueError("Head benchmark revision does not match the producing workflow")
+          metadata = json.loads(Path("benchmark-results/runner_metadata.json").read_text())
+          if metadata["runner"] != "ubuntu-24.04":
+              raise ValueError("Unexpected benchmark runner image")
+          if metadata["harness_sha"] != os.environ["COMMIT_SHA"]:
+              raise ValueError("Benchmark harness revision does not match the pull request head")
+          machine = results["machine_info"]
           python = ".".join(machine["python_version"].split(".")[:2])
           # The reporting job has its own runner. Use the benchmark runner's
           # metadata to keep CPU models and Python minor versions separate.
           name = (
-              f"{machine['system']}-{machine['machine']}-py{python}-"
+              f"{metadata['runner']}-{machine['machine']}-py{python}-"
               f"{machine['cpu']['brand_raw']}"
           )
           name = re.sub(r"[^\w.-]+", "-", name, flags=re.ASCII)
@@ -109,25 +138,91 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               print(f"BENCHER_TESTBED={name}", file=env_file)
 
+          if os.environ.get("PR_NUMBER"):
+              baseline_path = Path(os.environ["BASELINE_RESULTS"])
+              baseline = json.loads(baseline_path.read_text()) if baseline_path.exists() else None
+              if baseline and baseline["commit_info"]["id"] != os.environ["PR_BASE_SHA"]:
+                  raise ValueError("Base benchmark revision does not match the pull request event")
+              common = (
+                  {item["fullname"] for item in results["benchmarks"]}
+                  & {item["fullname"] for item in baseline["benchmarks"]}
+                  if baseline else set()
+              )
+              if common:
+                  base_machine = baseline["machine_info"]
+                  for key in ("system", "machine", "python_version"):
+                      if base_machine[key] != machine[key]:
+                          raise ValueError(f"Base and head benchmark runners differ: {key}")
+                  if base_machine["cpu"]["brand_raw"] != machine["cpu"]["brand_raw"]:
+                      raise ValueError("Base and head CPU models differ")
+                  unmatched = len(results["benchmarks"]) - len(common)
+                  for label, data in (("baseline", baseline), ("head", results)):
+                      data["benchmarks"] = [item for item in data["benchmarks"] if item["fullname"] in common]
+                      Path(f"benchmark-results/{label}_comparison.json").write_text(json.dumps(data))
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as outputs:
+                  print(f"comparison={str(bool(common)).lower()}", file=outputs)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  if common:
+                      print(f"Comparing {len(common)} benchmarks measured at the base and PR revisions on the same runner.", file=summary)
+                      print(f"Head benchmarks without matching base measurements: {unmatched}.", file=summary)
+                      print("The initial alert tolerance is a 25% latency increase. Runner load and cache state can still vary.", file=summary)
+                  else:
+                      print("PR comparison is unavailable because the base has no benchmark results or no matching benchmark names.", file=summary)
+                      print("Head measurements remain available in the producing workflow's benchmark-results artifact.", file=summary)
+
+      - name: Report unavailable PR comparison
+        if: steps.pr.outputs.current == 'true' && steps.results.outputs.comparison == 'false'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await github.rest.checks.create({
+              ...context.repo,
+              name: "Benchmark comparison",
+              head_sha: process.env.COMMIT_SHA,
+              status: "completed",
+              conclusion: "neutral",
+              details_url: context.payload.workflow_run.html_url,
+              output: {
+                title: "No comparable base measurements",
+                summary: "The base revision has no benchmark results or no matching benchmark names. No performance comparison was made. Head measurements are available in the producing workflow's benchmark-results artifact.",
+              },
+            })
+
       - name: Install Bencher CLI
-        if: steps.artifacts.outputs.found == 'true'
+        if: steps.artifacts.outputs.found == 'true' && (github.event.workflow_run.event != 'pull_request' || steps.results.outputs.comparison == 'true')
         uses: bencherdev/bencher@8d75325c3bc59403a2186a056b472c4f49d42838 # v0.6.12
         with:
           version: '0.6.12'
 
       - name: Track benchmarks with Bencher
-        if: steps.artifacts.outputs.found == 'true'
+        if: steps.artifacts.outputs.found == 'true' && (github.event.workflow_run.event != 'pull_request' || steps.results.outputs.comparison == 'true')
         env:
           BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           if [[ -n "$PR_NUMBER" ]]; then
+            # A separate branch holds only this runner's base measurements.
+            # Never reset or add PR baseline measurements to the main history.
+            bencher run \
+              --project conda-libmamba-solver \
+              --key "$BENCHER_API_KEY" \
+              --branch "$BASELINE_BRANCH" \
+              --hash "$PR_BASE_SHA" \
+              --testbed "$BENCHER_TESTBED" \
+              --adapter python_pytest \
+              --file benchmark-results/baseline_comparison.json
+            BENCHMARK_RESULTS=benchmark-results/head_comparison.json
             options=(
-              --start-point "$PR_BASE"
+              --start-point "$BASELINE_BRANCH"
               --start-point-hash "$PR_BASE_SHA"
-              --start-point-clone-thresholds
               --start-point-reset
+              --threshold-measure latency
+              --threshold-test percentage
+              --threshold-min-sample-size 1
+              --threshold-max-sample-size 1
+              --threshold-upper-boundary 0.25
+              --thresholds-reset
               --ci-only-on-alert
               --ci-number "$PR_NUMBER"
             )
@@ -135,6 +230,7 @@ jobs:
             options=(
               --threshold-measure latency
               --threshold-test t_test
+              --threshold-min-sample-size 10
               --threshold-max-sample-size 64
               --threshold-upper-boundary 0.99
               --thresholds-reset

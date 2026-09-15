@@ -23,23 +23,49 @@ the measured work.
 
 ## Benchmark tracking in CI
 
-The `linux-benchmarks` job in `Tests` runs the suite on Ubuntu 22.04 with Python 3.14.
-The separate `Track Benchmarks` workflow uploads results for pull requests and
-commits on `main`, feature branches, and release branches. Testbeds use the
-operating system, architecture, Python major/minor version, and CPU model recorded
-in the benchmark results. This keeps different CPUs assigned to the same GitHub
-runner label in separate histories. Pull requests compare against the base
-branch's available history on the same testbed.
+The `linux-benchmarks` job in `Tests` runs the suite on Ubuntu 24.04 with Python 3.14.
+For pull requests, it measures the exact base and head revisions sequentially on
+the same runner with the same resolved dependencies and `PYTHONHASHSEED=0`.
+This roughly doubles benchmark execution time. Both revisions run the PR head's
+benchmark cases, fixtures, and test data. The base production code stays at its
+original commit. Its benchmark JSON can therefore mark the checkout as dirty
+because the tests have been overlaid. `runner_metadata.json` records the head
+harness revision separately from the measured source commit and includes the
+runner image version. Rename a benchmark when changing the timed operation or
+its fixtures so that unlike measurements do not share a long-term history.
+
+The separate `Track Benchmarks` workflow uploads results with the Bencher project
+API key. It checks the measured commit IDs, harness revision, and runner metadata,
+then compares only benchmark names present in both revisions. Following Bencher's
+[relative benchmarking example](https://bencher.dev/docs/how-to/track-benchmarks/#relative-continuous-benchmarking),
+the initial alert tolerance is a 25% latency increase against that job's base
+measurement. This is an initial choice to tune with observed noise, not a
+statistical confidence level. New benchmark names have no comparison until the
+base implementation can run them. If the base run fails or has no matching
+benchmarks, CI reports a neutral `Benchmark comparison` check. The head results
+remain available in the `benchmark-results` artifact.
+
+Each PR run stores its base measurements in a separate Bencher branch named
+`pr-N-base-RUNID-ATTEMPT`. The `pr-N` comparison starts from that run's base results.
+PR baseline uploads never reset or add measurements to the history for `main`,
+feature branches, or release branches.
+
+Non-PR uploads build those histories separately for each testbed. Testbeds use
+`ubuntu-24.04`, architecture, Python major/minor version, and the CPU model from
+the benchmark results. This separates different CPUs assigned to the same GitHub
+runner label and keeps Ubuntu 22.04 measurements out of the new histories.
+Historical alerts use a t-test with a 0.99 prediction level, at least 10 prior
+samples, and at most 64. A green Bencher check means no alert was raised. A new
+testbed can have a green check before enough matching history exists for
+[regression detection](https://bencher.dev/docs/explanation/thresholds/).
+
+Matching CPU models and using the same runner reduce variation. Runner load,
+cache state, image updates, and dependency changes still need investigation when
+interpreting an alert. Both PR revisions use the head revision's dependency
+resolution, so this comparison measures source changes in that environment.
+The artifact includes the dependency list and a best-effort `bencher noise`
+diagnostic recorded before benchmarks. Noise diagnostics neither change the
+measurements nor determine whether the workflow passes.
 
 Maintainers enable uploads by creating the `conda-libmamba-solver` project in Bencher
 and setting the `BENCHER_API_KEY` repository secret to its project API key.
-Base branch uploads build a separate history for each testbed.
-
-A green Bencher check means no alert was raised.
-[Regression detection](https://bencher.dev/docs/explanation/thresholds/) requires
-a threshold and enough matching history for each benchmark. A new testbed can
-therefore have a green check before regression detection is possible.
-
-Matching CPU models do not eliminate variation from runner load, runner-image
-updates, or dependency changes. Investigate these alongside code changes when
-interpreting an alert.
