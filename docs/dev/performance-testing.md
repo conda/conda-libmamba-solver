@@ -34,16 +34,18 @@ harness revision separately from the measured source commit and includes the
 runner image version. Rename a benchmark when changing the timed operation or
 its fixtures so that unlike measurements do not share a long-term history.
 
-The separate `Track Benchmarks` workflow uploads results with the Bencher project
-API key. It checks the measured commit IDs, harness revision, and runner metadata,
-then compares only benchmark names present in both revisions. Following Bencher's
+The separate `Track Benchmarks` workflow uses the shared Bencher reporting action
+in [`conda/actions`](https://github.com/conda/actions) with the Bencher project API
+key. The action checks the measured commit IDs, harness revision, runner metadata,
+and matching benchmark names. Following Bencher's
 [relative benchmarking example](https://bencher.dev/docs/how-to/track-benchmarks/#relative-continuous-benchmarking),
 the initial alert tolerance is a 25% latency increase against that job's base
 measurement. This is an initial choice to tune with observed noise, not a
 statistical confidence level. New benchmark names have no comparison until the
-base implementation can run them. If the base run fails or has no matching
-benchmarks, CI reports a neutral `Benchmark comparison` check. The head results
-remain available in the `benchmark-results` artifact.
+base implementation can run them. If the base run fails or the benchmark names
+differ, CI reports a neutral `Benchmark comparison` check. The head results
+remain available in the `benchmark-results-v3` artifact alongside the workflow
+event and runner diagnostics.
 
 Each PR run stores its base measurements in a separate Bencher branch named
 `pr-N-base-RUNID-ATTEMPT`. The `pr-N` comparison starts from that run's base results.
