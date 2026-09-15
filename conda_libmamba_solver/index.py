@@ -85,6 +85,7 @@ from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
+from conda.exceptions import UnavailableInvalidChannel
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -518,7 +519,14 @@ class LibMambaIndexHelper:
             state = subdir_data.repo_cache.load_state()
         else:
             # TODO: This method loads reads the whole JSON file (does not parse)
-            json_path, state = subdir_data.repo_fetch.fetch_latest_path()
+            try:
+                json_path, state = subdir_data.repo_fetch.fetch_latest_path()
+            except UnavailableInvalidChannel:
+                if subdir_data.repodata_fn == REPODATA_FN:
+                    raise
+                # Match SubdirData._load() without parsing package records.
+                subdir_data.repodata_fn = REPODATA_FN
+                json_path, state = subdir_data.repo_fetch.fetch_latest_path()
         return url, json_path, state
 
     def _load_repo_info_from_json_path(

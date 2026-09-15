@@ -13,6 +13,7 @@ import pytest
 from conda.base.context import reset_context
 from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
+from conda.exceptions import UnavailableInvalidChannel
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
 
@@ -23,6 +24,8 @@ from conda_libmamba_solver.index import (
 
 if TYPE_CHECKING:
     import os
+
+    from conda.testing.fixtures import HttpTestServerFixture
 
 
 initialize_logging()
@@ -118,6 +121,64 @@ def test_reload_channels(tmp_path: Path):
     time.sleep(1)
     index.reload_channel(Channel(str(tmp_path)))
     assert index.n_packages() == initial_count + 1
+
+
+@pytest.mark.parametrize(
+    "repodata_fn", ("current_repodata.json", "custom_repodata.json", "repodata.json")
+)
+@pytest.mark.parametrize(
+    "subdirs",
+    (
+        pytest.param(("noarch",), id="noarch"),
+        pytest.param(("win-arm64", "noarch"), id="missing-platform"),
+    ),
+)
+def test_missing_repodata_falls_back(
+    http_test_server: HttpTestServerFixture,
+    repodata_fn: str,
+    subdirs: tuple[str, ...],
+):
+    noarch = http_test_server.directory / "noarch"
+    noarch.mkdir()
+    shutil.copy(DATA / "mamba_repo" / "noarch" / "repodata.json", noarch)
+
+    index = LibMambaIndexHelper(
+        channels=[Channel(http_test_server.url)],
+        subdirs=subdirs,
+        repodata_fn=repodata_fn,
+    )
+
+    assert [
+        (record.name, record.version, record.subdir) for record in index.search("test-package")
+    ] == [("test-package", "0.1", "noarch")]
+
+
+@pytest.mark.parametrize("repodata_fn", ("current_repodata.json", "repodata.json"))
+def test_missing_noarch_repodata(
+    http_test_server: HttpTestServerFixture,
+    repodata_fn: str,
+):
+    with pytest.raises(UnavailableInvalidChannel):
+        LibMambaIndexHelper(
+            channels=[Channel(http_test_server.url)],
+            subdirs=("noarch",),
+            repodata_fn=repodata_fn,
+        )
+
+
+def test_available_alternate_repodata(http_test_server: HttpTestServerFixture):
+    noarch = http_test_server.directory / "noarch"
+    noarch.mkdir()
+    shutil.copy(DATA / "mamba_repo" / "noarch" / "repodata.json", noarch)
+    (noarch / "current_repodata.json").write_text('{"packages": {}}')
+
+    index = LibMambaIndexHelper(
+        channels=[Channel(http_test_server.url)],
+        subdirs=("noarch",),
+        repodata_fn="current_repodata.json",
+    )
+
+    assert index.n_packages() == 0
 
 
 def test_package_info_from_package_dict_add_pip_as_python_dependency():
