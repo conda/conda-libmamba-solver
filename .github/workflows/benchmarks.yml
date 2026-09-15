@@ -1,0 +1,153 @@
+name: Track Benchmarks
+
+on:
+  workflow_run:
+    workflows: [Tests]
+    types: [completed]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_branch || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  track-benchmarks:
+    if: >-
+      !github.event.repository.fork
+      && contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+      && (
+        github.event.workflow_run.event == 'pull_request'
+        || (
+          contains(fromJSON('["push", "workflow_dispatch", "schedule"]'), github.event.workflow_run.event)
+          && (
+            github.event.workflow_run.head_branch == 'main'
+            || startsWith(github.event.workflow_run.head_branch, 'feature/')
+            || endsWith(github.event.workflow_run.head_branch, '.x')
+          )
+        )
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      checks: write
+      pull-requests: write
+    env:
+      BRANCH: ${{ github.event.workflow_run.head_branch }}
+      COMMIT_SHA: ${{ github.event.workflow_run.head_sha }}
+      BENCHMARK_RESULTS: benchmark-results/benchmark_results.json
+
+    steps:
+      - name: Locate benchmark artifacts
+        id: artifacts
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+              ...context.repo,
+              run_id: context.payload.workflow_run.id,
+            })
+            const names = new Set(artifacts.filter(artifact => !artifact.expired).map(artifact => artifact.name))
+            core.setOutput("found", (
+              names.has("benchmark-results")
+              && (context.payload.workflow_run.event !== "pull_request" || names.has("benchmark-event"))
+            ))
+
+      - name: Download benchmark results
+        if: steps.artifacts.outputs.found == 'true'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: benchmark-results
+          path: benchmark-results
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Download PR event
+        if: steps.artifacts.outputs.found == 'true' && github.event.workflow_run.event == 'pull_request'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: benchmark-event
+          path: ${{ runner.temp }}/benchmark-event
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Export PR event data
+        if: steps.artifacts.outputs.found == 'true' && github.event.workflow_run.event == 'pull_request'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          PR_EVENT: ${{ runner.temp }}/benchmark-event/event.json
+        with:
+          script: |
+            const fs = require("fs")
+            const prEvent = JSON.parse(fs.readFileSync(process.env.PR_EVENT, { encoding: "utf8" }))
+            core.exportVariable("BRANCH", `pr-${prEvent.number}`)
+            core.exportVariable("COMMIT_SHA", prEvent.pull_request.head.sha)
+            core.exportVariable("PR_BASE", prEvent.pull_request.base.ref)
+            core.exportVariable("PR_BASE_SHA", prEvent.pull_request.base.sha)
+            core.exportVariable("PR_NUMBER", prEvent.number)
+
+      - name: Identify benchmark testbed
+        if: steps.artifacts.outputs.found == 'true'
+        shell: python
+        run: |
+          import hashlib
+          import json
+          import os
+          import re
+
+          with open(os.environ["BENCHMARK_RESULTS"], encoding="utf-8") as results:
+              machine = json.load(results)["machine_info"]
+          python = ".".join(machine["python_version"].split(".")[:2])
+          # Identify the hardware that produced the benchmark artifact.
+          name = (
+              f"{machine['system']}-{machine['machine']}-py{python}-"
+              f"{machine['cpu']['brand_raw']}"
+          )
+          name = re.sub(r"[^\w.-]+", "-", name, flags=re.ASCII)
+          if len(name) > 64:
+              digest = hashlib.sha256(name.encode()).hexdigest()[:12]
+              name = f"{name[:51]}-{digest}"
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              print(f"BENCHER_TESTBED={name}", file=env_file)
+
+      - name: Install Bencher CLI
+        if: steps.artifacts.outputs.found == 'true'
+        uses: bencherdev/bencher@8d75325c3bc59403a2186a056b472c4f49d42838 # v0.6.12
+        with:
+          version: '0.6.12'
+
+      - name: Track benchmarks with Bencher
+        if: steps.artifacts.outputs.found == 'true'
+        env:
+          BENCHER_API_KEY: ${{ secrets.BENCHER_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if [[ -n "$PR_NUMBER" ]]; then
+            options=(
+              --start-point "$PR_BASE"
+              --start-point-hash "$PR_BASE_SHA"
+              --start-point-clone-thresholds
+              --start-point-reset
+              --ci-only-thresholds
+              --ci-only-on-alert
+              --ci-number "$PR_NUMBER"
+            )
+          else
+            options=(
+              --threshold-measure latency
+              --threshold-test t_test
+              --threshold-max-sample-size 64
+              --threshold-upper-boundary 0.99
+              --thresholds-reset
+            )
+          fi
+          bencher run \
+            --project conda-libmamba-solver \
+            --key "$BENCHER_API_KEY" \
+            --branch "$BRANCH" \
+            --hash "$COMMIT_SHA" \
+            --testbed "$BENCHER_TESTBED" \
+            --err \
+            --adapter python_pytest \
+            --github-actions "$GH_TOKEN" \
+            "${options[@]}" \
+            --file "$BENCHMARK_RESULTS"

@@ -1,26 +1,35 @@
 # Performance testing
 
-## Codspeed
+Performance benchmarks use [pytest-benchmark](https://pytest-benchmark.readthedocs.io/)
+and are tracked in [Bencher](https://bencher.dev/).
 
-Performance testing for this project can be found on codspeed here:
+## Running benchmarks locally
 
-- https://codspeed.io/conda/conda-libmamba-solver
-
-To run performance tests locally, run the following command in the root of the project:
+Follow the [development environment setup](setup.md), activate that environment,
+and run this command from the repository root:
 
 ```shell
-pytest --codspeed
+python -m pytest tests/test_benchmarks.py -m benchmark --benchmark-only --benchmark-json benchmark_results.json
 ```
 
-To profile tests, add the following decorator above it:
+The command writes the same JSON format uploaded by CI. Local runs do not require
+Bencher credentials. Benchmarks are marked with `@pytest.mark.benchmark` and use
+the `benchmark` fixture to time the target operation.
 
-```python
-import pytest
+The suite measures `LibMambaIndexHelper` construction from 100 and 1,000 installed
+`PackageRecord` objects and `solve_final_state` against the local channel in
+`tests/data/mamba_repo`. Benchmarks run offline for five rounds, with setup outside
+the measured work.
 
+## Benchmark tracking in CI
 
-@pytest.mark.benchmark
-def test_new_feature():
-    """Ensure feature performs well"""
-```
+The `linux-benchmarks` job in `Tests` runs the suite on Ubuntu 22.04 with Python 3.14.
+The separate `Track Benchmarks` workflow uploads results for pull requests and
+commits on `main`, feature branches, and release branches. Results are grouped by
+operating system, architecture, Python version, and CPU model in separate testbeds.
+Pull requests are compared with their base branch on the same testbed.
 
-See the official [codspeed documentation](https://codspeed.io/docs) for more information.
+Maintainers enable uploads by creating the `conda-libmamba-solver` project in Bencher
+and setting the `BENCHER_API_KEY` repository secret to its project API key.
+The first successful upload from `main` establishes the baseline
+for each testbed.
