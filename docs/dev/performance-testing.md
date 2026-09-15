@@ -25,11 +25,21 @@ the measured work.
 
 The `linux-benchmarks` job in `Tests` runs the suite on Ubuntu 22.04 with Python 3.14.
 The separate `Track Benchmarks` workflow uploads results for pull requests and
-commits on `main`, feature branches, and release branches. Results are grouped by
-operating system, architecture, Python version, and CPU model in separate testbeds.
-Pull requests are compared with their base branch on the same testbed.
+commits on `main`, feature branches, and release branches. Testbeds use the
+operating system, architecture, Python major/minor version, and CPU model recorded
+in the benchmark results. This keeps different CPUs assigned to the same GitHub
+runner label in separate histories. Pull requests compare against the base
+branch's available history on the same testbed.
 
 Maintainers enable uploads by creating the `conda-libmamba-solver` project in Bencher
 and setting the `BENCHER_API_KEY` repository secret to its project API key.
-The first successful upload from `main` establishes the baseline
-for each testbed.
+Base branch uploads build a separate history for each testbed.
+
+A green Bencher check means no alert was raised.
+[Regression detection](https://bencher.dev/docs/explanation/thresholds/) requires
+a threshold and enough matching history for each benchmark. A new testbed can
+therefore have a green check before regression detection is possible.
+
+Matching CPU models do not eliminate variation from runner load, runner-image
+updates, or dependency changes. Investigate these alongside code changes when
+interpreting an alert.
