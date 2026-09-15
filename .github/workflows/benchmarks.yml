@@ -115,10 +115,22 @@ jobs:
           import re
           from pathlib import Path
 
+          def unavailable(reason):
+              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as outputs:
+                  print("comparison=false", file=outputs)
+                  print(f"reason={reason}", file=outputs)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+                  print(reason, file=summary)
+                  print("No performance comparison was made. Head measurements remain available in the producing workflow's benchmark-results artifact.", file=summary)
+
           results = json.loads(Path(os.environ["BENCHMARK_RESULTS"]).read_text())
           if results["commit_info"]["id"] != os.environ["COMMIT_SHA"]:
               raise ValueError("Head benchmark revision does not match the producing workflow")
-          metadata = json.loads(Path("benchmark-results/runner_metadata.json").read_text())
+          metadata_path = Path("benchmark-results/runner_metadata.json")
+          if not metadata_path.exists() and os.environ.get("PR_NUMBER"):
+              unavailable("This producer did not record the runner image and benchmark harness revision.")
+              raise SystemExit(0)
+          metadata = json.loads(metadata_path.read_text())
           if metadata["runner"] != "ubuntu-24.04":
               raise ValueError("Unexpected benchmark runner image")
           if metadata["harness_sha"] != os.environ["COMMIT_SHA"]:
@@ -159,20 +171,18 @@ jobs:
                   for label, data in (("baseline", baseline), ("head", results)):
                       data["benchmarks"] = [item for item in data["benchmarks"] if item["fullname"] in common]
                       Path(f"benchmark-results/{label}_comparison.json").write_text(json.dumps(data))
-              with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as outputs:
-                  print(f"comparison={str(bool(common)).lower()}", file=outputs)
-              with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-                  if common:
-                      print(f"Comparing {len(common)} benchmarks measured at the base and PR revisions on the same runner.", file=summary)
-                      print(f"Head benchmarks without matching base measurements: {unmatched}.", file=summary)
-                      print("The initial alert tolerance is a 25% latency increase. Runner load and cache state can still vary.", file=summary)
-                  else:
-                      print("PR comparison is unavailable because the base has no benchmark results or no matching benchmark names.", file=summary)
-                      print("Head measurements remain available in the producing workflow's benchmark-results artifact.", file=summary)
+                  with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as outputs:
+                      print("comparison=true", file=outputs)
+                      print(f"comparison_count={len(common)}", file=outputs)
+                      print(f"unmatched_count={unmatched}", file=outputs)
+              else:
+                  unavailable("The base run has no benchmark results or no matching benchmark names.")
 
       - name: Report unavailable PR comparison
         if: steps.pr.outputs.current == 'true' && steps.results.outputs.comparison == 'false'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          COMPARISON_REASON: ${{ steps.results.outputs.reason }}
         with:
           script: |
             await github.rest.checks.create({
@@ -183,8 +193,8 @@ jobs:
               conclusion: "neutral",
               details_url: context.payload.workflow_run.html_url,
               output: {
-                title: "No comparable base measurements",
-                summary: "The base revision has no benchmark results or no matching benchmark names. No performance comparison was made. Head measurements are available in the producing workflow's benchmark-results artifact.",
+                title: "PR comparison is unavailable",
+                summary: `${process.env.COMPARISON_REASON} No performance comparison was made. Head measurements are available in the producing workflow's benchmark-results artifact.`,
               },
             })
 
@@ -247,3 +257,15 @@ jobs:
             --github-actions "$GH_TOKEN" \
             "${options[@]}" \
             --file "$BENCHMARK_RESULTS"
+
+      - name: Explain paired comparison
+        if: ${{ !cancelled() && steps.results.outputs.comparison == 'true' }}
+        env:
+          COMMON_BENCHMARKS: ${{ steps.results.outputs.comparison_count }}
+          UNMATCHED_BENCHMARKS: ${{ steps.results.outputs.unmatched_count }}
+        run: |
+          {
+            echo "Measured $COMMON_BENCHMARKS matching benchmarks at the base and PR revisions on the same runner."
+            echo "Head benchmarks without matching base measurements: $UNMATCHED_BENCHMARKS."
+            echo "The initial alert tolerance is a 25% latency increase. Runner load and cache state can still vary."
+          } >> "$GITHUB_STEP_SUMMARY"
