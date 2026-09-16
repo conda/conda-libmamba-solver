@@ -17,7 +17,7 @@ from conda_libmamba_solver.index import LibMambaIndexHelper
 
 @pytest.mark.parametrize("subdirs_kind", ("tuple", "generator", "default"))
 def test_older_conda_keeps_explicit_channels(mocker, subdirs_kind):
-    mocker.patch.object(index, "resolve_channel_relations", None)
+    mocker.patch.object(index, "resolve_channels", None)
     mocker.patch.object(LibMambaIndexHelper, "_init_db")
     mocker.patch.object(LibMambaIndexHelper, "_set_repo_priorities")
     load = mocker.patch.object(LibMambaIndexHelper, "_load_channels", return_value=[])
@@ -36,7 +36,7 @@ def test_older_conda_keeps_explicit_channels(mocker, subdirs_kind):
 def test_resolve_before_repository_loading(mocker, use_shards):
     heads = [Channel("https://example.org/alpha")]
     resolved = [Channel("https://example.org/beta"), *heads]
-    resolver = mocker.patch.object(index, "resolve_channel_relations", return_value=resolved)
+    resolver = mocker.patch.object(index, "resolve_channels", return_value=resolved)
     mocker.patch.object(LibMambaIndexHelper, "_init_db")
     mocker.patch.object(LibMambaIndexHelper, "_set_repo_priorities")
     observed = []
@@ -66,7 +66,7 @@ def test_resolve_before_repository_loading(mocker, use_shards):
 def test_libmamba_dry_run_uses_related_channel_priority(
     tmp_path, monkeypatch, conda_cli, relation, expected
 ):
-    if relation is not None and index.resolve_channel_relations is None:
+    if relation is not None and index.resolve_channels is None:
         pytest.skip("conda does not provide channel relation resolution")
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
     monkeypatch.setenv("CONDA_ENVS_PATH", str(tmp_path / "envs"))
@@ -125,7 +125,7 @@ def test_explicit_reload_fetches_after_relation_discovery(tmp_path, mocker):
     sd.repo_fetch.fetch_latest_path.return_value = (cached, {})
     mocked_subdir_data = mocker.patch.object(index, "SubdirData", return_value=sd)
     mocked_subdir_data._cache_ = {}
-    mocker.patch.object(index, "resolve_channel_relations", return_value=(channel,))
+    mocker.patch.object(index, "resolve_channels", return_value=(channel,))
     mocker.patch.object(index.context, "offline", False)
     mocker.patch.object(index.context, "use_index_cache", False)
     mocker.patch.object(LibMambaIndexHelper, "_init_db")

@@ -83,6 +83,7 @@ from conda.base.context import context
 from conda.common.compat import on_win
 from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time_recorder
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
+from conda.core import index as conda_index
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
 from conda.models.channel import Channel
@@ -123,12 +124,7 @@ if TYPE_CHECKING:
     from .state import SolverInputState
 
 
-try:
-    from conda.core.channel_relations import resolve_channel_relations
-except ModuleNotFoundError as exc:
-    if exc.name != "conda.core.channel_relations":
-        raise
-    resolve_channel_relations = None
+resolve_channels = getattr(conda_index, "resolve_channels", None)
 
 
 log = logging.getLogger(f"conda.{__name__}")
@@ -278,14 +274,14 @@ class LibMambaIndexHelper:
         self.repodata_fn = repodata_fn
         self.channels = (
             list(
-                resolve_channel_relations(
+                resolve_channels(
                     platform_less_channels,
                     self.subdirs,
                     repodata_fn=repodata_fn,
                     use_shards=bool(in_state and build_repodata_subset),
                 )
             )
-            if resolve_channel_relations is not None
+            if resolve_channels is not None
             else platform_less_channels
         )
         self.in_state = in_state
@@ -293,7 +289,7 @@ class LibMambaIndexHelper:
         self.build_repodata_subset = build_repodata_subset
         self.db = self._init_db()
 
-        self._reuse_relation_repodata = resolve_channel_relations is not None
+        self._reuse_relation_repodata = resolve_channels is not None
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
         self._reuse_relation_repodata = False
         if pkgs_dirs:
