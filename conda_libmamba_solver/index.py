@@ -123,6 +123,14 @@ if TYPE_CHECKING:
     from .state import SolverInputState
 
 
+try:
+    from conda.core.channel_relations import resolve_channel_relations
+except ModuleNotFoundError as exc:
+    if exc.name != "conda.core.channel_relations":
+        raise
+    resolve_channel_relations = None
+
+
 log = logging.getLogger(f"conda.{__name__}")
 
 
@@ -266,15 +274,28 @@ class LibMambaIndexHelper:
                 )
                 channel = Channel(**{k: v for k, v in channel.dump().items() if k != "platform"})
             platform_less_channels.append(channel)
-        self.channels = platform_less_channels
-        self.subdirs = subdirs or context.subdirs
+        self.subdirs = tuple(subdirs or context.subdirs)
         self.repodata_fn = repodata_fn
+        self.channels = (
+            list(
+                resolve_channel_relations(
+                    platform_less_channels,
+                    self.subdirs,
+                    repodata_fn=repodata_fn,
+                    use_shards=bool(in_state and build_repodata_subset),
+                )
+            )
+            if resolve_channel_relations is not None
+            else platform_less_channels
+        )
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
         self.build_repodata_subset = build_repodata_subset
         self.db = self._init_db()
 
+        self._reuse_relation_repodata = resolve_channel_relations is not None
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
+        self._reuse_relation_repodata = False
         if pkgs_dirs:
             self.repos.extend(self._load_pkgs_cache(pkgs_dirs))
         if installed_records:
@@ -511,7 +532,15 @@ class LibMambaIndexHelper:
             # /Workaround
 
         subdir_data = SubdirData(channel, repodata_fn=self.repodata_fn)
-        if context.offline or context.use_index_cache:
+        if (
+            context.offline
+            or context.use_index_cache
+            or (
+                self._reuse_relation_repodata
+                and subdir_data._loaded
+                and Path(subdir_data.cache_path_json).is_file()
+            )
+        ):
             # This might not exist (yet, anymore), but that's ok because we'll check
             # for existence later and safely ignore if needed
             json_path = subdir_data.cache_path_json
