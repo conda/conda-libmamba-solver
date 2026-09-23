@@ -70,6 +70,7 @@ jobs:
               - 'conda_libmamba_solver/**'
               - '*.py'
               - '.github/workflows/tests.yml'
+              - '.github/workflows/benchmarks.yml'
               - 'tests/**'
               - 'dev/requirements.txt'
               - 'pyproject.toml'
@@ -169,8 +170,6 @@ jobs:
           # Use the runner's Git until a native conda package is available.
           (Get-Content conda/tests/requirements-ci.txt) -notmatch '^git(\s|$)' | Set-Content conda/tests/requirements-ci.txt
           "$(Split-Path (Split-Path (Get-Command git).Source))\usr\bin" | Add-Content $env:GITHUB_PATH
-          # CodSpeed pins pytest-benchmark<5.1 in defaults. This job excludes benchmarks.
-          (Get-Content conda-libmamba-solver/tests/requirements.txt) -notmatch '^pytest-codspeed(\s|$)' | Set-Content conda-libmamba-solver/tests/requirements.txt
 
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -415,82 +414,116 @@ jobs:
 
   # linux benchmarks
   linux-benchmarks:
-    # only run benchmarks if there are code changes
     needs: changes
-    if: false # needs.changes.outputs.code == 'true' # disable for now.
-
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.code == 'true' && !github.event.repository.fork
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      PYTHONHASHSEED: '0'
+      HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
       run:
-        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
-        shell: bash -el {0}  # bash exit immediately on error + login shell
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.14']
+        shell: bash -el {0}
 
     steps:
-      - name: Checkout Source
+      - name: Checkout conda-libmamba-solver
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Hash + Timestamp
-        run: |
-          STEM="${{ runner.os }}-${{ runner.arch }}-Py${{ matrix.python-version }}-$(date -u "+%Y%m")"
-          echo "CACHE_KEY=${STEM}-defaults-aux" >> $GITHUB_ENV
-          echo "HASH=${STEM}-benchmark" >> $GITHUB_ENV
-
-      - name: Cache Conda
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/conda_pkgs_dir/*.tar.bz2
-            ~/conda_pkgs_dir/*.conda
-          key: cache-${{ env.CACHE_KEY }}
-
-      - name: Setup Miniconda
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        with:
+          miniforge-version: latest
+          activate-environment: benchmark
+          python-version: '3.14'
+          channels: conda-forge
+          channel-priority: strict
 
-      - name: Conda Install
-        run: >
-          conda install
-          --yes
+      - name: Install benchmark dependencies
+        run: >-
+          conda install --yes --solver classic
+          --file dev/requirements.txt
           --file tests/requirements.txt
-          --file tests/requirements-${{ runner.os }}.txt
-          --file tests/requirements-ci.txt
-          --file tests/requirements-s3.txt
-          python=${{ matrix.python-version }}
-          "pytest-benchmark>=5.1.0"
+          "conda>=26.5"
 
-      - name: Conda Info
-        run: python -m conda info --verbose
+      - name: Record runner and benchmark harness
+        shell: python
+        run: |
+          import json
+          import os
+          from pathlib import Path
 
-      - name: Conda Config
-        run: conda config --show-sources
+          metadata = {
+              "runner": "ubuntu-24.04",
+              "image_os": os.environ.get("ImageOS"),
+              "image_version": os.environ.get("ImageVersion"),
+              "harness_sha": os.environ["HEAD_SHA"],
+          }
+          Path(os.environ["RUNNER_TEMP"], "runner_metadata.json").write_text(json.dumps(metadata))
 
-      - name: Conda List
-        run: conda list --show-channel-urls
+      - name: Record benchmark dependencies
+        run: conda list --show-channel-urls | tee "$RUNNER_TEMP/benchmark_dependencies.txt"
 
-      - name: Run Benchmarks
-        run: >
-          $CONDA/envs/test/bin/python -m pytest
-          -m benchmark
-          --benchmark-json benchmark_results.json
-
-      - name: Upload Benchmark Results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - name: Install Bencher diagnostics
+        id: bencher
+        continue-on-error: true
+        uses: bencherdev/bencher@8d75325c3bc59403a2186a056b472c4f49d42838 # v0.6.12
         with:
-          name: benchmark-results
-          path: benchmark_results.json
-          retention-days: 7
+          version: '0.6.12'
 
-      - name: Upload GitHub Pull Request Event
+      - name: Record runner noise
+        if: steps.bencher.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          bencher noise --duration 30 --quiet | tee "$RUNNER_TEMP/noise.txt"
+
+      - name: Run base benchmarks on the same runner
         if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # A failed baseline must not leave partial data for the reporter.
+          trap 'rm -f "$RUNNER_TEMP/baseline_results.json"' ERR
+          git checkout --detach "$BASE_SHA"
+          # Keep the measured production code at BASE_SHA but use the PR's
+          # benchmark cases, fixtures, and data for both measurements.
+          git restore --source "$HEAD_SHA" --worktree -- tests
+          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pytest tests/test_benchmarks.py \
+            -o 'markers=benchmark: performance benchmarks' \
+            -m benchmark --benchmark-only \
+            --benchmark-json "$RUNNER_TEMP/baseline_results.json"
+
+      - name: Run benchmarks
+        run: |
+          # Discard only the test overlay in this disposable CI checkout.
+          git checkout --detach --force "$HEAD_SHA"
+          python -m pip install -e . --no-deps --no-build-isolation
+          python -m pytest tests/test_benchmarks.py \
+            -m benchmark --benchmark-only \
+            --benchmark-json "$RUNNER_TEMP/benchmark_results.json"
+
+      - name: Record workflow event
+        run: cp "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/event.json"
+
+      - name: Upload benchmark results
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: benchmark-event
-          path: ${{ github.event_path }}
+          name: benchmark-results-v3
+          path: |
+            ${{ runner.temp }}/benchmark_results.json
+            ${{ runner.temp }}/baseline_results.json
+            ${{ runner.temp }}/benchmark_dependencies.txt
+            ${{ runner.temp }}/noise.txt
+            ${{ runner.temp }}/runner_metadata.json
+            ${{ runner.temp }}/event.json
+          if-no-files-found: error
           retention-days: 7
 
   # linux-qemu test suite
