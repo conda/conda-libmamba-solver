@@ -143,6 +143,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
             "--channel=conda-forge",
             "--yes",
             "python=3.10",
+            "pip",
         )
         PrefixData._cache_.clear()
         assert PrefixData(prefix).get("python").version.startswith("3.10")
