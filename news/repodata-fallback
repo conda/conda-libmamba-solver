@@ -1,0 +1,3 @@
+### Bug fixes
+
+* Fall back to `repodata.json` when a channel does not provide the requested repodata file. (conda/conda#16664)
