@@ -69,15 +69,15 @@ Install [`rever`][rever docs] using whatever your project defines (e.g., a conda
 1. Clone and `cd` into the repository if you haven't done so already:
 
     ```bash
-    $ git clone git@github.com:/conda-libmamba-solver.git
+    $ git clone git@github.com:conda/conda-libmamba-solver.git
     $ cd conda-libmamba-solver
     ```
 
 2. Fetch the latest changes and create a versioned branch off `main` for the release PR:
 
     ```bash
-    $ git fetch upstream
-    $ git switch -c changelog-YY.MM.MICRO --no-track upstream/main
+    $ git fetch origin
+    $ git switch -c changelog-YY.MM.MICRO --no-track origin/main
     ```
 
 3. Run `rever --activities authors --force YY.MM.MICRO`:
@@ -138,7 +138,7 @@ Install [`rever`][rever docs] using whatever your project defines (e.g., a conda
 8. Push the versioned branch:
 
     ```bash
-    $ git push -u upstream
+    $ git push -u origin HEAD
     ```
 
 9. Open the Release PR targeting `main`:
