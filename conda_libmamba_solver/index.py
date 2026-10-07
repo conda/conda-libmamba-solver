@@ -232,7 +232,7 @@ def _package_info_from_package_dict(
         defaulted_keys=list(record.get("defaulted_keys") or []),
         noarch=noarch,
         size=record.get("size") or 0,
-        timestamp=timestamp_ms,
+        timestamp=int(timestamp_ms),
         **extra,
     )
 
@@ -720,7 +720,7 @@ class LibMambaIndexHelper:
             defaulted_keys=list(record.get("defaulted_keys") or []),
             noarch=noarch,
             size=record.get("size") or 0,
-            timestamp=timestamp_ms,
+            timestamp=int(timestamp_ms),
             **extra,
         )
 
