@@ -126,6 +126,10 @@ if TYPE_CHECKING:
 log = logging.getLogger(f"conda.{__name__}")
 
 
+# Year 9999 in seconds. Larger timestamps are treated as milliseconds.
+MAX_SECONDS_TIMESTAMP = 253402300799
+
+
 @dataclass
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
@@ -204,6 +208,10 @@ def _package_info_from_package_dict(
     ):
         depends.append("pip")
 
+    timestamp_ms = record.get("timestamp") or 0
+    if timestamp_ms < MAX_SECONDS_TIMESTAMP:
+        timestamp_ms *= 1000
+
     return PackageInfo(
         name=record["name"],
         version=record["version"],
@@ -224,9 +232,7 @@ def _package_info_from_package_dict(
         defaulted_keys=list(record.get("defaulted_keys") or []),
         noarch=noarch,
         size=record.get("size") or 0,
-        timestamp=int(
-            (record.get("timestamp") or 0) * 1000
-        ),  # XXX packages may have either seconds or milliseconds timestamps, see convert-if-out-of-range code in conda
+        timestamp=int(timestamp_ms),
         **extra,
     )
 
@@ -690,6 +696,10 @@ class LibMambaIndexHelper:
         else:
             extra = {}
 
+        timestamp_ms = record.get("timestamp") or 0
+        if timestamp_ms < MAX_SECONDS_TIMESTAMP:
+            timestamp_ms *= 1000
+
         return PackageInfo(
             name=record.name,
             version=record.version,
@@ -710,7 +720,7 @@ class LibMambaIndexHelper:
             defaulted_keys=list(record.get("defaulted_keys") or []),
             noarch=noarch,
             size=record.get("size") or 0,
-            timestamp=int((record.get("timestamp") or 0) * 1000),
+            timestamp=int(timestamp_ms),
             **extra,
         )
 
