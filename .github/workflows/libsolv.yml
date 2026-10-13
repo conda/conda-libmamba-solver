@@ -1,0 +1,127 @@
+# CONDA-LIBMAMBA-SOLVER CHANGE
+# Build a patched libsolv from AnacondaRecipes/libsolv-feedstock with conda-build
+# so the test suite can run against it before it is published.
+# See https://github.com/conda/conda-libmamba-solver/issues/1042
+name: libsolv
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: Feedstock repository to build
+        type: string
+        default: AnacondaRecipes/libsolv-feedstock
+      ref:
+        description: Feedstock git ref to build
+        type: string
+        default: cls-1042-patch
+
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Feedstock repository to build
+        type: string
+        default: AnacondaRecipes/libsolv-feedstock
+      ref:
+        description: Feedstock git ref to build
+        type: string
+        default: cls-1042-patch
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        # One build per (subdir, channel) pair used by tests.yml. Packages are built
+        # against the same channel the tests install from so run_exports
+        # (zlib, pcre2, ...) can be satisfied there.
+        include:
+          - {runs-on: ubuntu-latest, subdir: linux-64, channel: defaults}
+          - {runs-on: ubuntu-latest, subdir: linux-64, channel: conda-forge}
+          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: defaults}
+          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: conda-forge}
+          - {runs-on: macos-15-intel, subdir: osx-64, channel: conda-forge}
+          - {runs-on: macos-latest, subdir: osx-arm64, channel: defaults}
+          - {runs-on: windows-latest, subdir: win-64, channel: defaults}
+          - {runs-on: windows-latest, subdir: win-64, channel: conda-forge}
+          - {runs-on: windows-11-arm, subdir: win-arm64, channel: conda-forge}
+    env:
+      CHANNEL_URL: ${{ matrix.channel == 'defaults' && 'https://repo.anaconda.com/pkgs/main' || 'conda-forge' }}
+      # Global pinnings matching each channel's own builds.
+      PINNING_URL: ${{ matrix.channel == 'defaults' && 'https://raw.githubusercontent.com/AnacondaRecipes/aggregate/master/conda_build_config.yaml' || 'https://raw.githubusercontent.com/conda-forge/conda-forge-pinning-feedstock/main/recipe/conda_build_config.yaml' }}
+    steps:
+      - name: Checkout libsolv-feedstock
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.repository || 'AnacondaRecipes/libsolv-feedstock' }}
+          ref: ${{ inputs.ref || 'cls-1042-patch' }}
+          path: libsolv-feedstock
+
+      - name: Setup Miniforge
+        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        with:
+          miniforge-version: latest
+          activate-environment: build
+          channels: conda-forge
+          conda-remove-defaults: true
+          run-post: false
+          # Bootstrap with x64 on Windows ARM until a native installer is available.
+          architecture: ${{ matrix.subdir == 'win-arm64' && 'x64' || runner.arch }}
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir == 'win-arm64' && 'win-64' || matrix.subdir }}
+
+      - name: Install conda-build
+        run: conda install --yes conda-build
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir == 'win-arm64' && 'win-64' || matrix.subdir }}
+
+      - name: Prepare variant config
+        run: |
+          curl -fsSL "$PINNING_URL" -o pinning.yaml
+          : > override.yaml
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # The pinnings point at SDK locations that only exist on the channels'
+            # build machines; use the runner's Xcode SDK instead.
+            SDK="$(xcrun --sdk macosx --show-sdk-path)"
+            {
+              echo "CONDA_BUILD_SYSROOT: ['$SDK']"
+              echo "OSX_SDK_DIR: ['$(dirname "$SDK")']"
+            } >> override.yaml
+          fi
+          cat override.yaml
+          # ninja-base is the defaults name; ninja exists on both channels.
+          sed -i.bak 's/ninja-base/ninja/' libsolv-feedstock/recipe/meta.yaml
+          rm libsolv-feedstock/recipe/meta.yaml.bak
+          git -C libsolv-feedstock log -1 --oneline
+
+      - name: Build libsolv
+        run: >
+          conda build libsolv-feedstock/recipe
+          --override-channels
+          --channel "$CHANNEL_URL"
+          --variant-config-files pinning.yaml
+          --variant-config-files override.yaml
+          --output-folder libsolv-channel
+          --no-anaconda-upload
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir }}
+
+      - name: List built packages
+        run: find libsolv-channel -name '*.conda' -o -name '*.tar.bz2' -o -name 'repodata.json'
+
+      - name: Upload libsolv channel
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: libsolv-${{ matrix.subdir }}-${{ matrix.channel }}
+          path: |
+            libsolv-channel/*/repodata.json
+            libsolv-channel/*/*.conda
+            libsolv-channel/*/*.tar.bz2
+          if-no-files-found: error
+          retention-days: 7
+# /CONDA-LIBMAMBA-SOLVER CHANGE
