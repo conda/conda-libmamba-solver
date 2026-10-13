@@ -954,6 +954,132 @@ def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
         assert tf == ("py_freethreading",)
 
 
+def _write_channel(path: Path, records: list[dict]) -> str:
+    """Write a local channel with ``records`` in ``context.subdir`` and an empty noarch."""
+    for subdir, packages in ((context.subdir, records), ("noarch", [])):
+        (path / subdir).mkdir(parents=True)
+        (path / subdir / "repodata.json").write_text(
+            json.dumps(
+                {
+                    "info": {"subdir": subdir},
+                    "packages": {},
+                    "packages.conda": {
+                        f"{r['name']}-{r['version']}-{r['build']}.conda": {
+                            "depends": [],
+                            "md5": "0" * 32,
+                            "sha256": "0" * 64,
+                            "subdir": subdir,
+                            **r,
+                        }
+                        for r in packages
+                    },
+                }
+            )
+        )
+    return path.as_uri()
+
+
+@pytest.mark.parametrize("ft_first", (True, False), ids=("ft-first", "gil-first"))
+@pytest.mark.parametrize("with_defaults", (True, False), ids=("cf+main", "cf"))
+def test_track_features_dependency_not_cancelled_by_lower_priority_channel(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    with_defaults: bool,
+    ft_first: bool,
+) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/1042
+
+    ``python=3.14 numpy`` must pick the GIL build regardless of channel composition.
+
+    numpy has two variants with the same version, build number and (truncated to
+    seconds) timestamp; they differ only in ``python_abi *_cp314`` vs ``*_cp314t``.
+    The only thing that de-prioritizes the free-threaded numpy is that every
+    ``python_abi *_cp314t`` provider has ``track_features``.
+
+    Before AnacondaRecipes/repodata-hotfixes#351, ``pkgs/main`` shipped
+    ``python_abi *_cp314t`` without ``track_features``. The conda libsolv patch
+    considered providers from every repo, so this lower-priority, never-selected
+    record cancelled the penalty, the comparison fell through to an unstable
+    timestamp tie-break, and the free-threaded build was selected. The patched
+    libsolv only considers providers from the highest-priority repo.
+    """
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
+    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
+    monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "flexible")
+    reset_context()
+
+    numpy_gil = {
+        "name": "numpy",
+        "version": "2.5.2",
+        "build": "py314_gil_1",
+        "build_number": 1,
+        "depends": ["python", "python_abi 3.14.* *_cp314"],
+        "timestamp": 1788129265176,
+    }
+    numpy_ft = {
+        "name": "numpy",
+        "version": "2.5.2",
+        "build": "py314_ft_1",
+        "build_number": 1,
+        "depends": ["python", "python_abi 3.14.* *_cp314t"],
+        "timestamp": 1788129265997,
+    }
+    conda_forge = [
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_106_cp314",
+            "build_number": 106,
+            "depends": ["python_abi 3.14.* *_cp314"],
+        },
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_6_cp314t",
+            "build_number": 6,
+            "depends": ["python_abi 3.14.* *_cp314t"],
+            "track_features": "py_freethreading",
+        },
+        {
+            "name": "python_abi",
+            "version": "3.14",
+            "build": "8_cp314",
+            "build_number": 8,
+        },
+        {
+            "name": "python_abi",
+            "version": "3.14",
+            "build": "8_cp314t",
+            "build_number": 8,
+            "track_features": "freethreading",
+        },
+        *((numpy_ft, numpy_gil) if ft_first else (numpy_gil, numpy_ft)),
+    ]
+    # pkgs/main before the hotfix: free-threaded python_abi without track_features
+    main = [
+        {"name": "python_abi", "version": "3.14", "build": "0_cp314", "build_number": 0},
+        {"name": "python_abi", "version": "3.14", "build": "0_cp314t", "build_number": 0},
+    ]
+
+    channels = [_write_channel(tmp_path / "conda-forge", conda_forge)]
+    if with_defaults:
+        channels.append(_write_channel(tmp_path / "main", main))
+
+    solver = Solver(
+        prefix=tmp_path / "env",
+        channels=channels,
+        subdirs=(context.subdir, "noarch"),
+        specs_to_add=["python=3.14", "numpy"],
+        command="create",
+    )
+    records = {r.name: r for r in solver.solve_final_state()}
+
+    assert records["numpy"].build == numpy_gil["build"]
+    assert records["python"].build == "h0_106_cp314"
+    assert records["python_abi"].build == "8_cp314"
+
+
 @pytest.mark.parametrize(
     "conda_self_installed,frozen,expected_message",
     (
