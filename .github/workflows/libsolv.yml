@@ -40,16 +40,19 @@ jobs:
         # One build per (subdir, channel) pair used by tests.yml. Packages are built
         # against the same channel the tests install from so run_exports
         # (zlib, pcre2, ...) can be satisfied there.
+        # installer-arch selects the Miniforge installer: Linux ARM is
+        # Miniforge3-Linux-aarch64.sh, macOS ARM is Miniforge3-MacOSX-arm64.sh,
+        # and Windows ARM bootstraps with x64 until a native installer exists.
         include:
-          - {runs-on: ubuntu-latest, subdir: linux-64, channel: defaults}
-          - {runs-on: ubuntu-latest, subdir: linux-64, channel: conda-forge}
-          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: defaults}
-          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: conda-forge}
-          - {runs-on: macos-15-intel, subdir: osx-64, channel: conda-forge}
-          - {runs-on: macos-latest, subdir: osx-arm64, channel: defaults}
-          - {runs-on: windows-latest, subdir: win-64, channel: defaults}
-          - {runs-on: windows-latest, subdir: win-64, channel: conda-forge}
-          - {runs-on: windows-11-arm, subdir: win-arm64, channel: conda-forge}
+          - {runs-on: ubuntu-latest, subdir: linux-64, channel: defaults, installer-arch: x64}
+          - {runs-on: ubuntu-latest, subdir: linux-64, channel: conda-forge, installer-arch: x64}
+          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: defaults, installer-arch: aarch64}
+          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: conda-forge, installer-arch: aarch64}
+          - {runs-on: macos-15-intel, subdir: osx-64, channel: conda-forge, installer-arch: x64}
+          - {runs-on: macos-latest, subdir: osx-arm64, channel: defaults, installer-arch: arm64}
+          - {runs-on: windows-latest, subdir: win-64, channel: defaults, installer-arch: x64}
+          - {runs-on: windows-latest, subdir: win-64, channel: conda-forge, installer-arch: x64}
+          - {runs-on: windows-11-arm, subdir: win-arm64, channel: conda-forge, installer-arch: x64}
     env:
       CHANNEL_URL: ${{ matrix.channel == 'defaults' && 'https://repo.anaconda.com/pkgs/main' || 'conda-forge' }}
       # Global pinnings matching each channel's own builds.
@@ -70,8 +73,7 @@ jobs:
           channels: conda-forge
           conda-remove-defaults: true
           run-post: false
-          # Bootstrap with x64 on Windows ARM until a native installer is available.
-          architecture: ${{ matrix.subdir == 'win-arm64' && 'x64' || runner.arch }}
+          architecture: ${{ matrix.installer-arch }}
         env:
           CONDA_SUBDIR: ${{ matrix.subdir == 'win-arm64' && 'win-64' || matrix.subdir }}
 
