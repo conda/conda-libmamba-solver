@@ -101,7 +101,7 @@ jobs:
 
       - name: Build libsolv
         run: >
-          conda build libsolv-feedstock/recipe
+          python -m conda build libsolv-feedstock/recipe
           --override-channels
           --channel "$CHANNEL_URL"
           --variant-config-files pinning.yaml
