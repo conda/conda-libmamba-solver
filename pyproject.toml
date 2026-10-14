@@ -79,6 +79,7 @@ filterwarnings = [
   "ignore:conda.common.io.env_vars:PendingDeprecationWarning",
 ]
 markers = [
+  "benchmark: performance benchmarks",
   "integration: integration tests that usually require an internet connect",
   "slow: slow running tests",
   "trouble: troublesome tests",
