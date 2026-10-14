@@ -43,13 +43,15 @@ jobs:
         # installer-arch selects the Miniforge installer: Linux ARM is
         # Miniforge3-Linux-aarch64.sh, macOS ARM is Miniforge3-MacOSX-arm64.sh,
         # and Windows ARM bootstraps with x64 until a native installer exists.
+        # win-64/defaults uses windows-2022: windows-latest ships only VS 2026, and
+        # the defaults vs2022_win-64 activation can only locate a VS 2022 install.
         include:
           - {runs-on: ubuntu-latest, subdir: linux-64, channel: defaults, installer-arch: x64}
           - {runs-on: ubuntu-latest, subdir: linux-64, channel: conda-forge, installer-arch: x64}
           - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: defaults, installer-arch: aarch64}
           - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: conda-forge, installer-arch: aarch64}
           - {runs-on: macos-latest, subdir: osx-arm64, channel: defaults, installer-arch: arm64}
-          - {runs-on: windows-latest, subdir: win-64, channel: defaults, installer-arch: x64}
+          - {runs-on: windows-2022, subdir: win-64, channel: defaults, installer-arch: x64}
           - {runs-on: windows-latest, subdir: win-64, channel: conda-forge, installer-arch: x64}
           - {runs-on: windows-11-arm, subdir: win-arm64, channel: conda-forge, installer-arch: x64}
     env:
@@ -89,9 +91,13 @@ jobs:
             # The pinnings point at SDK locations that only exist on the channels'
             # build machines; use the runner's Xcode SDK instead.
             SDK="$(xcrun --sdk macosx --show-sdk-path)"
+            # Use block lists: conda-build treats a trailing `[...]` as a
+            # selector (even without `#`) and would strip a flow list.
             {
-              echo "CONDA_BUILD_SYSROOT: ['$SDK']"
-              echo "OSX_SDK_DIR: ['$(dirname "$SDK")']"
+              echo "CONDA_BUILD_SYSROOT:"
+              echo "  - $SDK"
+              echo "OSX_SDK_DIR:"
+              echo "  - $(dirname "$SDK")"
             } >> override.yaml
           fi
           cat override.yaml
