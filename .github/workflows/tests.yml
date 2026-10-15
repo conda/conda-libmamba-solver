@@ -98,13 +98,13 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
-            python-version: '3.10'
+            python-version: '3.11'
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -302,21 +302,17 @@ jobs:
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         runs-on: [ubuntu-latest, ubuntu-24.04-arm]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
-          - python-version: '3.10'
-            default-channel: conda-forge
           - python-version: '3.11'
             default-channel: conda-forge
           - python-version: '3.12'
             default-channel: conda-forge
           - test-type: unit
             test-group: 3
-          - runs-on: ubuntu-24.04-arm
-            python-version: '3.10'
           - runs-on: ubuntu-24.04-arm
             python-version: '3.11'
           - runs-on: ubuntu-24.04-arm
@@ -617,7 +613,7 @@ jobs:
       matrix:
         # test lower version (w/ osx-64 & conda-forge & unit tests) and upper version (w/ osx-arm64 & defaults & integration tests)
         arch: [osx-64, osx-arm64]
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
@@ -629,7 +625,7 @@ jobs:
           - arch: osx-64
             test-type: integration
           - arch: osx-arm64
-            python-version: '3.10'
+            python-version: '3.11'
           - arch: osx-arm64
             default-channel: conda-forge
           - arch: osx-arm64

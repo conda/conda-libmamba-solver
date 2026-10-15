@@ -117,11 +117,38 @@ jobs:
               echo "  - $SDK_DIR"
             } >> override.yaml
           fi
+          if [[ "$CHANNEL" == "defaults" ]]; then
+            # The aggregate pinning can be ahead of what pkgs/main ships (e.g. pcre2
+            # 10.49 while defaults' git still needs <10.49), and a newer run_export
+            # makes the patched libsolv uninstallable in the test envs. Build against
+            # the pcre2 used by the newest published libsolv instead.
+            PCRE2="$(conda search --override-channels --channel "$CHANNEL_URL" \
+              --platform "$SUBDIR" --json libsolv | python -c '
+          import json, re, sys
+          from conda.models.version import VersionOrder
+          recs = json.load(sys.stdin)["libsolv"]
+          rec = max(recs, key=lambda r: (VersionOrder(r["version"]), r["build_number"], r.get("timestamp", 0)))
+          for dep in rec["depends"]:
+              m = re.match(r"pcre2 >=(\d+\.\d+)", dep)
+              if m:
+                  print(m.group(1))
+          ')"
+            echo "pcre2 from ${CHANNEL_URL} libsolv: ${PCRE2:-<not found>}"
+            if [[ -n "$PCRE2" ]]; then
+              {
+                echo "pcre2:"
+                echo "  - '$PCRE2'"
+              } >> override.yaml
+            fi
+          fi
           cat override.yaml
           # ninja-base is the defaults name; ninja exists on both channels.
           sed -i.bak 's/ninja-base/ninja/' libsolv-feedstock/recipe/meta.yaml
           rm libsolv-feedstock/recipe/meta.yaml.bak
           git -C libsolv-feedstock log -1 --oneline
+        env:
+          CHANNEL: ${{ matrix.channel }}
+          SUBDIR: ${{ matrix.subdir }}
 
       - name: Build libsolv
         run: >
