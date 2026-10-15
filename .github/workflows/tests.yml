@@ -70,15 +70,24 @@ jobs:
               - 'conda_libmamba_solver/**'
               - '*.py'
               - '.github/workflows/tests.yml'
+              - '.github/workflows/libsolv.yml'
               - 'tests/**'
               - 'dev/requirements.txt'
               - 'pyproject.toml'
           # /CONDA-LIBMAMBA-SOLVER CHANGE
 
+  # CONDA-LIBMAMBA-SOLVER CHANGE
+  # build patched libsolv (cls#1042) to install before testing
+  libsolv:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    uses: ./.github/workflows/libsolv.yml
+  # /CONDA-LIBMAMBA-SOLVER CHANGE
+
   # windows test suite
   windows:
     # only run test suite if there are code changes
-    needs: changes
+    needs: [changes, libsolv]  # CONDA-LIBMAMBA-SOLVER CHANGE: add libsolv
     if: needs.changes.outputs.code == 'true'
 
     runs-on: ${{ matrix.runs-on }}
@@ -89,13 +98,13 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
-            python-version: '3.10'
+            python-version: '3.11'
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -191,6 +200,24 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
+
+      - name: Download patched libsolv
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: libsolv-${{ matrix.subdir }}-${{ matrix.default-channel }}
+          path: libsolv-channel
+
+      - name: Install patched libsolv
+        shell: bash -el {0}
+        run: |
+          # `pwd -W` is the Git Bash builtin; a cygpath from the conda env's m2
+          # packages (win-arm64) mistranslates Git Bash's /c/... paths.
+          CHANNEL="file:///$(pwd -W)/libsolv-channel"
+          conda install --yes --channel "$CHANNEL" "$CHANNEL::libsolv"
+          conda list --show-channel-urls '^libsolv$' | tee libsolv-list.txt
+          grep -q libsolv-channel libsolv-list.txt
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir }}
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -264,7 +291,7 @@ jobs:
   # linux test suite
   linux:
     # only run test suite if there are code changes
-    needs: changes
+    needs: [changes, libsolv]  # CONDA-LIBMAMBA-SOLVER CHANGE: add libsolv
     if: needs.changes.outputs.code == 'true'
 
     runs-on: ${{ matrix.runs-on }}
@@ -277,21 +304,17 @@ jobs:
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         runs-on: [ubuntu-latest, ubuntu-24.04-arm]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
-          - python-version: '3.10'
-            default-channel: conda-forge
           - python-version: '3.11'
             default-channel: conda-forge
           - python-version: '3.12'
             default-channel: conda-forge
           - test-type: unit
             test-group: 3
-          - runs-on: ubuntu-24.04-arm
-            python-version: '3.10'
           - runs-on: ubuntu-24.04-arm
             python-version: '3.11'
           - runs-on: ubuntu-24.04-arm
@@ -300,6 +323,13 @@ jobs:
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        # CONDA-LIBMAMBA-SOLVER CHANGE: subdir selects the patched libsolv artifact
+        include:
+          - runs-on: ubuntu-latest
+            subdir: linux-64
+          - runs-on: ubuntu-24.04-arm
+            subdir: linux-aarch64
+        # /CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -356,6 +386,19 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
+
+      - name: Download patched libsolv
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: libsolv-${{ matrix.subdir }}-${{ matrix.default-channel }}
+          path: libsolv-channel
+
+      - name: Install patched libsolv
+        run: |
+          CHANNEL="file://$PWD/libsolv-channel"
+          conda install --yes --channel "$CHANNEL" "$CHANNEL::libsolv"
+          conda list --show-channel-urls '^libsolv$' | tee libsolv-list.txt
+          grep -q libsolv-channel libsolv-list.txt
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -559,7 +602,7 @@ jobs:
   # macos test suite
   macos:
     # only run test suite if there are code changes
-    needs: changes
+    needs: [changes, libsolv]  # CONDA-LIBMAMBA-SOLVER CHANGE: add libsolv
     if: needs.changes.outputs.code == 'true'
 
     runs-on: ${{ (matrix.arch == 'osx-64' && 'macos-15-intel') || 'macos-latest' }}
@@ -572,7 +615,7 @@ jobs:
       matrix:
         # test lower version (w/ osx-64 & conda-forge & unit tests) and upper version (w/ osx-arm64 & defaults & integration tests)
         arch: [osx-64, osx-arm64]
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
@@ -584,7 +627,7 @@ jobs:
           - arch: osx-64
             test-type: integration
           - arch: osx-arm64
-            python-version: '3.10'
+            python-version: '3.11'
           - arch: osx-arm64
             default-channel: conda-forge
           - arch: osx-arm64
@@ -657,6 +700,22 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
+
+      # libsolv.yml does not build osx-64; those jobs test the stock libsolv.
+      - name: Download patched libsolv
+        if: matrix.arch != 'osx-64'
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: libsolv-${{ matrix.arch }}-${{ matrix.default-channel }}
+          path: libsolv-channel
+
+      - name: Install patched libsolv
+        if: matrix.arch != 'osx-64'
+        run: |
+          CHANNEL="file://$PWD/libsolv-channel"
+          conda install --yes --channel "$CHANNEL" "$CHANNEL::libsolv"
+          conda list --show-channel-urls '^libsolv$' | tee libsolv-list.txt
+          grep -q libsolv-channel libsolv-list.txt
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
@@ -740,7 +799,7 @@ jobs:
 
   # required check
   analyze:
-    needs: [windows, linux, linux-qemu, linux-benchmarks, macos, aggregate]
+    needs: [libsolv, windows, linux, linux-qemu, linux-benchmarks, macos, aggregate]  # CONDA-LIBMAMBA-SOLVER CHANGE: add libsolv
     if: '!cancelled()'
 
     runs-on: ubuntu-latest
