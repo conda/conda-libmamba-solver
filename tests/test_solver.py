@@ -1007,6 +1007,8 @@ def test_track_features_dependency_not_cancelled_by_lower_priority_channel(
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
     monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
     monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "flexible")
+    # the synthetic channels have no pip; condarc-defaults enables this
+    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "false")
     reset_context()
 
     numpy_gil = {
