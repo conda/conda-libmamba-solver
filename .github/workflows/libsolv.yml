@@ -91,13 +91,30 @@ jobs:
             # The pinnings point at SDK locations that only exist on the channels'
             # build machines; use the runner's Xcode SDK instead.
             SDK="$(xcrun --sdk macosx --show-sdk-path)"
+            # The defaults stdlib activation (macosx_deployment_target_osx-*)
+            # recomputes CONDA_BUILD_SYSROOT as $OSX_SDK_DIR/MacOSX<version>.sdk,
+            # but the runner only ships the latest SDK. Point OSX_SDK_DIR at a
+            # directory of versioned symlinks to the runner's SDK.
+            SDK_DIR="$RUNNER_TEMP/MacOSX-SDKs"
+            mkdir -p "$SDK_DIR"
+            {
+              awk '
+                /^(c_stdlib_version|MACOSX_DEPLOYMENT_TARGET|MACOSX_SDK_VERSION|macos_min_version):/ {f=1; next}
+                /^[^[:space:]#-]/ {f=0}
+                f && /^[[:space:]]*-/ {print $2}
+              ' pinning.yaml | grep -E '^[0-9]+(\.[0-9]+)*$'
+              grep -oE 'MacOSX[0-9.]+\.sdk' pinning.yaml | sed -E 's/^MacOSX(.*)\.sdk$/\1/'
+            } | sort -u | while read -r ver; do
+              ln -sfn "$SDK" "$SDK_DIR/MacOSX$ver.sdk"
+            done
+            ls -l "$SDK_DIR"
             # Use block lists: conda-build treats a trailing `[...]` as a
             # selector (even without `#`) and would strip a flow list.
             {
               echo "CONDA_BUILD_SYSROOT:"
               echo "  - $SDK"
               echo "OSX_SDK_DIR:"
-              echo "  - $(dirname "$SDK")"
+              echo "  - $SDK_DIR"
             } >> override.yaml
           fi
           cat override.yaml
