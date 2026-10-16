@@ -1,6 +1,7 @@
 conda-build
 conda-index
 conda-lock
+conda-forge::nvidia-virtual-packages
 conda-forge::pre-commit
 pytest-codspeed >=4
 conda-forge::pytest-mock

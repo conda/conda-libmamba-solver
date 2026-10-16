@@ -822,6 +822,11 @@ def test_pytorch_gpu(specs):
     """
     env = os.environ.copy()
     env["CONDA_OVERRIDE_CUDA"] = "12.6"
+    # Recent conda-forge CUDA builds (e.g. torchvision -> libcudnn -> cuda-arch) require the
+    # `__cuda_arch` virtual package, provided by the `nvidia-virtual-packages` plugin.
+    # Without it, only CPU builds are installable.
+    # https://github.com/conda-forge/cudnn-feedstock/issues/157
+    env["CONDA_OVERRIDE_CUDA_ARCH"] = "8.0"
     env["CONDA_OVERRIDE_GLIBC"] = "2.30"
     env["CONDA_OVERRIDE_LINUX"] = "5.15.167.4"
     env["CONDA_OVERRIDE_ARCHSPEC"] = "skylake"
