@@ -41,6 +41,8 @@ env:
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
   CONDA_REF: main # pin conda version to latest for more stable tests
+  # conda main requires Python 3.11, but CLS still supports Python 3.10.
+  CONDA_PY310_REF: 26.9.0
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -89,13 +91,13 @@ jobs:
       fail-fast: false
       matrix:
         # test lower version (w/ defaults) and upper version (w/ defaults and conda-forge)
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
           - default-channel: conda-forge
-            python-version: '3.10'
+            python-version: '3.11'
           - test-type: unit
             test-group: 3
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
@@ -105,6 +107,12 @@ jobs:
         include:
           - runs-on: windows-latest
             subdir: win-64
+          - runs-on: windows-latest
+            subdir: win-64
+            python-version: '3.10'
+            default-channel: defaults
+            test-type: conda-libmamba-solver
+            test-group: 1
           # conda-forge's native libmambapy builds require Python 3.14.
           - runs-on: windows-11-arm
             subdir: win-arm64
@@ -124,7 +132,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ env.CONDA_REF }}
+          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -277,21 +285,17 @@ jobs:
       matrix:
         # test all lower versions (w/ defaults) and upper version (w/ defaults and conda-forge)
         runs-on: [ubuntu-latest, ubuntu-24.04-arm]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]
         test-group: [1, 2, 3]
         exclude:
-          - python-version: '3.10'
-            default-channel: conda-forge
           - python-version: '3.11'
             default-channel: conda-forge
           - python-version: '3.12'
             default-channel: conda-forge
           - test-type: unit
             test-group: 3
-          - runs-on: ubuntu-24.04-arm
-            python-version: '3.10'
           - runs-on: ubuntu-24.04-arm
             python-version: '3.11'
           - runs-on: ubuntu-24.04-arm
@@ -300,6 +304,12 @@ jobs:
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        include:
+          - runs-on: ubuntu-latest
+            python-version: '3.10'
+            default-channel: defaults
+            test-type: conda-libmamba-solver
+            test-group: 1
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -311,7 +321,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ env.CONDA_REF }}
+          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -572,7 +582,7 @@ jobs:
       matrix:
         # test lower version (w/ osx-64 & conda-forge & unit tests) and upper version (w/ osx-arm64 & defaults & integration tests)
         arch: [osx-64, osx-arm64]
-        python-version: ['3.10', '3.13']
+        python-version: ['3.11', '3.13']
         default-channel: [defaults, conda-forge]
         test-type: [conda-libmamba-solver, unit, integration]  # CONDA-LIBMAMBA-SOLVER CHANGE
         test-group: [1, 2, 3]
@@ -584,7 +594,7 @@ jobs:
           - arch: osx-64
             test-type: integration
           - arch: osx-arm64
-            python-version: '3.10'
+            python-version: '3.11'
           - arch: osx-arm64
             default-channel: conda-forge
           - arch: osx-arm64
@@ -597,6 +607,12 @@ jobs:
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        include:
+          - arch: osx-64
+            python-version: '3.10'
+            default-channel: conda-forge
+            test-type: conda-libmamba-solver
+            test-group: 1
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -608,7 +624,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ env.CONDA_REF }}
+          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
