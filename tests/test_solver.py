@@ -804,6 +804,13 @@ def test_satisfied_skip_solve_matchspec(
 
 
 # @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason=(
+        "the `nvidia-virtual-packages` plugin providing `__cuda_arch` requires Python 3.11+ "
+        "(0.2.1); 0.2.0 is incompatible with conda 26.9+"
+    ),
+)
 @pytest.mark.parametrize(
     "specs",
     (
@@ -824,7 +831,7 @@ def test_pytorch_gpu(specs):
     env["CONDA_OVERRIDE_CUDA"] = "12.6"
     # Recent conda-forge CUDA builds (e.g. torchvision -> libcudnn -> cuda-arch) require the
     # `__cuda_arch` virtual package, provided by the `nvidia-virtual-packages` plugin.
-    # Without it, only CPU builds are installable.
+    # Without it, the CUDA builds cannot be installed and the solver falls back to CPU builds.
     # https://github.com/conda-forge/cudnn-feedstock/issues/157
     env["CONDA_OVERRIDE_CUDA_ARCH"] = "8.0"
     env["CONDA_OVERRIDE_GLIBC"] = "2.30"
