@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_mac, on_win
+from conda.common.url import urlparse
 from conda.core.index import Index
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
@@ -29,6 +30,7 @@ from conda.models.channel import Channel
 from conda.models.records import PackageRecord
 from conda.testing.integration import package_is_installed
 from conda_build.exceptions import DependencyNeedsBuildingError
+from libmambapy.specs import PackageInfo
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.solver import LibMambaSolver as Solver
@@ -694,6 +696,51 @@ def test_constrains_virtual_package(
         command="remove",
     ).solve_final_state()
     assert not any(r.name == "needs-cuda13" for r in records)
+
+
+@pytest.mark.parametrize("restore_credentials", [True, False])
+@pytest.mark.parametrize(
+    "username,password",
+    [
+        ("user", "pass%23word"),
+        ("user", "pass%3Fword"),
+        ("user", "pass%2Fword"),
+        ("user", "pass%25word"),
+        ("user", "pass%3Aword"),
+        ("user", "pass%40word"),
+        ("user%23name", "password"),
+    ],
+)
+def test_package_urls_preserve_encoded_credentials(
+    tmp_path: Path, username: str, password: str, restore_credentials: bool
+) -> None:
+    base = "https://example.invalid/channel/noarch"
+    authenticated = f"https://{username}:{password}@example.invalid/channel/noarch"
+    package_path = "/example-1%210-0.conda?key=a%23b%26c"
+    pkg = PackageInfo(
+        name="example",
+        version="1!0",
+        build_string="0",
+        build_number=0,
+        channel=base,
+        platform="noarch",
+        filename="example-1!0-0.conda",
+        package_url=(base if restore_credentials else authenticated) + package_path,
+    )
+    index = SimpleNamespace(
+        repos=[SimpleNamespace(url_no_cred=base, url_w_cred=authenticated)]
+        if restore_credentials
+        else []
+    )
+    solver = Solver(prefix=tmp_path / "env", channels=[])
+
+    record = solver._package_info_to_package_record(pkg, index)
+
+    assert record.url == authenticated + "/example-1!0-0.conda?key=a%23b%26c"
+    parsed = urlparse(record.url)
+    assert parsed.hostname == "example.invalid"
+    assert parsed.username == username
+    assert parsed.password == password
 
 
 def test_urls_are_percent_decoded(tmp_path: Path) -> None:
