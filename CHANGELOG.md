@@ -17,8 +17,7 @@ Remember to update the hyperlinks at the bottom.
 
 ### Enhancements
 
-* Avoid loading every package record solely to detect conda-build solves or discover their local channels, when conda-build supplies a lazy index. (#1045)
-
+* Avoid loading every package record solely to detect conda-build solves or discover their local channels, when conda-build supplies a lazy index. (#1045 via #1044)
 
 ### Bug fixes
 
@@ -26,16 +25,7 @@ Remember to update the hyperlinks at the bottom.
 * Report all missing requested packages when parsing libmamba solver errors. (#1048)
 * Avoid multiplying timestamps that are already in milliseconds when passing
   package records to libmamba. (#1071 via #1072)
-* Preserve percent-encoded credentials and query parameters in package download URLs. (#1083)
-
-
-### Deprecations
-
-
-
-### Docs
-
-
+* Preserve percent-encoded credentials and query parameters in package download URLs. (#1083 via #1084)
 
 ### Other
 
@@ -45,7 +35,7 @@ Remember to update the hyperlinks at the bottom.
 * Add a GitHub workflow to run the
   [pytest-conda-solvers](https://github.com/conda-incubator/pytest-conda-solvers/)
   test suite. (#999 via #1035)
-* Run the solver test suites natively on Windows ARM64 with Python 3.14 (conda/conda#16540).
+* Run the solver test suites natively on Windows ARM64 with Python 3.14. (conda/conda#16540 via #1047)
 
 ### Contributors
 
@@ -53,10 +43,10 @@ Remember to update the hyperlinks at the bottom.
 * @dholth
 * @jezdez
 * @kenodegard
+* @paperbenni made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/1044
 * @soapy1
 * @conda-bot
 * @dependabot[bot]
-* @paperbenni
 * @pre-commit-ci[bot]
 
 
