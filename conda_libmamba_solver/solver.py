@@ -20,6 +20,7 @@ from inspect import stack
 from itertools import chain
 from textwrap import dedent
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from conda import __version__ as _conda_version
 from conda.base.constants import (
@@ -680,7 +681,8 @@ class LibMambaSolver(Solver):
                 break
         else:
             url = pkg.package_url
-        url = percent_decode(url)
+        url_parts = urlsplit(url)
+        url = url_parts._replace(path=percent_decode(url_parts.path)).geturl()
 
         # Signature verification requires channel information _with_ subdir data
         channel = Channel(pkg.channel)

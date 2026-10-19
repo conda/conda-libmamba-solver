@@ -41,6 +41,8 @@ env:
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
   CONDA_REF: main # pin conda version to latest for more stable tests
+  # conda main requires Python 3.11, but CLS still supports Python 3.10.
+  CONDA_PY310_REF: 26.9.0
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -114,6 +116,12 @@ jobs:
         include:
           - runs-on: windows-latest
             subdir: win-64
+          - runs-on: windows-latest
+            subdir: win-64
+            python-version: '3.10'
+            default-channel: defaults
+            test-type: conda-libmamba-solver
+            test-group: 1
           # conda-forge's native libmambapy builds require Python 3.14.
           - runs-on: windows-11-arm
             subdir: win-arm64
@@ -133,7 +141,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ env.CONDA_REF }}
+          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -154,7 +162,7 @@ jobs:
           key: cache-${{ env.HASH }}
 
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
         with:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda\
           condarc-file: conda\.github\condarc-${{ matrix.default-channel }}
@@ -271,14 +279,14 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       - name: Upload Test Results
         if: '!cancelled()'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-${{ env.HASH }}
           # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
@@ -329,6 +337,12 @@ jobs:
             subdir: linux-64
           - runs-on: ubuntu-24.04-arm
             subdir: linux-aarch64
+          - runs-on: ubuntu-latest
+            subdir: linux-64
+            python-version: '3.10'
+            default-channel: defaults
+            test-type: conda-libmamba-solver
+            test-group: 1
         # /CONDA-LIBMAMBA-SOLVER CHANGE
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
@@ -341,7 +355,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ env.CONDA_REF }}
+          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -361,7 +375,7 @@ jobs:
           key: cache-${{ env.HASH }}
 
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
         with:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
@@ -440,14 +454,14 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: false # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       - name: Upload Test Results
         if: '!cancelled()'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-${{ env.HASH }}
           path: |
@@ -493,7 +507,7 @@ jobs:
           key: cache-${{ env.CACHE_KEY }}
 
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
 
       - name: Conda Install
         run: >
@@ -522,7 +536,7 @@ jobs:
           --benchmark-json benchmark_results.json
 
       - name: Upload Benchmark Results
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmark-results
           path: benchmark_results.json
@@ -530,7 +544,7 @@ jobs:
 
       - name: Upload GitHub Pull Request Event
         if: github.event_name == 'pull_request'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: benchmark-event
           path: ${{ github.event_path }}
@@ -574,7 +588,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup QEMU
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4.3.0
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Run Tests
         run: docker run
@@ -640,6 +654,12 @@ jobs:
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
+        include:
+          - arch: osx-64
+            python-version: '3.10'
+            default-channel: conda-forge
+            test-type: conda-libmamba-solver
+            test-group: 1
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -651,7 +671,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ env.CONDA_REF }}
+          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -671,7 +691,7 @@ jobs:
           key: cache-${{ env.HASH }}
 
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
         with:
           # CONDA-LIBMAMBA-SOLVER CHANGE: add conda/
           condarc-file: conda/.github/condarc-${{ matrix.default-channel }}
@@ -754,14 +774,14 @@ jobs:
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         if: false  # CONDA-LIBMAMBA-SOLVER CHANGE
         with:
           flags: ${{ runner.os }},${{ runner.arch }},${{ matrix.python-version }},${{ matrix.test-type }}
 
       - name: Upload Test Results
         if: '!cancelled()'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-${{ env.HASH }}
           # CONDA-LIBMAMBA-SOLVER CHANGE: need to prepend conda/ to the paths
@@ -782,11 +802,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
 
       - name: Upload Combined Test Results
         # provides one downloadable archive of all matrix run test results for further analysis
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: test-results-${{ github.sha }}-all
           path: test-results-*
