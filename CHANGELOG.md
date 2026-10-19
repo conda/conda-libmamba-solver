@@ -13,6 +13,54 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.10.0 (2026-10-19)
+
+### Enhancements
+
+* Avoid loading every package record solely to detect conda-build solves or discover their local channels, when conda-build supplies a lazy index. (#1045)
+
+
+### Bug fixes
+
+* Fix `conda update --all` so Python is updated within the current major.minor series (e.g. 3.13.9 → 3.13.14), matching classic solver behavior. (#1008 via #1009)
+* Report all missing requested packages when parsing libmamba solver errors. (#1048)
+* Avoid multiplying timestamps that are already in milliseconds when passing
+  package records to libmamba. (#1071 via #1072)
+* Preserve percent-encoded credentials and query parameters in package download URLs. (#1083)
+
+
+### Deprecations
+
+
+
+### Docs
+
+
+
+### Other
+
+* Replace the remote mirror regression test with a local test that verifies installed-prefix metadata cannot cause the solver to fetch an unconfigured channel. (#1027)
+* Keep Python 3.10 test coverage against conda 26.9.0 and run conda main tests with Python 3.11 or newer. (#1086)
+* Fix `test_pytorch_gpu` by installing the `nvidia-virtual-packages` conda plugin and setting `CONDA_OVERRIDE_CUDA_ARCH`, since recent conda-forge CUDA builds require the `__cuda_arch` virtual package. (#1086)
+* Add a GitHub workflow to run the
+  [pytest-conda-solvers](https://github.com/conda-incubator/pytest-conda-solvers/)
+  test suite. (#999 via #1035)
+* Run the solver test suites natively on Windows ARM64 with Python 3.14 (conda/conda#16540).
+
+### Contributors
+
+* @danyeaw
+* @dholth
+* @jezdez
+* @kenodegard
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @paperbenni
+* @pre-commit-ci[bot]
+
+
+
 ## 26.7.0 (2026-07-14)
 
 ### Enhancements
