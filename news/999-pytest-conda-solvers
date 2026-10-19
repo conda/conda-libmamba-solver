@@ -16,6 +16,6 @@
 
 ### Other
 
-* Add github workflow to run tests from
-  [pytest-conda-solvers](https://github.com/conda-incubator/pytest-conda-solvers/).
-  (#999)
+* Add a GitHub workflow to run the
+  [pytest-conda-solvers](https://github.com/conda-incubator/pytest-conda-solvers/)
+  test suite. (#999 via #1035)

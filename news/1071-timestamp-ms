@@ -4,8 +4,8 @@
 
 ### Bug fixes
 
-* When sending package records to solver, convert timestamp to milliseconds
-  conditionally. (#1071)
+* Avoid multiplying timestamps that are already in milliseconds when passing
+  package records to libmamba. (#1071 via #1072)
 
 ### Deprecations
 
