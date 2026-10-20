@@ -77,6 +77,19 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(f"conda.{__name__}")
 
+# Same order as the alternatives of libmamba's ``Request::Job`` variant, which libmamba's
+# ``order_request`` sorts by first. We sort the jobs ourselves (see
+# ``LibMambaSolver._sort_request_jobs``) and keep that order.
+_JOB_TYPE_ORDER = (
+    Request.Install,
+    Request.Remove,
+    Request.Update,
+    Request.UpdateAll,
+    Request.Keep,
+    Request.Freeze,
+    Request.Pin,
+)
+
 
 class LibMambaSolver(Solver):
     MAX_SOLVER_ATTEMPTS_CAP = 10
@@ -404,9 +417,8 @@ class LibMambaSolver(Solver):
             "force_reinstall": in_state.force_reinstall,
             "keep_dependencies": True,
             "keep_user_specs": True,
-            # we do the sorting ourselves, but we need it as True anyway to
-            # make test_solver.py::test_pytorch_gpu pass
-            "order_request": True,
+            # Jobs are sorted in _sort_request_jobs; libmamba must not re-sort them
+            "order_request": False,
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
         if log.isEnabledFor(logging.DEBUG):
@@ -427,7 +439,7 @@ class LibMambaSolver(Solver):
 
         request_jobs = []
         json_friendly = {}
-        for JobType, specs in jobs.items():
+        for JobType, specs in self._sort_request_jobs(jobs).items():
             for idx, conda_spec in enumerate(specs, 1):
                 libmamba_spec = self._conda_spec_to_libmamba_spec(conda_spec)
                 request_jobs.append(JobType(libmamba_spec))
@@ -440,6 +452,36 @@ class LibMambaSolver(Solver):
             json_str = json.dumps(json_friendly, indent=2)
             log.info("The solver will handle these requests:\n%s", json_str)
         return request_jobs
+
+    @staticmethod
+    def _sort_request_jobs(
+        jobs: Mapping[type, Sequence[MatchSpec | str]],
+    ) -> dict[type, list[MatchSpec | str]]:
+        """
+        Order the jobs the way libsolv will decide them.
+
+        libsolv decides the job rules in order, and each decision prunes the candidates of later
+        jobs. Job types follow the order of libmamba's ``Request::Job`` variant, and specs of the
+        same type are sorted by name. This is what libmamba's ``order_request`` does, with one
+        exception: a ``python`` spec with a version or build constraint goes first.
+
+        If python is decided first, its own track_features penalty (e.g. for free-threading
+        builds) applies to python itself. If a dependent package is decided first, the build
+        it picks can drag along a python variant the user did not ask for. See
+        conda-libmamba-solver#1042. A name-only ``python`` keeps its alphabetical place, so the
+        newest version of the other requested packages still wins over the newest python.
+        """
+
+        def key(spec: MatchSpec | str) -> tuple[bool, str]:
+            spec = MatchSpec(spec)
+            python_first = spec.name == "python" and not spec.is_name_only_spec
+            return (not python_first, spec.name)
+
+        return {
+            job_type: sorted(jobs[job_type], key=key)
+            for job_type in _JOB_TYPE_ORDER
+            if jobs.get(job_type)
+        }
 
     def _lock_virtual_packages(self, tasks: dict, in_state: SolverInputState) -> None:
         """Pin the host's virtual packages present for a prefix solve.

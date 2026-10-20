@@ -30,6 +30,7 @@ from conda.models.channel import Channel
 from conda.models.records import PackageRecord
 from conda.testing.integration import package_is_installed
 from conda_build.exceptions import DependencyNeedsBuildingError
+from libmambapy.solver import Request
 from libmambapy.specs import PackageInfo
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
@@ -1064,7 +1065,7 @@ def test_track_features_dependency_not_cancelled_by_lower_priority_channel(
     libsolv only considers providers from the highest-priority repo.
     """
     monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
-    monkeypatch.setenv("CONDA_PLUGINS_USE_SHARDED_REPODATA", "0")
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", "0")
     monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "flexible")
     # the synthetic channels have no pip; condarc-defaults enables this
     monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "false")
@@ -1139,6 +1140,103 @@ def test_track_features_dependency_not_cancelled_by_lower_priority_channel(
     assert records["numpy"].build == numpy_gil["build"]
     assert records["python"].build == "h0_106_cp314"
     assert records["python_abi"].build == "8_cp314"
+
+
+def test_versioned_python_decided_before_dependents(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/1042
+
+    ``python=3.14 pandas`` must pick the GIL build, as with conda-forge's
+    ``pandas-3.0.5-py314h3dd0261_1`` (cp314t) vs. ``py314he609de1_0`` (cp314).
+
+    The free-threaded pandas has the higher build number, and libsolv compares build
+    numbers before the track_features of a candidate's dependencies. If pandas' job is
+    decided first (name order: pandas < python), the free-threaded pandas wins and drags
+    in the free-threaded python. With python decided first, python's own track_features
+    penalty picks the GIL python, and only the GIL pandas remains installable.
+    """
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", "0")
+    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "false")
+    reset_context()
+
+    records = [
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_106_cp314",
+            "build_number": 106,
+            "depends": ["python_abi 3.14.* *_cp314"],
+        },
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_6_cp314t",
+            "build_number": 6,
+            "depends": ["python_abi 3.14.* *_cp314t"],
+            "track_features": "py_freethreading",
+        },
+        {"name": "python_abi", "version": "3.14", "build": "8_cp314", "build_number": 8},
+        {
+            "name": "python_abi",
+            "version": "3.14",
+            "build": "8_cp314t",
+            "build_number": 8,
+            "track_features": "freethreading",
+        },
+        {
+            "name": "pandas",
+            "version": "3.0.5",
+            "build": "py314_gil_0",
+            "build_number": 0,
+            "depends": ["python 3.14.* *_cp314", "python_abi 3.14.* *_cp314"],
+        },
+        {
+            "name": "pandas",
+            "version": "3.0.5",
+            "build": "py314_ft_1",
+            "build_number": 1,
+            "depends": ["python 3.14.* *_cp314t", "python_abi 3.14.* *_cp314t"],
+        },
+    ]
+    solver = Solver(
+        prefix=tmp_path / "env",
+        channels=[_write_channel(tmp_path / "channel", records)],
+        subdirs=(context.subdir, "noarch"),
+        specs_to_add=["python=3.14", "pandas"],
+        command="create",
+    )
+    solved = {r.name: r for r in solver.solve_final_state()}
+
+    assert solved["pandas"].build == "py314_gil_0"
+    assert solved["python"].build == "h0_106_cp314"
+    assert solved["python_abi"].build == "8_cp314"
+
+
+def test_sort_request_jobs() -> None:
+    """
+    Jobs follow libmamba's ``Request::Job`` variant order, then name; a ``python`` spec
+    with a version or build constraint goes first.
+    """
+    jobs = {
+        Request.Pin: ["zlib 1.*", "abc 1.*"],
+        Request.Install: ["torchvision>0.12", "python=3.14", "pytorch", "__cuda==12.6=0"],
+        Request.Update: ["python", "numpy"],
+    }
+    assert Solver._sort_request_jobs(jobs) == {
+        Request.Install: ["python=3.14", "__cuda==12.6=0", "pytorch", "torchvision>0.12"],
+        Request.Update: ["numpy", "python"],
+        Request.Pin: ["abc 1.*", "zlib 1.*"],
+    }
+    # dict order matters, not only content
+    assert list(Solver._sort_request_jobs(jobs)) == [
+        Request.Install,
+        Request.Update,
+        Request.Pin,
+    ]
 
 
 @pytest.mark.parametrize(
