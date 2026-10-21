@@ -387,7 +387,7 @@ class LibMambaSolver(Solver):
         log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %r", out_state.conflicts)
         flags = self._solver_flags(in_state)
-        jobs = self._specs_to_request_jobs(in_state, out_state)
+        jobs = self._specs_to_request_jobs(in_state, out_state, index)
         request = Request(jobs=jobs, flags=flags)
         solver = LibsolvSolver()
         outcome = solver.solve(index.db, request)
@@ -429,6 +429,7 @@ class LibMambaSolver(Solver):
         self,
         in_state: SolverInputState,
         out_state: SolverOutputState,
+        index: LibMambaIndexHelper | None = None,
     ) -> list[Request.Job]:
         if in_state.is_removing:
             jobs = self._specs_to_request_jobs_remove(in_state, out_state)
@@ -437,9 +438,10 @@ class LibMambaSolver(Solver):
         else:
             jobs = self._specs_to_request_jobs_add(in_state, out_state)
 
+        python_first = index is not None and self._python_variant_in_question(jobs, index)
         request_jobs = []
         json_friendly = {}
-        for JobType, specs in self._sort_request_jobs(jobs).items():
+        for JobType, specs in self._sort_request_jobs(jobs, python_first).items():
             for idx, conda_spec in enumerate(specs, 1):
                 libmamba_spec = self._conda_spec_to_libmamba_spec(conda_spec)
                 request_jobs.append(JobType(libmamba_spec))
@@ -454,28 +456,71 @@ class LibMambaSolver(Solver):
         return request_jobs
 
     @staticmethod
-    def _sort_request_jobs(
+    def _is_versioned_python(spec: MatchSpec | str) -> bool:
+        spec = MatchSpec(spec)
+        return spec.name == "python" and not spec.is_name_only_spec
+
+    @staticmethod
+    def _is_free_threading(track_features: Iterable[str]) -> bool:
+        # conda-forge: "py_freethreading"; defaults: "free-threading"
+        return any(
+            "freethreading" in feature.replace("-", "").replace("_", "").lower()
+            for feature in track_features
+        )
+
+    def _python_variant_in_question(
+        self,
         jobs: Mapping[type, Sequence[MatchSpec | str]],
+        index: LibMambaIndexHelper,
+    ) -> bool:
+        """
+        Whether an explicit ``python`` spec in an Install or Update job matches both
+        free-threading and regular (GIL) python builds, leaving libsolv that choice.
+
+        Only then does python's own job need to be decided before its dependents; see
+        ``_sort_request_jobs``. Other python variants with track_features (e.g. ``pypy`` on
+        older conda-forge, which ``python=3.8`` still matches) don't trigger it: deciding python
+        first there costs more than it fixes (``test_old_panel``).
+        """
+        for job_type in (Request.Install, Request.Update):
+            for spec in jobs.get(job_type, ()):
+                if not self._is_versioned_python(spec):
+                    continue
+                candidates = index.db.packages_matching(self._conda_spec_to_libmamba_spec(spec))
+                kinds = {self._is_free_threading(pkg.track_features) for pkg in candidates}
+                if kinds == {True, False}:
+                    log.debug("Deciding %s first: it matches GIL and free-threading builds", spec)
+                    return True
+        return False
+
+    @classmethod
+    def _sort_request_jobs(
+        cls,
+        jobs: Mapping[type, Sequence[MatchSpec | str]],
+        python_first: bool = False,
     ) -> dict[type, list[MatchSpec | str]]:
         """
         Order the jobs the way libsolv will decide them.
 
         libsolv decides the job rules in order, and each decision prunes the candidates of later
         jobs. Job types follow the order of libmamba's ``Request::Job`` variant, and specs of the
-        same type are sorted by name. This is what libmamba's ``order_request`` does, with one
-        exception: a ``python`` spec with a version or build constraint goes first.
+        same type are sorted by name. This is what libmamba's ``order_request`` does.
 
-        If python is decided first, its own track_features penalty (e.g. for free-threading
-        builds) applies to python itself. If a dependent package is decided first, the build
-        it picks can drag along a python variant the user did not ask for. See
-        conda-libmamba-solver#1042. A name-only ``python`` keeps its alphabetical place, so the
-        newest version of the other requested packages still wins over the newest python.
+        If ``python_first`` is set, a ``python`` spec with a version or build constraint goes
+        first. Then python's own track_features penalty (e.g. for free-threading builds) applies
+        to python itself; if a dependent package is decided first, the build it picks can drag
+        along a python variant the user did not ask for (conda-libmamba-solver#1042).
+
+        Whichever job is decided first gets its best candidate, and later jobs adapt. Deciding
+        python first in general makes python's newest build win over the newest versions of
+        the other packages (``test_old_panel`` gets an ancient panel with ``python=3.8 lumen``),
+        so callers enable it only when python's builds include both free-threading and GIL
+        variants; see ``_python_variant_in_question``.
         """
 
         def key(spec: MatchSpec | str) -> tuple[bool, str]:
-            spec = MatchSpec(spec)
-            python_first = spec.name == "python" and not spec.is_name_only_spec
-            return (not python_first, spec.name)
+            first = python_first and cls._is_versioned_python(spec)
+            return (not first, MatchSpec(spec).name)
 
         return {
             job_type: sorted(jobs[job_type], key=key)

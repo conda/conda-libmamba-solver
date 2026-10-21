@@ -1216,27 +1216,68 @@ def test_versioned_python_decided_before_dependents(
     assert solved["python_abi"].build == "8_cp314"
 
 
-def test_sort_request_jobs() -> None:
+@pytest.mark.parametrize("python_first", (True, False))
+def test_sort_request_jobs(python_first: bool) -> None:
     """
-    Jobs follow libmamba's ``Request::Job`` variant order, then name; a ``python`` spec
-    with a version or build constraint goes first.
+    Jobs follow libmamba's ``Request::Job`` variant order, then name. With ``python_first``,
+    a ``python`` spec with a version or build constraint goes first.
     """
     jobs = {
         Request.Pin: ["zlib 1.*", "abc 1.*"],
         Request.Install: ["torchvision>0.12", "python=3.14", "pytorch", "__cuda==12.6=0"],
         Request.Update: ["python", "numpy"],
     }
-    assert Solver._sort_request_jobs(jobs) == {
-        Request.Install: ["python=3.14", "__cuda==12.6=0", "pytorch", "torchvision>0.12"],
+    install = ["__cuda==12.6=0", "python=3.14", "pytorch", "torchvision>0.12"]
+    if python_first:
+        install = ["python=3.14", "__cuda==12.6=0", "pytorch", "torchvision>0.12"]
+    assert Solver._sort_request_jobs(jobs, python_first) == {
+        Request.Install: install,
         Request.Update: ["numpy", "python"],
         Request.Pin: ["abc 1.*", "zlib 1.*"],
     }
     # dict order matters, not only content
-    assert list(Solver._sort_request_jobs(jobs)) == [
+    assert list(Solver._sort_request_jobs(jobs, python_first)) == [
         Request.Install,
         Request.Update,
         Request.Pin,
     ]
+
+
+@pytest.mark.parametrize(
+    "jobs,track_features,expected",
+    (
+        pytest.param(
+            {Request.Install: ["python=3.14", "pandas"]}, ([], ["py_freethreading"]), True
+        ),
+        pytest.param({Request.Update: ["python=3.14"]}, ([], ["py_freethreading"]), True),
+        # defaults spells the feature differently
+        pytest.param({Request.Install: ["python=3.14"]}, ([], ["free-threading"]), True),
+        # python=3.8 lumen (test_old_panel): old conda-forge has pypy builds with
+        # track_features "pypy"; that is not a reason to decide python first
+        pytest.param({Request.Install: ["python=3.8", "lumen"]}, ([], ["pypy"]), False),
+        pytest.param({Request.Install: ["python=3.8", "lumen"]}, ([], []), False),
+        # explicit opt-in: every candidate has track_features, nothing to choose
+        pytest.param(
+            {Request.Install: ["python=3.14=*_cp314t"]},
+            (["py_freethreading"], ["py_freethreading"]),
+            False,
+        ),
+        # name-only python and python in non-deciding jobs never go first
+        pytest.param({Request.Install: ["python", "pandas"]}, ([], ["py_freethreading"]), False),
+        pytest.param({Request.Pin: ["python 3.14.*"]}, ([], ["py_freethreading"]), False),
+        pytest.param({Request.Freeze: ["python=3.14"]}, ([], ["py_freethreading"]), False),
+    ),
+)
+def test_python_variant_in_question(
+    jobs: dict, track_features: tuple[list[str], ...], expected: bool
+) -> None:
+    def packages_matching(spec):
+        assert str(spec.name) == "python"
+        return [SimpleNamespace(track_features=tf) for tf in track_features]
+
+    index = SimpleNamespace(db=SimpleNamespace(packages_matching=packages_matching))
+    solver = Solver(prefix="/tmp/unused", channels=[])
+    assert solver._python_variant_in_question(jobs, index) is expected
 
 
 @pytest.mark.parametrize(
