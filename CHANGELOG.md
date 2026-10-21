@@ -29,6 +29,11 @@ Remember to update the hyperlinks at the bottom.
 * Constrain `certifi` and `ca-certificates` to `>=2026.10.19` in the upstream
   conda recipe to use refreshed CA bundles following the eMudhra root distrust.
 
+### Deprecations
+
+* Require `conda >=26.7.1` and `libmambapy >=2.3.2`. Keep excluding
+  `libmambapy 2.6.2`.
+
 ### Other
 
 * Replace the remote mirror regression test with a local test that verifies installed-prefix metadata cannot cause the solver to fetch an unconfigured channel. (#1027)
