@@ -26,6 +26,8 @@ Remember to update the hyperlinks at the bottom.
 * Avoid multiplying timestamps that are already in milliseconds when passing
   package records to libmamba. (#1071 via #1072)
 * Preserve percent-encoded credentials and query parameters in package download URLs. (#1083 via #1084)
+* Constrain `certifi` and `ca-certificates` to `>=2026.10.19` in the upstream
+  conda recipe to use refreshed CA bundles following the eMudhra root distrust.
 
 ### Other
 

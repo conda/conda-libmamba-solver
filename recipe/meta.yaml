@@ -25,6 +25,9 @@ requirements:
     - conda >=26.5
     - libmambapy >=2.0.0,!=2.6.2
     - boltons >=23.0.0
+  run_constrained:
+    - certifi >=2026.10.19
+    - ca-certificates >=2026.10.19
 
 test:
   imports:
