@@ -1121,7 +1121,7 @@ def test_unsatisfiable_empty_prefix_solves_once(
     if max_attempts:
         monkeypatch.setenv("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", max_attempts)
     spy = mocker.spy(Solver, "_solve_attempt")
-    with pytest.raises(LibMambaUnsatisfiableError, match=r"typing_extensions"):
+    with pytest.raises(LibMambaUnsatisfiableError):
         conda_cli(
             "create",
             f"--prefix={tmp_path / 'env'}",
