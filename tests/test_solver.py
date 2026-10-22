@@ -1129,7 +1129,8 @@ def test_unsatisfiable_empty_prefix_solves_once(
             "--solver=libmamba",
             "--override-channels",
             "--channel=conda-forge",
-            "python=2.7",
-            "typing_extensions>=4.8",
+            # available on all platforms (including win-arm64) but mutually exclusive
+            "python=3.14",
+            "python_abi=3.13",
         )
     assert spy.call_count == 1
