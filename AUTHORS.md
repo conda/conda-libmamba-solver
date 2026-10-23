@@ -5,6 +5,7 @@ Authors are sorted alphabetically.
 * Albert DeFusco
 * Christopher Ostrouchov
 * Dan Yeaw
+* Daniel Ching
 * Daniel Holth
 * Jaime Rodríguez-Guerra
 * Jannis Leidel
@@ -23,4 +24,5 @@ Authors are sorted alphabetically.
 * Travis Hathaway
 * conda-bot
 * dependabot[bot]
+* paperbenni
 * pre-commit-ci[bot]
