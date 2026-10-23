@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: conda-incubator/pytest-conda-solvers
-          ref: b00309357749cc22e9cc1bedf2ff91ee14bc8f3d
+          ref: 617e015b9be12b580a219d6ae97ba4170c1a46d6
           fetch-depth: 0
           path: pytest-conda-solvers
           persist-credentials: false
