@@ -1109,7 +1109,7 @@ def test_parse_problems_reports_all_missing_packages() -> None:
     assert set(parsed["not_found"]) == {"package-one", "package-two", "package-three"}
 
 
-@pytest.mark.parametrize("max_attempts", [None, "1"])
+@pytest.mark.parametrize("max_attempts", [None, "1", "2", "5"])
 def test_unsatisfiable_empty_prefix_solves_once(
     conda_cli: CondaCLIFixture,
     monkeypatch: MonkeyPatch,

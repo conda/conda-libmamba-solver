@@ -1032,6 +1032,8 @@ class LibMambaSolver(Solver):
                 raise CondaValueError(
                     f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{max_attempts_from_env}'. Must be >=1."
                 )
+            elif not installed_count and not in_state.history:
+                return 1
             elif installed_count and max_attempts_from_env > installed_count:
                 log.warning(
                     "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
