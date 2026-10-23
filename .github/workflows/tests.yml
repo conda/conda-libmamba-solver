@@ -208,24 +208,6 @@ jobs:
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
         run: python -m pip install -e conda-libmamba-solver/ -vv --no-deps --no-build-isolation
-
-      - name: Download patched libsolv
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: libsolv-${{ matrix.subdir }}-${{ matrix.default-channel }}
-          path: libsolv-channel
-
-      - name: Install patched libsolv
-        shell: bash -el {0}
-        run: |
-          # `pwd -W` is the Git Bash builtin; a cygpath from the conda env's m2
-          # packages (win-arm64) mistranslates Git Bash's /c/... paths.
-          CHANNEL="file:///$(pwd -W)/libsolv-channel"
-          conda install --yes --channel "$CHANNEL" "$CHANNEL::libsolv"
-          conda list --show-channel-urls '^libsolv$' | tee libsolv-list.txt
-          grep -q libsolv-channel libsolv-list.txt
-        env:
-          CONDA_SUBDIR: ${{ matrix.subdir }}
       #/ CONDA-LIBMAMBA-SOLVER CHANGE
 
       - name: Conda Info
