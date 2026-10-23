@@ -1,0 +1,178 @@
+# CONDA-LIBMAMBA-SOLVER CHANGE
+# Build a patched libsolv from AnacondaRecipes/libsolv-feedstock with conda-build
+# so the test suite can run against it before it is published.
+# See https://github.com/conda/conda-libmamba-solver/issues/1042
+name: libsolv
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: Feedstock repository to build
+        type: string
+        default: AnacondaRecipes/libsolv-feedstock
+      ref:
+        description: Feedstock git ref to build
+        type: string
+        default: cls-1042-patch
+
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Feedstock repository to build
+        type: string
+        default: AnacondaRecipes/libsolv-feedstock
+      ref:
+        description: Feedstock git ref to build
+        type: string
+        default: cls-1042-patch
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}
+    strategy:
+      fail-fast: false
+      matrix:
+        # One build per (subdir, channel) pair used by tests.yml. Packages are built
+        # against the same channel the tests install from so run_exports
+        # (zlib, pcre2, ...) can be satisfied there.
+        # installer-arch selects the Miniforge installer: Linux ARM is
+        # Miniforge3-Linux-aarch64.sh, macOS ARM is Miniforge3-MacOSX-arm64.sh,
+        # and Windows ARM bootstraps with x64 until a native installer exists.
+        # win-64/defaults uses windows-2022: windows-latest ships only VS 2026, and
+        # the defaults vs2022_win-64 activation can only locate a VS 2022 install.
+        include:
+          - {runs-on: ubuntu-latest, subdir: linux-64, channel: defaults, installer-arch: x64}
+          - {runs-on: ubuntu-latest, subdir: linux-64, channel: conda-forge, installer-arch: x64}
+          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: defaults, installer-arch: aarch64}
+          - {runs-on: ubuntu-24.04-arm, subdir: linux-aarch64, channel: conda-forge, installer-arch: aarch64}
+          - {runs-on: macos-latest, subdir: osx-arm64, channel: defaults, installer-arch: arm64}
+          - {runs-on: windows-2022, subdir: win-64, channel: defaults, installer-arch: x64}
+          - {runs-on: windows-latest, subdir: win-64, channel: conda-forge, installer-arch: x64}
+          - {runs-on: windows-11-arm, subdir: win-arm64, channel: conda-forge, installer-arch: x64}
+    env:
+      CHANNEL_URL: ${{ matrix.channel == 'defaults' && 'https://repo.anaconda.com/pkgs/main' || 'conda-forge' }}
+      # Global pinnings matching each channel's own builds.
+      PINNING_URL: ${{ matrix.channel == 'defaults' && 'https://raw.githubusercontent.com/AnacondaRecipes/aggregate/master/conda_build_config.yaml' || 'https://raw.githubusercontent.com/conda-forge/conda-forge-pinning-feedstock/main/recipe/conda_build_config.yaml' }}
+    steps:
+      - name: Checkout libsolv-feedstock
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ inputs.repository || 'AnacondaRecipes/libsolv-feedstock' }}
+          ref: ${{ inputs.ref || 'cls-1042-patch' }}
+          path: libsolv-feedstock
+
+      - name: Setup Miniforge
+        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        with:
+          miniforge-version: latest
+          activate-environment: build
+          channels: conda-forge
+          conda-remove-defaults: true
+          run-post: false
+          architecture: ${{ matrix.installer-arch }}
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir == 'win-arm64' && 'win-64' || matrix.subdir }}
+
+      - name: Install conda-build
+        run: conda install --yes conda-build
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir == 'win-arm64' && 'win-64' || matrix.subdir }}
+
+      - name: Prepare variant config
+        run: |
+          curl -fsSL "$PINNING_URL" -o pinning.yaml
+          : > override.yaml
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            # The pinnings point at SDK locations that only exist on the channels'
+            # build machines; use the runner's Xcode SDK instead.
+            SDK="$(xcrun --sdk macosx --show-sdk-path)"
+            # The defaults stdlib activation (macosx_deployment_target_osx-*)
+            # recomputes CONDA_BUILD_SYSROOT as $OSX_SDK_DIR/MacOSX<version>.sdk,
+            # but the runner only ships the latest SDK. Point OSX_SDK_DIR at a
+            # directory of versioned symlinks to the runner's SDK.
+            SDK_DIR="$RUNNER_TEMP/MacOSX-SDKs"
+            mkdir -p "$SDK_DIR"
+            {
+              awk '
+                /^(c_stdlib_version|MACOSX_DEPLOYMENT_TARGET|MACOSX_SDK_VERSION|macos_min_version):/ {f=1; next}
+                /^[^[:space:]#-]/ {f=0}
+                f && /^[[:space:]]*-/ {print $2}
+              ' pinning.yaml | grep -E '^[0-9]+(\.[0-9]+)*$'
+              grep -oE 'MacOSX[0-9.]+\.sdk' pinning.yaml | sed -E 's/^MacOSX(.*)\.sdk$/\1/'
+            } | sort -u | while read -r ver; do
+              ln -sfn "$SDK" "$SDK_DIR/MacOSX$ver.sdk"
+            done
+            ls -l "$SDK_DIR"
+            # Use block lists: conda-build treats a trailing `[...]` as a
+            # selector (even without `#`) and would strip a flow list.
+            {
+              echo "CONDA_BUILD_SYSROOT:"
+              echo "  - $SDK"
+              echo "OSX_SDK_DIR:"
+              echo "  - $SDK_DIR"
+            } >> override.yaml
+          fi
+          if [[ "$CHANNEL" == "defaults" ]]; then
+            # The aggregate pinning can be ahead of what pkgs/main ships (e.g. pcre2
+            # 10.49 while defaults' git still needs <10.49), and a newer run_export
+            # makes the patched libsolv uninstallable in the test envs. Build against
+            # the pcre2 used by the newest published libsolv instead.
+            PCRE2="$(conda search --override-channels --channel "$CHANNEL_URL" \
+              --platform "$SUBDIR" --json libsolv | python -c '
+          import json, re, sys
+          from conda.models.version import VersionOrder
+          recs = json.load(sys.stdin)["libsolv"]
+          rec = max(recs, key=lambda r: (VersionOrder(r["version"]), r["build_number"], r.get("timestamp", 0)))
+          for dep in rec["depends"]:
+              m = re.match(r"pcre2 >=(\d+\.\d+)", dep)
+              if m:
+                  print(m.group(1))
+          ')"
+            echo "pcre2 from ${CHANNEL_URL} libsolv: ${PCRE2:-<not found>}"
+            if [[ -n "$PCRE2" ]]; then
+              {
+                echo "pcre2:"
+                echo "  - '$PCRE2'"
+              } >> override.yaml
+            fi
+          fi
+          cat override.yaml
+          # ninja-base is the defaults name; ninja exists on both channels.
+          sed -i.bak 's/ninja-base/ninja/' libsolv-feedstock/recipe/meta.yaml
+          rm libsolv-feedstock/recipe/meta.yaml.bak
+          git -C libsolv-feedstock log -1 --oneline
+        env:
+          CHANNEL: ${{ matrix.channel }}
+          SUBDIR: ${{ matrix.subdir }}
+
+      - name: Build libsolv
+        run: >
+          python -m conda build libsolv-feedstock/recipe
+          --override-channels
+          --channel "$CHANNEL_URL"
+          --variant-config-files pinning.yaml
+          --variant-config-files override.yaml
+          --output-folder libsolv-channel
+          --no-anaconda-upload
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir }}
+
+      - name: List built packages
+        run: find libsolv-channel -name '*.conda' -o -name '*.tar.bz2' -o -name 'repodata.json'
+
+      - name: Upload libsolv channel
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: libsolv-${{ matrix.subdir }}-${{ matrix.channel }}
+          path: |
+            libsolv-channel/*/repodata.json
+            libsolv-channel/*/*.conda
+            libsolv-channel/*/*.tar.bz2
+          if-no-files-found: error
+          retention-days: 7
+# /CONDA-LIBMAMBA-SOLVER CHANGE
