@@ -217,8 +217,8 @@ jobs:
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
         run: |
-          # Use a fresh destination to avoid replacing an installation that may be locked.
-          $PWSH_STABLE = "$env:LOCALAPPDATA\Microsoft\powershell-$([guid]::NewGuid())"
+          # Keep test installs separate from PowerShell's runtime cache.
+          $PWSH_STABLE = "$env:LOCALAPPDATA\conda-ci\powershell-stable"
           Invoke-Expression "& { $(Invoke-RestMethod https://aka.ms/install-powershell.ps1) } -Destination `"$PWSH_STABLE`""
           "PWSHPATH=$PWSH_STABLE" | Out-File -FilePath $env:GITHUB_ENV -Append
 
