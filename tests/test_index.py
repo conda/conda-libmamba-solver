@@ -15,6 +15,7 @@ from conda.common.compat import on_win
 from conda.core.subdir_data import SubdirData
 from conda.gateways.logging import initialize_logging
 from conda.models.channel import Channel
+from conda.models.records import PackageRecord
 
 from conda_libmamba_solver.index import (
     LibMambaIndexHelper,
@@ -118,6 +119,30 @@ def test_reload_channels(tmp_path: Path):
     time.sleep(1)
     index.reload_channel(Channel(str(tmp_path)))
     assert index.n_packages() == initial_count + 1
+
+
+def test_index_installed_records():
+    record = PackageRecord(
+        name="example",
+        version="1.0",
+        build="py_0",
+        build_number=0,
+        subdir="noarch",
+        noarch="python",
+        depends=["python >=3.10"],
+        url="https://example.invalid/channel/noarch/example-1.0-py_0.conda",
+        sha256="a" * 64,
+    )
+
+    index = LibMambaIndexHelper(channels=(), installed_records=(record,), pkgs_dirs=())
+
+    (package,) = index.db.packages_in_repo(index.repos[0].repo)
+    assert package.name == record.name
+    assert package.version == record.version
+    assert package.build_string == record.build
+    assert package.dependencies == list(record.depends)
+    assert package.package_url == record.url
+    assert package.sha256 == record.sha256
 
 
 def test_package_info_from_package_dict_add_pip_as_python_dependency():
