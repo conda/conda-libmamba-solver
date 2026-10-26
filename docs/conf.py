@@ -84,6 +84,8 @@ html_context = {
     "doc_path": "docs",
 }
 
+html_baseurl = "https://conda.github.io/conda-libmamba-solver/"
+
 # We don't have a locale set, so we can safely ignore that for the sitemaps.
 sitemap_locales = [None]
 # We're hard-coding stable here since that's what we want Google to point to.
