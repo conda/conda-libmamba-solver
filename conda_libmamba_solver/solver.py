@@ -799,7 +799,6 @@ class LibMambaSolver(Solver):
             python_site_packages_path=getattr(pkg, "python_site_packages_path", "") or None,
             md5=pkg.md5,
             sha256=pkg.sha256,
-            signatures=pkg.signatures,
             track_features=pkg.track_features,
             depends=pkg.dependencies,  # NOTE: Different attribute name
             constrains=pkg.constrains,
