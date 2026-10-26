@@ -2,7 +2,6 @@
 
 [compare]: https://github.com/conda/conda-libmamba-solver/compare
 [new release]: https://github.com/conda/conda-libmamba-solver/releases/new
-[release docs]: https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes
 [rever docs]: https://regro.github.io/rever-docs
 [Anaconda Recipes]: https://github.com/AnacondaRecipes/conda-libmamba-solver-feedstock
 [conda-forge]: https://github.com/conda-forge/conda-libmamba-solver-feedstock
@@ -59,7 +58,26 @@ Placeholder for `conda-libmamba-solver YY.MM.MICRO` release.
 
 </details>
 
-## 2. Run rever.
+## 2. Prepare the release notes.
+
+1. Make sure every change in the release is represented by a news fragment in `news/` (use Markdown, **not** reStructuredText), using `news/TEMPLATE` as a guide and naming files `<PR #>-<short-slug>.md`. Merge any missing fragments into `main` with regular PRs.
+
+    - You can utilize [GitHub's compare view][compare] to review what changes are to be included in this release.
+
+2. Ensure the `[//]: # (current developments)` marker is present at the top of `CHANGELOG.md` on `main`.
+
+3. Run the **Prepare release notes** workflow with `YY.MM.MICRO` as the `version` input:
+
+    ```bash
+    $ gh workflow run prepare-release.yml --ref main -f version=YY.MM.MICRO
+    ```
+
+    The workflow aggregates the `news/` fragments into a new `CHANGELOG.md` entry, removes the consumed fragments, computes first-time contributions, and opens a `release-notes-YY.MM.MICRO` PR targeting `main`.
+
+> [!NOTE]
+> The workflow regenerates the release PR branch from `main` on every run. If you re-run it for the same version, repeat the contributors step below afterwards.
+
+## 3. Prepare the contributors list.
 
 <details>
 <summary><h2>Rever steps</h2></summary>
@@ -73,11 +91,11 @@ Install [`rever`][rever docs] using whatever your project defines (e.g., a conda
     $ cd conda-libmamba-solver
     ```
 
-2. Fetch the latest changes and create a versioned branch off `main` for the release PR:
+2. Check out the release PR branch:
 
     ```bash
     $ git fetch origin
-    $ git switch -c changelog-YY.MM.MICRO --no-track origin/main
+    $ git switch release-notes-YY.MM.MICRO
     ```
 
 3. Run `rever --activities authors --force YY.MM.MICRO`:
@@ -99,77 +117,21 @@ Install [`rever`][rever docs] using whatever your project defines (e.g., a conda
 
       Compare this list against `AUTHORS.md` and repeat until they match.
 
-4. Review news snippets in `news/` (use Markdown, **not** reStructuredText). Add snippets for any undocumented changes using the `news/TEMPLATE` as a guide, naming files `<PR #>-<short-slug>.md`.
-
-    - You can utilize [GitHub's compare view][compare] to review what changes are to be included in this release.
-
-    - Commit when satisfied:
-
-        ```bash
-        $ git add news/
-        $ git commit -m "Update news"
-        ```
-
-5. Ensure the `[//]: # (current developments)` marker is present at the top of `CHANGELOG.md`, then run `rever --activities changelog --force YY.MM.MICRO`:
+4. Push the changes directly to the release PR branch:
 
     ```bash
-    $ rever --activities changelog --force YY.MM.MICRO
+    $ git push origin HEAD
     ```
-
-    - If this succeeds, undo the commit so both activities can be run together in the next step:
-
-        ```bash
-        $ git reset --hard HEAD~1
-        ```
-
-6. Run both activities together so the contributor list is embedded in the changelog entry:
-
-    ```bash
-    $ rever --force YY.MM.MICRO
-    ```
-
-7. Use [GitHub's auto-generated release notes][new release] to identify first-time contributors and add `made their first contribution in <URL>` next to their entry in the Contributors section of `CHANGELOG.md`. See [GitHub docs][release docs] for how to auto-generate the release notes. Commit:
-
-    ```bash
-    $ git add CHANGELOG.md
-    $ git commit -m "Add first-time contributions"
-    ```
-
-8. Push the versioned branch:
-
-    ```bash
-    $ git push -u origin HEAD
-    ```
-
-9. Open the Release PR targeting `main`:
-
-    ```markdown
-    ## Description
-
-    ✂️ snip snip ✂️ the making of a new release.
-
-    Xref #<RELEASE ISSUE>
-    ```
-
-10. [Create][new release] the release and **save as draft**:
-
-    | Field | Value |
-    |---|---|
-    | Choose a tag | `YY.MM.MICRO` |
-    | Target | `main` |
-    | Body | copy/paste from `CHANGELOG.md` |
-
-    > **Note:** Only publish the release after the release PR is merged.
 
 </details>
 
-## 3. Wait for review and approval of the release PR.
+## 4. Wait for review and approval of the release PR.
 
-## 4. Merge the release PR and publish the release.
+## 5. Merge the release PR and publish the release.
 
-Go to the [releases page][new release], add the release notes from `CHANGELOG.md` to the draft, and publish.
+After the release PR is reviewed and merged, go to the [releases page][new release], create the release with the release notes from the `YY.MM.MICRO` entry in `CHANGELOG.md`, and publish.
 
-## 5. Bump [Anaconda Recipes][Anaconda Recipes] and [conda-forge][conda-forge] feedstocks to use `YY.MM.MICRO`.
+## 6. Bump [Anaconda Recipes][Anaconda Recipes] and [conda-forge][conda-forge] feedstocks to use `YY.MM.MICRO`.
 
 Open a PR to bump the Anaconda Recipes feedstock.
 
@@ -185,7 +147,7 @@ For conda-forge, the `regro-cf-autotick-bot` will usually open a PR automaticall
 >
 > For more information about this process, please read the ["Pushing to regro-cf-autotick-bot branch" section of the conda-forge documentation](https://conda-forge.org/docs/maintainer/updating_pkgs.html#pushing-to-regro-cf-autotick-bot-branch).
 
-## 6. Hand off to Anaconda's packaging team.
+## 7. Hand off to Anaconda's packaging team.
 
 > [!NOTE]
 > This step should NOT be done past Thursday morning EST; please start the process on a Monday, Tuesday, or Wednesday instead in order to avoid any potential debugging sessions over evenings or weekends.
@@ -199,6 +161,6 @@ For conda-forge, the `regro-cf-autotick-bot` will usually open a PR automaticall
 
 </details>
 
-## 7. Announce the release.
+## 8. Announce the release.
 
 Post the release announcement on the Zulip thread in [#releases][zulip].
