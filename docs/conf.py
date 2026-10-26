@@ -74,18 +74,6 @@ html_theme_options = {
             "icon": "fa-brands fa-square-github",
             "type": "fontawesome",
         },
-        {
-            "name": "Element",
-            "url": "https://matrix.to/#/#conda-libmamba-solver:matrix.org",
-            "icon": "_static/element_logo.svg",
-            "type": "local",
-        },
-        {
-            "name": "Discourse",
-            "url": "https://conda.discourse.group/",
-            "icon": "fa-brands fa-discourse",
-            "type": "fontawesome",
-        },
     ],
 }
 
