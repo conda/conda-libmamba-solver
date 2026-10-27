@@ -4,7 +4,9 @@
 
 ### Bug fixes
 
-* Add test for track-features/package priority issue addressed by patched libsolv. (#1042)
+* Sort solver jobs in Python instead of having libsolv order them
+  alphabetically, addressing `track_features` priority bug that could result in
+  the wrong Python variant being chosen. (#1042)
 
 ### Deprecations
 
