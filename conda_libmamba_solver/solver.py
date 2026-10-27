@@ -336,6 +336,7 @@ class LibMambaSolver(Solver):
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
     ) -> IndexedSet[PackageRecord]:
+        outcome = None
         for attempt in range(1, self._max_attempts(in_state) + 1):
             try:
                 solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt)
@@ -354,15 +355,20 @@ class LibMambaSolver(Solver):
                     pins=dict(out_state.pins),
                 )
         if not solved:
-            log.debug("Last attempt: reporting all installed as conflicts")
-            out_state.conflicts.update(
-                {
-                    name: record.to_match_spec()
-                    for name, record in in_state.installed.items()
-                    if not record.is_unmanageable
-                }
-            )
-            solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
+            # Conflicts only relax installed and history specs, so without either the
+            # last attempt would send the same request and fail the same way again
+            if in_state.installed or in_state.history or outcome is None:
+                log.debug("Last attempt: reporting all installed as conflicts")
+                out_state.conflicts.update(
+                    {
+                        name: record.to_match_spec()
+                        for name, record in in_state.installed.items()
+                        if not record.is_unmanageable
+                    }
+                )
+                solved, outcome = self._solve_attempt(
+                    in_state, out_state, index, attempt=attempt + 1
+                )
             if not solved:
                 message = self._prepare_problems_message(outcome, index.db, out_state)
                 exc = LibMambaUnsatisfiableError(message)
@@ -1112,7 +1118,9 @@ class LibMambaSolver(Solver):
                 raise CondaValueError(
                     f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{max_attempts_from_env}'. Must be >=1."
                 )
-            elif max_attempts_from_env > installed_count:
+            elif not installed_count and not in_state.history:
+                return 1
+            elif installed_count and max_attempts_from_env > installed_count:
                 log.warning(
                     "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
                     "installed packages (%s). Using that one instead.",

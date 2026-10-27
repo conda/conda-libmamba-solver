@@ -41,6 +41,7 @@ from .utils import conda_subprocess, python_site_packages_path_support
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
     from pytest import MonkeyPatch
+    from pytest_mock import MockerFixture
 
 
 def test_conda_build_detection_preserves_lazy_index(
@@ -1373,3 +1374,30 @@ def test_parse_problems_reports_all_missing_packages() -> None:
     parsed = Solver._parse_problems(FakeUnsolvable(), db=None)
 
     assert set(parsed["not_found"]) == {"package-one", "package-two", "package-three"}
+
+
+@pytest.mark.parametrize("max_attempts", [None, "1", "2", "5"])
+def test_unsatisfiable_empty_prefix_solves_once(
+    conda_cli: CondaCLIFixture,
+    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
+    tmp_path: Path,
+    max_attempts: str | None,
+) -> None:
+    """Retrying a new environment repeats the identical solve, so only solve once."""
+    if max_attempts:
+        monkeypatch.setenv("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", max_attempts)
+    spy = mocker.spy(Solver, "_solve_attempt")
+    with pytest.raises(LibMambaUnsatisfiableError):
+        conda_cli(
+            "create",
+            f"--prefix={tmp_path / 'env'}",
+            "--dry-run",
+            "--solver=libmamba",
+            "--override-channels",
+            "--channel=conda-forge",
+            # available on all platforms (including win-arm64) but mutually exclusive
+            "python=3.14",
+            "python_abi=3.13",
+        )
+    assert spy.call_count == 1
