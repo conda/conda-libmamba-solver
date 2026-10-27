@@ -219,15 +219,17 @@ jobs:
         run: |
           # Keep test installs separate from PowerShell's runtime cache.
           $PWSH_STABLE = "$env:LOCALAPPDATA\conda-ci\powershell-stable"
+          $PWSH_PREVIEW = "$env:LOCALAPPDATA\conda-ci\powershell-preview"
           Invoke-Expression "& { $(Invoke-RestMethod https://aka.ms/install-powershell.ps1) } -Destination `"$PWSH_STABLE`""
-          "PWSHPATH=$PWSH_STABLE" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Invoke-Expression "& { $(Invoke-RestMethod https://aka.ms/install-powershell.ps1) } -Preview -Destination `"$PWSH_PREVIEW`""
+          "PWSHPATH=$PWSH_STABLE;$PWSH_PREVIEW" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: PowerShell Info
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
         run: |
           Get-Command -All powershell
-          Get-Command -All "$env:PWSHPATH\pwsh.exe"
+          "$env:PWSHPATH" -split ";" | ForEach-Object { Get-Command -All "$_\pwsh" }
 
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
