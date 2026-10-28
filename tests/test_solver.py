@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import pytest
 from conda.base.context import context, reset_context
 from conda.common.compat import on_linux, on_mac, on_win
+from conda.common.url import urlparse
 from conda.core.index import Index
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
@@ -29,6 +30,8 @@ from conda.models.channel import Channel
 from conda.models.records import PackageRecord
 from conda.testing.integration import package_is_installed
 from conda_build.exceptions import DependencyNeedsBuildingError
+from libmambapy.solver import Request
+from libmambapy.specs import PackageInfo
 
 from conda_libmamba_solver.exceptions import LibMambaUnsatisfiableError
 from conda_libmamba_solver.solver import LibMambaSolver as Solver
@@ -38,6 +41,7 @@ from .utils import conda_subprocess, python_site_packages_path_support
 if TYPE_CHECKING:
     from conda.testing.fixtures import CondaCLIFixture, TmpEnvFixture
     from pytest import MonkeyPatch
+    from pytest_mock import MockerFixture
 
 
 def test_conda_build_detection_preserves_lazy_index(
@@ -143,6 +147,7 @@ def test_python_downgrade_reinstalls_noarch_packages(
             "--channel=conda-forge",
             "--yes",
             "python=3.10",
+            "pip",
         )
         PrefixData._cache_.clear()
         assert PrefixData(prefix).get("python").version.startswith("3.10")
@@ -695,6 +700,51 @@ def test_constrains_virtual_package(
     assert not any(r.name == "needs-cuda13" for r in records)
 
 
+@pytest.mark.parametrize("restore_credentials", [True, False])
+@pytest.mark.parametrize(
+    "username,password",
+    [
+        ("user", "pass%23word"),
+        ("user", "pass%3Fword"),
+        ("user", "pass%2Fword"),
+        ("user", "pass%25word"),
+        ("user", "pass%3Aword"),
+        ("user", "pass%40word"),
+        ("user%23name", "password"),
+    ],
+)
+def test_package_urls_preserve_encoded_credentials(
+    tmp_path: Path, username: str, password: str, restore_credentials: bool
+) -> None:
+    base = "https://example.invalid/channel/noarch"
+    authenticated = f"https://{username}:{password}@example.invalid/channel/noarch"
+    package_path = "/example-1%210-0.conda?key=a%23b%26c"
+    pkg = PackageInfo(
+        name="example",
+        version="1!0",
+        build_string="0",
+        build_number=0,
+        channel=base,
+        platform="noarch",
+        filename="example-1!0-0.conda",
+        package_url=(base if restore_credentials else authenticated) + package_path,
+    )
+    index = SimpleNamespace(
+        repos=[SimpleNamespace(url_no_cred=base, url_w_cred=authenticated)]
+        if restore_credentials
+        else []
+    )
+    solver = Solver(prefix=tmp_path / "env", channels=[])
+
+    record = solver._package_info_to_package_record(pkg, index)
+
+    assert record.url == authenticated + "/example-1!0-0.conda?key=a%23b%26c"
+    parsed = urlparse(record.url)
+    assert parsed.hostname == "example.invalid"
+    assert parsed.username == username
+    assert parsed.password == password
+
+
 def test_urls_are_percent_decoded(tmp_path: Path) -> None:
     solver = Solver(
         prefix=tmp_path,
@@ -803,6 +853,13 @@ def test_satisfied_skip_solve_matchspec(
 
 
 # @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason=(
+        "the `nvidia-virtual-packages` plugin providing `__cuda_arch` requires Python 3.11+ "
+        "(0.2.1); 0.2.0 is incompatible with conda 26.9+"
+    ),
+)
 @pytest.mark.parametrize(
     "specs",
     (
@@ -821,6 +878,11 @@ def test_pytorch_gpu(specs):
     """
     env = os.environ.copy()
     env["CONDA_OVERRIDE_CUDA"] = "12.6"
+    # Recent conda-forge CUDA builds (e.g. torchvision -> libcudnn -> cuda-arch) require the
+    # `__cuda_arch` virtual package, provided by the `nvidia-virtual-packages` plugin.
+    # Without it, the CUDA builds cannot be installed and the solver falls back to CPU builds.
+    # https://github.com/conda-forge/cudnn-feedstock/issues/157
+    env["CONDA_OVERRIDE_CUDA_ARCH"] = "8.0"
     env["CONDA_OVERRIDE_GLIBC"] = "2.30"
     env["CONDA_OVERRIDE_LINUX"] = "5.15.167.4"
     env["CONDA_OVERRIDE_ARCHSPEC"] = "skylake"
@@ -953,6 +1015,272 @@ def test_track_features_recorded_correctly(tmp_env, monkeypatch, shards):
         assert tf == ("py_freethreading",)
 
 
+def _write_channel(path: Path, records: list[dict]) -> str:
+    """Write a local channel with ``records`` in ``context.subdir`` and an empty noarch."""
+    for subdir, packages in ((context.subdir, records), ("noarch", [])):
+        (path / subdir).mkdir(parents=True)
+        (path / subdir / "repodata.json").write_text(
+            json.dumps(
+                {
+                    "info": {"subdir": subdir},
+                    "packages": {},
+                    "packages.conda": {
+                        f"{r['name']}-{r['version']}-{r['build']}.conda": {
+                            "depends": [],
+                            "md5": "0" * 32,
+                            "sha256": "0" * 64,
+                            "subdir": subdir,
+                            **r,
+                        }
+                        for r in packages
+                    },
+                }
+            )
+        )
+    return path.as_uri()
+
+
+@pytest.mark.parametrize("ft_first", (True, False), ids=("ft-first", "gil-first"))
+@pytest.mark.parametrize("with_defaults", (True, False), ids=("cf+main", "cf"))
+def test_track_features_dependency_not_cancelled_by_lower_priority_channel(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+    with_defaults: bool,
+    ft_first: bool,
+) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/1042
+
+    ``python=3.14 numpy`` must pick the GIL build regardless of channel composition.
+
+    numpy has two variants with the same version, build number and (truncated to
+    seconds) timestamp; they differ only in ``python_abi *_cp314`` vs ``*_cp314t``.
+    The only thing that de-prioritizes the free-threaded numpy is that every
+    ``python_abi *_cp314t`` provider has ``track_features``.
+
+    Before AnacondaRecipes/repodata-hotfixes#351, ``pkgs/main`` shipped
+    ``python_abi *_cp314t`` without ``track_features``. The conda libsolv patch
+    considered providers from every repo, so this lower-priority, never-selected
+    record cancelled the penalty, the comparison fell through to an unstable
+    timestamp tie-break, and the free-threaded build was selected. The patched
+    libsolv only considers providers from the highest-priority repo.
+    """
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", "0")
+    monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "flexible")
+    # the synthetic channels have no pip; condarc-defaults enables this
+    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "false")
+    reset_context()
+
+    numpy_gil = {
+        "name": "numpy",
+        "version": "2.5.2",
+        "build": "py314_gil_1",
+        "build_number": 1,
+        "depends": ["python", "python_abi 3.14.* *_cp314"],
+        "timestamp": 1788129265176,
+    }
+    numpy_ft = {
+        "name": "numpy",
+        "version": "2.5.2",
+        "build": "py314_ft_1",
+        "build_number": 1,
+        "depends": ["python", "python_abi 3.14.* *_cp314t"],
+        "timestamp": 1788129265997,
+    }
+    conda_forge = [
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_106_cp314",
+            "build_number": 106,
+            "depends": ["python_abi 3.14.* *_cp314"],
+        },
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_6_cp314t",
+            "build_number": 6,
+            "depends": ["python_abi 3.14.* *_cp314t"],
+            "track_features": "py_freethreading",
+        },
+        {
+            "name": "python_abi",
+            "version": "3.14",
+            "build": "8_cp314",
+            "build_number": 8,
+        },
+        {
+            "name": "python_abi",
+            "version": "3.14",
+            "build": "8_cp314t",
+            "build_number": 8,
+            "track_features": "freethreading",
+        },
+        *((numpy_ft, numpy_gil) if ft_first else (numpy_gil, numpy_ft)),
+    ]
+    # pkgs/main before the hotfix: free-threaded python_abi without track_features
+    main = [
+        {"name": "python_abi", "version": "3.14", "build": "0_cp314", "build_number": 0},
+        {"name": "python_abi", "version": "3.14", "build": "0_cp314t", "build_number": 0},
+    ]
+
+    channels = [_write_channel(tmp_path / "conda-forge", conda_forge)]
+    if with_defaults:
+        channels.append(_write_channel(tmp_path / "main", main))
+
+    solver = Solver(
+        prefix=tmp_path / "env",
+        channels=channels,
+        subdirs=(context.subdir, "noarch"),
+        specs_to_add=["python=3.14", "numpy"],
+        command="create",
+    )
+    records = {r.name: r for r in solver.solve_final_state()}
+
+    assert records["numpy"].build == numpy_gil["build"]
+    assert records["python"].build == "h0_106_cp314"
+    assert records["python_abi"].build == "8_cp314"
+
+
+def test_versioned_python_decided_before_dependents(
+    monkeypatch: MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """
+    https://github.com/conda/conda-libmamba-solver/issues/1042
+
+    ``python=3.14 pandas`` must pick the GIL build, as with conda-forge's
+    ``pandas-3.0.5-py314h3dd0261_1`` (cp314t) vs. ``py314he609de1_0`` (cp314).
+
+    The free-threaded pandas has the higher build number, and libsolv compares build
+    numbers before the track_features of a candidate's dependencies. If pandas' job is
+    decided first (name order: pandas < python), the free-threaded pandas wins and drags
+    in the free-threaded python. With python decided first, python's own track_features
+    penalty picks the GIL python, and only the GIL pandas remains installable.
+    """
+    monkeypatch.setenv("CONDA_PKGS_DIRS", str(tmp_path / "pkgs"))
+    monkeypatch.setenv("CONDA_REPODATA_USE_SHARDS", "0")
+    monkeypatch.setenv("CONDA_ADD_PIP_AS_PYTHON_DEPENDENCY", "false")
+    reset_context()
+
+    records = [
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_106_cp314",
+            "build_number": 106,
+            "depends": ["python_abi 3.14.* *_cp314"],
+        },
+        {
+            "name": "python",
+            "version": "3.14.7",
+            "build": "h0_6_cp314t",
+            "build_number": 6,
+            "depends": ["python_abi 3.14.* *_cp314t"],
+            "track_features": "py_freethreading",
+        },
+        {"name": "python_abi", "version": "3.14", "build": "8_cp314", "build_number": 8},
+        {
+            "name": "python_abi",
+            "version": "3.14",
+            "build": "8_cp314t",
+            "build_number": 8,
+            "track_features": "freethreading",
+        },
+        {
+            "name": "pandas",
+            "version": "3.0.5",
+            "build": "py314_gil_0",
+            "build_number": 0,
+            "depends": ["python 3.14.* *_cp314", "python_abi 3.14.* *_cp314"],
+        },
+        {
+            "name": "pandas",
+            "version": "3.0.5",
+            "build": "py314_ft_1",
+            "build_number": 1,
+            "depends": ["python 3.14.* *_cp314t", "python_abi 3.14.* *_cp314t"],
+        },
+    ]
+    solver = Solver(
+        prefix=tmp_path / "env",
+        channels=[_write_channel(tmp_path / "channel", records)],
+        subdirs=(context.subdir, "noarch"),
+        specs_to_add=["python=3.14", "pandas"],
+        command="create",
+    )
+    solved = {r.name: r for r in solver.solve_final_state()}
+
+    assert solved["pandas"].build == "py314_gil_0"
+    assert solved["python"].build == "h0_106_cp314"
+    assert solved["python_abi"].build == "8_cp314"
+
+
+@pytest.mark.parametrize("python_first", (True, False))
+def test_sort_request_jobs(python_first: bool) -> None:
+    """
+    Jobs follow libmamba's ``Request::Job`` variant order, then name. With ``python_first``,
+    a ``python`` spec with a version or build constraint goes first.
+    """
+    jobs = {
+        Request.Pin: ["zlib 1.*", "abc 1.*"],
+        Request.Install: ["torchvision>0.12", "python=3.14", "pytorch", "__cuda==12.6=0"],
+        Request.Update: ["python", "numpy"],
+    }
+    install = ["__cuda==12.6=0", "python=3.14", "pytorch", "torchvision>0.12"]
+    if python_first:
+        install = ["python=3.14", "__cuda==12.6=0", "pytorch", "torchvision>0.12"]
+    assert Solver._sort_request_jobs(jobs, python_first) == {
+        Request.Install: install,
+        Request.Update: ["numpy", "python"],
+        Request.Pin: ["abc 1.*", "zlib 1.*"],
+    }
+    # dict order matters, not only content
+    assert list(Solver._sort_request_jobs(jobs, python_first)) == [
+        Request.Install,
+        Request.Update,
+        Request.Pin,
+    ]
+
+
+@pytest.mark.parametrize(
+    "jobs,track_features,expected",
+    (
+        pytest.param(
+            {Request.Install: ["python=3.14", "pandas"]}, ([], ["py_freethreading"]), True
+        ),
+        pytest.param({Request.Update: ["python=3.14"]}, ([], ["py_freethreading"]), True),
+        # defaults spells the feature differently
+        pytest.param({Request.Install: ["python=3.14"]}, ([], ["free-threading"]), True),
+        # python=3.8 lumen (test_old_panel): old conda-forge has pypy builds with
+        # track_features "pypy"; that is not a reason to decide python first
+        pytest.param({Request.Install: ["python=3.8", "lumen"]}, ([], ["pypy"]), False),
+        pytest.param({Request.Install: ["python=3.8", "lumen"]}, ([], []), False),
+        # explicit opt-in: every candidate has track_features, nothing to choose
+        pytest.param(
+            {Request.Install: ["python=3.14=*_cp314t"]},
+            (["py_freethreading"], ["py_freethreading"]),
+            False,
+        ),
+        # name-only python and python in non-deciding jobs never go first
+        pytest.param({Request.Install: ["python", "pandas"]}, ([], ["py_freethreading"]), False),
+        pytest.param({Request.Pin: ["python 3.14.*"]}, ([], ["py_freethreading"]), False),
+        pytest.param({Request.Freeze: ["python=3.14"]}, ([], ["py_freethreading"]), False),
+    ),
+)
+def test_python_variant_in_question(
+    jobs: dict, track_features: tuple[list[str], ...], expected: bool
+) -> None:
+    def packages_matching(spec):
+        assert str(spec.name) == "python"
+        return [SimpleNamespace(track_features=tf) for tf in track_features]
+
+    index = SimpleNamespace(db=SimpleNamespace(packages_matching=packages_matching))
+    solver = Solver(prefix="/tmp/unused", channels=[])
+    assert solver._python_variant_in_question(jobs, index) is expected
+
+
 @pytest.mark.parametrize(
     "conda_self_installed,frozen,expected_message",
     (
@@ -1046,3 +1374,30 @@ def test_parse_problems_reports_all_missing_packages() -> None:
     parsed = Solver._parse_problems(FakeUnsolvable(), db=None)
 
     assert set(parsed["not_found"]) == {"package-one", "package-two", "package-three"}
+
+
+@pytest.mark.parametrize("max_attempts", [None, "1", "2", "5"])
+def test_unsatisfiable_empty_prefix_solves_once(
+    conda_cli: CondaCLIFixture,
+    monkeypatch: MonkeyPatch,
+    mocker: MockerFixture,
+    tmp_path: Path,
+    max_attempts: str | None,
+) -> None:
+    """Retrying a new environment repeats the identical solve, so only solve once."""
+    if max_attempts:
+        monkeypatch.setenv("CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS", max_attempts)
+    spy = mocker.spy(Solver, "_solve_attempt")
+    with pytest.raises(LibMambaUnsatisfiableError):
+        conda_cli(
+            "create",
+            f"--prefix={tmp_path / 'env'}",
+            "--dry-run",
+            "--solver=libmamba",
+            "--override-channels",
+            "--channel=conda-forge",
+            # available on all platforms (including win-arm64) but mutually exclusive
+            "python=3.14",
+            "python_abi=3.13",
+        )
+    assert spy.call_count == 1

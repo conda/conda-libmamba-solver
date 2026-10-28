@@ -126,6 +126,10 @@ if TYPE_CHECKING:
 log = logging.getLogger(f"conda.{__name__}")
 
 
+# Year 9999 in seconds. Larger timestamps are treated as milliseconds.
+MAX_SECONDS_TIMESTAMP = 253402300799
+
+
 @dataclass
 class _ChannelRepoInfo:
     "A dataclass mapping conda Channels, libmamba Repos and URLs"
@@ -204,6 +208,10 @@ def _package_info_from_package_dict(
     ):
         depends.append("pip")
 
+    timestamp_ms = record.get("timestamp") or 0
+    if timestamp_ms < MAX_SECONDS_TIMESTAMP:
+        timestamp_ms *= 1000
+
     return PackageInfo(
         name=record["name"],
         version=record["version"],
@@ -216,7 +224,6 @@ def _package_info_from_package_dict(
         license=record.get("license") or "",  # does the solver use this?
         md5=record.get("md5") or "",
         sha256=record.get("sha256") or "",
-        signatures=record.get("signatures") or "",
         track_features=track_features,
         # conda can have list or tuple, but libmamba only accepts lists
         depends=depends,
@@ -224,9 +231,7 @@ def _package_info_from_package_dict(
         defaulted_keys=list(record.get("defaulted_keys") or []),
         noarch=noarch,
         size=record.get("size") or 0,
-        timestamp=int(
-            (record.get("timestamp") or 0) * 1000
-        ),  # XXX packages may have either seconds or milliseconds timestamps, see convert-if-out-of-range code in conda
+        timestamp=int(timestamp_ms),
         **extra,
     )
 
@@ -690,6 +695,10 @@ class LibMambaIndexHelper:
         else:
             extra = {}
 
+        timestamp_ms = record.get("timestamp") or 0
+        if timestamp_ms < MAX_SECONDS_TIMESTAMP:
+            timestamp_ms *= 1000
+
         return PackageInfo(
             name=record.name,
             version=record.version,
@@ -702,7 +711,6 @@ class LibMambaIndexHelper:
             license=record.get("license") or "",
             md5=record.get("md5") or "",
             sha256=record.get("sha256") or "",
-            signatures=record.get("signatures") or "",
             # conda can have list or tuple, but libmamba only accepts lists
             track_features=list(record.get("track_features") or []),
             depends=list(record.get("depends") or []),
@@ -710,7 +718,7 @@ class LibMambaIndexHelper:
             defaulted_keys=list(record.get("defaulted_keys") or []),
             noarch=noarch,
             size=record.get("size") or 0,
-            timestamp=int((record.get("timestamp") or 0) * 1000),
+            timestamp=int(timestamp_ms),
             **extra,
         )
 

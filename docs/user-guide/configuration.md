@@ -14,14 +14,16 @@ We do not recomment using these options in production environments. Their behavi
 
 ## Sharded Repodata
 
-Sharded repodata is a feature that enables faster repodata fetching and is enabled by default. If you need to disable and only use classic repodata fetching, run the following `conda config` command:
+Sharded repodata is a feature that enables faster repodata fetching and is enabled by default. Since conda 26.5, fetching sharded repodata is handled by `conda` itself and controlled by its `repodata_use_shards` setting. If you need to disable it and only use classic repodata fetching, run the following `conda config` command:
 
 ```shell
-conda config --set plugins.use_sharded_repodata false
+conda config --set repodata_use_shards false
 ```
 
 Alternatively, you can disable it via an environment variable:
 
 ```shell
-export CONDA_PLUGINS_USE_SHARDED_REPODATA=false
+export CONDA_REPODATA_USE_SHARDS=false
 ```
+
+To disable it for a single command only, pass the `--no-repodata-use-shards` flag.

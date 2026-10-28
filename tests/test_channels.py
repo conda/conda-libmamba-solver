@@ -247,11 +247,24 @@ def test_conda_build_with_aliased_channels(tmp_path: Path) -> None:
             id="basic-email",
         ),
         pytest.param(
+            lambda s: basic_auth_url(s, "user", "pass%23word"),
+            id="basic-hash",
+        ),
+        pytest.param(
+            lambda s: basic_auth_url(s, "user", "pass%3Fword"),
+            id="basic-query",
+        ),
+        pytest.param(
+            lambda s: basic_auth_url(s, "user", "pass%2Fword"),
+            id="basic-slash",
+        ),
+        pytest.param(
             lambda s: f"{s.url}/t/{TOKEN}",
             id="token",
         ),
     ],
 )
+@pytest.mark.usefixtures("tmp_pkgs_dir")
 def test_http_server_auth(
     mamba_repo_server: HttpTestServerFixture,
     conda_cli: CondaCLIFixture,
@@ -259,17 +272,19 @@ def test_http_server_auth(
     get_channel,
 ) -> None:
     channel = get_channel(mamba_repo_server)
-    conda_cli(
+    prefix = path_factory()
+    _, stderr, returncode = conda_cli(
         "create",
-        f"--prefix={path_factory()}",
+        f"--prefix={prefix}",
         "--solver=libmamba",
         "--json",
-        "--dry-run",
+        "--yes",
         "--override-channels",
         f"--channel={channel}",
         "test-package",
-        raises=DryRunExit,
     )
+    assert returncode == 0, stderr
+    assert package_is_installed(prefix, "test-package")
 
 
 def test_http_server_auth_token_in_defaults(

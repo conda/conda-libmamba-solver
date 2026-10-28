@@ -20,6 +20,7 @@ from inspect import stack
 from itertools import chain
 from textwrap import dedent
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from conda import __version__ as _conda_version
 from conda.base.constants import (
@@ -75,6 +76,19 @@ if TYPE_CHECKING:
     from libmambapy.specs import PackageInfo
 
 log = logging.getLogger(f"conda.{__name__}")
+
+# Same order as the alternatives of libmamba's ``Request::Job`` variant, which libmamba's
+# ``order_request`` sorts by first. We sort the jobs ourselves (see
+# ``LibMambaSolver._sort_request_jobs``) and keep that order.
+_JOB_TYPE_ORDER = (
+    Request.Install,
+    Request.Remove,
+    Request.Update,
+    Request.UpdateAll,
+    Request.Keep,
+    Request.Freeze,
+    Request.Pin,
+)
 
 
 class LibMambaSolver(Solver):
@@ -322,6 +336,7 @@ class LibMambaSolver(Solver):
         out_state: SolverOutputState,
         index: LibMambaIndexHelper,
     ) -> IndexedSet[PackageRecord]:
+        outcome = None
         for attempt in range(1, self._max_attempts(in_state) + 1):
             try:
                 solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt)
@@ -340,15 +355,20 @@ class LibMambaSolver(Solver):
                     pins=dict(out_state.pins),
                 )
         if not solved:
-            log.debug("Last attempt: reporting all installed as conflicts")
-            out_state.conflicts.update(
-                {
-                    name: record.to_match_spec()
-                    for name, record in in_state.installed.items()
-                    if not record.is_unmanageable
-                }
-            )
-            solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
+            # Conflicts only relax installed and history specs, so without either the
+            # last attempt would send the same request and fail the same way again
+            if in_state.installed or in_state.history or outcome is None:
+                log.debug("Last attempt: reporting all installed as conflicts")
+                out_state.conflicts.update(
+                    {
+                        name: record.to_match_spec()
+                        for name, record in in_state.installed.items()
+                        if not record.is_unmanageable
+                    }
+                )
+                solved, outcome = self._solve_attempt(
+                    in_state, out_state, index, attempt=attempt + 1
+                )
             if not solved:
                 message = self._prepare_problems_message(outcome, index.db, out_state)
                 exc = LibMambaUnsatisfiableError(message)
@@ -373,7 +393,7 @@ class LibMambaSolver(Solver):
         log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %r", out_state.conflicts)
         flags = self._solver_flags(in_state)
-        jobs = self._specs_to_request_jobs(in_state, out_state)
+        jobs = self._specs_to_request_jobs(in_state, out_state, index)
         request = Request(jobs=jobs, flags=flags)
         solver = LibsolvSolver()
         outcome = solver.solve(index.db, request)
@@ -403,9 +423,8 @@ class LibMambaSolver(Solver):
             "force_reinstall": in_state.force_reinstall,
             "keep_dependencies": True,
             "keep_user_specs": True,
-            # we do the sorting ourselves, but we need it as True anyway to
-            # make test_solver.py::test_pytorch_gpu pass
-            "order_request": True,
+            # Jobs are sorted in _sort_request_jobs; libmamba must not re-sort them
+            "order_request": False,
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
         if log.isEnabledFor(logging.DEBUG):
@@ -416,6 +435,7 @@ class LibMambaSolver(Solver):
         self,
         in_state: SolverInputState,
         out_state: SolverOutputState,
+        index: LibMambaIndexHelper | None = None,
     ) -> list[Request.Job]:
         if in_state.is_removing:
             jobs = self._specs_to_request_jobs_remove(in_state, out_state)
@@ -424,9 +444,10 @@ class LibMambaSolver(Solver):
         else:
             jobs = self._specs_to_request_jobs_add(in_state, out_state)
 
+        python_first = index is not None and self._python_variant_in_question(jobs, index)
         request_jobs = []
         json_friendly = {}
-        for JobType, specs in jobs.items():
+        for JobType, specs in self._sort_request_jobs(jobs, python_first).items():
             for idx, conda_spec in enumerate(specs, 1):
                 libmamba_spec = self._conda_spec_to_libmamba_spec(conda_spec)
                 request_jobs.append(JobType(libmamba_spec))
@@ -439,6 +460,79 @@ class LibMambaSolver(Solver):
             json_str = json.dumps(json_friendly, indent=2)
             log.info("The solver will handle these requests:\n%s", json_str)
         return request_jobs
+
+    @staticmethod
+    def _is_versioned_python(spec: MatchSpec | str) -> bool:
+        spec = MatchSpec(spec)
+        return spec.name == "python" and not spec.is_name_only_spec
+
+    @staticmethod
+    def _is_free_threading(track_features: Iterable[str]) -> bool:
+        # conda-forge: "py_freethreading"; defaults: "free-threading"
+        return any(
+            "freethreading" in feature.replace("-", "").replace("_", "").lower()
+            for feature in track_features
+        )
+
+    def _python_variant_in_question(
+        self,
+        jobs: Mapping[type, Sequence[MatchSpec | str]],
+        index: LibMambaIndexHelper,
+    ) -> bool:
+        """
+        Whether an explicit ``python`` spec in an Install or Update job matches both
+        free-threading and regular (GIL) python builds, leaving libsolv that choice.
+
+        Only then does python's own job need to be decided before its dependents; see
+        ``_sort_request_jobs``. Other python variants with track_features (e.g. ``pypy`` on
+        older conda-forge, which ``python=3.8`` still matches) don't trigger it: deciding python
+        first there costs more than it fixes (``test_old_panel``).
+        """
+        for job_type in (Request.Install, Request.Update):
+            for spec in jobs.get(job_type, ()):
+                if not self._is_versioned_python(spec):
+                    continue
+                candidates = index.db.packages_matching(self._conda_spec_to_libmamba_spec(spec))
+                kinds = {self._is_free_threading(pkg.track_features) for pkg in candidates}
+                if kinds == {True, False}:
+                    log.debug("Deciding %s first: it matches GIL and free-threading builds", spec)
+                    return True
+        return False
+
+    @classmethod
+    def _sort_request_jobs(
+        cls,
+        jobs: Mapping[type, Sequence[MatchSpec | str]],
+        python_first: bool = False,
+    ) -> dict[type, list[MatchSpec | str]]:
+        """
+        Order the jobs the way libsolv will decide them.
+
+        libsolv decides the job rules in order, and each decision prunes the candidates of later
+        jobs. Job types follow the order of libmamba's ``Request::Job`` variant, and specs of the
+        same type are sorted by name. This is what libmamba's ``order_request`` does.
+
+        If ``python_first`` is set, a ``python`` spec with a version or build constraint goes
+        first. Then python's own track_features penalty (e.g. for free-threading builds) applies
+        to python itself; if a dependent package is decided first, the build it picks can drag
+        along a python variant the user did not ask for (conda-libmamba-solver#1042).
+
+        Whichever job is decided first gets its best candidate, and later jobs adapt. Deciding
+        python first in general makes python's newest build win over the newest versions of
+        the other packages (``test_old_panel`` gets an ancient panel with ``python=3.8 lumen``),
+        so callers enable it only when python's builds include both free-threading and GIL
+        variants; see ``_python_variant_in_question``.
+        """
+
+        def key(spec: MatchSpec | str) -> tuple[bool, str]:
+            first = python_first and cls._is_versioned_python(spec)
+            return (not first, MatchSpec(spec).name)
+
+        return {
+            job_type: sorted(jobs[job_type], key=key)
+            for job_type in _JOB_TYPE_ORDER
+            if jobs.get(job_type)
+        }
 
     def _lock_virtual_packages(self, tasks: dict, in_state: SolverInputState) -> None:
         """Pin the host's virtual packages present for a prefix solve.
@@ -680,7 +774,8 @@ class LibMambaSolver(Solver):
                 break
         else:
             url = pkg.package_url
-        url = percent_decode(url)
+        url_parts = urlsplit(url)
+        url = url_parts._replace(path=percent_decode(url_parts.path)).geturl()
 
         # Signature verification requires channel information _with_ subdir data
         channel = Channel(pkg.channel)
@@ -710,7 +805,6 @@ class LibMambaSolver(Solver):
             python_site_packages_path=getattr(pkg, "python_site_packages_path", "") or None,
             md5=pkg.md5,
             sha256=pkg.sha256,
-            signatures=pkg.signatures,
             track_features=pkg.track_features,
             depends=pkg.dependencies,  # NOTE: Different attribute name
             constrains=pkg.constrains,
@@ -1024,7 +1118,9 @@ class LibMambaSolver(Solver):
                 raise CondaValueError(
                     f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{max_attempts_from_env}'. Must be >=1."
                 )
-            elif max_attempts_from_env > installed_count:
+            elif not installed_count and not in_state.history:
+                return 1
+            elif installed_count and max_attempts_from_env > installed_count:
                 log.warning(
                     "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
                     "installed packages (%s). Using that one instead.",
