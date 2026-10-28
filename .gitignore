@@ -158,5 +158,6 @@ rever/
 # setuptools_scm
 _version.py
 
-# codspeed
-.codspeed/
+# Benchmarks
+.benchmarks/
+benchmark_results.json
