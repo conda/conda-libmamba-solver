@@ -1,0 +1,19 @@
+### Enhancements
+
+* <news item>
+
+### Bug fixes
+
+* <news item>
+
+### Deprecations
+
+* <news item>
+
+### Docs
+
+* Document conda's `repodata_use_shards` setting in place of the removed `plugins.use_sharded_repodata` setting (#1106).
+
+### Other
+
+* <news item>
