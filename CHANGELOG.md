@@ -36,7 +36,7 @@ Remember to update the hyperlinks at the bottom.
 
 * @agriyakhetarpal
 * @dholth
-* *@larsoner made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/1094
+* @larsoner made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/1094
 * @jezdez
 * @conda-bot
 * @dependabot[bot]
