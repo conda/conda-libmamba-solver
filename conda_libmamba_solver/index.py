@@ -225,7 +225,6 @@ def _package_info_from_package_dict(
         license=record.get("license") or "",  # does the solver use this?
         md5=record.get("md5") or "",
         sha256=record.get("sha256") or "",
-        signatures=record.get("signatures") or "",
         track_features=track_features,
         # conda can have list or tuple, but libmamba only accepts lists
         depends=depends,
@@ -720,7 +719,6 @@ class LibMambaIndexHelper:
             license=record.get("license") or "",
             md5=record.get("md5") or "",
             sha256=record.get("sha256") or "",
-            signatures=record.get("signatures") or "",
             # conda can have list or tuple, but libmamba only accepts lists
             track_features=list(record.get("track_features") or []),
             depends=list(record.get("depends") or []),

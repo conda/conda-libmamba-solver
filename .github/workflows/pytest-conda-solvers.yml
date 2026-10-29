@@ -63,13 +63,13 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: conda-incubator/pytest-conda-solvers
-          ref: d757bfdb37c5235089c76ac4921f001713117b48
+          ref: ee640bd7b6dac4d0963db026e183900c6614ee25
           fetch-depth: 0
           path: pytest-conda-solvers
           persist-credentials: false
 
       - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@8ee1f361103df19b6f8c8655fd3967a8ecb162d5 # v4.0.1
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
         with:
           channels: conda-forge
           run-post: false  # skip post cleanup
@@ -110,6 +110,7 @@ jobs:
           --yes
           --override-channels -c conda-forge
           ${{ matrix.subdir == 'win-arm64' && '-c defaults' || '' }}
+          "conda>=26.9.3"
           pytest
           coverage
           fastapi
