@@ -7,6 +7,7 @@ Authors are sorted alphabetically.
 * Dan Yeaw
 * Daniel Ching
 * Daniel Holth
+* Eric Larson
 * Jaime Rodríguez-Guerra
 * Jannis Leidel
 * John Costa

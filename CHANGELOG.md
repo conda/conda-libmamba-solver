@@ -13,6 +13,37 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.10.1 (2026-10-29)
+
+### Bug fixes
+
+* Sort solver jobs in Python instead of having libsolv order them
+  alphabetically, addressing `track_features` priority bug that could result in
+  the wrong Python variant being chosen. (#1042)
+* Skip the repeated last solver attempt when creating a new environment, which
+  sent the same request and failed the same way again. (#1094)
+* Fix an `UnboundLocalError` when `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS` is set
+  and the target environment is empty. (#1094)
+* Fix package metadata conversion with libmambapy versions that omit the unused
+  `signatures` field. (#1098)
+
+### Docs
+
+* Document conda's `repodata_use_shards` setting in place of the removed
+  `plugins.use_sharded_repodata` setting (#1106).
+
+### Contributors
+
+* @agriyakhetarpal
+* @dholth
+* @larsoner made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/1094
+* @jezdez
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
 ## 26.10.0 (2026-10-19)
 
 ### Enhancements
