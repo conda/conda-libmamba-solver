@@ -628,6 +628,8 @@ class LibMambaSolver(Solver):
                     tasks[Request.Install].append(spec)
             elif name in in_state.always_update:
                 tasks[Request.Update].append(name)
+            elif name == "python" and installed and not pinned:
+                pass
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
             elif in_state.prune:
