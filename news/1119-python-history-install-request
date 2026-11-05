@@ -1,0 +1,3 @@
+### Bug fixes
+
+* Stop sending the history spec of an installed, unrequested Python as an install request. Since 26.10.0, it made libsolv keep the installed Python before updating the requested packages, which could hold them back. Python can move within its history spec again, matching the conda-pycosat-solver behaviour. (#1119 via #1120)
