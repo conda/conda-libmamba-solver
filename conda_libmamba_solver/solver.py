@@ -629,6 +629,9 @@ class LibMambaSolver(Solver):
             elif name in in_state.always_update:
                 tasks[Request.Update].append(name)
             elif name == "python" and installed and not pinned:
+                # The X.Y.* pin above is enough; an Install task for the history spec
+                # makes libsolv keep the installed python before updating the requested
+                # specs, holding them back (see conda-libmamba-solver#1119)
                 pass
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
