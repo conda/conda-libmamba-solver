@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
+import pytest
 from conda.base.constants import UpdateModifier
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord, PrefixRecord
@@ -156,3 +157,35 @@ def test_explicit_python_request_skips_major_minor_pin(tmp_path):
     pins = [str(spec) for spec in tasks.get(Request.Pin, ())]
 
     assert "python 3.13.*" not in pins
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        "foo[build_number=0]",
+        "foo[build_number=1]",
+        "foo=1.0[build_number=0]",
+        "foo[version=*,build_number=0]",
+    ],
+)
+def test_build_number_zero_is_not_dropped(tmp_path, spec):
+    """A zero build number must survive `_check_spec_compat` like any other build number.
+
+    `MatchSpec.get_raw_value("build_number")` returns the int 0 for `build_number=0`,
+    which is falsy, so a truthiness check used to drop the field and libmamba saw a
+    bare `foo`. See https://github.com/conda/conda-libmamba-solver/issues/1117.
+    """
+    in_state = SolverInputState(tmp_path, requested=(spec,), command="install")
+    out_state = SolverOutputState(solver_input_state=in_state)
+    solver = LibMambaSolver(
+        tmp_path,
+        channels=("defaults",),
+        specs_to_add=(spec,),
+        command="install",
+    )
+
+    tasks = solver._specs_to_request_jobs_add(in_state, out_state)
+    installs = [str(task) for task in tasks.get(Request.Install, ())]
+
+    assert str(MatchSpec(spec)) in installs
+    assert "foo" not in installs
