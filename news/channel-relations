@@ -1,0 +1,17 @@
+### Enhancements
+
+* Resolve CEP 42 channel relations before loading repositories and assigning solver priorities when conda provides the shared resolver. (conda/conda#16697)
+
+### Bug fixes
+
+
+
+### Deprecations
+
+
+
+### Docs
+
+
+
+### Other
