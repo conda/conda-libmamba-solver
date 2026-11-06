@@ -397,6 +397,29 @@ class LibMambaSolver(Solver):
         request = Request(jobs=jobs, flags=flags)
         solver = LibsolvSolver()
         outcome = solver.solve(index.db, request)
+        if (
+            isinstance(outcome, Solution)
+            and not in_state.is_removing
+            and not in_state.prune
+            and "python" in in_state.installed
+            and "python" in in_state.history
+            and "python" not in in_state.requested
+            and "python" not in in_state.pinned
+            and "python" not in in_state.always_update
+            and any(
+                getattr(getattr(action, "remove", None), "name", None) == "python"
+                for action in outcome.actions
+            )
+            and not any(
+                getattr(getattr(action, "install", None), "name", None) == "python"
+                for action in outcome.actions
+            )
+            and not self._called_from_conda_build()
+        ):
+            # A history pin constrains Python but allows it to be absent. Require its
+            # presence only if needed, so an Install job does not hold back updates.
+            jobs.append(Request.Install(self._conda_spec_to_libmamba_spec(MatchSpec("python"))))
+            outcome = solver.solve(index.db, Request(jobs=jobs, flags=flags))
         if isinstance(outcome, Solution):
             out_state.conflicts.clear()
             return True, outcome
@@ -628,16 +651,18 @@ class LibMambaSolver(Solver):
                     tasks[Request.Install].append(spec)
             elif name in in_state.always_update:
                 tasks[Request.Update].append(name)
-            elif name == "python" and installed and not pinned:
-                # The X.Y.* pin above is enough; an Install task for the history spec
-                # makes libsolv keep the installed python before updating the requested
-                # specs, holding them back (see conda-libmamba-solver#1119)
-                pass
             # These specs are "implicit"; the solver logic massages them for better UX
             # as long as they don't cause trouble
             elif in_state.prune:
                 continue
             elif history:
+                # Constrain Python without preferring the installed version over the
+                # newest requested packages. Preserve history relaxation below.
+                task_type = (
+                    Request.Pin
+                    if name == "python" and installed and not pinned
+                    else Request.Install
+                )
                 if conflicting and history.strictness == 3:
                     # relax name-version-build (strictness=3) history specs that cause conflicts
                     # this is called neutering and makes test_neutering_of_historic_specs pass
@@ -650,9 +675,9 @@ class LibMambaSolver(Solver):
                         spec_str = f"{name} {version}.*"
                     else:
                         spec_str = name
-                    tasks[Request.Install].append(spec_str)
+                    tasks[task_type].append(spec_str)
                 else:
-                    tasks[Request.Install].append(history)
+                    tasks[task_type].append(history)
             elif installed:
                 if conflicting:
                     # NOTE: We don't do anything now with conflicting installed.

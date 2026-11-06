@@ -159,7 +159,7 @@ def test_explicit_python_request_skips_major_minor_pin(tmp_path):
 
 
 def test_install_does_not_reassert_python_history_spec(tmp_path):
-    """Installed python gets the X.Y.* pin only, not an Install task for its history spec."""
+    """Installed Python gets version pins without an Install task for its history spec."""
     in_state = SolverInputState(
         tmp_path,
         requested=("sqlite",),
@@ -190,6 +190,7 @@ def test_install_does_not_reassert_python_history_spec(tmp_path):
     keeps = [MatchSpec(spec).name for spec in tasks.get(Request.Keep, ())]
 
     assert "python 3.13.*" in pins
+    assert "python=3" in pins
     assert "python" not in installs
     # python stays protected from removal as a user-installed package
     assert "python" in keeps
