@@ -1,4 +1,5 @@
-# Copyright (C) 2026 conda
+# Copyright (C) 2022 Anaconda, Inc
+# Copyright (C) 2023 conda
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
