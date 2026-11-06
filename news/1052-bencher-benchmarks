@@ -1,0 +1,3 @@
+### Other
+
+* Track offline solver and index benchmarks with Bencher instead of CodSpeed.
