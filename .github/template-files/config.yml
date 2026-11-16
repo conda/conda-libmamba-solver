@@ -20,6 +20,16 @@ conda/infrastructure:
   - .github/workflows/stale.yml
   - .github/workflows/lock.yml
 
+  # [optional] canary build workflow
+  - src: templates/workflows/build.yml
+    dst: .github/workflows/build.yml
+  # For noarch packages, add:
+    with:
+      noarch: true
+  # For repos whose test workflow is not named "Tests", add:
+  #   with:
+  #     tests_workflow: Test
+
   # [optional] general processes for the conda org
   - src: templates/HOW_WE_USE_GITHUB.md
     dst: HOW_WE_USE_GITHUB.md
@@ -43,6 +53,14 @@ conda/infrastructure:
   - src: templates/pull_requests/base.md
     dst: .github/PULL_REQUEST_TEMPLATE.md
 
+  # [optional] dependabot
+  - src: templates/dependabot.yml
+    dst: .github/dependabot.yml
+    with:
+      github_actions: true
+      pre_commit: true
+      docs: false
+
   # [optional] rever release files
   # Select one of the following:
   # conda and conda-build release file or
@@ -52,9 +70,9 @@ conda/infrastructure:
   - src: templates/releases/RELEASE_ON_DEMAND.md
     dst: RELEASE.md
     with:
-      canary_channel: https://anaconda.org/conda-canary
+      # canary_channel: https://anaconda.org/conda-canary
       placeholder: YY.MM.MICRO
-      placeholder_x: YY.MM.x
+      # placeholder_x: YY.MM.x
   - src: templates/releases/rever.xsh
     dst: rever.xsh
   - src: templates/releases/TEMPLATE

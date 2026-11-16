@@ -1,0 +1,148 @@
+name: Pytest Conda Solvers
+
+on:
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#push
+  push:
+    branches:
+      - main
+      - feature/**
+      - '[0-9].*.x'  # e.g., 4.14.x
+      - '[0-9][0-9].*.x'  # e.g., 23.3.x
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#pull_request
+  pull_request:
+
+  # https://docs.github.com/en/webhooks-and-events/webhooks/webhook-events-and-payloads#workflow_dispatch
+  workflow_dispatch:
+
+  schedule:
+    - cron: "15 7 * * 1-5"  # Mon to Fri, 7:15am
+
+concurrency:
+  # Concurrency group that uses the workflow name and PR number if available
+  # or commit SHA as a fallback. If a new build is triggered under that
+  # concurrency group while a previous build is running it will be canceled.
+  # Repeated pushes to a PR will cancel all previous builds, while multiple
+  # merges to main will not cancel.
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # run the shared solver YAML suite against the libmamba backend
+  CONDA_SOLVER: libmamba
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        # https://github.com/conda-incubator/setup-miniconda#use-a-default-shell
+        shell: bash -el {0}  # bash exit immediately on error + login shell
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.12', '3.13', '3.14']
+        include:
+          - os: windows-11-arm
+            python-version: '3.14'
+            subdir: win-arm64
+
+    steps:
+      - name: Checkout conda-libmamba-solver
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          path: conda-libmamba-solver
+          persist-credentials: false
+
+      - name: Checkout pytest-conda-solvers
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: conda-incubator/pytest-conda-solvers
+          ref: ee640bd7b6dac4d0963db026e183900c6614ee25
+          fetch-depth: 0
+          path: pytest-conda-solvers
+          persist-credentials: false
+
+      - name: Setup Miniconda
+        uses: conda-incubator/setup-miniconda@be893c923ea9cf1cf7cd510fbdde27c7e18cbdcb # v4.1.0
+        with:
+          channels: conda-forge
+          run-post: false  # skip post cleanup
+          architecture: ${{ matrix.subdir == 'win-arm64' && 'x64' || '' }}
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir == 'win-arm64' && 'win-64' || '' }}
+
+      - name: Update conda in base
+        run: conda install -n base --yes --override-channels -c conda-forge "conda>=26.5" conda-pypi
+
+      - name: Configure native package channels
+        if: matrix.subdir == 'win-arm64'
+        run: |
+          # Native conda, msgspec, and some dependencies are only in defaults.
+          conda config --append channels defaults
+          conda config --set channel_priority flexible
+
+      - name: Install conda dependencies
+        # libmamba/libmambapy are not declared in conda-libmamba-solver's
+        # pyproject.toml, so install them (plus the build backend needed for
+        # the editable install) explicitly.
+        run: >
+          conda install
+          --yes
+          --override-channels -c conda-forge
+          ${{ matrix.subdir == 'win-arm64' && '-c defaults' || '' }}
+          --file conda-libmamba-solver/dev/requirements.txt
+          python=${{ matrix.python-version }}
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir }}
+
+      - name: Install pytest-conda-solvers dependencies
+        # `conda pypi install -e` does not resolve dependencies, so install
+        # pytest-conda-solvers' runtime dependencies and the test requirements
+        # from pytest-conda-solvers/tests/requirements.txt explicitly.
+        run: >
+          conda install
+          --yes
+          --override-channels -c conda-forge
+          ${{ matrix.subdir == 'win-arm64' && '-c defaults' || '' }}
+          "conda>=26.9.3"
+          pytest
+          coverage
+          fastapi
+          fastapi-cache2
+          httpx
+          msgspec
+          pytest-cov
+          pytest-split
+          pytest-xprocess
+          typer
+          uvicorn
+          xdoctest
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir }}
+
+      - name: Editable install conda-libmamba-solver and pytest-conda-solvers
+        # Run as separate commands: a single `conda pypi install -e A -e B`
+        # trips a conda-pypi bug where the second editable install reuses a
+        # stale (already deleted) ephemeral package cache directory.
+        run: |
+          conda pypi install --yes -e conda-libmamba-solver
+          conda pypi install --yes -e pytest-conda-solvers
+        env:
+          CONDA_SUBDIR: ${{ matrix.subdir }}
+
+      - name: Conda Info
+        run: python -m conda info --verbose
+
+      - name: Conda List
+        run: conda list --show-channel-urls
+
+      - name: Run solver tests
+        working-directory: pytest-conda-solvers
+        # same invocation as pytest-conda-solvers' own CI
+        run: python -m pytest --conda-solver=${{ env.CONDA_SOLVER }} -vv

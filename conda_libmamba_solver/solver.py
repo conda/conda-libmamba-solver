@@ -20,6 +20,7 @@ from inspect import stack
 from itertools import chain
 from textwrap import dedent
 from typing import TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from conda import __version__ as _conda_version
 from conda.base.constants import (
@@ -69,10 +70,24 @@ if TYPE_CHECKING:
         UpdateModifier,
     )
     from conda.common.path import PathType
+    from conda.gateways.shards import BuildRepodataSubset
     from libmambapy.solver.libsolv import Database, UnSolvable
     from libmambapy.specs import PackageInfo
 
 log = logging.getLogger(f"conda.{__name__}")
+
+# Same order as the alternatives of libmamba's ``Request::Job`` variant, which libmamba's
+# ``order_request`` sorts by first. We sort the jobs ourselves (see
+# ``LibMambaSolver._sort_request_jobs``) and keep that order.
+_JOB_TYPE_ORDER = (
+    Request.Install,
+    Request.Remove,
+    Request.Update,
+    Request.UpdateAll,
+    Request.Keep,
+    Request.Freeze,
+    Request.Pin,
+)
 
 
 class LibMambaSolver(Solver):
@@ -96,6 +111,8 @@ class LibMambaSolver(Solver):
         specs_to_remove: Iterable[MatchSpec | str] = (),
         repodata_fn: str = REPODATA_FN,
         command: str | _Null = NULL,
+        *,
+        build_repodata_subset: BuildRepodataSubset | None = None,
     ):
         if specs_to_add and specs_to_remove:
             raise ValueError(
@@ -124,6 +141,7 @@ class LibMambaSolver(Solver):
             self.subdirs = (*self.subdirs, "noarch")
 
         self._repodata_fn = self._maybe_ignore_current_repodata()
+        self._build_repodata_subset = build_repodata_subset
         self._libmamba_context = init_libmamba_context(
             channels=tuple(c.canonical_name for c in self.channels),
             platform=next(s for s in self.subdirs if s != "noarch"),
@@ -242,12 +260,27 @@ class LibMambaSolver(Solver):
             # We need to recover the local dirs (conda-build's local, output_folder, etc)
             # from the index. This is a bit of a hack, but it works.
             conda_build_channels = {}
-            for record in self._index or {}:
-                if record.channel.scheme == "file":
+            index = self._index
+            expanded_channels = getattr(index, "expanded_channels", None)
+            if expanded_channels is not None:
+                # Lazy conda Index (conda >= 24.9): the Channel objects are
+                # available without realizing the index. Iterating the index
+                # itself (``for record in index``) would call ``Index.data``
+                # and eagerly construct a PackageRecord for every package of
+                # every channel, only to find the handful of ``file://``
+                # channels conda-build registered. That cost is measured in
+                # minutes for conda-forge-sized channels. See
+                # conda/conda-build#4961.
+                channels = expanded_channels
+            else:
+                # Plain dict of records (older conda-build or custom index).
+                channels = (record.channel for record in index or {})
+            for channel in channels:
+                if channel.scheme == "file":
                     # Remove 'Channel.platform' to avoid missing subdirs. Channel.urls()
                     # will ignore our explicitly passed subdirs if .platform is defined!
                     channel = Channel(
-                        **{k: v for k, v in record.channel.dump().items() if k != "platform"}
+                        **{k: v for k, v in channel.dump().items() if k != "platform"}
                     )
                     if channel not in seen:
                         conda_build_channels.setdefault(channel)
@@ -272,6 +305,7 @@ class LibMambaSolver(Solver):
             ),
             pkgs_dirs=context.pkgs_dirs if context.offline else (),
             in_state=in_state,
+            build_repodata_subset=self._build_repodata_subset,
         )
         for channel in conda_build_channels:
             index.reload_channel(channel)
@@ -319,15 +353,20 @@ class LibMambaSolver(Solver):
                     pins=dict(out_state.pins),
                 )
         if not solved:
-            log.debug("Last attempt: reporting all installed as conflicts")
-            out_state.conflicts.update(
-                {
-                    name: record.to_match_spec()
-                    for name, record in in_state.installed.items()
-                    if not record.is_unmanageable
-                }
-            )
-            solved, outcome = self._solve_attempt(in_state, out_state, index, attempt=attempt + 1)
+            # Conflicts only relax installed and history specs, so without either the
+            # last attempt would send the same request and fail the same way again
+            if in_state.installed or in_state.history or outcome is None:
+                log.debug("Last attempt: reporting all installed as conflicts")
+                out_state.conflicts.update(
+                    {
+                        name: record.to_match_spec()
+                        for name, record in in_state.installed.items()
+                        if not record.is_unmanageable
+                    }
+                )
+                solved, outcome = self._solve_attempt(
+                    in_state, out_state, index, attempt=attempt + 1
+                )
             if not solved:
                 message = self._prepare_problems_message(outcome, index.db, out_state)
                 exc = LibMambaUnsatisfiableError(message)
@@ -352,7 +391,7 @@ class LibMambaSolver(Solver):
         log.info("Solver attempt: #%d", attempt)
         log.debug("Current conflicts (including learnt ones): %r", out_state.conflicts)
         flags = self._solver_flags(in_state)
-        jobs = self._specs_to_request_jobs(in_state, out_state)
+        jobs = self._specs_to_request_jobs(in_state, out_state, index)
         request = Request(jobs=jobs, flags=flags)
         solver = LibsolvSolver()
         outcome = solver.solve(index.db, request)
@@ -374,7 +413,7 @@ class LibMambaSolver(Solver):
 
     def _solver_flags(self, in_state: SolverInputState) -> Request.Flags:
         flags = {
-            "allow_downgrade": True,
+            "allow_downgrade": not in_state.is_updating,
             # About flags.allow_uninstall = True:
             # We used to set this to False on a global basis and then add jobs
             # individually with ALLOW_UNINSTALL=True. Libmamba v2 has a Keep job instead now.
@@ -382,9 +421,8 @@ class LibMambaSolver(Solver):
             "force_reinstall": in_state.force_reinstall,
             "keep_dependencies": True,
             "keep_user_specs": True,
-            # we do the sorting ourselves, but we need it as True anyway to
-            # make test_solver.py::test_pytorch_gpu pass
-            "order_request": True,
+            # Jobs are sorted in _sort_request_jobs; libmamba must not re-sort them
+            "order_request": False,
             "strict_repo_priority": context.channel_priority is ChannelPriority.STRICT,
         }
         if log.isEnabledFor(logging.DEBUG):
@@ -395,6 +433,7 @@ class LibMambaSolver(Solver):
         self,
         in_state: SolverInputState,
         out_state: SolverOutputState,
+        index: LibMambaIndexHelper | None = None,
     ) -> list[Request.Job]:
         if in_state.is_removing:
             jobs = self._specs_to_request_jobs_remove(in_state, out_state)
@@ -403,9 +442,10 @@ class LibMambaSolver(Solver):
         else:
             jobs = self._specs_to_request_jobs_add(in_state, out_state)
 
+        python_first = index is not None and self._python_variant_in_question(jobs, index)
         request_jobs = []
         json_friendly = {}
-        for JobType, specs in jobs.items():
+        for JobType, specs in self._sort_request_jobs(jobs, python_first).items():
             for idx, conda_spec in enumerate(specs, 1):
                 libmamba_spec = self._conda_spec_to_libmamba_spec(conda_spec)
                 request_jobs.append(JobType(libmamba_spec))
@@ -418,6 +458,94 @@ class LibMambaSolver(Solver):
             json_str = json.dumps(json_friendly, indent=2)
             log.info("The solver will handle these requests:\n%s", json_str)
         return request_jobs
+
+    @staticmethod
+    def _is_versioned_python(spec: MatchSpec | str) -> bool:
+        spec = MatchSpec(spec)
+        return spec.name == "python" and not spec.is_name_only_spec
+
+    @staticmethod
+    def _is_free_threading(track_features: Iterable[str]) -> bool:
+        # conda-forge: "py_freethreading"; defaults: "free-threading"
+        return any(
+            "freethreading" in feature.replace("-", "").replace("_", "").lower()
+            for feature in track_features
+        )
+
+    def _python_variant_in_question(
+        self,
+        jobs: Mapping[type, Sequence[MatchSpec | str]],
+        index: LibMambaIndexHelper,
+    ) -> bool:
+        """
+        Whether an explicit ``python`` spec in an Install or Update job matches both
+        free-threading and regular (GIL) python builds, leaving libsolv that choice.
+
+        Only then does python's own job need to be decided before its dependents; see
+        ``_sort_request_jobs``. Other python variants with track_features (e.g. ``pypy`` on
+        older conda-forge, which ``python=3.8`` still matches) don't trigger it: deciding python
+        first there costs more than it fixes (``test_old_panel``).
+        """
+        for job_type in (Request.Install, Request.Update):
+            for spec in jobs.get(job_type, ()):
+                if not self._is_versioned_python(spec):
+                    continue
+                candidates = index.db.packages_matching(self._conda_spec_to_libmamba_spec(spec))
+                kinds = {self._is_free_threading(pkg.track_features) for pkg in candidates}
+                if kinds == {True, False}:
+                    log.debug("Deciding %s first: it matches GIL and free-threading builds", spec)
+                    return True
+        return False
+
+    @classmethod
+    def _sort_request_jobs(
+        cls,
+        jobs: Mapping[type, Sequence[MatchSpec | str]],
+        python_first: bool = False,
+    ) -> dict[type, list[MatchSpec | str]]:
+        """
+        Order the jobs the way libsolv will decide them.
+
+        libsolv decides the job rules in order, and each decision prunes the candidates of later
+        jobs. Job types follow the order of libmamba's ``Request::Job`` variant, and specs of the
+        same type are sorted by name. This is what libmamba's ``order_request`` does.
+
+        If ``python_first`` is set, a ``python`` spec with a version or build constraint goes
+        first. Then python's own track_features penalty (e.g. for free-threading builds) applies
+        to python itself; if a dependent package is decided first, the build it picks can drag
+        along a python variant the user did not ask for (conda-libmamba-solver#1042).
+
+        Whichever job is decided first gets its best candidate, and later jobs adapt. Deciding
+        python first in general makes python's newest build win over the newest versions of
+        the other packages (``test_old_panel`` gets an ancient panel with ``python=3.8 lumen``),
+        so callers enable it only when python's builds include both free-threading and GIL
+        variants; see ``_python_variant_in_question``.
+        """
+
+        def key(spec: MatchSpec | str) -> tuple[bool, str]:
+            first = python_first and cls._is_versioned_python(spec)
+            return (not first, MatchSpec(spec).name)
+
+        return {
+            job_type: sorted(jobs[job_type], key=key)
+            for job_type in _JOB_TYPE_ORDER
+            if jobs.get(job_type)
+        }
+
+    def _lock_virtual_packages(self, tasks: dict, in_state: SolverInputState) -> None:
+        """Pin the host's virtual packages present for a prefix solve.
+
+        Virtual packages (e.g. ``__cuda``) model immutable host state. The
+        solver runs with ``allow_uninstall=True``, so unless they are forced
+        to be present, libsolv may drop a virtual package from the installed repo to
+        dodge a ``constrains`` rule that references it (silently ignoring
+        ``__cuda>=13`` on a host providing ``__cuda==12`` for example).
+        Keeping them at their current version keeps them present so such
+        constraints are enforced.
+        """
+        tasktype = Request.Keep if in_state.is_removing else Request.Install
+        for record in in_state.virtual.values():
+            tasks[tasktype].append(record.to_match_spec().conda_build_form())
 
     def _specs_to_request_jobs_add(
         self,
@@ -473,6 +601,12 @@ class LibMambaSolver(Solver):
                 # constrain updates too but those can be overridden in case of conflicts.
                 # name-only pins are treated as locks when installed, see below
                 tasks[Request.Pin].append(pinned)
+            elif name == "python" and installed and not pinned and not requested:
+                # Classic major.minor business rule: do not float python beyond X.Y.*
+                # unless the user requested python explicitly. Pin is compatible with
+                # Update (below), so --update-all can still take patch releases.
+                pyver = ".".join(installed.version.split(".")[:2])
+                tasks[Request.Pin].append(f"python {pyver}.*")
             # in libmamba, pins and installs are compatible tasks (pin only constrains,
             # does not 'request' a package). In classic, pins were actually targeted installs
             # so they were exclusive
@@ -496,9 +630,6 @@ class LibMambaSolver(Solver):
             # as long as they don't cause trouble
             elif in_state.prune:
                 continue
-            elif name == "python" and installed and not pinned:
-                pyver = ".".join(installed.version.split(".")[:2])
-                tasks[Request.Pin].append(f"python {pyver}.*")
             elif history:
                 if conflicting and history.strictness == 3:
                     # relax name-version-build (strictness=3) history specs that cause conflicts
@@ -539,6 +670,8 @@ class LibMambaSolver(Solver):
                     # else:
                     #     tasks[Request.Keep].append(name)
 
+        self._lock_virtual_packages(tasks, in_state)
+
         # Sort tasks by priority
         # This ensures that more important tasks are added to the solver first
         returned_tasks = {}
@@ -577,6 +710,8 @@ class LibMambaSolver(Solver):
             spec = self._check_spec_compat(spec)
             tasks[Request.Remove].append(str(spec))
 
+        self._lock_virtual_packages(tasks, in_state)
+
         return dict(tasks)
 
     def _specs_to_request_jobs_conda_build(
@@ -590,6 +725,7 @@ class LibMambaSolver(Solver):
             spec = self._fix_version_field_for_conda_build(spec)
             tasks[Request.Install].append(spec.conda_build_form())
 
+        self._lock_virtual_packages(tasks, in_state)
         return dict(tasks)
 
     # endregion
@@ -636,7 +772,8 @@ class LibMambaSolver(Solver):
                 break
         else:
             url = pkg.package_url
-        url = percent_decode(url)
+        url_parts = urlsplit(url)
+        url = url_parts._replace(path=percent_decode(url_parts.path)).geturl()
 
         # Signature verification requires channel information _with_ subdir data
         channel = Channel(pkg.channel)
@@ -666,7 +803,6 @@ class LibMambaSolver(Solver):
             python_site_packages_path=getattr(pkg, "python_site_packages_path", "") or None,
             md5=pkg.md5,
             sha256=pkg.sha256,
-            signatures=pkg.signatures,
             track_features=pkg.track_features,
             depends=pkg.dependencies,  # NOTE: Different attribute name
             constrains=pkg.constrains,
@@ -750,7 +886,6 @@ class LibMambaSolver(Solver):
                     if "does not exist" in explained_line and "which" not in explained_line:
                         end = explained_words.index("does")
                         not_found.append(cls._matchspec_from_error_str(explained_words[:end]))
-                        break
             else:
                 log.debug("! Problem line not recognized: %s", line)
 
@@ -882,7 +1017,10 @@ class LibMambaSolver(Solver):
         return (
             # conda_build.environ.get_install_actions will always pass a custom 'index'
             # which conda.plan.install_actions uses to override our null Solver._index
-            getattr(self, "_index", None)
+            # NB: `is not None`, NOT truthiness. A lazy conda Index is a UserDict:
+            #     truthiness calls len(index.data) and realizes every PackageRecord
+            #     in the index. See conda/conda-build#4961.
+            getattr(self, "_index", None) is not None
             # Is conda build in use? In that case, it should have been imported
             and "conda_build" in sys.modules
             # Confirm conda_build.environ's 'get_install_actions' and conda.plan's
@@ -898,18 +1036,19 @@ class LibMambaSolver(Solver):
         spec_fields = {}
         for field in spec.FIELD_NAMES:
             value = spec.get_raw_value(field)
-            if value:
-                if field == "channel":
-                    if str(value) == "<unknown>":
-                        continue
-                    if not getattr(value, "name", ""):
-                        # channels like http://localhost:8000 don't have a name
-                        # this makes mamba choke so we should skip it
-                        # however the subdir is still useful information; keep it!
-                        if getattr(value, "platform", ""):
-                            spec_fields["subdir"] = value.platform
-                        continue
-                spec_fields[field] = value
+            if value is None:
+                continue
+            if field == "channel":
+                if str(value) == "<unknown>":
+                    continue
+                if not getattr(value, "name", ""):
+                    # channels like http://localhost:8000 don't have a name
+                    # this makes mamba choke so we should skip it
+                    # however the subdir is still useful information; keep it!
+                    if getattr(value, "platform", ""):
+                        spec_fields["subdir"] = value.platform
+                    continue
+            spec_fields[field] = value
         return MatchSpec(**spec_fields)
 
     def _conda_spec_to_libmamba_spec(self, spec: MatchSpec) -> LibmambaMatchSpec:
@@ -978,7 +1117,9 @@ class LibMambaSolver(Solver):
                 raise CondaValueError(
                     f"CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='{max_attempts_from_env}'. Must be >=1."
                 )
-            elif max_attempts_from_env > installed_count:
+            elif not installed_count and not in_state.history:
+                return 1
+            elif installed_count and max_attempts_from_env > installed_count:
                 log.warning(
                     "CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS='%s' is higher than the number of "
                     "installed packages (%s). Using that one instead.",
@@ -1059,11 +1200,11 @@ class LibMambaSolver(Solver):
         # print instructions to stderr if we found a newer conda
         if conda_newer_records:
             newest = max(conda_newer_records, key=lambda x: VersionOrder(x.version))
-            conda_update_message = f"conda update -n base -c {channel_name} conda"
-            if prefix_data.is_frozen():
-                if prefix_data.get("conda-self", None):
-                    conda_update_message = "conda self update"
-                else:
+            if prefix_data.get("conda-self", None):
+                conda_update_message = "conda self update"
+            else:
+                conda_update_message = f"conda update -n base -c {channel_name} conda"
+                if prefix_data.is_frozen():
                     conda_update_message += " --override-frozen"
 
             print(

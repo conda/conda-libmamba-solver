@@ -51,8 +51,6 @@ Their origins can be:
 - Specified by the user on the command-line (-c arguments)
 - Specified by the configuration files (.condarc) or environment vars (context object)
 - Added from channel-specific MatchSpec (e.g. `conda-forge::python`)
-- Added from installed packages in target environment (e.g. a package that was installed
-  from a non-default channel remembers where it comes from)
 
 Also note that a channel URL might have authentication in the form:
 
@@ -87,6 +85,7 @@ from conda.common.io import DummyExecutor, ThreadLimitedThreadPoolExecutor, time
 from conda.common.url import path_to_url, remove_auth, split_anaconda_token
 from conda.core.package_cache_data import PackageCacheData
 from conda.core.subdir_data import SubdirData
+from conda.exceptions import UnavailableInvalidChannel
 from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PackageRecord
@@ -108,8 +107,6 @@ from libmambapy.specs import (
     PackageInfo,
 )
 
-from conda_libmamba_solver.shards_subset import build_repodata_subset
-
 from .mamba_utils import logger_callback
 
 if TYPE_CHECKING:
@@ -118,16 +115,20 @@ if TYPE_CHECKING:
 
     from conda.common.path import PathsType
     from conda.gateways.repodata import RepodataState
+    from conda.gateways.shards import BuildRepodataSubset
+    from conda.gateways.shards.typing import Shards as ShardBase
     from libmambapy import QueryResult
     from libmambapy.solver.libsolv import RepoInfo
-
-    from conda_libmamba_solver.shards import ShardBase
 
     from .shards_typing import PackageRecordDict
     from .state import SolverInputState
 
 
 log = logging.getLogger(f"conda.{__name__}")
+
+
+# Year 9999 in seconds. Larger timestamps are treated as milliseconds.
+MAX_SECONDS_TIMESTAMP = 253402300799
 
 
 @dataclass
@@ -153,7 +154,8 @@ def _is_sharded_repodata_enabled():
     """
     Flag to see whether we should check for sharded repodata.
     """
-    return context.plugins.use_sharded_repodata is True  # type: ignore
+    # TODO this is referenced in the conda tests. Keeping here for compat.
+    return True
 
 
 _SUPPORTS_PYTHON_SITE_PACKAGES = hasattr(PackageInfo, "python_site_packages_path")
@@ -207,6 +209,10 @@ def _package_info_from_package_dict(
     ):
         depends.append("pip")
 
+    timestamp_ms = record.get("timestamp") or 0
+    if timestamp_ms < MAX_SECONDS_TIMESTAMP:
+        timestamp_ms *= 1000
+
     return PackageInfo(
         name=record["name"],
         version=record["version"],
@@ -219,7 +225,6 @@ def _package_info_from_package_dict(
         license=record.get("license") or "",  # does the solver use this?
         md5=record.get("md5") or "",
         sha256=record.get("sha256") or "",
-        signatures=record.get("signatures") or "",
         track_features=track_features,
         # conda can have list or tuple, but libmamba only accepts lists
         depends=depends,
@@ -227,9 +232,7 @@ def _package_info_from_package_dict(
         defaulted_keys=list(record.get("defaulted_keys") or []),
         noarch=noarch,
         size=record.get("size") or 0,
-        timestamp=int(
-            (record.get("timestamp") or 0) * 1000
-        ),  # XXX packages may have either seconds or milliseconds timestamps, see convert-if-out-of-range code in conda
+        timestamp=int(timestamp_ms),
         **extra,
     )
 
@@ -253,6 +256,8 @@ class LibMambaIndexHelper:
         installed_records: Iterable[PackageRecord] = (),
         pkgs_dirs: PathsType = (),
         in_state: SolverInputState | None = None,
+        *,
+        build_repodata_subset: BuildRepodataSubset | None = None,
     ):
         platform_less_channels: list[Channel] = []
         for channel in channels:
@@ -272,6 +277,7 @@ class LibMambaIndexHelper:
         self.repodata_fn = repodata_fn
         self.in_state = in_state
         self._add_pip_as_python_dependency = context.add_pip_as_python_dependency
+        self.build_repodata_subset = build_repodata_subset
         self.db = self._init_db()
 
         self.repos: list[_ChannelRepoInfo] = self._load_channels()
@@ -377,7 +383,7 @@ class LibMambaIndexHelper:
         urls_to_channel = self._encoded_urls_to_channels(urls_to_channel)
 
         # Prefer sharded repodata loading if enabled
-        if self.in_state and _is_sharded_repodata_enabled():
+        if self.in_state and self.build_repodata_subset:
             # _load_channel_repo_info_shards() must return ChannelRepoInfo
             # matching the key order of urls_to_channel:
             channel_repos_info = self._load_channel_repo_info_shards(urls_to_channel)
@@ -394,9 +400,11 @@ class LibMambaIndexHelper:
         """
         Load repository information from sharded repodata cache.
         """
+        if self.build_repodata_subset is None:  # typing
+            return None
         # make a subset of possible dependencies
         root_packages = (*self.in_state.installed.keys(), *self.in_state.requested)
-        channel_data = build_repodata_subset(root_packages, urls_to_channel)
+        channel_data = self.build_repodata_subset(root_packages, urls_to_channel)
         if channel_data is None:
             return  # caller should fall back to repodata.json
 
@@ -516,7 +524,14 @@ class LibMambaIndexHelper:
             state = subdir_data.repo_cache.load_state()
         else:
             # TODO: This method loads reads the whole JSON file (does not parse)
-            json_path, state = subdir_data.repo_fetch.fetch_latest_path()
+            try:
+                json_path, state = subdir_data.repo_fetch.fetch_latest_path()
+            except UnavailableInvalidChannel:
+                if subdir_data.repodata_fn == REPODATA_FN:
+                    raise
+                # Match SubdirData._load() without parsing package records.
+                subdir_data.repodata_fn = REPODATA_FN
+                json_path, state = subdir_data.repo_fetch.fetch_latest_path()
         return url, json_path, state
 
     def _load_repo_info_from_json_path(
@@ -639,26 +654,23 @@ class LibMambaIndexHelper:
         """
         repos = []
         for channel_url, shardlike in repodata_subset.items():
-            repodata = shardlike.build_repodata()
-            # Don't like going back and forth between channel objects and URLs;
-            # build_repodata_subset() expands channels into per-subdir URLs as
-            # part of fetch:
+            # Channels are already expanded to per-subdir URLs by the caller.
+            # Reconstruct Channel object to get channel_id for the solver.
             channel_object = Channel(channel_url)
             channel_id = self._channel_to_id(channel_object)
             # must be appropriate for string concatenation:
             base_url = shardlike.base_url
 
             packages = []
-            for package_group in ("packages", "packages.conda"):
-                for filename, record in repodata.get(package_group, {}).items():
-                    package = _package_info_from_package_dict(
-                        record,
-                        filename,
-                        url=f"{base_url}{filename}",
-                        channel_id=channel_id,
-                        add_pip_as_python_dependency=self._add_pip_as_python_dependency,
-                    )
-                    packages.append(package)
+            for filename, record in shardlike.iter_records():
+                package = _package_info_from_package_dict(
+                    record,
+                    filename,
+                    url=f"{base_url}{filename}",
+                    channel_id=channel_id,
+                    add_pip_as_python_dependency=self._add_pip_as_python_dependency,
+                )
+                packages.append(package)
 
             repo = self.db.add_repo_from_packages(
                 packages=packages,
@@ -691,6 +703,10 @@ class LibMambaIndexHelper:
         else:
             extra = {}
 
+        timestamp_ms = record.get("timestamp") or 0
+        if timestamp_ms < MAX_SECONDS_TIMESTAMP:
+            timestamp_ms *= 1000
+
         return PackageInfo(
             name=record.name,
             version=record.version,
@@ -703,7 +719,6 @@ class LibMambaIndexHelper:
             license=record.get("license") or "",
             md5=record.get("md5") or "",
             sha256=record.get("sha256") or "",
-            signatures=record.get("signatures") or "",
             # conda can have list or tuple, but libmamba only accepts lists
             track_features=list(record.get("track_features") or []),
             depends=list(record.get("depends") or []),
@@ -711,7 +726,7 @@ class LibMambaIndexHelper:
             defaulted_keys=list(record.get("defaulted_keys") or []),
             noarch=noarch,
             size=record.get("size") or 0,
-            timestamp=int((record.get("timestamp") or 0) * 1000),
+            timestamp=int(timestamp_ms),
             **extra,
         )
 

@@ -74,18 +74,6 @@ html_theme_options = {
             "icon": "fa-brands fa-square-github",
             "type": "fontawesome",
         },
-        {
-            "name": "Element",
-            "url": "https://matrix.to/#/#conda-libmamba-solver:matrix.org",
-            "icon": "_static/element_logo.svg",
-            "type": "local",
-        },
-        {
-            "name": "Discourse",
-            "url": "https://conda.discourse.group/",
-            "icon": "fa-brands fa-discourse",
-            "type": "fontawesome",
-        },
     ],
 }
 
@@ -95,6 +83,8 @@ html_context = {
     "github_version": "main",
     "doc_path": "docs",
 }
+
+html_baseurl = "https://conda.github.io/conda-libmamba-solver/"
 
 # We don't have a locale set, so we can safely ignore that for the sitemaps.
 sitemap_locales = [None]

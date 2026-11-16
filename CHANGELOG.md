@@ -13,6 +13,157 @@ Remember to update the hyperlinks at the bottom.
 
 [//]: # (current developments)
 
+## 26.10.1 (2026-10-29)
+
+### Bug fixes
+
+* Sort solver jobs in Python instead of having libsolv order them
+  alphabetically, addressing `track_features` priority bug that could result in
+  the wrong Python variant being chosen. (#1042)
+* Skip the repeated last solver attempt when creating a new environment, which
+  sent the same request and failed the same way again. (#1094)
+* Fix an `UnboundLocalError` when `CONDA_LIBMAMBA_SOLVER_MAX_ATTEMPTS` is set
+  and the target environment is empty. (#1094)
+* Fix package metadata conversion with libmambapy versions that omit the unused
+  `signatures` field. (#1098)
+
+### Docs
+
+* Document conda's `repodata_use_shards` setting in place of the removed
+  `plugins.use_sharded_repodata` setting (#1106).
+
+### Contributors
+
+* @agriyakhetarpal
+* @dholth
+* @larsoner made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/1094
+* @jezdez
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
+## 26.10.0 (2026-10-19)
+
+### Enhancements
+
+* Avoid loading every package record solely to detect conda-build solves or discover their local channels, when conda-build supplies a lazy index. (#1045 via #1044)
+
+### Bug fixes
+
+* Fix `conda update --all` so Python is updated within the current major.minor series (e.g. 3.13.9 → 3.13.14), matching classic solver behavior. (#1008 via #1009)
+* Report all missing requested packages when parsing libmamba solver errors. (#1048)
+* Avoid multiplying timestamps that are already in milliseconds when passing
+  package records to libmamba. (#1071 via #1072)
+* Preserve percent-encoded credentials and query parameters in package download URLs. (#1083 via #1084)
+* Constrain `certifi` and `ca-certificates` to `>=2026.10.19` in the upstream
+  conda recipe to use refreshed CA bundles following the eMudhra root distrust.
+
+### Deprecations
+
+* Require `conda >=26.7.1` and `libmambapy >=2.3.2`. Keep excluding
+  `libmambapy 2.6.2`.
+
+### Other
+
+* Replace the remote mirror regression test with a local test that verifies installed-prefix metadata cannot cause the solver to fetch an unconfigured channel. (#1027)
+* Keep Python 3.10 test coverage against conda 26.9.0 and run conda main tests with Python 3.11 or newer. (#1086)
+* Fix `test_pytorch_gpu` by installing the `nvidia-virtual-packages` conda plugin and setting `CONDA_OVERRIDE_CUDA_ARCH`, since recent conda-forge CUDA builds require the `__cuda_arch` virtual package. (#1086)
+* Add a GitHub workflow to run the
+  [pytest-conda-solvers](https://github.com/conda-incubator/pytest-conda-solvers/)
+  test suite. (#999 via #1035)
+* Run the solver test suites natively on Windows ARM64 with Python 3.14. (conda/conda#16540 via #1047)
+
+### Contributors
+
+* @danyeaw
+* @dholth
+* @jezdez
+* @kenodegard
+* @paperbenni made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/1044
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
+## 26.7.0 (2026-07-14)
+
+### Enhancements
+
+* Cache `SolverInputState.installed` for the lifetime of a single solve. `conda install`, `conda update`, and `conda remove` against large environments (thousands of packages) are now dramatically faster: a 50,000-record prefix that previously timed out after 5+ minutes completes in ~10 s. (#921)
+* Suggest updating conda with `conda self` if conda self plugin is installed. (#993)
+
+### Bug fixes
+
+* Enforce `run_constrained`/`constrains` entries that reference virtual packages
+  (e.g. a `constrains` on `__cuda`). Virtual packages are now kept present
+  at their detected version/build in solver requests, so the solver -- which runs
+  with `allow_uninstall=True` -- cannot drop them to dodge such a constraint.
+  `__cuda>=13` against a host providing `__cuda==12` was silently ignored.
+  (conda/conda#10803 via #962)
+
+### Contributors
+
+* @carterbox made their first contribution in https://github.com/conda/conda-libmamba-solver/pull/962
+* @jaimergp
+* @jezdez
+* @kenodegard
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
+## 26.6.0 (2026-06-30)
+
+### Enhancements
+
+* Add a new `build_repodata_subset: Callable | None` parameter to
+`LibMambaSolver`, allowing `conda` to provide sharded repodata instead of
+hosting the implementation in this project. The implementation in
+`conda-libmamba-solver` has been removed. (#908)
+
+### Bug fixes
+
+* Fix an error when the verbosity level from conda is set higher than 4. (#948 via #949)
+* Do not allow package downgrades when running `conda update` (#976)
+
+### Deprecations
+
+* Remove `requests`, `zstandard` dependencies; network access, shards are
+  delegated to conda. (#812)
+* Require `conda >=26.5` (#908)
+* Remove `CONDA_PLUGINS_USE_SHARDED_REPODATA`/`plugins.use_sharded_repodata`
+  setting. `conda` provides a `repodata_use_shards` (default True) setting
+  instead. (#908)
+
+### Docs
+
+* Replace sharded repodata documentation with link to conda developer guide. (#974)
+
+### Other
+
+* Add `libmambapy != 2.6.2` to `run_constrained` dependencies. (#959)
+* Enable infrastructure-managed Dependabot configuration via conda/infrastructure templates. (#969)
+* Remove temporary CI workarounds that deselected upstream tests and stripped Anaconda auth/telemetry plugins from base. (#977)
+* Replace the vendored `xprocess`-based HTTP test server with conda's `http_test_server` fixture. Isolate the token-in-`default_channels` test in a subprocess so its localhost channel URL no longer leaks into later tests' `default_channels`. (#978)
+
+### Contributors
+
+* @danyeaw
+* @dholth
+* @jaimergp
+* @soapy1
+* @conda-bot
+* @dependabot[bot]
+* @pre-commit-ci[bot]
+
+
+
 ## 26.4.2 (2026-05-13)
 
 ### Bug fixes

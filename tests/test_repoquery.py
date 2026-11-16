@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import json
 
+from conda.base.context import context
 from conda.models.channel import Channel
 
 from conda_libmamba_solver.index import LibMambaIndexHelper
@@ -21,32 +22,37 @@ def test_repoquery():
     data = json.loads(p.stdout)
     assert data["result"]["status"] == "OK"
     assert len(data["result"]["pkgs"]) > 0
-    assert len([p for p in data["result"]["pkgs"] if p["name"] == "python"]) == 1
+    python = [p for p in data["result"]["pkgs"] if p["name"] == "python"]
+    assert python
+    if context.subdir != "linux-aarch64":
+        # Shows up as duplicate for this platform for some reason
+        # Reported at https://github.com/mamba-org/mamba/issues/4346
+        assert len(python) == 1
 
 
 def test_query_search():
     index = LibMambaIndexHelper(channels=[Channel("conda-forge")])
     for query in (
         "ca-certificates",
-        "ca-certificates =2022.9.24",
-        "ca-certificates >=2022.9.24",
-        "ca-certificates >2022.9.24",
-        "ca-certificates<2022.9.24,>2020",
-        "ca-certificates<=2022.9.24,>2020",
-        "ca-certificates !=2022.9.24,>2020",
+        "ca-certificates =2025.7.9",
+        "ca-certificates >=2025.7.9",
+        "ca-certificates >2025.7.9",
+        "ca-certificates<2025.7.9,>2020",
+        "ca-certificates<=2025.7.9,>2020",
+        "ca-certificates !=2025.7.9,>2020",
         "ca-certificates=*=*_0",
         # TODO: channel specs are accepted but they seem to be ignored by libmambapy.Query!
         # "defaults::ca-certificates",
-        # "defaults::ca-certificates=2022.9.24",
-        # "defaults::ca-certificates[version='>=2022.9.24']",
+        # "defaults::ca-certificates=2025.7.9",
+        # "defaults::ca-certificates[version='>=2025.7.9']",
         # "defaults::ca-certificates[build='*_0']",
     ):
         results = index.search(query)
         assert len(results) > 0, query
 
     assert index.search("ca-certificates=*=*_0") == index.search("ca-certificates[build='*_0']")
-    assert index.search("ca-certificates >=2022.9.24") == index.search(
-        "ca-certificates[version='>=2022.9.24']"
+    assert index.search("ca-certificates >=2025.7.9") == index.search(
+        "ca-certificates[version='>=2025.7.9']"
     )
 
 

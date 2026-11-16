@@ -1,10 +1,9 @@
 # build-time
 pip
 # run-time
-conda>=26.1
-conda-forge::libmamba>=2.0.0
-conda-forge::libmambapy>=2.0.0,!=2.6.2
-msgpack-python>=1.1.1
+conda>=26.7.1
+conda-forge::libmamba>=2.3.2
+conda-forge::libmambapy>=2.3.2,!=2.6.2
 # needed for 'pip install -e conda-libmamba-solver'
 hatchling
 hatch-vcs
