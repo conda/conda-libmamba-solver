@@ -21,9 +21,7 @@ def test_user_agent_conda_info(solver):
     out = check_output(["conda", "info", "--json"], env=env)
     info = json.loads(out)
     assert "conda/" in info["user_agent"]
-    if solver == "classic":
-        assert "solver/" not in info["user_agent"]
-    elif solver == "libmamba":
-        assert "solver/libmamba" in info["user_agent"]
+    assert f"solver/{solver}" in info["user_agent"]
+    if solver == "libmamba":
         assert f"conda-libmamba-solver/{version('conda-libmamba-solver')}" in info["user_agent"]
         assert f"libmambapy/{version('libmambapy')}" in info["user_agent"]

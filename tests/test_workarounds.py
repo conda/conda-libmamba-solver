@@ -100,7 +100,7 @@ def test_ctrl_c(stage):
                 break
             try:
                 chunk = await asyncio.wait_for(p.stdout.readline(), timeout=remaining)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
             if not chunk:
                 break

@@ -853,13 +853,6 @@ def test_satisfied_skip_solve_matchspec(
 
 
 # @pytest.mark.skipif(context.subdir != "linux-64", reason="Linux x64 only")
-@pytest.mark.skipif(
-    sys.version_info < (3, 11),
-    reason=(
-        "the `nvidia-virtual-packages` plugin providing `__cuda_arch` requires Python 3.11+ "
-        "(0.2.1); 0.2.0 is incompatible with conda 26.9+"
-    ),
-)
 @pytest.mark.parametrize(
     "specs",
     (
