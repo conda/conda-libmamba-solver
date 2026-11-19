@@ -1,3 +1,0 @@
-### Bug fixes
-
-* Fix package metadata conversion with libmambapy versions that omit the unused `signatures` field. (#1098)

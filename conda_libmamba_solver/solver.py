@@ -1038,18 +1038,19 @@ class LibMambaSolver(Solver):
         spec_fields = {}
         for field in spec.FIELD_NAMES:
             value = spec.get_raw_value(field)
-            if value:
-                if field == "channel":
-                    if str(value) == "<unknown>":
-                        continue
-                    if not getattr(value, "name", ""):
-                        # channels like http://localhost:8000 don't have a name
-                        # this makes mamba choke so we should skip it
-                        # however the subdir is still useful information; keep it!
-                        if getattr(value, "platform", ""):
-                            spec_fields["subdir"] = value.platform
-                        continue
-                spec_fields[field] = value
+            if value is None:
+                continue
+            if field == "channel":
+                if str(value) == "<unknown>":
+                    continue
+                if not getattr(value, "name", ""):
+                    # channels like http://localhost:8000 don't have a name
+                    # this makes mamba choke so we should skip it
+                    # however the subdir is still useful information; keep it!
+                    if getattr(value, "platform", ""):
+                        spec_fields["subdir"] = value.platform
+                    continue
+            spec_fields[field] = value
         return MatchSpec(**spec_fields)
 
     def _conda_spec_to_libmamba_spec(self, spec: MatchSpec) -> LibmambaMatchSpec:
