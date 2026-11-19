@@ -41,8 +41,6 @@ env:
   # those tests will still be available for local debugging if necessary
   CONDA_TEST_SOLVERS: libmamba
   CONDA_REF: main # pin conda version to latest for more stable tests
-  # conda main requires Python 3.11, but CLS still supports Python 3.10.
-  CONDA_PY310_REF: 26.9.0
 
 jobs:
   # detect whether any code changes are included in this PR
@@ -107,12 +105,6 @@ jobs:
         include:
           - runs-on: windows-latest
             subdir: win-64
-          - runs-on: windows-latest
-            subdir: win-64
-            python-version: '3.10'
-            default-channel: defaults
-            test-type: conda-libmamba-solver
-            test-group: 1
           # conda-forge's native libmambapy builds require Python 3.14.
           - runs-on: windows-11-arm
             subdir: win-arm64
@@ -132,7 +124,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
+          ref: ${{ env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -183,7 +175,6 @@ jobs:
       - name: Conda Install
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
-        # conda-forge's Python 3.10 AnyIO build is incompatible with pytest 9.2.
         run: >
           conda install
           --yes
@@ -194,7 +185,6 @@ jobs:
           --file ..\conda-libmamba-solver\dev\requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ..\\conda-libmamba-solver\\tests\\requirements.txt' || '' }}
           python=${{ matrix.python-version }}
-          ${{ matrix.python-version == '3.10' && '"pytest<9.2"' || '' }}
         env:
           CONDA_SUBDIR: ${{ matrix.subdir }}
 
@@ -236,6 +226,8 @@ jobs:
       - name: Run Upstream Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        env:
+          CONDA_SOLVER: libmamba
         run: python -m pytest
           --durations-path=durations\${{ runner.os }}.json
           --group=${{ matrix.test-group }}
@@ -310,12 +302,6 @@ jobs:
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
-        include:
-          - runs-on: ubuntu-latest
-            python-version: '3.10'
-            default-channel: defaults
-            test-type: conda-libmamba-solver
-            test-group: 1
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -327,7 +313,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
+          ref: ${{ env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -358,7 +344,6 @@ jobs:
 
       - name: Conda Install
         working-directory: conda
-        # conda-forge's Python 3.10 AnyIO build is incompatible with pytest 9.2.
         run: >
           conda install
           --yes
@@ -369,7 +354,6 @@ jobs:
           --file ../conda-libmamba-solver/dev/requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
           python=${{ matrix.python-version }}
-          ${{ matrix.python-version == '3.10' && '"pytest<9.2"' || '' }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
@@ -391,11 +375,13 @@ jobs:
       - name: Setup Shells
         # for tests/shell, so only necessary for integration tests
         if: matrix.test-type == 'integration'
-        run: sudo apt update && sudo apt install ash csh fish tcsh xonsh zsh
+        run: sudo apt update && sudo apt install csh fish tcsh xonsh zsh
 
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        env:
+          CONDA_SOLVER: libmamba
         run: python -m pytest
           --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
@@ -615,12 +601,6 @@ jobs:
             test-group: 2  # CONDA-LIBMAMBA-SOLVER CHANGE
           - test-type: conda-libmamba-solver  # CONDA-LIBMAMBA-SOLVER CHANGE
             test-group: 3  # CONDA-LIBMAMBA-SOLVER CHANGE
-        include:
-          - arch: osx-64
-            python-version: '3.10'
-            default-channel: conda-forge
-            test-type: conda-libmamba-solver
-            test-group: 1
     env:
       PYTEST_MARKER: ${{ matrix.test-type == 'unit' && 'not integration and not benchmark' || 'integration and not benchmark' }}
       PYTEST_SPLITS: ${{ matrix.test-type == 'unit' && '2' || '3' }}
@@ -632,7 +612,7 @@ jobs:
           fetch-depth: 0
           repository: conda/conda  # CONDA-LIBMAMBA-SOLVER CHANGE
           path: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
-          ref: ${{ matrix.python-version == '3.10' && env.CONDA_PY310_REF || env.CONDA_REF }}
+          ref: ${{ env.CONDA_REF }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Checkout conda-libmamba-solver
@@ -668,7 +648,6 @@ jobs:
       - name: Conda Install
         working-directory: conda # CONDA-LIBMAMBA-SOLVER CHANGE
         # CONDA-LIBMAMBA-SOLVER CHANGE: add conda-libmamba-solver requirements.txt
-        # conda-forge's Python 3.10 AnyIO build is incompatible with pytest 9.2.
         run: >
           conda install
           --yes
@@ -678,7 +657,6 @@ jobs:
           --file ../conda-libmamba-solver/dev/requirements.txt
           ${{ matrix.test-type == 'conda-libmamba-solver' && '--file ../conda-libmamba-solver/tests/requirements.txt' || '' }}
           python=${{ matrix.python-version }}
-          ${{ matrix.python-version == '3.10' && '"pytest<9.2"' || '' }}
 
       # CONDA-LIBMAMBA-SOLVER CHANGE
       - name: Install conda-libmamba-solver
@@ -702,6 +680,8 @@ jobs:
       - name: Run Tests
         working-directory: conda  # CONDA-LIBMAMBA-SOLVER CHANGE
         if: ${{ matrix.test-type != 'conda-libmamba-solver' }}  # CONDA-LIBMAMBA-SOLVER CHANGE
+        env:
+          CONDA_SOLVER: libmamba
         run: python -m pytest
           --durations-path=durations/${{ runner.os }}.json
           --group=${{ matrix.test-group }}
