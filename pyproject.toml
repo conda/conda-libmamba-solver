@@ -24,7 +24,8 @@ requires-python = ">=3.11"
 dependencies = [
   "conda >=26.7.1",
   # "libmambapy >=2.3.2,!=2.6.2",
-  "boltons >=23.0.0",
+  "requests >=2.28.0,<3",
+  "zstandard >=0.15"
 ]
 dynamic = [
   "version"
