@@ -159,6 +159,44 @@ def test_explicit_python_request_skips_major_minor_pin(tmp_path):
     assert "python 3.13.*" not in pins
 
 
+def test_install_does_not_reassert_python_history_spec(tmp_path):
+    """Installed Python gets version pins without an Install task for its history spec."""
+    in_state = SolverInputState(
+        tmp_path,
+        requested=("sqlite",),
+        update_modifier=UpdateModifier.UPDATE_SPECS,
+        command="install",
+    )
+    in_state.prefix_data._prefix_records["python"] = PrefixRecord(
+        name="python",
+        version="3.13.9",
+        build="0",
+        build_number=0,
+        channel="conda-forge",
+        subdir="noarch",
+        fn="python-3.13.9-0.conda",
+    )
+    in_state._history = {"python": MatchSpec("python=3")}
+    out_state = SolverOutputState(solver_input_state=in_state)
+    solver = LibMambaSolver(
+        tmp_path,
+        channels=("defaults",),
+        specs_to_add=("sqlite",),
+        command="install",
+    )
+
+    tasks = solver._specs_to_request_jobs_add(in_state, out_state)
+    pins = [str(spec) for spec in tasks.get(Request.Pin, ())]
+    installs = [MatchSpec(spec).name for spec in tasks.get(Request.Install, ())]
+    keeps = [MatchSpec(spec).name for spec in tasks.get(Request.Keep, ())]
+
+    assert "python 3.13.*" in pins
+    assert "python=3" in pins
+    assert "python" not in installs
+    # python stays protected from removal as a user-installed package
+    assert "python" in keeps
+
+
 @pytest.mark.parametrize(
     "spec",
     [
