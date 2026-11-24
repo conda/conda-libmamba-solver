@@ -17,6 +17,8 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy"
 ]
@@ -41,7 +43,7 @@ source = "vcs"
 
 [tool.black]
 line-length = 99
-target-version = ['py311', 'py312', 'py313']
+target-version = ['py311', 'py312', 'py313', 'py314', 'py315']
 exclude = '''
 (
       ^/conda_libmamba_solver/_libmamba\.py
